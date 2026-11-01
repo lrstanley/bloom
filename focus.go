@@ -121,14 +121,14 @@ func (f *Focus[K]) step(frame *Frame, dir int) bool {
 	if frame == nil {
 		return false
 	}
-	var order []int
+	var order []K
 	at := -1
 	for i := range frame.entries {
 		if id, ok := f.focusable(frame, i); ok {
 			if f.Is(id) {
 				at = len(order)
 			}
-			order = append(order, i)
+			order = append(order, id)
 		}
 	}
 	if len(order) == 0 {
@@ -142,8 +142,7 @@ func (f *Focus[K]) step(frame *Frame, dir int) bool {
 	default:
 		at = len(order) - 1
 	}
-	id, _ := f.focusable(frame, order[at])
-	f.Set(id)
+	f.Set(order[at])
 	return true
 }
 

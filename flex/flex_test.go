@@ -58,6 +58,51 @@ func TestSplit(t *testing.T) {
 	}
 }
 
+func TestFit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		tracks []Track
+		wants  []int
+		want   int
+	}{
+		{"one", []Track{Fill(1)}, []int{7}, 7},
+		{"equal weights", []Track{Fill(1), Fill(1)}, []int{3, 10}, 19},
+		{"by weight", []Track{Fill(1), Fill(3)}, []int{2, 9}, 11},
+		{"rounding favors earlier tracks", []Track{Fill(1), Fill(1), Fill(2)}, []int{2, 6, 4}, 22},
+		{"max leaves the rest", []Track{{Grow: 1, Max: 1, Shrink: 1}, Fill(1)}, []int{1, 10}, 11},
+		{"min leaves the rest", []Track{{Grow: 1, Min: 20, Shrink: 1}, Fill(1)}, []int{1, 10}, 30},
+		{"wants are clamped", []Track{{Grow: 1, Max: 4, Shrink: 1}}, []int{9}, 4},
+		{"not growing", []Track{Auto(3), Fill(1)}, []int{3, 5}, 8},
+		{"nothing wanted", []Track{Fill(1), Fill(1)}, []int{0, 0}, 0},
+		{"empty", nil, nil, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := Fit(nil, tt.tracks, tt.wants)
+			if got != tt.want {
+				t.Fatalf("Fit(%v) = %d, want %d", tt.wants, got, tt.want)
+			}
+			// It is enough, and one cell less is not.
+			fits := func(budget int) bool {
+				sizes := Split(nil, budget, 0, tt.tracks)
+				for i, tr := range tt.tracks {
+					if sizes[i] < tr.clamp(tt.wants[i]) {
+						return false
+					}
+				}
+				return true
+			}
+			if !fits(got) || got > 0 && fits(got-1) {
+				t.Fatalf("Fit(%v) = %d is not the least that fits", tt.wants, got)
+			}
+		})
+	}
+}
+
 func TestPlace(t *testing.T) {
 	t.Parallel()
 

@@ -359,17 +359,17 @@ func (e *engine) slotOf(i int) SlotNode {
 // of its children on the main axis, and on the cross axis, the largest of
 // its children at the sizes they get when it is that long.
 //
-// Growing children share the space left by the others in proportion to
-// their weights rather than to their natural sizes, so they are given the
-// least space in which every one of their shares fits its child: the most
-// any of them needs for each unit of its weight, times all their weights.
+// Growing children share the space left by the others by weight rather
+// than by their natural sizes, so they are given the least space in which
+// [flex.Split] gives each of them its natural size (see [flex.Fit]).
 func (e *engine) measureFlex(i int, n FlexNode, avail Size) Size {
 	mainAvail, crossAvail := axes(avail, n.vertical)
 	kids := e.kidsOf(i)
 	main, visible := 0, 0
-	// needs/per is the most a growing child needs for each unit of its
-	// weight, and weights is all their weights.
-	needs, per, weights := 0, 1, 0
+	// The growing children's tracks and natural sizes, borrowed from the
+	// arenas. Children measured in between give back what they borrow, so
+	// each stays contiguous.
+	tracksAt, wantsAt := len(e.tracks), len(e.ints)
 	for _, k := range kids {
 		sl := e.slotOf(k)
 		m := sl.track(0, mainAvail).Basis
@@ -385,19 +385,20 @@ func (e *engine) measureFlex(i int, n FlexNode, avail Size) Size {
 		if sl.max > 0 {
 			m = min(m, sl.max)
 		}
-		if sl.sizing == sizeFill && sl.n > 0 {
-			if m*per > needs*sl.n {
-				needs, per = m, sl.n
-			}
-			weights += sl.n
+		t := sl.track(m, mainAvail)
+		if t.Grow > 0 {
+			e.tracks = append(e.tracks, t)
+			e.ints = append(e.ints, m)
 		} else {
 			main += m
 		}
-		if !sl.track(m, mainAvail).Empty() {
+		if !t.Empty() {
 			visible++
 		}
 	}
-	main += (needs*weights + per - 1) / per
+	end := len(e.ints)
+	main += flex.Fit(e.ints[end:end], e.tracks[tracksAt:], e.ints[wantsAt:end])
+	e.tracks, e.ints = e.tracks[:tracksAt], e.ints[:wantsAt]
 	main = min(main+n.gap*max(visible-1, 0), mainAvail)
 
 	sizes, _, mark := e.planFlex(i, n, main, crossAvail)

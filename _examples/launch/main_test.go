@@ -28,10 +28,12 @@ func column(view, text string) int {
 
 // row returns the screen line text is first on, or -1.
 func row(view, text string) int {
-	for i, line := range strings.Split(view, "\n") {
+	i := 0
+	for line := range strings.SplitSeq(view, "\n") {
 		if strings.Contains(line, text) {
 			return i
 		}
+		i++
 	}
 	return -1
 }

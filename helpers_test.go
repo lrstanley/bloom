@@ -306,11 +306,23 @@ func TestFillNaturalSize(t *testing.T) {
 		Fill(Text("abcdef").Style(wraps)).ID("b"),
 		Grow(2, Text("abcd").Style(wraps)).ID("c"),
 	).Gap(1)
-	// b needs 6 cells for each unit of its weight, so the 4 units need 24.
+	// 22 cells, plus the gaps, is the least in which b gets its 6.
 	f := Solve(row, 0, 0)
-	expectRect(t, f, "a", image.Rect(0, 0, 6, 1))
-	expectRect(t, f, "b", image.Rect(7, 0, 13, 1))
-	expectRect(t, f, "c", image.Rect(14, 0, 26, 1))
+	expectRect(t, f, "a", image.Rect(0, 0, 5, 1))
+	expectRect(t, f, "b", image.Rect(6, 0, 12, 1))
+	expectRect(t, f, "c", image.Rect(13, 0, 24, 1))
+
+	// A child held to its Min or Max leaves the others the rest, as
+	// sharing out space does, so the row needs no more than their sizes.
+	for want, row := range map[int]Child{
+		11: Row(Fill(Text("x").Style(wraps)).Max(1), Fill(Text("abcdefghij").Style(wraps))),
+		30: Row(Fill(Text("x").Style(wraps)).Min(20), Fill(Text("abcdefghij").Style(wraps))),
+	} {
+		r, _ := Solve(Column(row, Text("end").ID("end")), 0, 0).Rect("end")
+		if r.Dx() != want || r.Min.Y != 1 {
+			t.Fatalf("row of %d cells measured %v", want, r)
+		}
+	}
 
 	// A column measures the row's height at that size, so the row is as tall
 	// stretched across the column as it is at its natural size.

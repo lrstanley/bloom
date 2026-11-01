@@ -8,21 +8,17 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/fx"
 )
-
-// skeletonFade is how far an unstyled skeleton's bars are faded from the
-// terminal's foreground into its background.
-const skeletonFade = 0.8
 
 // SkeletonNode is a placeholder for content that is still loading. Build one
 // with [Skeleton].
 type SkeletonNode struct {
-	lines     []int
-	style     lipgloss.Style
-	styled    bool
-	phase     float64
-	shimmered bool
+	lines  []int
+	style  lipgloss.Style
+	styled bool
+	phase  float64
 }
 
 // Skeleton returns a placeholder for content that is still loading: a bar
@@ -57,7 +53,7 @@ func (n SkeletonNode) Style(style lipgloss.Style) SkeletonNode {
 // For a band of another color or width, draw the skeleton in a [Transition]
 // with an [fx.Shimmer] instead.
 func (n SkeletonNode) Shimmer(phase float64) SkeletonNode {
-	n.phase, n.shimmered = phase, true
+	n.phase = phase
 	return n
 }
 
@@ -67,22 +63,43 @@ func (n SkeletonNode) View() string { return Render(n, 0, 0) }
 // Layout implements [Layouter].
 func (n SkeletonNode) Layout(ctx Context) Child {
 	width := lineWidth(n.style, ctx.Width)
+	bar := func(w int) int { return min(max(w, 0), width) }
+
+	size := max(len(n.lines)-1, 0) // the line breaks
+	for _, w := range n.lines {
+		size += bar(w) * len("█")
+	}
 	var b strings.Builder
+	b.Grow(size)
 	for i, w := range n.lines {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
-		b.WriteString(strings.Repeat("█", min(max(w, 0), width)))
+		for range bar(w) {
+			b.WriteString("█")
+		}
 	}
 
-	var c Child
-	if n.styled {
-		c = Text(b.String()).Style(n.style)
-	} else {
-		c = Transition(1, Text(b.String()), fx.Dim{Amount: skeletonFade})
+	// The shimmer's band is off the skeleton at phase 0, so it is only drawn
+	// once it moves.
+	text := Text(b.String())
+	switch {
+	case !n.styled:
+		return Transition(n.phase, text, skeletonBars{})
+	case n.phase != 0:
+		return Transition(n.phase, text.Style(n.style), fx.Shimmer{})
+	default:
+		return text.Style(n.style)
 	}
-	if n.shimmered {
-		c = Transition(n.phase, c, fx.Shimmer{})
-	}
-	return c
+}
+
+// skeletonBars draws an unstyled skeleton's bars, in the terminal's
+// foreground, faded most of the way into its background, with the shimmer's
+// band at t over them. It is one effect, so they are drawn on one surface.
+type skeletonBars struct{}
+
+// Apply implements [fx.Effect].
+func (skeletonBars) Apply(s *canvas.Surface, t float64) {
+	fx.Dim{Amount: 0.8}.Apply(s, 1)
+	fx.Shimmer{}.Apply(s, t)
 }

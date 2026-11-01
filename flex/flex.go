@@ -105,6 +105,50 @@ func Split(dst []int, budget, gap int, tracks []Track) []int {
 	return dst
 }
 
+// Fit returns the least space in which [Split], given no gap, sizes every
+// track at least as big as its want, which is clamped to the track's Min and
+// Max: how much room growing tracks need for each to fit its content. dst is
+// scratch storage for Split, as for its own dst.
+func Fit(dst []int, tracks []Track, wants []int) int {
+	// Shared by weight alone, the most a track wants for each unit of its
+	// weight, times all their weights, is enough. Clamped tracks freeze and
+	// leave the others more, which can make less enough, down to the wants
+	// added up.
+	least, most := 0, 0
+	need, per, weights := 0, 1, 0
+	for i, t := range tracks {
+		want := t.clamp(wants[i])
+		least += want
+		if t.Grow <= 0 {
+			most += want
+			continue
+		}
+		if want*per > need*t.Grow {
+			need, per = want, t.Grow
+		}
+		weights += t.Grow
+	}
+	most += (need*weights + per - 1) / per
+
+	fits := func(budget int) bool {
+		dst = Split(dst, budget, 0, tracks)
+		for i, t := range tracks {
+			if dst[i] < t.clamp(wants[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	for least < most {
+		if mid := least + (most-least)/2; fits(mid) {
+			most = mid
+		} else {
+			least = mid + 1
+		}
+	}
+	return least
+}
+
 // resolve sizes the visible tracks to fill avail, the way CSS resolves
 // flexible lengths: free space (or a deficit) is shared by weight from each
 // track's basis, then sizes are clamped to Min and Max. If clamping moved the
