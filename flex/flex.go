@@ -8,6 +8,12 @@
 // [Split] decides sizes and [Place] decides positions. Neither allocates when
 // given a destination slice with enough capacity, so both are safe to call on
 // every frame.
+//
+// See the [documentation] for guides and examples. It is also available for
+// LLMs and agents as [llms.txt].
+//
+// [documentation]: https://lrstanley.github.io/bloom/
+// [llms.txt]: https://lrstanley.github.io/bloom/llms.txt
 package flex
 
 import "slices"

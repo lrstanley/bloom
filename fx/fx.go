@@ -10,6 +10,12 @@
 // 1, when it is fully shown; at 1 a transition effect leaves the cells as
 // they are. Given to a backdrop, it is applied to everything drawn beneath a
 // layer, and t is the strength, following the layer's transition.
+//
+// See the [documentation] for guides and examples. It is also available for
+// LLMs and agents as [llms.txt].
+//
+// [documentation]: https://lrstanley.github.io/bloom/
+// [llms.txt]: https://lrstanley.github.io/bloom/llms.txt
 package fx
 
 import (

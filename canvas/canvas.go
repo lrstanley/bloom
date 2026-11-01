@@ -6,6 +6,12 @@
 // [Canvas] of cells, parsed once from styled strings and cached by [Cache],
 // copied onto a frame with [Canvas.Blit], and handed to effects as a
 // [Surface].
+//
+// See the [documentation] for guides and examples. It is also available for
+// LLMs and agents as [llms.txt].
+//
+// [documentation]: https://lrstanley.github.io/bloom/
+// [llms.txt]: https://lrstanley.github.io/bloom/llms.txt
 package canvas
 
 import (

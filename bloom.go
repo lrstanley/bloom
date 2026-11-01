@@ -38,6 +38,14 @@
 //
 // Layout is a pure function of the tree, so [Solve] can compute the same
 // rectangles in Update, for components that need their size there.
+//
+// # Documentation
+//
+// See the [documentation] for guides and examples. It is also available for
+// LLMs and agents as [llms.txt].
+//
+// [documentation]: https://lrstanley.github.io/bloom/
+// [llms.txt]: https://lrstanley.github.io/bloom/llms.txt
 package bloom
 
 import (

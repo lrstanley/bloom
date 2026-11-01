@@ -11,6 +11,12 @@
 // every message to Update, which schedules the next frame until the
 // animation is done. Progress follows the clock, not the number of frames, so
 // a slow frame does not slow an animation down.
+//
+// See the [documentation] for guides and examples. It is also available for
+// LLMs and agents as [llms.txt].
+//
+// [documentation]: https://lrstanley.github.io/bloom/
+// [llms.txt]: https://lrstanley.github.io/bloom/llms.txt
 package anim
 
 import (
