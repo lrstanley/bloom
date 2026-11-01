@@ -3,6 +3,36 @@ title: Troubleshooting
 description: Fixes for common problems - a blank screen, clicks that don't arrive or arrive twice, animations that don't move, text that doesn't wrap, and more.
 ---
 
+## See what the layout did
+
+[`bloom.Debug`](https://pkg.go.dev/github.com/lrstanley/bloom#Debug) lays out a tree like `Solve` and returns it as
+text: every node, how it's sized, its ID, and where it went. Nodes that were collapsed, scrolled away, or only partly
+on screen are marked. Write it somewhere you can read while the program runs, such as a log file:
+
+```go
+func (m model) View() tea.View {
+	if m.debug {
+		log.Print(bloom.Debug(m.layout(), m.width, m.height))
+	}
+	return m.ui.View(m.width, m.height, m.layout())
+}
+```
+
+```text
+Column 0,0 30x5
+├─ Row 0,0 30x3
+│  ├─ Fixed(10) id="sidebar" hidden collapsible=1
+│  │  └─ Box hidden
+│  │     └─ Text "Inbox" hidden
+│  └─ Fill id="reader" 0,0 30x3 min=24
+│     └─ main.reader 0,0 30x3
+└─ Text "ready" 0,3 30x1 truncate
+```
+
+Rectangles are `x,y` then `width x height`. `Debug` is stateless, so layout animations show where they're headed, not
+where they are mid-flight, and effects that move a node, such as `fx.Slide`, aren't applied. The format is for
+reading, and may change between versions.
+
 ## The screen is blank
 
 `m.ui.View` draws nothing while the width is zero, which it is until Bubble Tea sends the first
