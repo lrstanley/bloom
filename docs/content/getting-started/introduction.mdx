@@ -1,0 +1,81 @@
+---
+title: Introduction
+description: What bloom is, what it takes off your hands in a Bubble Tea program, and how its packages fit together.
+---
+
+bloom is a layout, compositing, and animation engine for [Bubble Tea](https://github.com/charmbracelet/bubbletea)
+programs. You describe your view as a tree of nodes, built fresh from your model on every frame. bloom works
+out where everything goes, draws layers like dialogs and toasts on top, runs effects and animations, and tells
+you which node the mouse is over.
+
+```go
+func (m *model) View() tea.View {
+	return m.ui.View(m.width, m.height, bloom.Overlay(
+		bloom.Column(
+			bloom.Fill(bloom.Row(
+				bloom.Fixed(24, m.sidebar).Collapsible(1),
+				bloom.Fill(m.reader).Min(40),
+			)),
+			m.statusbar,
+		),
+		bloom.Layer(m.dialog).
+			Modal().
+			Backdrop(fx.Dim{Amount: 0.5}).
+			Presence(m.dialogAnim, fx.Fade{}, fx.Slide{From: bloom.Bottom}),
+	))
+}
+```
+
+<Callout type="warn" title="Pre-1.0">
+  bloom's API may change in breaking ways until v1.0.0. Pin a version in your `go.mod` and check the release
+  notes when you upgrade.
+</Callout>
+
+## Why bloom exists
+
+Bubble Tea gives you a model, an update loop, and a view that returns a string.
+[Lip Gloss](https://github.com/charmbracelet/lipgloss) styles those strings and joins them side by side or top
+to bottom. That covers a lot, but some common needs take a surprising amount of code:
+
+- **Sizing panes.** A sidebar and a reader that share the width means measuring rendered strings, subtracting
+  borders and padding, and redoing the math on every resize.
+- **Layering.** A dialog, dropdown, or toast has to be drawn *over* the rest of the screen. Strings can only be
+  joined, not stacked, so you end up splicing lines by hand, and dimming what's underneath is harder still.
+- **Mouse input.** A click arrives as an X and Y. Working out which list item or button that was means keeping
+  your own map of where you drew everything.
+- **Focus.** Tab order, a focused style, and a dialog that keeps focus inside it until it closes.
+- **Animation.** Tick messages, timers, and state machines, so a dialog can fade in or a toast can hide itself
+  after two seconds.
+
+bloom handles each of these in the view tree, so your model only holds application state and a few animation
+values.
+
+## The packages
+
+| Package | What it does |
+| --- | --- |
+| [`bloom`](https://pkg.go.dev/github.com/lrstanley/bloom) | Layout nodes (rows, columns, grids, boxes, text), overlays and layers, mouse routing, focus, and the `Root` that renders it all. |
+| [`bloom/anim`](https://pkg.go.dev/github.com/lrstanley/bloom/anim) | Animated numbers kept in your model: eased or spring `Value`s, a `Presence` for showing and hiding, and `Sequence`s of steps. |
+| [`bloom/fx`](https://pkg.go.dev/github.com/lrstanley/bloom/fx) | Cell effects such as `Fade`, `Slide`, `Iris`, and `Dim`, used as transitions on nodes or as backdrops behind layers. |
+| [`bloom/canvas`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas) | The cell surfaces effects draw on. You only need it to write your own effects. |
+| [`bloom/flex`](https://pkg.go.dev/github.com/lrstanley/bloom/flex) | The space-sharing math behind rows and columns, plus the `Justify` options. |
+
+## How it fits into Bubble Tea
+
+bloom doesn't replace Bubble Tea's model or update loop. You keep writing `Init`, `Update`, and `View`; bloom
+lives inside them:
+
+- A `*bloom.Root` in your model renders the tree in `View` and returns the `tea.View`.
+- Any component with a `View() string` method, including [Bubbles](https://github.com/charmbracelet/bubbles)
+  components and your own, can be placed in the tree as is.
+- Mouse clicks come back to `Update` as `bloom.MouseMsg`, already resolved to the node you clicked.
+- Animations are values in your model, advanced by messages like any other Bubble Tea state.
+
+## Where to go next
+
+<Cards>
+  <Card title="Installation" href="/getting-started/installation" description="Add bloom to a Go module." />
+  <Card title="Build your first layout" href="/getting-started/first-layout" description="A tutorial: a notes app with a sidebar, a reader, and clickable items." />
+  <Card title="How layout works" href="/concepts/how-layout-works" description="The model behind slots, sizes, and placement, if you prefer to start with the ideas." />
+  <Card title="Examples" href="/resources/examples" description="Runnable programs, from a basic layout to a 120 FPS dashboard." />
+</Cards>

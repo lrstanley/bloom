@@ -1,0 +1,137 @@
+---
+title: Text, boxes, and alignment
+description: Show styled and truncated text, draw Lip Gloss borders around nodes, center things, and control alignment, justification, and gaps.
+---
+
+## Show text
+
+`bloom.Text(s)` shows a string, which may already contain ANSI styles. On its own it's drawn as is, and clipped
+to the space it's given. Give it a Lip Gloss style with `Style` and it's rendered at the size of its node instead,
+so long lines wrap and a background fills the whole node:
+
+```go
+bloom.Text(body)                                                   // clipped
+bloom.Text(body).Style(lipgloss.NewStyle().Padding(0, 1))          // wraps inside 1 column of padding
+bloom.Text(title).Style(lipgloss.NewStyle().Background(highlight)) // background fills the node
+```
+
+A width or height set on the style itself is kept, so `Style(s.Width(20))` is 20 columns wide wherever it's
+placed.
+
+### Keep text on one line
+
+`Truncate` shows a single line, turning newlines into spaces and cutting the text short with "…" when it doesn't
+fit. Padding and borders count against the width. It's what you want for status bars, titles, and list items:
+
+```go
+bloom.Text(path).Style(statusStyle).Truncate()
+```
+
+```
+a long line…
+```
+
+For text that should scroll rather than be cut short, such as a long title in a focused list item, see
+[`Marquee`](/motion/feedback-effects#scroll-text-that-doesnt-fit).
+
+### Plain strings and components
+
+Any value with a `View() string` method can go in a layout, so you don't need `Text` for your own components or
+for [Bubbles](/layout/bubbles-components). `Text` is for plain strings, which don't have a method.
+
+## Draw a box around a node
+
+`bloom.Box(style, child)` draws a Lip Gloss style's frame around a child: its margins, border, padding, and
+background. The child gets the space inside.
+
+```go
+panel := lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#6e6a86")).
+	Padding(0, 1)
+
+bloom.Box(panel, bloom.Column(title, body))
+```
+
+Use `Box` rather than calling `panel.Render(...)` yourself. A pre-rendered string has a fixed size, but a box
+knows its frame and gives the right amount of space to its child at any size. A box given less space than its
+own border and padding is left out, rather than drawn broken.
+
+## Center a node
+
+`bloom.Centered(child)` places a child at its natural size in the middle of its space:
+
+```go
+bloom.Centered(bloom.Box(panel, bloom.Text("hi")))
+```
+
+```
+        ┌──┐
+        │hi│
+        └──┘
+```
+
+## Align children across a row or column
+
+In a row, children stretch to the row's full height by default, and in a column, to its full width. `Align`
+changes that, for every child of the row or column:
+
+```go
+bloom.Row(sidebar, content).Align(bloom.Start) // each child at its natural height, at the top
+```
+
+Or for one slot only:
+
+```go
+bloom.Row(
+	bloom.Fixed(10, tall),
+	bloom.Auto(badge).Align(bloom.Center), // vertically centered next to tall
+)
+```
+
+The values are `bloom.Stretch` (the default), `bloom.Start`, `bloom.Center`, and `bloom.End`.
+
+## Justify children along a row or column
+
+When no child grows, there may be space left over along the row or column. `Justify` decides where it goes,
+using the values from the [`flex`](https://pkg.go.dev/github.com/lrstanley/bloom/flex#Justify) package:
+
+```go
+import "github.com/lrstanley/bloom/flex"
+
+bloom.Row(a, b).Justify(flex.SpaceBetween)
+```
+
+```
+┌─┐                        ┌─┐
+│a│                        │b│
+└─┘                        └─┘
+```
+
+| Value | Leftover space goes |
+| --- | --- |
+| `flex.Start` | after the children (the default) |
+| `flex.Center` | equally before and after them |
+| `flex.End` | before them |
+| `flex.SpaceBetween` | between the children, none at the edges |
+| `flex.SpaceAround` | around each child, so the edges get half as much as between children |
+| `flex.SpaceEvenly` | equally between children and at both edges |
+
+## Space children evenly
+
+`Gap(n)` puts `n` cells between each pair of children:
+
+```go
+bloom.Row(cancel, save).Gap(2)
+bloom.Column(fields...).Gap(1)
+```
+
+A slot that can never have any cells, such as `Fixed(0, ...)` or one that has collapsed, doesn't get a gap, so
+hiding a child doesn't leave a double gap behind.
+
+## Related
+
+- [`TextNode`](https://pkg.go.dev/github.com/lrstanley/bloom#TextNode),
+  [`BoxNode`](https://pkg.go.dev/github.com/lrstanley/bloom#BoxNode), and
+  [`FlexNode`](https://pkg.go.dev/github.com/lrstanley/bloom#FlexNode) API reference
+- [Lip Gloss](https://github.com/charmbracelet/lipgloss), for the styles themselves

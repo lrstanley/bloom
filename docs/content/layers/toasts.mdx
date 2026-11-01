@@ -1,0 +1,200 @@
+---
+title: Toast notifications
+description: Show a notification in a corner of the screen that animates in and hides itself after a while, and stack several of them.
+---
+
+A toast is a [layer](/layers/dialogs) anchored to a corner of the screen, shown with an
+[`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) that hides itself.
+
+## Show one toast
+
+Keep a presence and the message in your model:
+
+```go
+type model struct {
+	// ...
+	toast     anim.Presence
+	toastText string
+}
+```
+
+Create the presence with `anim.NewPresence()`, and show it with
+[`ShowFor`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence.ShowFor). It animates in, waits, then
+animates out, with no timer messages for you to handle:
+
+```go
+func (m *model) save() tea.Cmd {
+	// ...
+	m.toastText = "Saved"
+	return m.toast.ShowFor(2 * time.Second)
+}
+```
+
+Calling `ShowFor` again while the toast is up restarts the countdown, so repeated saves keep one toast on screen
+rather than flickering it.
+
+In `View`, anchor the layer to the bottom-right corner, one cell in from the edges:
+
+```go
+toast := bloom.Layer(bloom.Box(toastStyle, bloom.Text(m.toastText))).
+	Anchor(bloom.End, bloom.End).
+	Margin(1).
+	Presence(m.toast, fx.Slide{From: bloom.Right})
+
+v := m.ui.View(m.width, m.height, bloom.Overlay(screen, toast))
+```
+
+Pass every message to the presence, with `anim.Update(msg, &m.toast)` in `Update`, so it can animate.
+
+### Other corners and entrances
+
+`Anchor(x, y)` takes `bloom.Start`, `bloom.Center`, or `bloom.End` on each axis:
+
+| Position | Anchor | A matching entrance |
+| --- | --- | --- |
+| bottom right | `Anchor(bloom.End, bloom.End)` | `fx.Slide{From: bloom.Right}` |
+| top right | `Anchor(bloom.End, bloom.Start)` | `fx.Slide{From: bloom.Right}` |
+| bottom center | `Anchor(bloom.Center, bloom.End)` | `fx.Slide{From: bloom.Bottom}` |
+| top center | `Anchor(bloom.Center, bloom.Start)` | `fx.Slide{From: bloom.Top}` |
+
+Effects combine, so `fx.Typewriter{}, fx.Fade{}` types the message in while it fades. See the
+[effects reference](/reference/effects) for the full list.
+
+## Stack several toasts
+
+To show more than one at a time, keep a list of toasts, each with its own presence. Put them in a column inside a
+single layer, and wrap each in [`bloom.Present`](https://pkg.go.dev/github.com/lrstanley/bloom#Present).
+`Present` is the `Presence` of an ordinary node: a hidden toast takes no space and leaves no gap, so the others
+close up behind it.
+
+```go
+type toast struct {
+	text     string
+	presence anim.Presence
+}
+
+// notify adds a toast that shows for three seconds.
+func (m *model) notify(text string) tea.Cmd {
+	t := &toast{text: text, presence: anim.NewPresence()}
+	m.toasts = append(m.toasts, t)
+	return t.presence.ShowFor(3 * time.Second)
+}
+```
+
+Every presence needs every message. Once a toast has finished animating out, drop it from the list:
+
+```go
+	for _, t := range m.toasts {
+		cmds = append(cmds, t.presence.Update(msg))
+	}
+	m.toasts = slices.DeleteFunc(m.toasts, func(t *toast) bool { return !t.presence.Visible() })
+```
+
+```
+press n for a notification, q to quit
+
+
+                                ╭───────────────╮
+                                │ Saved draft 1 │
+                                ╰───────────────╯
+                                ╭───────────────╮
+                                │ Saved draft 2 │
+                                ╰───────────────╯
+
+```
+
+The complete program, which adds a toast each time you press <kbd>n</kbd>:
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+	"os"
+	"slices"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/anim"
+	"github.com/lrstanley/bloom/fx"
+)
+
+var toastBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ccfd8")).Padding(0, 1)
+
+type toast struct {
+	text     string
+	presence anim.Presence
+}
+
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	toasts        []*toast
+	count         int
+}
+
+func (m *model) Init() tea.Cmd { return m.ui.Init() }
+
+// notify adds a toast that shows for three seconds.
+func (m *model) notify(text string) tea.Cmd {
+	t := &toast{text: text, presence: anim.NewPresence()}
+	m.toasts = append(m.toasts, t)
+	return t.presence.ShowFor(3 * time.Second)
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "n":
+			m.count++
+			cmds = append(cmds, m.notify(fmt.Sprintf("Saved draft %d", m.count)))
+		}
+	}
+
+	for _, t := range m.toasts {
+		cmds = append(cmds, t.presence.Update(msg))
+	}
+	// Forget toasts once they have finished animating out.
+	m.toasts = slices.DeleteFunc(m.toasts, func(t *toast) bool { return !t.presence.Visible() })
+
+	cmds = append(cmds, m.ui.Update(msg))
+	return m, tea.Batch(cmds...)
+}
+
+func (m *model) View() tea.View {
+	stack := make([]bloom.Child, len(m.toasts))
+	for i, t := range m.toasts {
+		stack[i] = bloom.Present(t.presence, bloom.Box(toastBox, bloom.Text(t.text)), fx.Slide{From: bloom.Right})
+	}
+
+	v := m.ui.View(m.width, m.height, bloom.Overlay(
+		bloom.Text("press n for a notification, q to quit"),
+		bloom.Layer(bloom.Column(stack...).Align(bloom.End)).Anchor(bloom.End, bloom.End).Margin(1),
+	))
+	v.AltScreen = true
+	return v
+}
+
+func main() {
+	if _, err := tea.NewProgram(&model{ui: bloom.New()}).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+```
+
+The toasts are stored as pointers, so the presence each `ShowFor` started is the one that keeps receiving
+messages, even as the slice changes.
+
+## Related
+
+- [Animating values](/motion/animating-values), for more on presences
+- [Dialogs and modals](/layers/dialogs)

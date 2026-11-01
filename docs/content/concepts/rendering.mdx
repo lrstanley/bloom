@@ -1,0 +1,77 @@
+---
+title: Rendering and performance
+description: How bloom turns a tree into a frame - caching, compositing, effects, and mouse routing - and what to keep in mind for smooth animation.
+---
+
+## From tree to frame
+
+Each time `m.ui.View` runs, bloom:
+
+1. **Lays out** the tree, giving every node a rectangle, as described in [How layout works](/concepts/how-layout-works).
+2. **Draws** each node's content into cells. Strings from `View()` methods and `Text` are parsed into cells,
+   styles are rendered by Lip Gloss at the node's size, and boxes draw their frames.
+3. **Composites** the nodes in tree order, each clipped to its parent, then each layer of an overlay on top.
+4. **Runs effects**: a transition's effects run on a node's own cells before they're composited, and a backdrop's
+   effects run on the frame beneath its layer.
+5. **Records geometry**: where each node with an ID went, which nodes can take focus, and what the mouse can hit.
+   That's the `Frame` returned by `m.ui.Frame()`.
+6. **Returns a `tea.View`** with the content, the terminal cursor if a node placed one, and an `OnMouse` handler that
+   routes mouse events using the recorded geometry.
+
+## What's cached
+
+Most frames change little, so bloom avoids repeating work:
+
+- A string is parsed into cells and measured once, and reused for as long as the same string is drawn.
+- A Lip Gloss render is reused while the node's style, content, and size don't change.
+- A frame that would be identical to the last one isn't composited again at all.
+
+On a 200×60 dashboard, an unchanged frame takes about 0.04ms, a frame where most of the content changed about
+0.44ms, and a dialog animating in over a dimmed backdrop about 0.58ms. At 120 frames a second, each frame has
+8.3ms. You can run the benchmarks yourself with `go test -bench . ./...` in the repository.
+
+## Keep frames cheap to compare
+
+To know that a frame is unchanged, bloom compares what it's about to draw with the last frame, including effects,
+which are compared with `==`. Effects that are plain structs, like all of the [`fx`](/reference/effects) effects, compare by
+value. A few things can't be compared, so bloom assumes they change every frame:
+
+- Effects that are functions, such as `fx.Func` or `fx.Ease` (which holds an easing function).
+- Effects behind pointers, which could be changed in place.
+
+That only costs anything while they're on screen. Wrapping a node in a transition only while it animates, as in
+`if m.shake.Animating() { ... }`, keeps still frames free.
+
+## Colors and the terminal
+
+Some effects blend toward the terminal's own colors: `Dim` toward its background, and `Shimmer` and `Wave` toward
+its foreground. `m.ui.Init()` asks the terminal for those colors, and `m.ui.Update` hears the reply, along with the
+terminal's color profile. Until the reply arrives, or if the terminal never answers, bloom uses defaults that you can
+set with [`bloom.WithColors`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors).
+
+Text widths are measured with grapheme clustering by default, as Lip Gloss and modern terminals do. If your
+program targets terminals that measure differently, set the method with
+[`bloom.WithWidthMethod`](https://pkg.go.dev/github.com/lrstanley/bloom#WithWidthMethod) so bloom agrees with the
+terminal about where each cell is.
+
+## Frame rate
+
+Bubble Tea draws at most 60 frames a second by default. Animations in `anim` ask for 60 too. For smoother motion on
+fast terminals, raise both: `tea.WithFPS(120)` on the program, and `anim.FPS(120)` on your values or
+`bloom.WithFPS(120)` on the root for layout animation. Nothing is scheduled while nothing moves, so an idle program
+stays idle.
+
+## Render without a program
+
+[`bloom.Render`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) lays out and draws a tree once, and returns
+a string. It doesn't keep anything between calls and shows animations at their targets, so it suits places where a
+string is wanted: printing to stdout, inside a Lip Gloss layout, a component's `View` method, or tests. A width or
+height of zero uses the tree's natural size on that axis.
+
+`m.ui.Render(w, h, tree)` does the same with the root's caches, for programs that draw inline rather than in the
+alternate screen, where a height of zero means "as tall as the content".
+
+## Related
+
+- [Testing](/resources/testing)
+- [Root options reference](/reference/options#root-options)

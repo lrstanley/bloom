@@ -1,0 +1,114 @@
+---
+title: Dropdowns and popovers
+description: Attach a layer to another node with AnchorTo, for autocomplete suggestions, menus, tooltips, and popovers that follow what they belong to.
+---
+
+A dropdown is a layer placed against another node, rather than against the screen.
+[`AnchorTo(id, side)`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.AnchorTo) puts a layer against a side
+of the node with that ID, aligned with its start.
+
+## Show suggestions below an input
+
+Give the input an ID, then anchor a layer to its bottom edge:
+
+```go
+type (
+	fieldID  string
+	optionID int // the index of a suggestion
+)
+
+const fieldLanguage fieldID = "language"
+
+func (m *model) View() tea.View {
+	form := bloom.Column(
+		bloom.Text("Language"),
+		bloom.Text(m.language).Style(inputStyle).ID(fieldLanguage),
+	)
+
+	var layers []bloom.LayerNode
+	if matches := m.suggestions(); len(matches) > 0 {
+		options := make([]bloom.Child, len(matches))
+		for i, match := range matches {
+			options[i] = bloom.Text(match).Style(optionStyle).ID(optionID(i))
+		}
+		layers = append(layers, bloom.Layer(bloom.Box(menuStyle, bloom.Column(options...))).
+			AnchorTo(fieldLanguage, bloom.Bottom))
+	}
+
+	v := m.ui.View(m.width, m.height, bloom.Overlay(form, layers...))
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+```
+
+`m.suggestions()` stands for your own matching: it returns the options that match what's been typed.
+
+The dropdown isn't modal, so the rest of the screen still gets clicks. Clicks on an option arrive as a
+`bloom.MouseMsg` like any other:
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
+			if i, ok := msg.Target[optionID](); ok {
+				m.language = m.suggestions()[i]
+			}
+		}
+```
+
+## Choose a side
+
+The side is `bloom.Bottom`, `bloom.Top`, `bloom.Left`, or `bloom.Right`:
+
+- `Bottom` and `Top` put the layer below or above the node, lined up with its left edge.
+- `Left` and `Right` put it beside the node, lined up with its top edge.
+
+The layer is shifted to stay on screen, so a menu anchored near the right edge moves left rather than being cut
+off. Use `Offset(x, y)` to nudge it, such as one row down to leave a gap.
+
+## Follow the node
+
+The anchor is found again every frame, so a popover stays attached when its node moves: when the list scrolls, a
+panel resizes, or a slot [animates to a new place](/motion/layout-animation). Add `.ID(...).Animate()` to the
+layer itself to have it glide from place to place rather than jump.
+
+```go
+bloom.Layer(marker).AnchorTo(selectedRow, bloom.Right).ID("marker").Animate()
+```
+
+While the anchor node isn't on screen, because it's scrolled away, collapsed, or not in the tree, the layer is
+hidden too.
+
+## Tooltips
+
+A tooltip is the same thing, shown while the pointer is over a node. Mouse motion events need
+`v.MouseMode = tea.MouseModeAllMotion`.
+
+bloom only sends a `bloom.MouseMsg` when the pointer is over a node with an ID. To find out when it leaves a
+button for empty space, give the whole screen an ID too. Every motion event then arrives as a `bloom.MouseMsg`,
+and `Target` reports whether a button is under the pointer:
+
+```go
+screen := bloom.Column(bloom.Fill(content).ID("screen"))
+```
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseMotionMsg); ok {
+			m.hovered, _ = msg.Target[buttonID]() // "" when not over a button
+		}
+```
+
+Then anchor a small layer to the hovered button:
+
+```go
+if m.hovered != "" {
+	layers = append(layers, bloom.Layer(bloom.Text(tooltips[m.hovered]).Style(tipStyle)).
+		AnchorTo(m.hovered, bloom.Top))
+}
+```
+
+## Related
+
+- [Dialogs and modals](/layers/dialogs)
+- [Mouse events](/input/mouse)
+- The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with an autocomplete dropdown

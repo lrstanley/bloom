@@ -1,0 +1,175 @@
+---
+title: Dialogs and modals
+description: Show dialogs over the rest of the screen with Overlay and Layer, make them modal, dim or recolor what's beneath, add shadows, and stack them.
+---
+
+A dialog is a **layer**: a node drawn over the rest of the screen without taking space from it.
+`bloom.Overlay(base, layers...)` draws a base layout and then each layer over it, in order.
+
+```go
+bloom.Overlay(
+	screen,
+	bloom.Layer(bloom.Box(dialogStyle, dialogContent)),
+)
+```
+
+A layer made with `bloom.Layer(child)` is centered on the screen at its natural size. For a step-by-step version
+of this page, see the [dialogs and toasts tutorial](/getting-started/dialogs-and-toasts).
+
+## Show and hide a dialog
+
+Keep an [`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) for the dialog in your
+model, and give it to the layer. The layer is only drawn while the presence is visible, including while it
+animates out, and its effects run with the presence's progress:
+
+```go
+type model struct {
+	// ...
+	confirm anim.Presence
+}
+
+func newModel() *model {
+	return &model{
+		ui:      bloom.New(),
+		confirm: anim.NewPresence(anim.Duration(200 * time.Millisecond)),
+	}
+}
+```
+
+```go
+bloom.Layer(dialog).Presence(m.confirm, fx.Fade{}, fx.Slide{From: bloom.Bottom})
+```
+
+`m.confirm.Show()`, `Hide()`, and `Toggle()` start the animation and return a command for it. Pass every message to
+the presence so it can move, with [`anim.Update`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Update):
+
+```go
+return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
+```
+
+`m.confirm.Shown()` reports whether the dialog is open or opening, which is what your key handling should check.
+`Visible()` is also true while it animates out.
+
+## Make it modal
+
+`Modal()` makes a layer take every mouse event. Clicks inside it go to its nodes as usual. Clicks outside arrive as
+a `bloom.MouseMsg` with `Outside` set, rather than reaching the screen behind, so you can close the dialog:
+
+```go
+bloom.Layer(dialog).ID(confirmDialog).Modal().Presence(m.confirm, fx.Fade{})
+```
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); ok && msg.Outside {
+			return m, m.closeDialog()
+		}
+```
+
+A modal layer with an ID is also a focus scope. See [focus and keyboard navigation](/input/focus#keep-focus-inside-a-dialog)
+for keeping <kbd>tab</kbd> inside the dialog.
+
+Keyboard events aren't routed by bloom; your `Update` sees every key. While a dialog is open, check
+`m.confirm.Shown()` first, and handle keys for the dialog rather than the screen behind it.
+
+## Dim what's beneath
+
+`Backdrop(effects...)` applies [effects](/reference/effects) to everything drawn beneath the layer. Its strength
+follows the layer's transition, so the screen dims as the dialog opens and brightens as it closes.
+
+```go
+bloom.Layer(dialog).
+	Modal().
+	Backdrop(fx.Dim{Amount: 0.6}).
+	Presence(m.confirm, fx.Fade{})
+```
+
+Effects that suit backdrops:
+
+| Effect | Looks like |
+| --- | --- |
+| `fx.Dim{Amount: 0.6}` | colors fade toward the terminal's background |
+| `fx.Desaturate{Amount: 1}` | colors fade to gray |
+| `fx.Tint{Color: c, Amount: 0.3}` | colors move toward `c` |
+| `fx.Recolor{Fg: fg, Bg: bg}` | everything redrawn in two colors, keeping the text |
+| `fx.Spotlight{Rect: r}` | everything dimmed except the rectangle `r` |
+
+Several effects can be combined: `Backdrop(fx.Desaturate{Amount: 1}, fx.Dim{Amount: 0.4})`.
+
+<Callout title="Dim needs the terminal's colors">
+  `Dim` moves colors toward the terminal's background color, and `Shimmer` and `Wave` use its foreground. The root
+  asks the terminal for both. Return `m.ui.Init()` from your model's `Init` and pass every message to
+  `m.ui.Update` so it hears the answer, or set defaults with
+  [`bloom.WithColors`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors).
+</Callout>
+
+## Add a shadow
+
+`Shadow(x, y, effects...)` applies effects to the area beneath the layer, offset by `x` columns and `y` rows,
+like a drop shadow:
+
+```go
+bloom.Layer(dialog).Shadow(2, 1, fx.Dim{Amount: 0.7})
+```
+
+Terminal cells are about twice as tall as they are wide, so an offset of two columns and one row looks even.
+
+## Size and place a dialog
+
+- `Size(w, h)` sets the layer's size. Zero for either uses the child's natural size on that axis. Text styled with
+  `Style` wraps to the width you set.
+- `Margin(n)` keeps the layer at least `n` cells from the screen's edges, shrinking it if the screen is small.
+- `Anchor(x, y)` places it on each axis with `bloom.Start`, `bloom.Center`, or `bloom.End`. The default is the
+  center.
+- `Offset(x, y)` moves it from where it's anchored.
+
+```go
+bloom.Layer(helpText).Size(60, 0).Margin(2) // 60 columns wide, as tall as its text
+```
+
+## Stack dialogs
+
+Layers are drawn in order, so a dialog later in the list appears on top. A second confirmation opened from the
+first is just another layer after it:
+
+```go
+bloom.Overlay(screen,
+	bloom.Layer(confirm).ID(confirmDialog).Modal().Presence(m.confirm, fx.Fade{}),
+	bloom.Layer(overwrite).ID(overwriteDialog).Modal().Presence(m.overwrite, fx.Fade{}),
+)
+```
+
+Mouse events go to the topmost modal layer. For focus, push each dialog's scope as it opens and pop it as it
+closes, and focus returns to the right place each time.
+
+A backdrop applies to everything beneath its layer, including other dialogs. To dim the screen once, rather than
+once per dialog, only give the top dialog a backdrop:
+
+```go
+first := bloom.Layer(confirm).ID(confirmDialog).Modal().Presence(m.confirm, fx.Fade{})
+if !m.overwrite.Visible() {
+	first = first.Backdrop(fx.Dim{Amount: 0.6})
+}
+second := bloom.Layer(overwrite).ID(overwriteDialog).Modal().
+	Backdrop(fx.Dim{Amount: 0.6}).
+	Presence(m.overwrite, fx.Fade{})
+```
+
+## Animate without a presence
+
+`Presence` is the simplest way to show and hide a layer, but `Transition(t, effects...)` takes any progress from
+0 to 1, such as an [`anim.Value`](/motion/animating-values) or a number you compute. The layer is drawn whatever
+`t` is, so leave it out of the overlay when it shouldn't be there.
+
+```go
+bloom.Layer(panel).Transition(m.panelAnim.Float(), fx.Wipe{From: bloom.Left})
+```
+
+## Related
+
+- [`LayerNode` API reference](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode)
+- [Dropdowns and popovers](/layers/dropdowns)
+- [Toast notifications](/layers/toasts)
+- [Transitions](/motion/transitions), for every effect a dialog can open with
+- The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with stacked dialogs and a
+  springy entrance

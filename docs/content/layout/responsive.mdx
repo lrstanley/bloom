@@ -1,0 +1,107 @@
+---
+title: Responsive layouts
+description: Adapt a layout to the terminal's size by collapsing panels by priority, using percentages, and building layouts for the space a component is given.
+---
+
+Terminal windows range from a narrow split pane to a full-screen monitor. bloom gives you three tools to adapt:
+collapsing panels when they don't fit, percentages, and components that build a different layout for the space
+they get.
+
+## Collapse panels when space runs out
+
+Mark slots `Collapsible(priority)` and set the `Min` of the slots that must stay usable. When the minimum sizes
+don't all fit, bloom drops collapsible slots, lowest priority first, along with the gap beside each.
+
+```go
+bloom.Row(
+	bloom.Fixed(24, nav).Collapsible(2),
+	bloom.Fill(reader).Min(40),
+	bloom.Fixed(30, details).Collapsible(1),
+)
+```
+
+As the terminal narrows below 94 columns, the details panel goes first because its priority is lowest. Below
+64 columns, the navigation goes too, and the reader has the whole width. Widen the terminal and they come back.
+
+A collapsed slot isn't drawn and has no rectangle, so `frame.Rect(id)` reports `false` for it. You can use that to
+show a hint, such as a key to open the missing panel.
+
+## Size by percentage
+
+`Percent(p, c)` gives a child `p` percent of its container, which keeps proportions as the terminal resizes:
+
+```go
+bloom.Row(
+	bloom.Percent(30, list),
+	bloom.Fill(preview),
+)
+```
+
+Unlike `Fixed`, a percentage slot can shrink below its share when space runs short, down to its `Min`.
+
+## Build a layout for the space you're given
+
+Some components should change shape, not just size: a toolbar that shows icon labels when wide and only icons
+when narrow, or a form that's two columns on a wide screen and one on a narrow one.
+
+A component that implements [`bloom.Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds its
+own layout. bloom calls its `Layout` method with a `bloom.Context` holding the width and height it has, and draws
+whatever it returns:
+
+```go
+type toolbar struct {
+	actions []string
+}
+
+// View is used when the toolbar is drawn on its own, outside a bloom layout.
+func (t toolbar) View() string {
+	return strings.Join(t.actions, " ")
+}
+
+func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
+	children := []bloom.Child{bloom.Text("◆ reader"), bloom.Space()}
+	for _, action := range t.actions {
+		if ctx.Width < 70 {
+			// "⟳ refresh" becomes "⟳".
+			action, _, _ = strings.Cut(action, " ")
+		}
+		children = append(children, bloom.Text(action).Style(actionStyle))
+	}
+	return bloom.Row(children...)
+}
+```
+
+`Layout` may be called more than once a frame, while bloom measures as well as for the final layout, so it must
+not change the component. Treat it like `View`: read state, return nodes.
+
+## Switch between a row and a column
+
+The same idea works for a whole screen. A `Layouter` can return a row on a wide terminal and a column on a
+narrow one:
+
+```go
+type editor struct {
+	code, preview bloom.Child
+}
+
+func (e editor) View() string {
+	return bloom.Render(e.Layout(bloom.Context{}), 0, 0)
+}
+
+func (e editor) Layout(ctx bloom.Context) bloom.Child {
+	if ctx.Width >= 100 {
+		return bloom.Row(bloom.Fill(e.code), bloom.Fill(e.preview)).Gap(1)
+	}
+	return bloom.Column(bloom.Fill(e.code), bloom.Fill(e.preview))
+}
+```
+
+`bloom.Render` with a size of zero draws a layout at its natural size, which gives the component a sensible
+`View` when it's used outside a bloom layout.
+
+## Related
+
+- [Sizing with slots](/layout/slots)
+- [Scrolling and sizing components in Update](/layout/scrolling)
+- The [`responsive` example](https://github.com/lrstanley/bloom/tree/master/_examples/responsive), which combines
+  all of these

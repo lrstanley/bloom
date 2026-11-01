@@ -1,0 +1,18 @@
+name: test
+
+on:
+  pull_request:
+    branches: [master, v2-exp]
+    paths-ignore: [".gitignore", "**/*.md", ".github/ISSUE_TEMPLATE/**"]
+    types: [opened, edited, reopened, synchronize, unlocked]
+  push:
+    branches: [master, v2-exp]
+    paths-ignore: [".gitignore", "**/*.md", ".github/ISSUE_TEMPLATE/**"]
+
+jobs:
+  go-test:
+    uses: lrstanley/.github/.github/workflows/lang-go-test-matrix.yml@master
+    with: { num-minor: 1, num-patch: 2 }
+  go-lint:
+    uses: lrstanley/.github/.github/workflows/lang-go-lint.yml@master
+    secrets: inherit

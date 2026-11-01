@@ -1,0 +1,92 @@
+---
+title: Layout animation
+description: Make slots and layers move and resize smoothly whenever the layout changes, with Animate, and no animation state in your model.
+---
+
+When a panel opens, a list re-sorts, or a split changes ratio, the layout jumps to its new shape on the next frame.
+Add `.Animate()` to a slot or layer and bloom glides it there instead, reflowing its content at each size along
+the way. Your model only holds the application state, such as whether the sidebar is open, and no animation
+values.
+
+```go
+width := 0
+if m.sidebarOpen {
+	width = 24
+}
+
+bloom.Row(
+	bloom.Fixed(width, sidebar).ID("sidebar").Animate(),
+	bloom.Fill(content).ID("content").Animate(),
+)
+```
+
+Toggle `m.sidebarOpen` and the sidebar slides open or closed while the content resizes to match.
+
+## Requirements
+
+Layout animation is kept by the `*bloom.Root` between frames, so it needs three things:
+
+- **An ID** on each animated slot or layer, so bloom can match it from one frame to the next.
+- **A `Root`**, rendering with `m.ui.View`. `bloom.Render` and `bloom.Solve` don't keep state between calls, and
+  always show the final layout.
+- **Every message passed to `m.ui.Update`**, with its command returned. That's what schedules frames while
+  anything is moving:
+
+```go
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmd := m.ui.Update(msg)
+	// ...
+	return m, cmd
+}
+```
+
+## What animates
+
+- A slot moving to a new place, such as list items re-sorting, glides there. Give each item an ID that stays with
+  the item, not with its position, like its name or database ID.
+- A slot changing size grows or shrinks, and its children lay out again at each intermediate size.
+- A slot whose size becomes zero, like the closed sidebar above, animates closed rather than vanishing.
+- A layer anchored to a node, such as a marker [anchored](/layers/dropdowns#follow-the-node) to the selected row,
+  follows it smoothly from row to row.
+
+Some changes happen at once: a [collapsed](/layout/responsive) slot, a node removed from the tree, and a layer whose
+anchor disappears are gone on the next frame.
+
+## Choose the motion
+
+`Animate` takes the same options as an [animated value](/motion/animating-values). The default eases over 250
+milliseconds; a spring suits things that move often, because it keeps its momentum when the target changes
+mid-flight:
+
+```go
+bloom.Fixed(width, sidebar).ID("sidebar").Animate(anim.Spring(16, 0.85))
+
+bloom.Layer(marker).
+	AnchorTo(selected, bloom.Right).
+	ID("marker").
+	Animate(anim.Spring(20, 1))
+```
+
+The options are captured when the ID first appears, so changing them later has no effect on a node already on
+screen. The frame rate and clock come from the root, set with
+[`bloom.WithFPS`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFPS) and
+[`bloom.WithClock`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock).
+
+## Geometry while animating
+
+`m.ui.Frame().Rect(id)` reports where a node was drawn on screen, so mid-animation it's the in-between
+rectangle. `bloom.Solve` reports where the layout is headed. Use `Solve` when you need final sizes in `Update`,
+such as to [size a Bubbles component](/layout/bubbles-components).
+
+## When to use a Value instead
+
+`Animate` covers layout: position and size. Use an [`anim.Value`](/motion/animating-values) when you need the
+number in your model, such as to drive an effect, to read the progress, or to animate something that isn't a
+rectangle.
+
+## Related
+
+- [`SlotNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.Animate) and
+  [`LayerNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.Animate) API reference
+- The [`reflow` example](https://github.com/lrstanley/bloom/tree/master/_examples/reflow): a sidebar, a re-sorting
+  list, a changing split, a panel coming and going, and a marker following the selection

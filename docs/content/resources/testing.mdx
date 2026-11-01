@@ -1,0 +1,77 @@
+---
+title: Testing
+description: Test bloom layouts with Render and Solve in plain unit tests, and test whole programs end to end with steep.
+---
+
+Because a bloom view is a function of your model, most of it can be tested without running a terminal.
+
+## Test what a layout draws
+
+[`bloom.Render`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) draws a tree at a size and returns a string.
+Compare it with a golden file, or check for the text you expect:
+
+```go
+func TestSidebarCollapses(t *testing.T) {
+	m := newModel()
+	m.width, m.height = 50, 10
+
+	got := ansi.Strip(bloom.Render(m.layout(), m.width, m.height))
+	if strings.Contains(got, "Groceries") {
+		t.Errorf("sidebar should collapse at 50 columns:\n%s", got)
+	}
+}
+```
+
+`Render` returns styled text; `ansi.Strip` from `github.com/charmbracelet/x/ansi` removes the styles when you only
+care about the text. `Render` has no animation state, so it always draws the final layout, with transitions at
+whatever progress you give them.
+
+This works best when your model has a method that returns the layout, separate from `View`, which only adds the
+`tea.View` settings.
+
+## Test where things go
+
+[`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) returns the geometry without drawing. Use it to
+check sizes and positions, which is less brittle than comparing drawn output:
+
+```go
+func TestReaderMinimum(t *testing.T) {
+	frame := bloom.Solve(newModel().layout(), 60, 20)
+
+	r, ok := frame.Rect(paneReader)
+	if !ok {
+		t.Fatal("reader not in the frame")
+	}
+	if r.Dx() < 40 {
+		t.Errorf("reader is %d columns wide, want at least 40", r.Dx())
+	}
+}
+```
+
+## Test a whole program
+
+For behavior that depends on the event loop, such as clicks, focus, timing, and animation, run the program in an
+emulated terminal. [steep](/resources/related-libraries#steep) does that: it drives the program with keys, text,
+mouse events, and resizes, waits for what it draws, and compares snapshots. bloom's own examples are tested this
+way:
+
+```go
+func TestNotes(t *testing.T) {
+	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(80, 12))
+	h.Wait("Groceries")
+	h.LeftClick(3, 2).Wait("A terminal garden")
+	h.Key("d").Wait("Delete \"Ideas\"?")
+	h.AssertSnapshot()
+	h.Key("ctrl+c")
+	h.WaitFinished()
+}
+```
+
+Clicks go through the same path as a real terminal's, so this tests your IDs and mouse handling too.
+
+## Make animations deterministic
+
+Animations run on the wall clock, which makes timing-sensitive tests flaky. Give values a clock you control with
+[`anim.Clock`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Clock), and the root one with
+[`bloom.WithClock`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) for layout animation. Or wait for the
+end state instead: tests usually care that a dialog opened, not how it looked halfway.

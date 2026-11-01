@@ -1,0 +1,53 @@
+---
+title: Related libraries
+description: Libraries that work well alongside bloom, for theming, testing, and the rest of a Bubble Tea program.
+---
+
+bloom covers layout, layering, input routing, and motion. These libraries cover other parts of a terminal app.
+
+## From the same author
+
+### bubbletint
+
+[bubbletint](https://github.com/lrstanley/bubbletint) gives you hundreds of ready-made terminal color themes, such as
+Dracula, Catppuccin, Nord, and Rosé Pine, as Go values, and can switch between them at runtime or follow the theme
+of the terminal your program runs in. Its colors are standard `color.Color` values, so they work directly in Lip
+Gloss styles and bloom effects:
+
+```go
+import tint "github.com/lrstanley/bubbletint/v2"
+
+theme := tint.TintRosePine
+
+panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(theme.BrightBlack)
+backdrop := fx.Recolor{Fg: theme.BrightBlack, Bg: theme.Bg}
+
+// Effects that blend toward the terminal's colors start from the theme's.
+ui := bloom.New(bloom.WithColors(theme.Fg, theme.Bg))
+```
+
+Browse the themes at [lrstanley.github.io/bubbletint](https://lrstanley.github.io/bubbletint/).
+
+### steep
+
+[steep](https://github.com/lrstanley/x/tree/master/term/steep) is a test harness for Bubble Tea programs and
+components. It runs your program in an emulated terminal, drives it with keys, text, mouse events, and resizes,
+waits for output, and compares snapshots. It can also record what happened as a GIF. bloom's examples are tested
+with it; see [Testing](/resources/testing).
+
+```console
+go get github.com/lrstanley/x/term/steep@latest
+```
+
+## The Charm ecosystem
+
+bloom builds on [Charm](https://charm.land)'s libraries, and works alongside the rest:
+
+| Library | What it's for |
+| --- | --- |
+| [Bubble Tea](https://github.com/charmbracelet/bubbletea) | The framework: models, messages, commands, and the program loop. |
+| [Lip Gloss](https://github.com/charmbracelet/lipgloss) | Styles: colors, borders, padding. bloom's `Box` and `Text.Style` take Lip Gloss styles. |
+| [Bubbles](https://github.com/charmbracelet/bubbles) | Components: text inputs, viewports, lists, tables, spinners. See [Using Bubbles components](/layout/bubbles-components). |
+| [Ultraviolet](https://github.com/charmbracelet/ultraviolet) | The cell-based screen library under Bubble Tea v2. bloom's cells, and `Drawable`, come from it. |
+| [Glamour](https://github.com/charmbracelet/glamour) | Markdown rendered for the terminal, which you can place in a layout as text. |
+| [Huh](https://github.com/charmbracelet/huh) | Forms and prompts. |

@@ -1,0 +1,401 @@
+---
+title: Build your first layout
+description: A step-by-step tutorial that builds a small notes app with a sidebar, a reader, a status bar, and clickable items.
+---
+
+In this tutorial you'll build a small notes browser: a list of notes on the left, the selected note on the right,
+and a status bar along the bottom. You can choose a note with the arrow keys or by clicking it, and the sidebar
+gets out of the way when the terminal is too narrow for both panes.
+
+```
+╭──────────────────────╮╭──────────────────────────────────────────────────────╮
+│ Groceries            ││ Groceries                                            │
+│ Ideas                ││ Oat milk, lemons, basil, and a loaf of rye.          │
+│ Reading              ││                                                      │
+│                      ││                                                      │
+╰──────────────────────╯╰──────────────────────────────────────────────────────╯
+ 3 notes, ↑/↓ or click to choose, q to quit
+```
+
+You should know the basics of a Bubble Tea program: a model with `Init`, `Update`, and `View` methods. If you
+haven't written one before, the [Bubble Tea tutorial](https://github.com/charmbracelet/bubbletea/tree/main/tutorials)
+covers it in a few minutes.
+
+## Set up the project
+
+Create a new module and add bloom, Bubble Tea, and Lip Gloss:
+
+```console
+mkdir notes && cd notes
+go mod init example.com/notes
+go get github.com/lrstanley/bloom@latest charm.land/bubbletea/v2 charm.land/lipgloss/v2
+```
+
+Everything below goes in `main.go`.
+
+<Steps>
+<Step>
+
+### Start with an empty screen
+
+Every bloom program keeps a `*bloom.Root` in its model. The root renders your layout, and remembers what it can
+between frames so it doesn't redo work. Your model also needs the window's size, which Bubble Tea sends in a
+`tea.WindowSizeMsg`.
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bloom"
+)
+
+type model struct {
+	ui            *bloom.Root
+	width, height int
+}
+
+func (m *model) Init() tea.Cmd {
+	return m.ui.Init()
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		if msg.String() == "q" || msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	}
+	return m, m.ui.Update(msg)
+}
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.width, m.height, bloom.Text("Hello from bloom"))
+	v.AltScreen = true
+	return v
+}
+
+func main() {
+	m := &model{ui: bloom.New()}
+	if _, err := tea.NewProgram(m).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+```
+
+Run it with `go run .`, and press <kbd>q</kbd> to quit.
+
+There are three bloom calls here, and every program has them:
+
+- `m.ui.Init()` asks the terminal for its colors, which some effects use to blend. Return it from `Init`.
+- `m.ui.Update(msg)` lets the root see what the terminal reports, and keeps layout animations ticking. Pass it
+  every message and return its command.
+- `m.ui.View(width, height, layout)` lays out and draws `layout` at the window's size and returns a `tea.View`.
+
+</Step>
+<Step>
+
+### Split the screen into panes
+
+Layouts are built from nodes. `bloom.Row` places its children left to right, and `bloom.Column` places them top
+to bottom. How much space each child gets depends on the **slot** you wrap it in:
+
+- `bloom.Fixed(n, child)` gets exactly `n` cells.
+- `bloom.Fill(child)` gets an equal share of whatever is left over.
+- A child with no slot gets its natural size, the space its content needs.
+
+Add the panes and a status bar. Replace `View` with this:
+
+```go
+func (m *model) View() tea.View {
+	layout := bloom.Column(
+		bloom.Fill(bloom.Row(
+			bloom.Fixed(24, bloom.Text("sidebar")),
+			bloom.Fill(bloom.Text("reader")),
+		)),
+		bloom.Text(" status bar"),
+	)
+
+	v := m.ui.View(m.width, m.height, layout)
+	v.AltScreen = true
+	return v
+}
+```
+
+The status bar has no slot, so it takes the one row its text needs. The row of panes is in a `Fill` slot, so it
+takes all the remaining height. Inside the row, the sidebar is 24 columns wide and the reader fills the rest.
+
+Resize your terminal while it runs. The panes follow, without any width arithmetic in your code.
+
+</Step>
+<Step>
+
+### Add borders and styles
+
+`bloom.Box(style, child)` draws a Lip Gloss style's border, padding, and background around a child, and the child
+gets the space inside it. `Text(s).Style(style)` renders text with a style at whatever size the node is given.
+Styled text also wraps to fit its width, and text without a style is clipped instead.
+
+Add `"charm.land/lipgloss/v2"` to your imports, then add some styles and the notes to show, above
+`type model`:
+
+```go
+type note struct {
+	title, body string
+}
+
+var notes = []note{
+	{"Groceries", "Oat milk, lemons, basil, and a loaf of rye."},
+	{"Ideas", "A terminal garden that grows while you type."},
+	{"Reading", "The Elements of Typographic Style, chapter 2."},
+}
+
+var (
+	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+	item     = lipgloss.NewStyle().Padding(0, 1)
+	selected = item.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92"))
+	heading  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f6c177"))
+	prose    = lipgloss.NewStyle().Padding(0, 1)
+	status   = lipgloss.NewStyle().Foreground(lipgloss.Color("#908caa"))
+)
+```
+
+Add a `selected int` field to the model, then build the sidebar from the notes in `View`:
+
+```go
+func (m *model) View() tea.View {
+	items := make([]bloom.Child, len(notes))
+	for i, n := range notes {
+		style := item
+		if i == m.selected {
+			style = selected
+		}
+		items[i] = bloom.Text(n.title).Style(style)
+	}
+
+	current := notes[m.selected]
+	layout := bloom.Column(
+		bloom.Fill(bloom.Row(
+			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))),
+			bloom.Fill(bloom.Box(panel, bloom.Column(
+				bloom.Text(current.title).Style(heading.Padding(0, 1)),
+				bloom.Text(current.body).Style(prose),
+			))),
+		)),
+		bloom.Text(fmt.Sprintf(" %d notes, ↑/↓ or click to choose, q to quit", len(notes))).Style(status).Truncate(),
+	)
+
+	v := m.ui.View(m.width, m.height, layout)
+	v.AltScreen = true
+	return v
+}
+```
+
+`Truncate` keeps the status bar on one line and cuts it short with "…" when the terminal is narrow, rather than
+letting it wrap onto a second row.
+
+Then handle the arrow keys in `Update`, next to the quit keys:
+
+```go
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "up":
+			m.selected = max(m.selected-1, 0)
+		case "down":
+			m.selected = min(m.selected+1, len(notes)-1)
+		}
+```
+
+</Step>
+<Step>
+
+### Make the notes clickable
+
+To find out what was clicked, give nodes an **ID**. An ID can be any comparable value, and using a type of your
+own for each kind of node makes clicks easy to tell apart. Add one for notes:
+
+```go
+// noteID identifies a note in the sidebar, so a click can say which one it hit.
+type noteID int
+```
+
+Give each sidebar item its ID in `View`:
+
+```go
+		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
+```
+
+And turn on mouse reporting, before returning the view:
+
+```go
+	v.MouseMode = tea.MouseModeCellMotion
+```
+
+The root now sends a `bloom.MouseMsg` to `Update` for every mouse event over a node with an ID.
+`msg.Target[noteID]()` returns the `noteID` of the node under the pointer, if it has one. Handle clicks in
+`Update`:
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
+			if id, ok := msg.Target[noteID](); ok {
+				m.selected = int(id)
+			}
+		}
+```
+
+`msg.Msg` is the original Bubble Tea mouse event, so you can check whether it was a click, a release, the wheel,
+or motion. bloom has already worked out which node it landed on.
+
+</Step>
+<Step>
+
+### Handle narrow terminals
+
+Make the terminal very narrow and the reader gets squeezed until its text barely fits. Two slot options fix that:
+
+- `.Min(30)` on the reader stops it from shrinking below 30 columns.
+- `.Collapsible(1)` on the sidebar lets bloom drop it entirely when the minimum sizes don't all fit.
+
+```go
+		bloom.Fill(bloom.Row(
+			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).Collapsible(1),
+			bloom.Fill(bloom.Box(panel, bloom.Column(
+				bloom.Text(current.title).Style(heading.Padding(0, 1)),
+				bloom.Text(current.body).Style(prose),
+			))).Min(30),
+		)),
+```
+
+Narrow the terminal below 54 columns (24 for the sidebar plus 30 for the reader) and the sidebar disappears.
+Widen it again and the sidebar comes back. When several slots are collapsible, the one with the lowest priority
+goes first.
+
+</Step>
+</Steps>
+
+## The complete program
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+	"os"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom"
+)
+
+type note struct {
+	title, body string
+}
+
+var notes = []note{
+	{"Groceries", "Oat milk, lemons, basil, and a loaf of rye."},
+	{"Ideas", "A terminal garden that grows while you type."},
+	{"Reading", "The Elements of Typographic Style, chapter 2."},
+}
+
+// noteID identifies a note in the sidebar, so a click can say which one it hit.
+type noteID int
+
+var (
+	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+	item     = lipgloss.NewStyle().Padding(0, 1)
+	selected = item.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92"))
+	heading  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f6c177"))
+	prose    = lipgloss.NewStyle().Padding(0, 1)
+	status   = lipgloss.NewStyle().Foreground(lipgloss.Color("#908caa"))
+)
+
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	selected      int
+}
+
+func (m *model) Init() tea.Cmd {
+	return m.ui.Init()
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "up":
+			m.selected = max(m.selected-1, 0)
+		case "down":
+			m.selected = min(m.selected+1, len(notes)-1)
+		}
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
+			if id, ok := msg.Target[noteID](); ok {
+				m.selected = int(id)
+			}
+		}
+	}
+	return m, m.ui.Update(msg)
+}
+
+func (m *model) View() tea.View {
+	items := make([]bloom.Child, len(notes))
+	for i, n := range notes {
+		style := item
+		if i == m.selected {
+			style = selected
+		}
+		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
+	}
+
+	current := notes[m.selected]
+	layout := bloom.Column(
+		bloom.Fill(bloom.Row(
+			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).Collapsible(1),
+			bloom.Fill(bloom.Box(panel, bloom.Column(
+				bloom.Text(current.title).Style(heading.Padding(0, 1)),
+				bloom.Text(current.body).Style(prose),
+			))).Min(30),
+		)),
+		bloom.Text(fmt.Sprintf(" %d notes, ↑/↓ or click to choose, q to quit", len(notes))).Style(status).Truncate(),
+	)
+
+	v := m.ui.View(m.width, m.height, layout)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+func main() {
+	m := &model{ui: bloom.New()}
+	if _, err := tea.NewProgram(m).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+```
+
+## What you learned
+
+- A `*bloom.Root` renders your layout from `View`, and gets every message in `Update`.
+- `Row` and `Column` share space between children, and the slot a child is in decides its share: `Fixed`,
+  `Fill`, or its natural size.
+- `Box` draws a Lip Gloss border around a child, and `Text(...).Style(...)` styles and wraps text.
+- Nodes with an `ID` receive `bloom.MouseMsg`s, and `msg.Target[T]()` finds the node you care about.
+- `Min` and `Collapsible` decide what gives way when space runs out.
+
+Next, [add a dialog and a toast](/getting-started/dialogs-and-toasts) to this app. For more on how rows and
+columns share space, see [Sizing with slots](/layout/slots).

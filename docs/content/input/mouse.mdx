@@ -1,0 +1,143 @@
+---
+title: Mouse events
+description: Find out which node a click, wheel, or motion event landed on, using IDs of your own types, local coordinates, and modal layers.
+---
+
+Bubble Tea reports mouse events in screen coordinates. bloom knows where it drew every node, so it can tell you
+which node an event landed on, and where inside it.
+
+## Turn on mouse reporting
+
+Set a mouse mode on the view you return:
+
+```go
+v := m.ui.View(m.width, m.height, layout)
+v.MouseMode = tea.MouseModeCellMotion // clicks, the wheel, and drags
+return v
+```
+
+Use `tea.MouseModeAllMotion` to also get motion while no button is pressed, for hover effects.
+
+## Give nodes IDs
+
+Only nodes with an ID receive events. Text, slots, and layers have an `ID` method:
+
+```go
+bloom.Text("Save").Style(button).ID(buttonID("save"))
+bloom.Fill(m.reader).ID(paneReader)
+bloom.Layer(dialog).ID(confirmDialog)
+```
+
+An ID can be any comparable value. Defining a type for each kind of node keeps them apart, and lets an ID carry
+data, such as an index:
+
+```go
+type (
+	paneID   string
+	buttonID string
+	rowID    int // the index of a row in a table
+)
+```
+
+## Handle a MouseMsg
+
+`m.ui.View` installs a handler that turns each mouse event into a
+[`bloom.MouseMsg`](https://pkg.go.dev/github.com/lrstanley/bloom#MouseMsg) for the node under the pointer.
+`msg.Target[T]()` returns the innermost ID of type `T` that the pointer is inside:
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
+			break
+		}
+		if row, ok := msg.Target[rowID](); ok {
+			m.selected = int(row)
+		}
+```
+
+The fields of a `MouseMsg`:
+
+| Field | Holds |
+| --- | --- |
+| `Msg` | the original Bubble Tea event: a `tea.MouseClickMsg`, `tea.MouseReleaseMsg`, `tea.MouseWheelMsg`, or `tea.MouseMotionMsg`, in screen coordinates |
+| `Path` | the IDs of the node hit and of the nodes with IDs it's inside, outermost first |
+| `X`, `Y` | where the pointer is, relative to the node hit |
+| `Outside` | set when a [modal layer](/layers/dialogs#make-it-modal) took an event outside itself |
+
+Because `Target` looks through the whole path, a click on a button inside a row inside a pane can be checked for
+each: `msg.Target[buttonID]()`, `msg.Target[rowID]()`, and `msg.Target[paneID]()` all succeed.
+
+<Callout type="warn" title="You get both messages">
+  The original `tea.MouseClickMsg` (or other mouse message) still reaches `Update` too, as well as the
+  `bloom.MouseMsg` made from it. Handle one or the other, not both, or every click will count twice.
+</Callout>
+
+## Use the position inside a node
+
+`X` and `Y` are relative to the node hit, which is useful for things like a progress bar you can click to seek:
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
+			if _, ok := msg.Target[seekBar](); ok {
+				m.position = m.duration * time.Duration(msg.X) / time.Duration(m.seekWidth)
+			}
+		}
+```
+
+`X` and `Y` are relative to the innermost node with an ID, so give the seek bar the ID, not its container.
+
+## Scroll with the wheel
+
+Check which pane the pointer is over, so each pane scrolls on its own:
+
+```go
+	case bloom.MouseMsg:
+		wheel, ok := msg.Msg.(tea.MouseWheelMsg)
+		if !ok {
+			break
+		}
+		delta := 3
+		if wheel.Button == tea.MouseWheelUp {
+			delta = -3
+		}
+		switch pane, _ := msg.Target[paneID](); pane {
+		case paneList:
+			m.listOffset += delta
+		case paneReader:
+			m.readerOffset += delta
+		}
+```
+
+## Layers and the mouse
+
+Layers drawn on top get events first. A layer that's [modal](/layers/dialogs#make-it-modal) takes every event,
+including those outside it, which arrive with `Outside` set and the layer's ID as the path. That's how clicking
+the backdrop closes a dialog:
+
+```go
+	case bloom.MouseMsg:
+		if _, ok := msg.Msg.(tea.MouseClickMsg); ok && msg.Outside {
+			return m, m.closeDialog()
+		}
+```
+
+A layer whose presence is hidden doesn't take events. One that's still animating out does, so a modal dialog keeps
+blocking clicks until it's gone.
+
+## Find where a node is
+
+For things other than events, such as drawing an effect from a button's position, `m.ui.Frame().Rect(id)` returns
+where a node was drawn in the last frame, in screen coordinates:
+
+```go
+if r, ok := m.ui.Frame().Rect(buttonID("deploy")); ok {
+	center := image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
+	// ...
+}
+```
+
+## Related
+
+- [Focus and keyboard navigation](/input/focus), which can focus the node you click
+- [Scrolling and sizing in Update](/layout/scrolling)

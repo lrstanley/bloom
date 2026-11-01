@@ -1,0 +1,153 @@
+---
+title: Custom effects
+description: Write your own cell effects with the fx.Effect interface and canvas.Surface, and draw directly onto cells with Drawable.
+---
+
+An effect is anything with an `Apply` method:
+
+```go
+type Effect interface {
+	Apply(s *canvas.Surface, t float64)
+}
+```
+
+`s` is the area of cells to change: a node's own cells for a transition, or the frame beneath a layer for a
+backdrop. `t` is the progress, from 0 to 1. For a transition, an effect at 1 should leave the cells as they are,
+so the node ends up looking like itself.
+
+## Write an effect
+
+This effect flashes a node in a color and fades it back to its own colors, such as to draw attention to a value
+that just changed:
+
+```go
+import (
+	"image/color"
+
+	"github.com/lrstanley/bloom/canvas"
+)
+
+// Flash shows a node in Color at first, and fades it back to its own colors as t
+// reaches 1.
+type Flash struct {
+	Color color.Color
+}
+
+// Apply implements fx.Effect.
+func (e Flash) Apply(s *canvas.Surface, t float64) {
+	for y := range s.Height() {
+		for x := range s.Width() {
+			c := s.Cell(x, y)
+			if c == nil {
+				continue
+			}
+			c.Style.Fg = s.Mix(e.Color, s.Fg(c), t)
+		}
+	}
+}
+```
+
+Use it like any other effect:
+
+```go
+bloom.Transition(m.flash.Float(), value, Flash{Color: lipgloss.Color("#f6c177")})
+```
+
+## Keep effects comparable
+
+bloom skips drawing a frame that's identical to the previous one, and compares effects with `==` to find out.
+A struct of plain fields, like `Flash`, compares by value, so a node that isn't animating costs nothing to keep on
+screen.
+
+`fx.Func` turns a function into an effect, which is handy for a quick experiment:
+
+```go
+var revealDown = fx.Func(func(s *canvas.Surface, t float64) {
+	for y := int(t * float64(s.Height())); y < s.Height(); y++ {
+		for x := range s.Width() {
+			s.Hide(x, y)
+		}
+	}
+})
+```
+
+But Go can't compare functions, so bloom assumes a function effect changes every frame and redraws whenever it's
+on screen. Effects behind pointers are treated the same way, since they can change in place. Prefer a struct for
+effects you keep.
+
+## What a surface offers
+
+[`canvas.Surface`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas#Surface) is the grid of cells an effect
+changes. Coordinates are relative to its top-left cell.
+
+| Method or field | Use |
+| --- | --- |
+| `Width()`, `Height()` | the size of the surface |
+| `Cell(x, y)` | the cell at a position, to change its glyph or style. Keep its width the same. |
+| `Fg(c)`, `Bg(c)` | the colors a cell shows, with unset colors resolved to the terminal's defaults |
+| `Mix(a, b, t)`, `Gray(c, t)` | blend two colors, or move one toward gray |
+| `Hide(x, y)` | don't draw a cell, so what's beneath shows through. Only on a node's own cells. |
+| `Visible(x, y)` | whether a cell will be drawn |
+| `Under(x, y)` | the frame's cell beneath, for blending with what's under a node |
+| `Move(r, d)` | shift the cells of a rectangle, keeping wide glyphs whole |
+| `Sub(r)` | a surface over part of this one, such as a row, for effects applied piece by piece |
+| `Offset` | moves the whole surface when it's drawn, as `fx.Slide` does |
+| `Viewport` | the area the node is placed in, such as the screen for a dialog, which tells you how far it can move out of sight |
+| `Env` | the terminal's default colors and color profile |
+
+Cells are [Ultraviolet](https://github.com/charmbracelet/ultraviolet) cells: `c.Content` is the glyph, `c.Width`
+its width in columns, and `c.Style` its colors and attributes.
+
+## Draw directly with Drawable
+
+An effect transforms cells that something else drew. To paint cells yourself, such as a chart, a meter, or a
+game board, implement [Ultraviolet](https://github.com/charmbracelet/ultraviolet)'s `Drawable` interface and place it
+with [`bloom.Drawable`](https://pkg.go.dev/github.com/lrstanley/bloom#Drawable):
+
+```go
+import (
+	"image/color"
+
+	uv "github.com/charmbracelet/ultraviolet"
+)
+
+// meter fills a fraction of its area, from the left.
+type meter struct {
+	value float64 // from 0 to 1
+	color color.Color
+}
+
+func (m meter) Draw(scr uv.Screen, area uv.Rectangle) {
+	filled := area.Min.X + int(m.value*float64(area.Dx()))
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			glyph := "░"
+			if x < filled {
+				glyph = "█"
+			}
+			scr.SetCell(x, y, &uv.Cell{Content: glyph, Width: 1, Style: uv.Style{Fg: m.color}})
+		}
+	}
+}
+```
+
+```go
+bloom.Row(
+	bloom.Text("cpu "),
+	bloom.Fill(bloom.Drawable(meter{value: m.cpu, color: lipgloss.Color("#eb6f92")})),
+)
+```
+
+```
+cpu ████████░░░░░░░░░░░░
+```
+
+The drawable is clipped to the area it's given. Its natural size is zero unless it also implements
+[`bloom.Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer), so give it a sized slot such as `Fill` or
+`Fixed`.
+
+## Related
+
+- [`fx` package source](https://github.com/lrstanley/bloom/tree/master/fx), for how the built-in effects are written
+- The [`effects` example](https://github.com/lrstanley/bloom/tree/master/_examples/effects), with two custom effects
+  and a `Drawable`

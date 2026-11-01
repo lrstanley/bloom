@@ -1,0 +1,105 @@
+---
+title: Sizing with slots
+description: Control how children of a row or column share space with Fixed, Auto, Fill, Grow, Percent, Min, Max, and Space.
+---
+
+A `bloom.Row` places children left to right, and a `bloom.Column` places them top to bottom. How much of the
+row or column each child gets is decided by the **slot** you wrap it in. The child doesn't choose; whoever builds
+the layout does. That's why the same component can be a fixed-width sidebar in one screen and fill the space in
+another.
+
+```go
+bloom.Row(
+	bloom.Fixed(10, nav),   // exactly 10 columns
+	toolbar,                // no slot: its natural width
+	bloom.Fill(editor),     // a share of what's left
+	bloom.Grow(2, preview), // two shares of what's left
+)
+```
+
+```
+┌────────┐┌────┐┌────────────┐┌────────────────────────────┐
+│fixed   ││auto││fill        ││grow 2                      │
+└────────┘└────┘└────────────┘└────────────────────────────┘
+```
+
+## Choose a slot
+
+| Slot | Size | Grows | Shrinks when space is short |
+| --- | --- | --- | --- |
+| [`Fixed(n, c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Fixed) | exactly `n` cells | no | no |
+| [`Auto(c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Auto), or `c` with no slot | the child's natural size | no | yes, down to its `Min` |
+| [`Fill(c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Fill) | an equal share of the space left over | yes | yes, down to its `Min` |
+| [`Grow(w, c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Grow) | `w` shares of the space left over | yes, by weight | yes, down to its `Min` |
+| [`Percent(p, c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Percent) | `p`% of the row or column | no | yes, down to its `Min` |
+
+"Space left over" is what remains after the `Fixed`, `Auto`, and `Percent` slots, and the gaps, are placed. `Fill`
+is the same as `Grow(1, c)`.
+
+A child's natural size is the space its content needs: the width of its longest line and its number of lines for
+text, plus the border and padding for a box. See [How layout works](/concepts/how-layout-works) for how bloom
+measures a child, and how a component can report its own size.
+
+## Set a minimum and a maximum
+
+`Min` and `Max` clamp a slot on the row or column's direction:
+
+```go
+bloom.Row(
+	bloom.Fill(sidebar).Max(32), // grows, but never past 32 columns
+	bloom.Fill(editor).Min(40),  // shrinks, but never below 40 columns
+)
+```
+
+The minimum is zero unless you set one, so without `Min` a slot can be squeezed to nothing. When the minimums
+don't all fit, see [Responsive layouts](/layout/responsive) for dropping slots with `Collapsible`.
+
+## Leave empty space
+
+- `bloom.Fixed(n, nil)` is `n` empty cells, such as a blank line in a column.
+- `bloom.Space()` is empty space that grows, which pushes the children after it to the far end.
+
+```go
+bloom.Row(bloom.Text("left"), bloom.Space(), bloom.Text("right"))
+```
+
+```
+left                     right
+```
+
+To put the same space between every pair of children, use `Gap`, described in
+[Text, boxes, and alignment](/layout/text-and-boxes#space-children-evenly).
+
+## Slots in a column
+
+Everything above applies to columns too, with heights instead of widths. A common screen shape is a header and
+a status bar at their natural height, and the content filling the middle:
+
+```go
+bloom.Column(
+	header,
+	bloom.Fill(content),
+	statusbar,
+)
+```
+
+<Callout type="idea" title="A column is as tall as the screen">
+  The outermost node gets the whole window. A column that should stretch its middle child needs that child in a
+  `Fill` slot; without one, the children sit at the top at their natural heights.
+</Callout>
+
+## Give a slot an ID
+
+Slots are where the other per-child options live: `ID` for mouse events and lookups, `Focusable` and `Scope` for
+[focus](/input/focus), `Align` for the cross axis, and `Animate` for
+[layout animation](/motion/layout-animation).
+
+```go
+bloom.Fixed(24, sidebar).ID(paneSidebar).Collapsible(1)
+```
+
+## Related
+
+- [`SlotNode` API reference](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode)
+- [Responsive layouts](/layout/responsive)
+- [How layout works](/concepts/how-layout-works)

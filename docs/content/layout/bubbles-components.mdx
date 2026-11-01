@@ -1,0 +1,215 @@
+---
+title: Using Bubbles components
+description: Place Bubbles components such as viewport, textinput, list, and table in a bloom layout, give them the size they need, and show the real terminal cursor.
+---
+
+[Bubbles](https://github.com/charmbracelet/bubbles) components work in bloom without any wrapping: each has a
+`View() string` method, so it can be a child anywhere in a layout. bloom draws its view into whatever space it's
+given and clips anything that doesn't fit.
+
+```go
+bloom.Row(
+	bloom.Fixed(30, m.list),
+	bloom.Fill(m.viewport),
+)
+```
+
+Many components also need to know their size, because they decide what to render from it: a viewport shows as
+many lines as its height, a list pages by its height, and a table truncates columns by its width. bloom decides
+those sizes during layout, so you have to pass them to the component.
+
+## Give a component its size
+
+Give the slot the component is in an ID, then use [`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve)
+when the window size changes. `Solve` lays out the same tree `View` draws, without drawing it, and reports
+where each node with an ID goes:
+
+```go
+func (m *model) layout() bloom.Child {
+	return bloom.Column(
+		bloom.Fill(bloom.Box(panel, m.log)).ID(paneLog),
+		statusbar,
+	)
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		if r, ok := bloom.Solve(m.layout(), m.width, m.height).Rect(paneLog); ok {
+			m.log.SetWidth(r.Dx() - panel.GetHorizontalFrameSize())
+			m.log.SetHeight(r.Dy() - panel.GetVerticalFrameSize())
+		}
+	}
+	// ...
+}
+```
+
+The slot's rectangle includes the box's border, so subtract the style's frame size to get the space inside.
+
+If your layout also changes for other reasons, such as a panel being toggled or collapsing, run the same code
+after those changes too. Putting it in one method that you call from each place keeps it in sync.
+
+## Show the terminal cursor
+
+Text inputs in Bubbles can draw a fake cursor in their view, or report where the real terminal cursor should go.
+bloom can place the real one: [`Text(s).Cursor(c)`](https://pkg.go.dev/github.com/lrstanley/bloom#TextNode.Cursor)
+shows the cursor at `c`, relative to the node's top-left corner, wherever the node ends up on screen.
+
+```go
+input := textinput.New()
+input.SetVirtualCursor(false) // report the cursor, rather than drawing one
+input.Focus()
+```
+
+```go
+bloom.Box(panel, bloom.Text(m.input.View()).Cursor(m.input.Cursor()))
+```
+
+`Cursor` returns `nil` when the input isn't focused, which shows no cursor. bloom also hides the cursor while a
+[layer](/layers/dialogs) covers its cell, so a dialog opening over an input doesn't leave a cursor blinking on top.
+
+## A complete example
+
+A chat-style log with an input at the bottom. Type and press <kbd>enter</kbd> to add a line, and the log scrolls to
+the end.
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom"
+)
+
+type pane string
+
+const (
+	paneLog   pane = "log"
+	paneInput pane = "input"
+)
+
+var panel = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	log           viewport.Model
+	input         textinput.Model
+	lines         []string
+}
+
+func newModel() *model {
+	input := textinput.New()
+	input.Placeholder = "say something"
+	input.SetVirtualCursor(false)
+	input.Focus()
+	return &model{ui: bloom.New(), log: viewport.New(), input: input}
+}
+
+func (m *model) Init() tea.Cmd {
+	return m.ui.Init()
+}
+
+func (m *model) layout() bloom.Child {
+	return bloom.Column(
+		bloom.Fill(bloom.Box(panel, m.log)).ID(paneLog),
+		bloom.Auto(bloom.Box(panel, bloom.Text(m.input.View()).Cursor(m.input.Cursor()))).ID(paneInput),
+	)
+}
+
+// resize gives the components the size their slots will have, inside the border.
+func (m *model) resize() {
+	frame := bloom.Solve(m.layout(), m.width, m.height)
+	if r, ok := frame.Rect(paneLog); ok {
+		m.log.SetWidth(r.Dx() - panel.GetHorizontalFrameSize())
+		m.log.SetHeight(r.Dy() - panel.GetVerticalFrameSize())
+	}
+	if r, ok := frame.Rect(paneInput); ok {
+		// Leave room for the prompt, and for the cursor after the last character.
+		m.input.SetWidth(r.Dx() - panel.GetHorizontalFrameSize() - lipgloss.Width(m.input.Prompt) - 1)
+	}
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		m.resize()
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "enter":
+			m.lines = append(m.lines, m.input.Value())
+			m.log.SetContent(strings.Join(m.lines, "\n"))
+			m.log.GotoBottom()
+			m.input.Reset()
+			return m, nil
+		}
+	}
+
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	cmds = append(cmds, cmd)
+	m.log, cmd = m.log.Update(msg)
+	cmds = append(cmds, cmd, m.ui.Update(msg))
+	return m, tea.Batch(cmds...)
+}
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.width, m.height, m.layout())
+	v.AltScreen = true
+	return v
+}
+
+func main() {
+	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+```
+
+## Write your own components the same way
+
+The components you write don't need anything bloom-specific either: a `View() string` method is enough. When a
+component would benefit from knowing more, it can opt in:
+
+- [`bloom.Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports its natural size, so bloom
+  doesn't have to render its view to measure it. A one-line status bar can say it's one row tall at any width.
+- [`bloom.Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a bloom layout for the space it's
+  given, which lets it [change shape with its size](/layout/responsive#build-a-layout-for-the-space-youre-given).
+
+```go
+type statusbar struct {
+	text string
+}
+
+func (s statusbar) View() string {
+	return " " + s.text
+}
+
+// Measure reports one row, as wide as the text. A column stretches it across its
+// full width anyway.
+func (s statusbar) Measure(bloom.Size) bloom.Size {
+	return bloom.Size{W: lipgloss.Width(s.View()), H: 1}
+}
+```
+
+Return the size the component needs, not the space it's offered: when a layout is drawn at its natural size, the
+space offered is unbounded.
+
+## Related
+
+- [Scrolling and sizing in Update](/layout/scrolling)
+- [How layout works](/concepts/how-layout-works)
+- [Bubbles](https://github.com/charmbracelet/bubbles) on GitHub

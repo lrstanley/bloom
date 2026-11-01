@@ -1,0 +1,139 @@
+---
+title: Transitions
+description: Animate nodes and layers in and out with effects, combine and sequence effects, and open a dialog from the button that was pressed.
+---
+
+A **transition** draws a node with [effects](/reference/effects) applied to its cells, for a progress from 0 to 1.
+At 0 the node is just starting to enter, and at 1 it's fully shown, exactly as it would be without the effect. Feed
+the progress from an [animated value](/motion/animating-values) and the node animates.
+
+## Three ways to apply one
+
+| Where | Use |
+| --- | --- |
+| A layer that comes and goes | `bloom.Layer(c).Presence(p, effects...)` |
+| A node in a layout that comes and goes | `bloom.Present(p, c, effects...)` |
+| Any node, with any progress | `bloom.Transition(t, c, effects...)` or `bloom.Layer(c).Transition(t, effects...)` |
+
+The `Presence` forms take an [`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) and
+leave the node out completely while it's hidden. A hidden `Present` node takes no space in its row or column and
+leaves no gap behind. A hidden layer has no backdrop, no shadow, and doesn't take mouse events.
+
+```go
+// a dialog
+bloom.Layer(dialog).Presence(m.dialog, fx.Fade{}, fx.Slide{From: bloom.Bottom})
+
+// a details panel that slides open below a list
+bloom.Column(
+	list,
+	bloom.Present(m.details, bloom.Box(panel, details), fx.Wipe{From: bloom.Top}),
+)
+```
+
+The `Transition` forms draw the node whatever the progress is. Use them for effects that run on something that's
+always there, or with progress you compute yourself:
+
+```go
+bloom.Transition(m.reveal.Float(), chart, fx.Typewriter{})
+```
+
+## Showing and hiding use the same effects
+
+When a presence hides, its progress runs back from 1 to 0, so the effects play in reverse: a dialog that slides up
+from the bottom slides back down. You don't need separate exit effects.
+
+If you want something to leave differently from how it came in, choose the effects from its state:
+
+```go
+effects := []fx.Effect{fx.Fade{}, fx.Slide{From: bloom.Bottom}}
+if !m.dialog.Shown() { // animating out
+	effects = []fx.Effect{fx.Fade{}}
+}
+bloom.Layer(dialog).Presence(m.dialog, effects...)
+```
+
+## Combine effects
+
+Effects given together are applied in order, all with the same progress. `fx.Fade{}, fx.Slide{From: bloom.Bottom}`
+fades in while sliding up. `fx.Scramble{}, fx.Fade{}` settles random glyphs into the text while it fades in.
+
+The [`fx`](https://pkg.go.dev/github.com/lrstanley/bloom/fx) package has four combinators for finer control:
+
+### Cascade with Stagger
+
+`Stagger` splits a node into rows or columns, and runs an effect on each one after the other. A list sliding in
+one item at a time:
+
+```go
+fx.Stagger{Effect: fx.Slide{From: bloom.Left}, From: bloom.Top}
+```
+
+`From` is the edge the first part is at: `Top` and `Bottom` split the node into rows, and `Left` and `Right` into
+columns. `Spread` is how much of the progress is spent starting the parts; the default, 0.5, starts the last part
+when the first is halfway done.
+
+### Run in sequence with Delay
+
+`Delay` runs an effect over part of the progress only. Several delays in a row play one after another:
+
+```go
+bloom.Layer(card).Presence(m.card,
+	fx.Delay{Effect: fx.Fade{}, To: 0.5},              // fade in over the first half
+	fx.Delay{Effect: fx.Scramble{Seed: 5}, From: 0.5}, // then unscramble the text
+)
+```
+
+### Run backward with Reverse
+
+`Reverse` runs an effect with the progress flipped, for a node leaving while the progress rises:
+
+```go
+bloom.Transition(m.leaving.Float(), oldPage, fx.Reverse{Effect: fx.Wipe{From: bloom.Left}})
+```
+
+### Change the curve with Ease
+
+`Ease` runs an effect with eased progress, using any easing function, such as those in `anim`:
+
+```go
+fx.Ease{Effect: fx.Slide{From: bloom.Left}, Easing: anim.OutBack} // overshoots, then settles
+```
+
+Easing the effect is different from easing the presence: the presence's progress drives the backdrop and every
+effect, while `fx.Ease` changes one effect only. `Ease` holds a function, which Go can't compare, so a frame using
+it is redrawn every time even when nothing changed. That's fine while it animates; avoid leaving it on a node that
+sits still.
+
+## Open a dialog from its button
+
+`fx.Iris` reveals a node through a growing circle. Center the circle on the button that was pressed and the
+dialog appears to open out of it. Find the button in the last frame when it's pressed:
+
+```go
+case bloom.MouseMsg:
+	if id, ok := msg.Target[buttonID](); ok && id == buttonShare {
+		if r, ok := m.ui.Frame().Rect(buttonShare); ok {
+			m.shareFrom = image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
+		}
+		cmd = m.share.Show()
+	}
+```
+
+```go
+bloom.Layer(shareDialog).Presence(m.share, fx.Iris{At: m.shareFrom})
+```
+
+`At` is in screen coordinates. The zero point means the center of the node.
+
+## Random effects stay steady
+
+Effects with randomness, like `Dissolve`, `Scramble`, `Shade`, `Decode`, and `Glitch`, take a `Seed`. The same
+seed gives the same pattern on every frame, so the effect doesn't flicker as it runs. Change the seed to vary it,
+such as one per dialog or one per time it opens.
+
+## Related
+
+- [Effects reference](/reference/effects), with every effect and its fields
+- [Animating values](/motion/animating-values)
+- The [`transitions`](https://github.com/lrstanley/bloom/tree/master/_examples/transitions) and
+  [`effects`](https://github.com/lrstanley/bloom/tree/master/_examples/effects) examples, which show every effect

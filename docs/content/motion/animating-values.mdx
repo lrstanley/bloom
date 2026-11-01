@@ -1,0 +1,180 @@
+---
+title: Animating values
+description: Keep animations in your model with anim.Value, anim.Presence, and anim.Sequence, choose between easing and springs, and drive them with messages.
+---
+
+Everything that moves in bloom is driven by a number. The
+[`anim`](https://pkg.go.dev/github.com/lrstanley/bloom/anim) package animates those numbers, as ordinary fields in
+your model:
+
+| Type | Use it for |
+| --- | --- |
+| [`anim.Value`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Value) | a number moving toward a target, such as a panel's width, or a one-shot effect's progress |
+| [`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) | something being shown and hidden, from 0 to 1, such as a dialog or toast |
+| [`anim.Sequence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Sequence) | a series of steps on one number: animate, hold, jump, or loop forever |
+
+## How animations run
+
+Animations follow the Bubble Tea pattern: starting one returns a `tea.Cmd`, which schedules a frame message, and
+passing that message back to the animation moves it forward and schedules the next. Two rules keep it working:
+
+1. **Return the command** from `Show`, `To`, `Play`, or `Loop`.
+2. **Pass every message** to every animation. [`anim.Update`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Update)
+   does that for any number of them and batches their commands:
+
+```go
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		if msg.String() == "?" {
+			cmd = m.help.Toggle()
+		}
+	}
+	return m, tea.Batch(cmd, anim.Update(msg, &m.help, &m.sidebar, &m.toast))
+}
+```
+
+Each animation ignores frame messages that aren't its own, so you don't need to sort them. Progress follows the
+clock rather than counting frames, so a slow frame never makes an animation take longer.
+
+Animations are kept by value in your model and change in place, which is why `anim.Update` takes pointers to
+them.
+
+## Animate a number with Value
+
+`anim.NewValue(start, options...)` makes a value. `To(target)` animates it there from wherever it is now, and
+`Float()` or `Int()` reads it in `View`:
+
+```go
+type model struct {
+	sidebarWidth anim.Value
+	// ...
+}
+
+func newModel() *model {
+	return &model{sidebarWidth: anim.NewValue(24)}
+}
+
+// in Update
+case "b":
+	if m.sidebarWidth.Target() > 0 {
+		cmd = m.sidebarWidth.To(0)
+	} else {
+		cmd = m.sidebarWidth.To(24)
+	}
+
+// in View
+bloom.Fixed(m.sidebarWidth.Int(), sidebar)
+```
+
+Calling `To` again mid-animation changes course smoothly. For moving layout, consider
+[layout animation](/motion/layout-animation) instead, which needs no state in your model at all.
+
+### Run a one-shot effect
+
+Some effects play from the start each time something happens, such as a shake when input is rejected.
+`Play(from, to)` jumps to `from` and animates to `to`:
+
+```go
+shake: anim.NewValue(1, anim.Duration(450*time.Millisecond), anim.Ease(anim.Linear)),
+
+// when the input is wrong
+cmd = m.shake.Play(0, 1)
+
+// in View, only while it runs
+if m.shake.Animating() {
+	field = bloom.Transition(m.shake.Float(), field, fx.Shake{})
+}
+```
+
+See [Feedback effects](/motion/feedback-effects) for more of these.
+
+## Show and hide with Presence
+
+A presence is a value from 0, hidden, to 1, shown. It's what layers, toasts, and `bloom.Present` take:
+
+```go
+help := anim.NewPresence(anim.Duration(200 * time.Millisecond))
+
+help.Show()               // animate in
+help.Hide()               // animate out
+help.Toggle()             // whichever is the opposite
+help.ShowFor(time.Second) // in, then out again after a second
+```
+
+Each returns a command. To read it:
+
+- `Shown()` is true once it's shown or animating in. Use it to decide what keys do.
+- `Visible()` is true while any of it is on screen, including while it animates out. Use it to decide what to draw.
+- `Progress()` is how far in it is, from 0 to 1.
+- `Float()` is the same, without clamping, for springs that overshoot.
+
+Effects given to a presence run with its progress, so the same effects play forward when it shows and backward
+when it hides.
+
+## Choose easing or a spring
+
+By default a value eases to each target over 250 milliseconds with `anim.OutCubic`. Change that with options:
+
+```go
+anim.NewValue(0, anim.Duration(600*time.Millisecond), anim.Ease(anim.InOutCubic))
+anim.NewPresence(anim.Spring(9, 0.35))
+```
+
+- **Easing** takes a fixed duration and a curve. Use it for things that should take a predictable time.
+  The easings are `Linear`, `InQuad`, `OutQuad`, `InOutQuad`, `OutCubic`, `InOutCubic`, and `OutBack`, which
+  overshoots slightly. Any `func(float64) float64` works too.
+- **A spring** is a damped spring of an angular frequency, where higher is faster, and a damping ratio, where 1
+  settles without bouncing and less than 1 bounces. A spring keeps its speed when the target changes partway,
+  which feels natural for things the user moves quickly, like a selection.
+
+A spring with damping below 1 overshoots its target. For a presence, `Progress()` stays between 0 and 1, and
+`Float()` goes past them, which you can use to make a dialog bounce past its place:
+
+```go
+bloom.Layer(dialog).
+	Offset(0, int(math.Round((1-m.dialog.Float())*-10))).
+	Presence(m.dialog, fx.Fade{})
+```
+
+## Chain steps with Sequence
+
+A sequence runs a number through a list of steps. It replaces chains of timers, and its steps start when the
+previous one was due to end, so a long sequence doesn't drift:
+
+```go
+pulse := anim.NewSequence(0,
+	anim.To(1, anim.Duration(900*time.Millisecond)),
+	anim.To(0, anim.Duration(900*time.Millisecond)),
+).With(anim.Ease(anim.InOutQuad))
+
+cmd := pulse.Loop() // or Play() to run the steps once
+```
+
+The steps are `To(target, options...)`, `Hold(duration)`, and `Jump(target)`. `With` sets the options every step
+starts from, and options passed to a `To` override them for that step.
+
+A phase that runs from 0 to 1 at an even pace and starts over, as a shimmer or scrolling text needs, has a
+shortcut:
+
+```go
+shimmer := anim.NewLoop(1400 * time.Millisecond)
+cmd := shimmer.Loop()
+```
+
+`Stop()` stops a sequence where it is.
+
+## Frame rate
+
+Values ask for 60 frames a second while they animate, which is Bubble Tea's default rendering rate. Use
+`anim.FPS(n)` to change it per value, such as a lower rate for a slow pulse. If you raise it, raise Bubble Tea's
+too, with `tea.WithFPS(n)` when you create the program, or the extra frames won't be drawn.
+
+Nothing is scheduled while no animation is running, so an idle program doesn't wake up.
+
+## Related
+
+- [Transitions](/motion/transitions), for using these values with effects
+- [`anim` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/anim)
+- [Animation options reference](/reference/options#animation-options)

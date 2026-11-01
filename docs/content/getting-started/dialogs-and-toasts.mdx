@@ -1,0 +1,527 @@
+---
+title: Add a dialog and a toast
+description: A tutorial that adds a confirmation dialog with a dimmed backdrop, keyboard focus, and an auto-hiding toast notification to the notes app.
+---
+
+This tutorial continues from [Build your first layout](/getting-started/first-layout). You'll add a way to delete
+notes, with a confirmation dialog that animates in over a dimmed screen, buttons you can tab between or click, and
+a notification in the corner that hides itself after two seconds.
+
+```
+╭──────────────────────╮╭──────────────────────────────────────────────╮
+│ Groceries            ││ Groceries                                    │
+│ Ideas                ││ Oat milk, lemons, basil, and a loaf of rye.  │
+│ Reading            ╭────────────────────────────╮                    │
+│                    │                            │                    │
+│                    │  Delete "Groceries"?       │                    │
+│                    │  This can't be undone.     │                    │
+│                    │                            │                    │
+│                    │    Cancel      Delete      │                    │
+│                    │                            │                    │
+│                    ╰────────────────────────────╯                    │
+╰──────────────────────╯╰──────────────────────────────────────────────╯
+ ↑/↓ choose, d delete, q quit
+```
+
+Doing this without bloom would mean drawing one string over another, dimming every cell outside the dialog,
+keeping keyboard focus inside it, and running a timer to hide the notification. Here it takes three ideas:
+
+- An **overlay** draws **layers** over a base layout. The dialog and the toast are layers.
+- A **presence**, from the `anim` package, animates something being shown and hidden.
+- A **focus** remembers which node has keyboard focus, and can be confined to the dialog while it's open.
+
+<Steps>
+<Step>
+
+### Keep the notes in the model
+
+Deleting notes means the list has to be model state now, rather than a package variable. Change the model and
+add a constructor:
+
+```go
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	notes         []note
+	selected      int
+}
+
+func newModel() *model {
+	return &model{
+		ui: bloom.New(),
+		notes: []note{
+			{"Groceries", "Oat milk, lemons, basil, and a loaf of rye."},
+			{"Ideas", "A terminal garden that grows while you type."},
+			{"Reading", "The Elements of Typographic Style, chapter 2."},
+		},
+	}
+}
+```
+
+Replace `notes` with `m.notes` everywhere, and start the program with `tea.NewProgram(newModel())`.
+
+</Step>
+<Step>
+
+### Draw the dialog as a layer
+
+`bloom.Overlay(base, layers...)` draws each layer over the base, without taking any space from it. A layer
+made with `bloom.Layer(child)` sits in the middle of the screen at its natural size.
+
+Add styles for the dialog and its buttons:
+
+```go
+	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#eb6f92")).Padding(1, 2)
+	button    = lipgloss.NewStyle().Padding(0, 2).Background(lipgloss.Color("#393552"))
+	buttonOn  = button.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92")).Bold(true)
+```
+
+Then, in `View`, keep the column you already have as `base`, build the dialog, and render both:
+
+```go
+	dialog := bloom.Layer(bloom.Box(dialogBox, bloom.Column(
+		bloom.Text(fmt.Sprintf("Delete %q?", title)).Style(heading),
+		bloom.Text("This can't be undone."),
+		bloom.Fixed(1, nil),
+		bloom.Row(bloom.Space(), bloom.Text("Cancel").Style(button), bloom.Text("Delete").Style(button)).Gap(2),
+	)))
+
+	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog))
+```
+
+`title` is the selected note's title. `bloom.Fixed(1, nil)` is a blank row, and `bloom.Space()` is empty space
+that grows, pushing the buttons to the right. `Gap(2)` puts two columns between the children of the row.
+
+Run it and the dialog is always on screen. Next, you'll make it appear only when needed.
+
+</Step>
+<Step>
+
+### Show and hide it with a presence
+
+An `anim.Presence` is a number from 0 (hidden) to 1 (shown) that animates between the two. Add the `anim` and
+`fx` imports:
+
+```go
+	"github.com/lrstanley/bloom/anim"
+	"github.com/lrstanley/bloom/fx"
+```
+
+Add a presence to the model, and create it in `newModel`:
+
+```go
+	confirm anim.Presence
+```
+
+```go
+		confirm: anim.NewPresence(anim.Duration(180 * time.Millisecond)),
+```
+
+`confirm.Show()` and `confirm.Hide()` start the animation and return a command that drives it. The animation
+moves forward on messages, so every presence has to see every message: `anim.Update(msg, &m.confirm)` passes one
+message to any number of animations and returns their commands. Return it from `Update`:
+
+```go
+	return m, tea.Batch(m.ui.Update(msg), anim.Update(msg, &m.confirm))
+```
+
+Now give the layer to the presence (`content` here is the column from the previous step). `Presence(p, effects...)` shows the layer only while `p` is visible, and runs
+the effects with its progress: here it fades in while sliding up from the bottom of the screen.
+
+```go
+	dialog := bloom.Layer(bloom.Box(dialogBox, content)).
+		Modal().
+		Backdrop(fx.Dim{Amount: 0.6}).
+		Presence(m.confirm, fx.Fade{}, fx.Slide{From: bloom.Bottom})
+```
+
+Two more options are set here:
+
+- `Modal()` makes the dialog take every mouse event while it's open. Clicks outside it don't reach the notes
+  underneath; you get a `bloom.MouseMsg` with `Outside` set instead.
+- `Backdrop(fx.Dim{Amount: 0.6})` dims everything beneath the dialog. It follows the presence too, so the screen
+  darkens as the dialog appears.
+
+Open it with <kbd>d</kbd> by returning `m.confirm.Show()` from `Update`, and you have an animated modal dialog.
+
+</Step>
+<Step>
+
+### Move focus into the dialog
+
+The buttons should respond to <kbd>tab</kbd> and <kbd>enter</kbd>, and focus shouldn't escape to the screen
+behind while the dialog is open. Add a `bloom.Focus` and a button ID type:
+
+```go
+type buttonID string
+
+// confirmDialog is the ID of the dialog's layer, which is also its focus scope.
+const confirmDialog = "confirm"
+```
+
+```go
+	focus bloom.Focus
+```
+
+A button is text with an ID that's marked `Focusable`, styled by whether it has focus:
+
+```go
+func (m *model) button(id buttonID, label string) bloom.Child {
+	style := button
+	if m.focus.Is(id) {
+		style = buttonOn
+	}
+	return bloom.Text(label).Style(style).ID(id).Focusable()
+}
+```
+
+Give the dialog layer the ID `confirmDialog`. A modal layer is a **focus scope**: after
+`m.focus.Push(confirmDialog)`, focus can only move between the focusable nodes inside it, until
+`m.focus.Pop()` puts it back where it was.
+
+```go
+func (m *model) openDialog() tea.Cmd {
+	if len(m.notes) == 0 {
+		return nil
+	}
+	m.focus.Push(confirmDialog)
+	m.focus.Set(buttonID("cancel"))
+	return m.confirm.Show()
+}
+
+func (m *model) closeDialog() tea.Cmd {
+	if !m.confirm.Shown() {
+		return nil
+	}
+	m.focus.Pop()
+	return m.confirm.Hide()
+}
+```
+
+`m.focus.Update(msg, m.ui.Frame())` handles <kbd>tab</kbd> and <kbd>shift+tab</kbd>, using the layout of the last
+frame drawn. It reports whether it handled the message, so only look at other keys when it didn't. Keep the
+command your own key handling returns in a `cmd` variable, declared with `var cmd tea.Cmd` at the top of
+`Update`, and add it to the batch you return:
+
+```go
+	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if !m.focus.Update(msg, m.ui.Frame()) {
+			cmd = m.key(msg)
+		}
+```
+
+In `key`, <kbd>enter</kbd> presses whichever button has focus. `m.focus.Current()` returns the focused node's ID,
+and a type assertion tells you whether it's a button:
+
+```go
+		case "enter":
+			if id, ok := m.focus.Current().(buttonID); ok {
+				return m.press(id)
+			}
+```
+
+Clicks work the same way, with `msg.Target[buttonID]()`. A click on the backdrop, outside the modal dialog,
+closes it:
+
+```go
+	if msg.Outside {
+		return m.closeDialog()
+	}
+	if id, ok := msg.Target[buttonID](); ok {
+		return m.press(id)
+	}
+```
+
+</Step>
+<Step>
+
+### Add a toast
+
+A toast is one more layer. Add a style for it next to the others:
+
+```go
+	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ccfd8")).Padding(0, 1)
+```
+
+The layer is anchored to the bottom-right corner with a one-cell margin. `Anchor(x, y)` takes where
+the layer goes on each axis: `bloom.Start`, `bloom.Center`, or `bloom.End`.
+
+```go
+	toast := bloom.Layer(bloom.Box(toastBox, bloom.Text("Deleted "+m.deleted))).
+		Anchor(bloom.End, bloom.End).
+		Margin(1).
+		Presence(m.toast, fx.Slide{From: bloom.Right})
+
+	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog, toast))
+```
+
+Give it its own presence, `toast anim.Presence`, and a `deleted string` field for the message, with the presence
+created with `anim.NewPresence()`, and add it to
+`anim.Update(msg, &m.confirm, &m.toast)`. `ShowFor` shows it and hides it again after a duration, with no timer
+messages of your own:
+
+```go
+func (m *model) press(id buttonID) tea.Cmd {
+	if id == "delete" {
+		m.deleted = m.notes[m.selected].title
+		m.notes = slices.Delete(m.notes, m.selected, m.selected+1)
+		m.selected = max(min(m.selected, len(m.notes)-1), 0)
+		return tea.Batch(m.closeDialog(), m.toast.ShowFor(2*time.Second))
+	}
+	return m.closeDialog()
+}
+```
+
+</Step>
+</Steps>
+
+## The complete program
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+	"os"
+	"slices"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/anim"
+	"github.com/lrstanley/bloom/fx"
+)
+
+type note struct {
+	title, body string
+}
+
+type (
+	// noteID identifies a note in the sidebar.
+	noteID int
+	// buttonID identifies a button in the dialog.
+	buttonID string
+)
+
+// confirmDialog is the ID of the dialog's layer, which is also its focus scope.
+const confirmDialog = "confirm"
+
+var (
+	panel     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+	item      = lipgloss.NewStyle().Padding(0, 1)
+	selected  = item.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92"))
+	heading   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f6c177"))
+	prose     = lipgloss.NewStyle().Padding(0, 1)
+	status    = lipgloss.NewStyle().Foreground(lipgloss.Color("#908caa"))
+	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#eb6f92")).Padding(1, 2)
+	button    = lipgloss.NewStyle().Padding(0, 2).Background(lipgloss.Color("#393552"))
+	buttonOn  = button.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92")).Bold(true)
+	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ccfd8")).Padding(0, 1)
+)
+
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	notes         []note
+	selected      int
+
+	focus   bloom.Focus
+	confirm anim.Presence
+	toast   anim.Presence
+	deleted string
+}
+
+func newModel() *model {
+	return &model{
+		ui: bloom.New(),
+		notes: []note{
+			{"Groceries", "Oat milk, lemons, basil, and a loaf of rye."},
+			{"Ideas", "A terminal garden that grows while you type."},
+			{"Reading", "The Elements of Typographic Style, chapter 2."},
+		},
+		confirm: anim.NewPresence(anim.Duration(180 * time.Millisecond)),
+		toast:   anim.NewPresence(),
+	}
+}
+
+func (m *model) Init() tea.Cmd {
+	return m.ui.Init()
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if !m.focus.Update(msg, m.ui.Frame()) {
+			cmd = m.key(msg)
+		}
+	case bloom.MouseMsg:
+		cmd = m.mouse(msg)
+	}
+	return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm, &m.toast))
+}
+
+func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	if m.confirm.Shown() {
+		switch msg.String() {
+		case "esc":
+			return m.closeDialog()
+		case "enter":
+			if id, ok := m.focus.Current().(buttonID); ok {
+				return m.press(id)
+			}
+		}
+		return nil
+	}
+
+	switch msg.String() {
+	case "q":
+		return tea.Quit
+	case "up":
+		m.selected = max(m.selected-1, 0)
+	case "down":
+		m.selected = min(m.selected+1, len(m.notes)-1)
+	case "d":
+		return m.openDialog()
+	}
+	return nil
+}
+
+func (m *model) mouse(msg bloom.MouseMsg) tea.Cmd {
+	if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
+		return nil
+	}
+	if msg.Outside {
+		return m.closeDialog()
+	}
+	if id, ok := msg.Target[buttonID](); ok {
+		return m.press(id)
+	}
+	if id, ok := msg.Target[noteID](); ok {
+		m.selected = int(id)
+	}
+	return nil
+}
+
+func (m *model) openDialog() tea.Cmd {
+	if len(m.notes) == 0 {
+		return nil
+	}
+	m.focus.Push(confirmDialog)
+	m.focus.Set(buttonID("cancel"))
+	return m.confirm.Show()
+}
+
+func (m *model) closeDialog() tea.Cmd {
+	if !m.confirm.Shown() {
+		return nil
+	}
+	m.focus.Pop()
+	return m.confirm.Hide()
+}
+
+func (m *model) press(id buttonID) tea.Cmd {
+	if id == "delete" {
+		m.deleted = m.notes[m.selected].title
+		m.notes = slices.Delete(m.notes, m.selected, m.selected+1)
+		m.selected = max(min(m.selected, len(m.notes)-1), 0)
+		return tea.Batch(m.closeDialog(), m.toast.ShowFor(2*time.Second))
+	}
+	return m.closeDialog()
+}
+
+func (m *model) button(id buttonID, label string) bloom.Child {
+	style := button
+	if m.focus.Is(id) {
+		style = buttonOn
+	}
+	return bloom.Text(label).Style(style).ID(id).Focusable()
+}
+
+func (m *model) View() tea.View {
+	items := make([]bloom.Child, len(m.notes))
+	for i, n := range m.notes {
+		style := item
+		if i == m.selected {
+			style = selected
+		}
+		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
+	}
+
+	reader := bloom.Child(bloom.Text("Nothing here.").Style(prose))
+	if len(m.notes) > 0 {
+		current := m.notes[m.selected]
+		reader = bloom.Column(
+			bloom.Text(current.title).Style(heading.Padding(0, 1)),
+			bloom.Text(current.body).Style(prose),
+		)
+	}
+
+	base := bloom.Column(
+		bloom.Fill(bloom.Row(
+			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).Collapsible(1),
+			bloom.Fill(bloom.Box(panel, reader)).Min(30),
+		)),
+		bloom.Text(" ↑/↓ choose, d delete, q quit").Style(status).Truncate(),
+	)
+
+	title := ""
+	if len(m.notes) > 0 {
+		title = m.notes[m.selected].title
+	}
+	dialog := bloom.Layer(bloom.Box(dialogBox, bloom.Column(
+		bloom.Text(fmt.Sprintf("Delete %q?", title)).Style(heading),
+		bloom.Text("This can't be undone."),
+		bloom.Fixed(1, nil),
+		bloom.Row(bloom.Space(), m.button("cancel", "Cancel"), m.button("delete", "Delete")).Gap(2),
+	))).
+		ID(confirmDialog).
+		Modal().
+		Backdrop(fx.Dim{Amount: 0.6}).
+		Presence(m.confirm, fx.Fade{}, fx.Slide{From: bloom.Bottom})
+
+	toast := bloom.Layer(bloom.Box(toastBox, bloom.Text("Deleted "+m.deleted))).
+		Anchor(bloom.End, bloom.End).
+		Margin(1).
+		Presence(m.toast, fx.Slide{From: bloom.Right})
+
+	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog, toast))
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+func main() {
+	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+```
+
+## What you learned
+
+- `Overlay` draws `Layer`s over a base layout, and `Anchor` and `Margin` place them.
+- `Modal` routes every mouse event to a layer, and `Backdrop` applies an effect to everything beneath it.
+- An `anim.Presence` animates showing and hiding; `Layer(...).Presence(p, effects...)` uses it as a transition.
+  Pass every message to `anim.Update` so animations keep moving.
+- `bloom.Focus` tracks keyboard focus, and `Push` and `Pop` confine it to a dialog while it's open.
+- `ShowFor` shows something for a while, then hides it.
+
+## Next steps
+
+<Cards>
+  <Card title="Dialogs and modals" href="/layers/dialogs" description="Stacked dialogs, shadows, and other backdrops." />
+  <Card title="Toast notifications" href="/layers/toasts" description="Stacking several toasts, and other corners." />
+  <Card title="Focus and keyboard navigation" href="/input/focus" description="Focus order, scopes, and the text cursor." />
+  <Card title="Transitions" href="/motion/transitions" description="Every way to animate a node in and out." />
+</Cards>

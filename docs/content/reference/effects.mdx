@@ -1,0 +1,88 @@
+---
+title: Effects
+description: Every effect in the fx package, its fields, and whether it suits a transition, a backdrop, or feedback.
+---
+
+All effects are in [`github.com/lrstanley/bloom/fx`](https://pkg.go.dev/github.com/lrstanley/bloom/fx). Each takes a
+progress `t` from 0 to 1:
+
+- As a **transition** (`bloom.Transition`, `bloom.Present`, `Layer.Presence`, `Layer.Transition`), it changes the
+  node's own cells. `t` runs from 0, starting to enter, to 1, fully shown and unchanged.
+- As a **backdrop** or **shadow** (`Layer.Backdrop`, `Layer.Shadow`), it changes the frame beneath a layer. `t` is
+  the strength, following the layer's transition.
+- Some take their own progress, such as a shake's or a burst's, and are applied with `bloom.Transition` while it runs.
+
+`Edge` fields take `bloom.Top`, `bloom.Bottom`, `bloom.Left`, or `bloom.Right` (also available as `fx.Top` and so
+on). The zero value is `Bottom`. `Seed` fields pick a random pattern that stays the same for the same seed.
+
+## Entrances
+
+| Effect | Fields | Brings a node in by |
+| --- | --- | --- |
+| [`Fade`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fade) | | crossfading from what's beneath it |
+| [`Slide`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Slide) | `From Edge` | moving in from beyond an edge of its viewport |
+| [`Wipe`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Wipe) | `From Edge` | revealing it from one edge to the other |
+| [`Dissolve`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Dissolve) | `Seed` | revealing its cells in a random order |
+| [`Typewriter`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Typewriter) | | revealing its cells in reading order |
+| [`Scramble`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Scramble) | `Seed` | random glyphs settling into its own |
+| [`Decode`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Decode) | `Seed` | columns falling into place like digital rain |
+| [`Unfold`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Unfold) | | opening from its middle row outward, like a CRT turning on |
+| [`Iris`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Iris) | `At image.Point` | a circle growing from `At` (screen coordinates; zero is the node's center) |
+| [`Shade`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shade) | `Seed` | each cell stepping through ░ ▒ ▓ to its glyph |
+| [`Blinds`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Blinds) | `From Edge`, `Size int` (default 3) | opening slats, like window blinds |
+| [`Wave`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Wave) | `From Edge` | a wobbling front sweeping across, with a bright crest |
+| [`Glitch`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Glitch) | `Seed` | a breaking-up signal that settles, with jitter and split colors |
+
+## Backdrops
+
+| Effect | Fields | Changes what's beneath a layer by |
+| --- | --- | --- |
+| [`Dim`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Dim) | `Amount float64` | moving colors toward the terminal's background |
+| [`Desaturate`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Desaturate) | `Amount float64` | moving colors toward gray |
+| [`Tint`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Tint) | `Color color.Color`, `Amount float64` | moving colors toward `Color` |
+| [`Recolor`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Recolor) | `Fg, Bg color.Color` | drawing every cell in two colors, keeping the glyphs |
+| [`Spotlight`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Spotlight) | `Rect image.Rectangle`, `Amount float64` (default 0.7), `Soft int` | dimming everything outside `Rect`, with a soft edge `Soft` cells wide |
+
+`Amount` runs from 0, no change, to 1, all the way. Backdrops also work as transitions; `Tint` on a node fades it in
+from a color, for example.
+
+## Feedback
+
+These take their own progress rather than an entrance's. See [Feedback effects](/motion/feedback-effects) for how to
+drive them.
+
+| Effect | Fields | Does |
+| --- | --- | --- |
+| [`Shake`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shake) | `Amount int` (default 2), `Times int` (default 4) | moves the node side to side with a decaying wobble; still at 0 and 1 |
+| [`Shimmer`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shimmer) | `Color color.Color`, `Width int` (default 6) | sweeps a highlight band across the node; `t` is the band's position |
+| [`Roll`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Roll) | `From string` | turns digits over like an odometer, from the number in `From` |
+| [`Burst`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Burst) | `At image.Point`, `Count int` (default 40), `Seed` | throws confetti from `At`; `t` is its age, gone at 1 |
+
+## Combinators
+
+These wrap other effects.
+
+| Effect | Fields | Does |
+| --- | --- | --- |
+| [`Stagger`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Stagger) | `Effect`, `From Edge`, `Spread float64` (default 0.5) | runs `Effect` on each row (`From` top or bottom) or column (left or right), one after another |
+| [`Delay`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Delay) | `Effect`, `From, To float64` (`To` defaults to 1) | runs `Effect` only between `From` and `To` of the progress |
+| [`Reverse`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Reverse) | `Effect` | runs `Effect` with `1-t` |
+| [`Ease`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Ease) | `Effect`, `Easing func(float64) float64` | runs `Effect` with eased progress, such as `anim.OutBack` |
+
+## Your own
+
+| Type | Does |
+| --- | --- |
+| [`Func`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Func) | turns a `func(*canvas.Surface, float64)` into an effect |
+
+Any type with an `Apply(*canvas.Surface, float64)` method is an effect. See [Custom effects](/motion/custom-effects).
+
+## Things to know
+
+- Effects listed together run in order with the same `t`.
+- Effects that need the terminal's colors (`Dim`, `Shimmer` with no color, `Wave`) work best when the root has
+  heard them: return `m.ui.Init()` from `Init` and pass messages to `m.ui.Update`.
+- Effects that replace glyphs (`Scramble`, `Decode`, `Shade`, `Glitch`) leave wide characters, such as emoji, alone or
+  reveal them in one step, so they never draw half a character.
+- `Ease` and `Func` hold functions, which can't be compared, so frames using them are redrawn every time. Keep them
+  on nodes that are animating.

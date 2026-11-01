@@ -1,0 +1,113 @@
+---
+title: How layout works
+description: The model behind bloom's layout - constraints go down, sizes come up, parents place - and why the tree is rebuilt every frame.
+---
+
+This page explains the ideas behind bloom's layout. You don't need it to use bloom, but it makes the rules on the
+other pages predictable rather than something to memorize.
+
+## A tree, rebuilt every frame
+
+In Bubble Tea, `View` turns the model into a string on every frame. bloom keeps that shape: `View` turns the model
+into a tree of nodes, and bloom turns the tree into the frame.
+
+The tree is a value, built fresh each time from the model's current state. Nothing in it needs to be kept, updated,
+or torn down; a dialog that's closed is simply not in the tree (or is in it with a hidden presence). This is the
+same idea as Bubble Tea's own: state lives in the model, and the view is a function of it.
+
+Building a tree every frame sounds expensive, but nodes are small values, and bloom caches the expensive work
+(parsing strings into cells, rendering Lip Gloss styles) between frames, keyed by what the node contains. See
+[Rendering and performance](/concepts/rendering).
+
+## Constraints down, sizes up, parents place
+
+Layout is one pass down the tree and back up:
+
+<Mermaid chart={`flowchart TD
+    R["Column (80×24)"] -->|"you have 80×24"| A["Row"]
+    R -->|"you have 80×1"| S["status bar"]
+    A -->|"you have 24 columns"| B["sidebar"]
+    A -->|"you have 56 columns"| C["reader"]
+    S -.->|"I need 1 row"| R
+    B -.->|"I need 3 rows"| A
+`} />
+
+1. **Constraints go down.** A parent tells each child how much space it may use.
+2. **Sizes come up.** A child that has a natural size reports it: a text node its lines, a box its child plus its
+   frame, a component that implements `Measurer` whatever it says.
+3. **Parents place.** The parent decides each child's final rectangle from those answers and its own rules,
+   whether the child is shown at all, and clips the child to it.
+
+A child never decides its own position, and never gets more than its parent gives it.
+
+## The slot belongs to the parent
+
+How a child takes part in sharing space, whether it's fixed, fills, or grows, is set by the **slot** it's placed
+in, not by the child:
+
+```go
+bloom.Row(bloom.Fixed(24, list), bloom.Fill(preview))   // list is a sidebar
+bloom.Column(bloom.Fill(list), bloom.Fixed(8, preview)) // the same list fills the screen
+```
+
+That keeps components reusable. A component doesn't know whether it's a sidebar or a full screen, and doesn't need
+options for every arrangement it might end up in. The screen that uses it decides.
+
+## How a row shares space
+
+For a row (and, turned on its side, a column), bloom works out sizes in this order:
+
+1. `Fixed` slots get exactly their size.
+2. `Auto` slots (and children with no slot) get their natural size, and `Percent` slots their percentage.
+3. The gaps between children are subtracted.
+4. What's left is shared between `Fill` and `Grow` slots by weight, within each slot's `Min` and `Max`.
+5. If there wasn't enough, slots that can shrink give up space in proportion to their size, down to their `Min`.
+   Rounding leftovers go to the earlier slots.
+6. If the minimums still don't fit, `Collapsible` slots are dropped, lowest priority first (the last one, on a
+   tie), and the rest is worked out again.
+
+On the other axis, children stretch to the row's height unless an `Align` says otherwise.
+
+## Components that know their size
+
+bloom can measure any component by rendering its `View()` and counting lines and columns. Two optional interfaces
+let a component do better:
+
+- [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) answers "how big do you want to be, given
+  this much space?" without rendering, which is cheaper and lets a component ask for less than its view.
+- [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) answers "what layout do you want, given this
+  much space?" by returning nodes. This is how a component changes its shape with its size, rather than only
+  stretching.
+
+A `Layouter`'s `Layout` method can be called several times per frame, while measuring and for the final layout,
+which is why it must not change the component.
+
+## Layout is a pure function
+
+Given the same tree and the same size, layout always gives the same rectangles. bloom relies on this in two ways:
+
+- [`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) can run the layout in `Update`, without
+  drawing, and get exactly the rectangles `View` will draw. That's how components like viewports learn their size
+  before they render.
+- Mouse events are matched against the frame that's on screen, so a click always lands on what the user saw, even
+  if the model changed since.
+
+[Layout animation](/motion/layout-animation) is the one place bloom keeps layout state between frames: the `Root`
+remembers where animated nodes were, so it can move them smoothly to where the pure layout says they should be.
+
+## Cells, not pixels
+
+Terminal layout works in whole cells, and that shows up in a few places:
+
+- Shares that don't divide evenly are rounded, and the leftover cells go to some slots and not others, so two
+  `Fill` slots can differ by a cell.
+- Some characters, such as many emoji and CJK characters, are two cells wide. bloom measures text the way the
+  terminal does, and never cuts a wide character in half: one cut by an edge is drawn as blanks instead.
+- Cells are about twice as tall as they are wide, which is why shadows look even at an offset of `(2, 1)`, and why
+  `fx.Spotlight` counts horizontal distance as half.
+
+## Related
+
+- [Sizing with slots](/layout/slots)
+- [Responsive layouts](/layout/responsive)
+- [Rendering and performance](/concepts/rendering)

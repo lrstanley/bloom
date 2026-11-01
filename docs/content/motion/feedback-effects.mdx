@@ -1,0 +1,184 @@
+---
+title: Feedback effects
+description: Shake rejected input, shimmer loading placeholders, roll changing numbers, burst confetti, glitch a badge, spotlight a tour step, and scroll text that doesn't fit.
+---
+
+Some effects aren't entrances. They respond to something happening: input rejected, data loading, a number
+changing, a deploy succeeding. Each takes its own progress, usually from a one-shot
+[`anim.Value`](/motion/animating-values#run-a-one-shot-effect) or a looping
+[`anim.Sequence`](/motion/animating-values#chain-steps-with-sequence).
+
+The pattern for one-shot effects is the same each time:
+
+1. Keep an `anim.Value` that starts at 1, with a duration and linear easing.
+2. When the event happens, `Play(0, 1)` and return its command.
+3. In `View`, wrap the node with `bloom.Transition` only while the value is animating.
+
+## Shake rejected input
+
+`fx.Shake` moves a node side to side with a decaying wobble. It's still at 0 and at 1.
+
+```go
+shake: anim.NewValue(1, anim.Duration(450*time.Millisecond), anim.Ease(anim.Linear)),
+```
+
+```go
+// in Update, when the input is wrong
+cmd = m.shake.Play(0, 1)
+
+// in View
+field := bloom.Child(input)
+if m.shake.Animating() {
+	field = bloom.Transition(m.shake.Float(), field, fx.Shake{Amount: 3, Times: 3})
+}
+```
+
+`Amount` is how many cells it moves at most (2 by default), and `Times` is how many times it swings each way (4 by
+default).
+
+## Shimmer loading placeholders
+
+`fx.Shimmer` sweeps a highlight band across a node. Draw placeholder bars while data loads, and loop the shimmer's
+position with `anim.NewLoop`:
+
+```go
+shimmer: anim.NewLoop(1400 * time.Millisecond),
+```
+
+```go
+func (m *model) Init() tea.Cmd {
+	return tea.Batch(m.ui.Init(), m.shimmer.Loop(), fetchStats) // fetchStats is your command that loads the data
+}
+
+// when the data arrives
+m.shimmer.Stop()
+
+// in View
+if !m.loaded {
+	bars := bloom.Column(
+		bloom.Text(strings.Repeat("█", 8)).Style(skeleton),
+		bloom.Text(strings.Repeat("█", 12)).Style(skeleton),
+	)
+	return bloom.Transition(m.shimmer.Float(), bloom.Box(card, bars), fx.Shimmer{Color: accent, Width: 10})
+}
+```
+
+The band starts just off one side and ends just off the other, so the loop restarts without a visible jump.
+`Color` defaults to the terminal's foreground.
+
+## Roll changing numbers
+
+`fx.Roll` turns the digits of a number over like an odometer. Draw the new number, and give the effect the number
+shown before:
+
+```go
+roll: anim.NewValue(1, anim.Duration(700*time.Millisecond), anim.Ease(anim.Linear)),
+```
+
+```go
+// when the number changes
+m.previous, m.requests = m.requests, latest
+cmd = m.roll.Play(0, 1)
+
+// in View
+num := bloom.Child(bloom.Text(strconv.Itoa(m.requests)))
+if m.roll.Animating() {
+	num = bloom.Transition(m.roll.Float(), num, fx.Roll{From: strconv.Itoa(m.previous)})
+}
+```
+
+Digits are matched from the right and separators like commas are skipped, so going from 1,021 to 1,058 only turns
+the last two digits over. `Roll` works on the text, so format the number however you like, as long as `From` is
+formatted the same way.
+
+## Burst confetti
+
+`fx.Burst` throws particles out from a point. Its progress is the burst's age, and nothing is drawn at 1. Apply it
+to the whole screen so particles can fly anywhere, starting from a button's position in the last frame:
+
+```go
+burst: anim.NewValue(1, anim.Duration(1800*time.Millisecond), anim.Ease(anim.Linear)),
+```
+
+```go
+screen := bloom.Child(layout)
+if m.burst.Animating() {
+	if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
+		screen = bloom.Transition(m.burst.Float(), screen, fx.Burst{
+			At:    image.Pt((r.Min.X+r.Max.X)/2, r.Min.Y),
+			Count: 90,
+			Seed:  m.deploys,
+		})
+	}
+}
+```
+
+Particles only change the glyph and color of cells they land on, and stay inside the node the effect is applied
+to.
+
+## Glitch a badge
+
+`fx.Glitch` makes a node look like a breaking-up signal: rows jitter, colors split, and cells garble, fading to
+nothing at 1. It works well as an entrance for a status that just changed:
+
+```go
+badge := bloom.Child(bloom.Text("LIVE").Style(live))
+if m.badge.Animating() {
+	badge = bloom.Transition(m.badge.Float(), badge, fx.Glitch{Seed: m.deploys})
+}
+```
+
+## Spotlight a tour
+
+`fx.Spotlight` dims everything except a rectangle. As a layer's backdrop, it walks the user through a screen one
+part at a time. Put the explanation in a layer, and light the part it explains:
+
+```go
+note := bloom.Layer(bloom.Box(tourStyle, bloom.Text(steps[m.step]))).
+	Anchor(bloom.Center, bloom.End).
+	Margin(2).
+	Presence(m.tour, fx.Fade{})
+
+if r, ok := m.ui.Frame().Rect(cardID(m.step)); ok {
+	note = note.Backdrop(fx.Spotlight{Rect: r.Inset(-1), Soft: 5})
+}
+```
+
+`Soft` is how many cells the dimming takes to reach full strength, for a soft edge. `fx.Decode` suits the
+explanation text, revealing it like digital rain settling into place.
+
+## Scroll text that doesn't fit
+
+`bloom.Marquee(s, phase)` shows one line of text. When it fits, it's shown as is. When it doesn't, it's cut short
+with "…" while `phase` is 0, and scrolls around as `phase` runs from 0 to 1. That suits a long title in a list
+item, scrolling only while the item is selected:
+
+```go
+name: anim.NewSequence(0,
+	anim.Jump(0),
+	anim.Hold(900*time.Millisecond), // wait a moment before scrolling
+	anim.To(1, anim.Duration(7*time.Second)),
+).With(anim.Ease(anim.Linear)),
+```
+
+```go
+// when an item is selected
+cmd = m.name.Loop()
+
+// in View
+phase := 0.0
+if i == m.selected {
+	phase = m.name.Float()
+}
+bloom.Fill(bloom.Marquee(item.title, phase).Style(itemStyle))
+```
+
+For a news ticker that always scrolls, use `anim.NewLoop(24 * time.Second)` as the phase, and `Gap` to set what's
+shown between the end of the text and its start: `bloom.Marquee(headlines, phase).Gap("  ◆  ")`.
+
+## Related
+
+- [Effects reference](/reference/effects)
+- The [`launch` example](https://github.com/lrstanley/bloom/tree/master/_examples/launch), which uses all of these
+  effects in a deploy console, and the [`ticker` example](https://github.com/lrstanley/bloom/tree/master/_examples/ticker)
+  for marquees

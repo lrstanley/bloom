@@ -1,0 +1,154 @@
+---
+title: Focus and keyboard navigation
+description: Track keyboard focus with bloom.Focus, move it with tab and clicks, confine it to dialogs and panels with scopes, and show the terminal cursor.
+---
+
+[`bloom.Focus`](https://pkg.go.dev/github.com/lrstanley/bloom#Focus) keeps track of which node has keyboard focus,
+by ID. It lives in your model. The layout marks which nodes can take focus, and the order they appear in the
+layout is the tab order.
+
+## Make nodes focusable
+
+Add a `bloom.Focus` to your model. Its zero value has nothing focused:
+
+```go
+type model struct {
+	ui    *bloom.Root
+	focus bloom.Focus
+	// ...
+}
+```
+
+Mark nodes `Focusable`. They need an ID, which is what focus refers to them by:
+
+```go
+type fieldID int
+
+const (
+	fieldName fieldID = iota
+	fieldEmail
+)
+
+bloom.Text(m.name).Style(input).ID(fieldName).Focusable()
+bloom.Text(m.email).Style(input).ID(fieldEmail).Focusable()
+```
+
+Slots can be focusable too, such as `bloom.Fill(m.editor).ID(paneEditor).Focusable()`, which makes a whole pane a
+stop in the tab order.
+
+## Move focus with tab and clicks
+
+`m.focus.Update(msg, m.ui.Frame())` handles <kbd>tab</kbd> and <kbd>shift+tab</kbd>, and moves focus to a node
+when it's clicked. It reports whether it handled the message:
+
+```go
+	case tea.KeyPressMsg:
+		if m.focus.Update(msg, m.ui.Frame()) {
+			break // tab or shift+tab moved focus
+		}
+		// handle other keys for whatever has focus
+	case bloom.MouseMsg:
+		m.focus.Update(msg, m.ui.Frame())
+```
+
+`m.ui.Frame()` is the layout of the last frame drawn, which has the nodes that can be focused and their order.
+Focus wraps around from the last node to the first.
+
+You can also move focus yourself: `Set(id)`, `Next(frame)`, `Prev(frame)`, and `Clear()`.
+
+## Style the focused node
+
+`m.focus.Is(id)` reports whether a node has focus, so `View` can style it:
+
+```go
+func (m *model) field(id fieldID, value string) bloom.Child {
+	style := input
+	if m.focus.Is(id) {
+		style = inputFocused
+	}
+	return bloom.Text(value).Style(style).ID(id).Focusable()
+}
+```
+
+To route keys, `m.focus.Current()` returns the focused ID. A type switch tells you what kind of node it is:
+
+```go
+		switch id := m.focus.Current().(type) {
+		case fieldID:
+			m.values[id] += msg.Text
+		case buttonID:
+			if msg.String() == "enter" {
+				return m, m.press(id)
+			}
+		}
+```
+
+## Show the cursor in an input
+
+`Cursor` on a text node shows the terminal's cursor at a position inside the node. Put it after the text in the
+focused input:
+
+```go
+in := bloom.Text(value).Style(style).ID(id).Focusable()
+if m.focus.Is(id) {
+	// one column in, for the style's left padding
+	in = in.Cursor(tea.NewCursor(1+ansi.StringWidth(value), 0))
+}
+```
+
+The position is relative to the node's top-left cell, wherever it ends up on screen. The cursor is hidden while a
+layer covers that cell. `ansi` here is `github.com/charmbracelet/x/ansi`, which measures the width of text the way
+the terminal does.
+
+For Bubbles text inputs, use the cursor the component reports; see
+[Using Bubbles components](/layout/bubbles-components#show-the-terminal-cursor).
+
+## Keep focus inside a dialog
+
+While a dialog is open, <kbd>tab</kbd> should only move between its buttons. A **scope** confines focus to the
+focusable nodes inside it. Modal layers with an ID are scopes:
+
+```go
+bloom.Layer(dialog).ID(confirmDialog).Modal()
+```
+
+`Push(scope)` confines focus to the scope and clears it, and remembers what was focused before. `Pop()` leaves the
+scope and focuses that node again:
+
+```go
+func (m *model) openDialog() tea.Cmd {
+	m.focus.Push(confirmDialog)
+	m.focus.Set(buttonID("cancel"))
+	return m.confirm.Show()
+}
+
+func (m *model) closeDialog() tea.Cmd {
+	m.focus.Pop()
+	return m.confirm.Hide()
+}
+```
+
+Scopes nest, so a dialog opened from a dialog pushes a second scope, and closing it returns to the first.
+`m.focus.Scope()` returns the innermost scope pushed, which tells you which dialog is on top.
+
+## Group a panel into a scope
+
+Slots can be scopes too, with `Scope()`. Without pushing it, a scope lets you ask whether focus is somewhere in a
+part of the screen, such as to highlight a panel's border while any field in it is focused:
+
+```go
+bloom.Fixed(60, form).ID(scopeForm).Scope()
+```
+
+```go
+if m.focus.Within(m.ui.Frame(), scopeForm) {
+	border = activeBorder
+}
+```
+
+## Related
+
+- [`Focus` API reference](https://pkg.go.dev/github.com/lrstanley/bloom#Focus)
+- [Dialogs and modals](/layers/dialogs)
+- The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with focusable inputs,
+  buttons, and stacked dialog scopes

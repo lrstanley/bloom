@@ -1,0 +1,136 @@
+---
+title: Nodes and options
+description: A compact reference of bloom's nodes, slot and layer options, Root options, and anim options, with links to the full API documentation.
+---
+
+This page lists what's available, grouped by what it's for. The full documentation, with every method's details,
+is on [pkg.go.dev](https://pkg.go.dev/github.com/lrstanley/bloom).
+
+## Nodes
+
+| Function | Makes |
+| --- | --- |
+| [`Row(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Row) | children left to right |
+| [`Column(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Column) | children top to bottom |
+| [`Grid(cols, children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Grid) | equal-width columns, filled row by row |
+| [`Wrap(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Wrap) | children flowing onto new lines at their natural sizes |
+| [`Text(s)`](https://pkg.go.dev/github.com/lrstanley/bloom#Text) | a string, optionally styled |
+| [`Marquee(s, phase)`](https://pkg.go.dev/github.com/lrstanley/bloom#Marquee) | one line that scrolls, or is cut short, when it doesn't fit |
+| [`Box(style, child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Box) | a Lip Gloss frame around a child |
+| [`Centered(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Centered) | a child at its natural size in the middle of its space |
+| [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset` |
+| [`Overlay(base, layers...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Overlay) | layers drawn over a base |
+| [`Layer(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Layer) | a layer for an overlay, centered at its natural size |
+| [`Transition(t, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Transition) | a child drawn with effects at progress `t` |
+| [`Present(p, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Present) | a child shown only while a presence is visible |
+| [`Drawable(d)`](https://pkg.go.dev/github.com/lrstanley/bloom#Drawable) | an Ultraviolet `Drawable`, painting cells directly |
+
+Any value with a `View() string` method can also be a child.
+
+## Container options
+
+| Method | On | Does |
+| --- | --- | --- |
+| `Gap(n)` | `Row`, `Column` | `n` cells between children |
+| `Gap(x, y)` | `Grid`, `Wrap` | space between columns and between rows |
+| `Align(a)` | `Row`, `Column` | cross-axis placement of children: `Stretch` (default), `Start`, `Center`, `End` |
+| `Justify(j)` | `Row`, `Column` | main-axis placement when nothing grows: `flex.Start`, `Center`, `End`, `SpaceBetween`, `SpaceAround`, `SpaceEvenly` |
+
+## Slots
+
+| Function | Size |
+| --- | --- |
+| `Fixed(n, child)` | exactly `n` cells; a `nil` child is empty space |
+| `Auto(child)` | the child's natural size |
+| `Fill(child)` | an equal share of what's left |
+| `Grow(weight, child)` | a weighted share of what's left |
+| `Percent(p, child)` | `p`% of the container |
+| `Space()` | empty space that fills what's left |
+
+| Method | Does |
+| --- | --- |
+| `Min(n)`, `Max(n)` | clamp the size on the main axis |
+| `Collapsible(priority)` | allow dropping the slot when minimums don't fit, lowest priority first |
+| `Align(a)` | this slot's cross-axis placement |
+| `ID(id)` | the ID for mouse events, focus, and `Frame.Rect` |
+| `Focusable()` | a stop in the focus order |
+| `Scope()` | a focus scope, for `Focus.Within` and `Focus.Push` |
+| `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
+
+## Text
+
+| Method | Does |
+| --- | --- |
+| `Style(style)` | render with a Lip Gloss style at the node's size, wrapping long lines |
+| `Truncate()` | one line, cut short with "…" |
+| `Cursor(c)` | show the terminal cursor at `c`, relative to the node |
+| `ID(id)`, `Focusable()` | as for slots |
+
+`Marquee` has `Style(style)` and `Gap(s)`, the text shown between loops.
+
+## Layers
+
+| Method | Does |
+| --- | --- |
+| `Anchor(x, y)` | place on each axis: `Start`, `Center` (default), `End` |
+| `AnchorTo(id, side)` | place against a side of another node |
+| `Offset(x, y)` | move from where it's anchored |
+| `Size(w, h)` | set the size; zero uses the natural size |
+| `Margin(n)` | stay `n` cells from the screen's edges |
+| `Modal()` | take every mouse event, and be a focus scope |
+| `Backdrop(effects...)` | apply effects to everything beneath |
+| `Shadow(x, y, effects...)` | apply effects beneath, offset like a drop shadow |
+| `Presence(p, effects...)` | show while a presence is visible, with effects |
+| `Transition(t, effects...)` | draw with effects at progress `t` |
+| `ID(id)` | the ID for mouse events, focus, and `Frame.Rect` |
+| `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
+
+## Root
+
+| | Does |
+| --- | --- |
+| `bloom.New(opts...)` | make a root; keep it in your model by pointer |
+| `ui.Init()` | ask the terminal for its colors; return from `Init` |
+| `ui.Update(msg)` | hear the terminal, and run layout animation; pass every message, return the command |
+| `ui.View(w, h, tree)` | lay out, draw, and return a `tea.View` with mouse routing |
+| `ui.Render(w, h, tree)` | lay out and draw to a string; a height of zero uses the natural height |
+| `ui.Frame()` | the geometry of the last frame drawn |
+
+### Root options
+
+| Option | Default | Sets |
+| --- | --- | --- |
+| [`WithColors(fg, bg)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors) | white on black | the terminal colors effects blend with, until the terminal reports its own |
+| [`WithFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFPS) | 60 | the frame rate of layout animation |
+| [`WithWidthMethod(m)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
+| [`WithClock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) | `time.Now` | the clock for layout animation, for tests |
+
+## Geometry and input
+
+| | Does |
+| --- | --- |
+| [`Solve(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) | lay out without drawing, and return the `*Frame` |
+| [`Render(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) | lay out and draw to a string, without a root |
+| `frame.Rect(id)` | where a node went, and whether it's in the frame |
+| `MouseMsg.Target[T]()` | the innermost ID of type `T` under the pointer |
+| `Focus` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Click`, `Push`, `Pop`, `Scope`, `Within` |
+
+Component interfaces: [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports a natural size,
+and [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a layout for the space given.
+
+## Animation options
+
+For `anim.NewValue`, `anim.NewPresence`, `anim.NewLoop`, `Sequence.With`, `anim.To`, and `Animate`:
+
+| Option | Default | Sets |
+| --- | --- | --- |
+| [`Duration(d)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Duration) | 250ms | how long easing to a target takes |
+| [`Ease(e)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Ease) | `OutCubic` | the easing curve |
+| [`Spring(frequency, damping)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Spring) | | move like a spring instead of easing |
+| [`FPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#FPS) | 60 | frames requested while animating |
+| [`Clock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Clock) | `time.Now` | the source of time, for tests |
+
+Easings: `Linear`, `InQuad`, `OutQuad`, `InOutQuad`, `OutCubic`, `InOutCubic`, `OutBack`, or any
+`func(float64) float64`.
+
+Sequence steps: `To(target, opts...)`, `Hold(d)`, `Jump(target)`.

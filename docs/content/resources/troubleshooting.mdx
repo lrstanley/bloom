@@ -1,0 +1,79 @@
+---
+title: Troubleshooting
+description: Fixes for common problems - a blank screen, clicks that don't arrive or arrive twice, animations that don't move, text that doesn't wrap, and more.
+---
+
+## The screen is blank
+
+`m.ui.View` draws nothing while the width is zero, which it is until Bubble Tea sends the first
+`tea.WindowSizeMsg`. Store the size from that message in your model and pass it to `View`:
+
+```go
+case tea.WindowSizeMsg:
+	m.width, m.height = msg.Width, msg.Height
+```
+
+## Clicks don't arrive
+
+Check each of these:
+
+- The view turns on mouse reporting: `v.MouseMode = tea.MouseModeCellMotion` (or `tea.MouseModeAllMotion` for
+  hover).
+- The view comes from `m.ui.View(...)`. It installs the handler that sends `bloom.MouseMsg`. If you build the
+  `tea.View` yourself, or replace its `OnMouse`, the messages stop.
+- The node, or something it's inside, has an `ID`. Events over nodes without IDs aren't sent.
+- `msg.Target[T]()` uses the same type you gave the ID. `ID("save")` is a `string`; `ID(buttonID("save"))` is a
+  `buttonID`, and `Target[string]` won't find it.
+- A modal layer isn't open, taking the events.
+
+## Every click happens twice
+
+Both the original `tea.MouseClickMsg` and the `bloom.MouseMsg` made from it reach `Update`. Handle one or the other.
+See [Mouse events](/input/mouse#handle-a-mousemsg).
+
+## Animations don't move, or stop partway
+
+- Return the command from `Show`, `Hide`, `To`, `Play`, and `Loop`. Without it, the first frame is never scheduled.
+- Pass **every** message to every animation, with `anim.Update(msg, &m.a, &m.b)`, and return its command. Passing
+  only some message types drops the frame messages.
+- For layout animation (`Animate`), pass every message to `m.ui.Update` and return its command, and give the
+  animated slot or layer an ID.
+- Animations in a slice need to be updated through pointers to the elements, as in
+  [stacking toasts](/layers/toasts#stack-several-toasts).
+
+## Effects look wrong on a light terminal
+
+`Dim` fades toward the terminal's background, and some effects use its foreground. Until the terminal reports its
+colors, bloom assumes white on black. Return `m.ui.Init()` from your model's `Init` and pass every message to
+`m.ui.Update` so the root hears the reply. For terminals that never answer, set defaults with `bloom.WithColors`.
+
+## Text doesn't wrap, or wraps when it shouldn't
+
+- `bloom.Text(s)` on its own is clipped, not wrapped. Add `.Style(...)`, even an empty `lipgloss.NewStyle()`, to wrap
+  it to its node's width.
+- A status bar or title that should stay on one line needs `.Truncate()`.
+- A string you rendered yourself with Lip Gloss has a fixed size already. Pass the style to `Text(...).Style(...)` or
+  `Box(...)` instead, so bloom renders it at the right size.
+
+## A panel disappears
+
+A `Collapsible` slot is dropped when the minimum sizes in its row or column don't fit. Lower another slot's `Min`,
+raise the collapsible slot's priority, or make the terminal bigger. `frame.Rect(id)` reports `false` for a collapsed
+slot, which you can use to tell the user the panel is hidden.
+
+## A component has the wrong size
+
+Components that size themselves internally, such as a Bubbles viewport, need to be told the size their slot has.
+Find it with `bloom.Solve` when the window size or layout changes; see
+[Using Bubbles components](/layout/bubbles-components#give-a-component-its-size). Remember that a slot's rectangle
+includes the border of a `Box` inside it.
+
+## Wide characters look misaligned
+
+bloom measures text with grapheme clustering by default, as Lip Gloss does. If your terminal measures emoji or other
+wide characters differently, set the method to match with `bloom.WithWidthMethod`.
+
+## Still stuck?
+
+Ask in [GitHub Discussions](https://github.com/lrstanley/bloom/discussions/new?category=q-a), report a bug in
+[issues](https://github.com/lrstanley/bloom/issues/new/choose), or chat on [Discord](https://liam.sh/chat).

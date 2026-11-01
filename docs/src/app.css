@@ -1,0 +1,788 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "fumapress/css/preset.css";
+
+/*
+ * bloom's brand (lrstanley/remotion, design/bloom.md): rose, salmon, apricot, and cream petals on plum
+ * black, with Martian Mono for the wordmark. Body text is Hanken Grotesk, so long prose stays easy to read
+ * next to the monospace headings and code.
+ */
+/*
+ * Box-drawing, block, and arrow glyphs from JetBrains Mono, which Google Fonts leaves out of its subsets. Without
+ * them a fallback font draws diagrams of terminal output, and its glyphs neither line up nor join.
+ */
+@font-face {
+  font-family: "JetBrains Mono Symbols";
+  src: url("./assets/fonts/jetbrains-mono-symbols-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+00B7, U+2022, U+2026, U+2190-2193, U+2500-259F, U+25C6;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Symbols";
+  src: url("./assets/fonts/jetbrains-mono-symbols-700.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+  unicode-range: U+00B7, U+2022, U+2026, U+2190-2193, U+2500-259F, U+25C6;
+}
+
+@theme {
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  /* Code, in a terminal face. Martian Mono is bloom's display face, for the wordmark and headings. */
+  --font-mono: "JetBrains Mono Symbols", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display: "Martian Mono", ui-monospace, monospace;
+  --default-font-family: var(--font-sans);
+
+  --color-plum-black: #0d0a12;
+  --color-plum: #2b1328;
+  --color-rose: #ff6f91;
+  --color-salmon: #ff9a8b;
+  --color-apricot: #ffc29b;
+  --color-cream: #fff1d6;
+  --color-blush: #fff1ea;
+}
+
+:root {
+  --color-fd-background: #fdf8f9;
+  --color-fd-foreground: #2b1328;
+  --color-fd-muted: #f6ecef;
+  --color-fd-muted-foreground: #765766;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #2b1328;
+  --color-fd-card: #fbf2f4;
+  --color-fd-card-foreground: #2b1328;
+  --color-fd-border: #eedbe1;
+  --color-fd-primary: #c2255c;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #f6ecef;
+  --color-fd-secondary-foreground: #2b1328;
+  --color-fd-accent: #fbe3ea;
+  --color-fd-accent-foreground: #2b1328;
+  --color-fd-ring: #c2255c;
+  --fd-layout-width: 90rem;
+}
+
+.dark {
+  --color-fd-background: #0d0a12;
+  --color-fd-foreground: #fff1ea;
+  --color-fd-muted: #18111e;
+  --color-fd-muted-foreground: #b39893;
+  --color-fd-popover: #140e1a;
+  --color-fd-popover-foreground: #fff1ea;
+  --color-fd-card: #140e1a;
+  --color-fd-card-foreground: #fff1ea;
+  --color-fd-border: #2d2030;
+  --color-fd-primary: #ff6f91;
+  --color-fd-primary-foreground: #0d0a12;
+  --color-fd-secondary: #18111e;
+  --color-fd-secondary-foreground: #fff1ea;
+  --color-fd-accent: #2b1328;
+  --color-fd-accent-foreground: #fff1ea;
+  --color-fd-ring: #ff6f91;
+}
+
+code,
+pre,
+kbd {
+  tab-size: 4;
+}
+
+pre {
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+/* Martian Mono is wide; a narrower cut keeps headings from crowding. */
+.prose :where(h1, h2, h3, h4):not(:where(.not-prose *)),
+#nd-page h1 {
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  letter-spacing: -0.02em;
+}
+
+.prose :where(h2):not(:where(.not-prose *)) {
+  font-weight: 700;
+}
+
+.bloom-wordmark {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.05em;
+}
+
+.dark .bloom-glow {
+  text-shadow:
+    0 0 22px rgb(255 111 145 / 0.6),
+    0 0 3px rgb(255 241 214 / 0.5);
+}
+
+/* Mermaid diagrams are rendered to SVG at build time by Pele, themed with the Fumadocs tokens. */
+.pele {
+  --pele-bg: var(--color-fd-background);
+  --pele-fg: var(--color-fd-foreground);
+  --pele-muted: var(--color-fd-muted-foreground);
+  --pele-line: var(--color-fd-muted-foreground);
+  --pele-surface: var(--color-fd-card);
+  --pele-surface-alt: var(--color-fd-accent);
+  --pele-border: var(--color-fd-primary);
+  --pele-accent: var(--color-fd-primary);
+  --pele-font: var(--font-sans);
+  --pele-font-mono: var(--font-mono);
+  --pele-radius: 6px;
+}
+
+/*
+ * Homepage terminal demo (src/components/terminal-demo.tsx). One 6 second timeline, played once:
+ *   0.3s  "d" pressed, the screen dims and the dialog irises open
+ *   1.7s  "tab" moves focus from Cancel to Delete
+ *   2.6s  "enter" closes the dialog, Groceries is removed, and a toast slides in
+ * The rules outside the keyframes are the frame shown when motion is reduced: the dialog open over a dimmed screen.
+ */
+.td {
+  --td-bg: #0d0a12;
+  --td-fg: #e9dcd8;
+  --td-muted: #8b7a86;
+  --td-line: #5b4658;
+  --td-rose: #ff6f91;
+  --td-apricot: #ffc29b;
+  --td-cream: #fff1d6;
+  --td-plum: #2b1328;
+  --td-dur: 6s;
+  margin: 0;
+}
+
+.td-window {
+  container-type: inline-size;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--td-bg);
+  box-shadow:
+    0 0 0 1px rgb(255 111 145 / 0.22),
+    0 30px 80px -30px rgb(255 111 145 / 0.35),
+    0 18px 40px -20px rgb(0 0 0 / 0.6);
+}
+
+.td-chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--td-muted);
+}
+
+.td-dots {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.td-dots i {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.td-title {
+  flex: 1;
+}
+
+.td-keys {
+  position: relative;
+  min-width: 4rem;
+  height: 1.4rem;
+}
+
+.td-key {
+  position: absolute;
+  right: 0;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid rgb(255 111 145 / 0.4);
+  border-radius: 6px;
+  background: rgb(255 111 145 / 0.1);
+  color: var(--td-cream);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  opacity: 0;
+  animation: var(--td-dur) linear both;
+}
+
+.td-key-d { animation-name: td-key-d; }
+.td-key-tab { animation-name: td-key-tab; }
+.td-key-enter { animation-name: td-key-enter; }
+
+@keyframes td-key-d { 0%, 4% { opacity: 0; } 6%, 16% { opacity: 1; } 19%, 100% { opacity: 0; } }
+@keyframes td-key-tab { 0%, 26% { opacity: 0; } 28%, 36% { opacity: 1; } 39%, 100% { opacity: 0; } }
+@keyframes td-key-enter { 0%, 41% { opacity: 0; } 43%, 51% { opacity: 1; } 54%, 100% { opacity: 0; } }
+
+.td-screen {
+  /* JetBrains Mono's full height, as a terminal's cells use. */
+  --td-row: 1.32em;
+  position: relative;
+  width: 66ch;
+  padding: 0.75rem 0.9rem 0.9rem;
+  box-sizing: content-box;
+  font-family: var(--font-mono);
+  /* 66 columns of JetBrains Mono (0.6em each) fill the window, less its padding. */
+  font-size: calc((100cqi - 1.8rem) / 39.6);
+  line-height: var(--td-row);
+  color: var(--td-fg);
+  white-space: pre;
+}
+
+.td-row {
+  height: var(--td-row);
+}
+
+.td-panes {
+  display: flex;
+}
+
+/* A box of --cols by --rows cells, its border through the middle of its outer cells. */
+.td-box {
+  --td-border: var(--td-line);
+  position: relative;
+  width: calc(var(--cols) * 1ch);
+  height: calc(var(--rows) * var(--td-row));
+  padding: var(--td-row) 1ch;
+  box-sizing: border-box;
+}
+
+.td-box::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--td-row) / 2) 0.5ch;
+  border: 1px solid var(--td-border);
+  border-radius: 0.6ch;
+  pointer-events: none;
+}
+
+.td-sel {
+  background: var(--td-rose);
+  color: var(--td-bg);
+}
+
+.td-heading {
+  color: var(--td-apricot);
+  font-weight: 700;
+}
+
+.td-body {
+  position: relative;
+  height: calc(var(--td-row) * 3);
+}
+
+.td-body-a,
+.td-body-b {
+  position: absolute;
+  inset: 0;
+}
+
+.td-body-b {
+  opacity: 0;
+}
+
+.td-status {
+  color: var(--td-muted);
+}
+
+/* The screen beneath the dialog, dimmed like fx.Dim and fx.Desaturate. */
+.td-base {
+  filter: brightness(0.42) saturate(0.5);
+  animation: td-dim var(--td-dur) ease-out both;
+}
+
+@keyframes td-dim {
+  0%, 6% { filter: none; }
+  16%, 44% { filter: brightness(0.42) saturate(0.5); }
+  52%, 100% { filter: none; }
+}
+
+/* The dialog: an iris in (fx.Iris), a fade and slide out. */
+.td-dialog {
+  --td-border: var(--td-rose);
+  position: absolute;
+  top: calc(0.75rem + var(--td-row) * 2);
+  left: calc(0.9rem + 17ch);
+  background: var(--td-bg);
+  box-shadow: 2ch var(--td-row) 0 rgb(0 0 0 / 0.45);
+  animation: td-dialog var(--td-dur) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes td-dialog {
+  0%, 6% { clip-path: circle(0% at 50% 50%); opacity: 1; transform: none; }
+  17%, 44% { clip-path: circle(80% at 50% 50%); opacity: 1; transform: none; }
+  51%, 100% { clip-path: circle(80% at 50% 50%); opacity: 0; transform: translateY(var(--td-row)); }
+}
+
+.td-btn {
+  background: var(--td-plum);
+  color: var(--td-fg);
+}
+
+.td-cancel {
+  background: var(--td-rose);
+  color: var(--td-bg);
+  font-weight: 700;
+  animation: td-focus-off var(--td-dur) steps(1, end) both;
+}
+
+.td-delete {
+  animation: td-focus-on var(--td-dur) steps(1, end) both;
+}
+
+@keyframes td-focus-off {
+  0%, 28% { background: var(--td-rose); color: var(--td-bg); font-weight: 700; }
+  29%, 100% { background: var(--td-plum); color: var(--td-fg); font-weight: 400; }
+}
+
+@keyframes td-focus-on {
+  0%, 28% { background: var(--td-plum); color: var(--td-fg); font-weight: 400; }
+  29%, 100% { background: var(--td-rose); color: var(--td-bg); font-weight: 700; }
+}
+
+/* Deleting the note: its row closes, the next one is selected, the reader crossfades. */
+.td-collapse { overflow: hidden; animation: td-collapse var(--td-dur) ease-in-out both; }
+.td-next { animation: td-select var(--td-dur) steps(1, end) both; }
+.td-body-a { animation: td-out var(--td-dur) ease-out both; }
+.td-body-b { animation: td-in var(--td-dur) ease-out both; }
+
+@keyframes td-collapse {
+  0%, 49% { height: var(--td-row); opacity: 1; }
+  50% { opacity: 0; }
+  55%, 100% { height: 0; opacity: 0; }
+}
+
+@keyframes td-select {
+  0%, 52% { background: transparent; color: var(--td-fg); }
+  53%, 100% { background: var(--td-rose); color: var(--td-bg); }
+}
+
+@keyframes td-out {
+  0%, 50% { opacity: 1; }
+  54%, 100% { opacity: 0; }
+}
+
+@keyframes td-in {
+  0%, 53% { opacity: 0; }
+  58%, 100% { opacity: 1; }
+}
+
+/* The toast: a slide from the right (fx.Slide) with its text typed in (fx.Typewriter). */
+.td-toast {
+  --td-border: #9ccfd8;
+  position: absolute;
+  right: calc(0.9rem + 1ch);
+  bottom: calc(0.9rem + var(--td-row));
+  background: var(--td-bg);
+  opacity: 0;
+  animation: td-toast var(--td-dur) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.td-type {
+  display: inline-block;
+  animation: td-type var(--td-dur) steps(19, end) both;
+}
+
+@keyframes td-toast {
+  0%, 56% { opacity: 0; transform: translateX(calc(100% + 2ch)); }
+  57% { opacity: 1; }
+  64%, 100% { opacity: 1; transform: none; }
+}
+
+@keyframes td-type {
+  0%, 59% { clip-path: inset(0 100% 0 0); }
+  72%, 100% { clip-path: inset(0 0 0 0); }
+}
+
+.td-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  font-size: 0.8125rem;
+  color: var(--color-fd-muted-foreground);
+}
+
+.td-replay {
+  flex: none;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 999px;
+  color: var(--color-fd-foreground);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.td-replay:hover {
+  border-color: var(--color-fd-primary);
+}
+
+.td-replay:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .td * {
+    animation: none !important;
+  }
+
+  .td-replay {
+    display: none;
+  }
+}
+
+/* Homepage. */
+.bloom-home {
+  --home-width: 74rem;
+  width: 100%;
+}
+
+.bloom-hero {
+  position: relative;
+  display: grid;
+  gap: 3rem;
+  align-items: center;
+  max-width: var(--home-width);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 7vw, 5.5rem) 1.5rem clamp(3rem, 6vw, 5rem);
+}
+
+.bloom-hero::before {
+  content: "";
+  position: absolute;
+  inset: -4rem -10rem auto -10rem;
+  height: 44rem;
+  z-index: -1;
+  background: radial-gradient(38rem 26rem at 72% 42%, rgb(255 111 145 / 0.12), transparent 70%);
+  pointer-events: none;
+}
+
+.dark .bloom-hero::before {
+  background:
+    radial-gradient(40rem 28rem at 72% 42%, #2b1328, transparent 70%),
+    radial-gradient(22rem 16rem at 72% 42%, rgb(255 111 145 / 0.1), transparent 70%);
+}
+
+@media (min-width: 64rem) {
+  .bloom-hero {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.25fr);
+  }
+}
+
+.bloom-hero-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+}
+
+.bloom-tagline {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-lede {
+  max-width: 34rem;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+.bloom-lede a,
+.bloom-split a,
+.bloom-footer a {
+  color: var(--color-fd-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.bloom-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.bloom-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 1.15rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 999px;
+  font-weight: 600;
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.bloom-button:hover {
+  border-color: var(--color-fd-primary);
+}
+
+.bloom-button-primary {
+  border-color: transparent;
+  background: var(--color-fd-primary);
+  color: var(--color-fd-primary-foreground);
+}
+
+.bloom-button-primary:hover {
+  background: color-mix(in oklab, var(--color-fd-primary) 85%, white);
+}
+
+.bloom-button:focus-visible,
+.bloom-effect:focus-visible,
+.bloom-chore a:focus-visible,
+.bloom-path a:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 3px;
+}
+
+/* Like the banner's code box. */
+.bloom-install {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid rgb(255 111 145 / 0.28);
+  border-radius: 6px;
+  background: rgb(255 111 145 / 0.07);
+  font-size: 0.8125rem;
+  user-select: all;
+}
+
+.bloom-note {
+  font-size: 0.875rem;
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-hero-demo {
+  min-width: 0;
+}
+
+.bloom-section {
+  max-width: var(--home-width);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 4.5rem) 1.5rem;
+}
+
+.bloom-section h2 {
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  font-weight: 700;
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.bloom-section-lede {
+  max-width: 44rem;
+  margin-top: 0.85rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-chores {
+  margin-top: 2.25rem;
+  border-top: 1px solid var(--color-fd-border);
+}
+
+.bloom-chore {
+  display: grid;
+  gap: 0.35rem 2rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid var(--color-fd-border);
+}
+
+@media (min-width: 56rem) {
+  .bloom-chore {
+    grid-template-columns: 14rem minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: baseline;
+  }
+}
+
+.bloom-chore dt {
+  font-weight: 650;
+}
+
+.bloom-chore dt a:hover {
+  color: var(--color-fd-primary);
+}
+
+.bloom-chore-without {
+  color: var(--color-fd-muted-foreground);
+  line-height: 1.5;
+}
+
+.brand-code {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.bloom-chore-with .brand-code {
+  font-size: 0.78rem;
+}
+
+.bloom-split {
+  display: grid;
+  gap: 2.5rem;
+  align-items: start;
+}
+
+@media (min-width: 64rem) {
+  .bloom-split {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+}
+
+.bloom-split p {
+  max-width: 36rem;
+  margin-top: 0.85rem;
+  line-height: 1.65;
+}
+
+.bloom-points {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 36rem;
+  margin-top: 1.25rem;
+  line-height: 1.55;
+}
+
+.bloom-points li {
+  padding-left: 1rem;
+  border-left: 2px solid var(--color-fd-primary);
+}
+
+.bloom-code-panel {
+  padding: 1.25rem 1.4rem;
+  border: 1px solid rgb(255 111 145 / 0.28);
+  border-radius: 12px;
+  background: rgb(255 111 145 / 0.05);
+}
+
+.dark .bloom-code-panel {
+  background: rgb(255 111 145 / 0.06);
+}
+
+.bloom-effects {
+  display: grid;
+  gap: 1.75rem 2.5rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 48rem) {
+  .bloom-effects {
+    grid-template-columns: 1.6fr 1fr;
+  }
+}
+
+.bloom-effect-group h3 {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-effect-group p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.1rem;
+  margin-top: 0.5rem;
+}
+
+.bloom-effect {
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  font-size: 1.05rem;
+  text-decoration: underline transparent;
+  text-underline-offset: 4px;
+  transition: color 150ms, text-decoration-color 150ms;
+}
+
+.bloom-effect:hover {
+  color: var(--color-fd-primary);
+  text-decoration-color: currentColor;
+}
+
+.bloom-paths {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 56rem) {
+  .bloom-paths {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Rose, salmon, then apricot: the petal rings, outside in. */
+.bloom-path {
+  padding-left: 1.25rem;
+  border-left: 3px solid #ff6f91;
+}
+
+.bloom-path:nth-child(2) {
+  border-color: #ff9a8b;
+}
+
+.bloom-path:nth-child(3) {
+  border-color: #ffc29b;
+}
+
+.bloom-path h3 {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+.bloom-path p {
+  margin-top: 0.4rem;
+  line-height: 1.55;
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-path ul {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.8rem;
+}
+
+.bloom-path a {
+  color: var(--color-fd-primary);
+  text-underline-offset: 3px;
+}
+
+.bloom-path a:hover {
+  text-decoration: underline;
+}
+
+.bloom-footer {
+  display: grid;
+  gap: 0.75rem;
+  max-width: var(--home-width);
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+  border-top: 1px solid var(--color-fd-border);
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-footer p {
+  max-width: 44rem;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bloom-button,
+  .bloom-effect {
+    transition: none;
+  }
+}

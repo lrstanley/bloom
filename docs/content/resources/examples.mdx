@@ -1,0 +1,35 @@
+---
+title: Examples
+description: Runnable example programs in the bloom repository, what each one shows, and how to run them.
+---
+
+The repository's [`_examples`](https://github.com/lrstanley/bloom/tree/master/_examples) directory has complete
+programs, in rough order of complexity. To run one, clone the repository and run it from that directory:
+
+```console
+git clone https://github.com/lrstanley/bloom
+cd bloom/_examples
+go run ./forms
+```
+
+| Example | Shows | Related pages |
+| --- | --- | --- |
+| [basics](https://github.com/lrstanley/bloom/tree/master/_examples/basics) | Layouts printed with `Render`, without a program: every slot, `Min` and `Max`, `Collapsible`, gaps, `Justify`, `Align`, `Space`, `Box`, wrapping text, `Centered`, and a layout inside Lip Gloss | [Sizing with slots](/layout/slots), [Text, boxes, and alignment](/layout/text-and-boxes) |
+| [standard](https://github.com/lrstanley/bloom/tree/master/_examples/standard) | The usual shape of a program: a sidebar that's a `Layouter`, a plain component as the reader, a `Measurer` status bar, and clicks | [Build your first layout](/getting-started/first-layout) |
+| [responsive](https://github.com/lrstanley/bloom/tree/master/_examples/responsive) | Panels collapsing by priority, `Percent`, a toolbar that rebuilds for its width, wrapping tags, paging with `Solve` in `Update`, and wheel scrolling | [Responsive layouts](/layout/responsive), [Scrolling](/layout/scrolling) |
+| [forms](https://github.com/lrstanley/bloom/tree/master/_examples/forms) | Focusable inputs with the cursor, an anchored autocomplete dropdown, stacked modal dialogs as focus scopes, recolored backdrops, shadows, a spring entrance, and a toast | [Dialogs and modals](/layers/dialogs), [Focus](/input/focus), [Dropdowns](/layers/dropdowns) |
+| [effects](https://github.com/lrstanley/bloom/tree/master/_examples/effects) | Every effect as a looping transition, two custom effects, a `Drawable`, and each backdrop | [Effects reference](/reference/effects), [Custom effects](/motion/custom-effects) |
+| [transitions](https://github.com/lrstanley/bloom/tree/master/_examples/transitions) | `Unfold`, `Iris`, `Shade`, `Blinds`, `Wave`, the `Stagger`, `Delay`, `Reverse`, and `Ease` combinators, and dialogs opening from their button | [Transitions](/motion/transitions) |
+| [launch](https://github.com/lrstanley/bloom/tree/master/_examples/launch) | A deploy console: shimmering placeholders, rolling numbers, a shake on wrong input, a spotlight tour with `Decode`, confetti, and a glitching badge | [Feedback effects](/motion/feedback-effects) |
+| [ticker](https://github.com/lrstanley/bloom/tree/master/_examples/ticker) | `Marquee` headlines and list items, and `anim.Sequence` for a banner and a pulse | [Feedback effects](/motion/feedback-effects#scroll-text-that-doesnt-fit), [Animating values](/motion/animating-values) |
+| [reflow](https://github.com/lrstanley/bloom/tree/master/_examples/reflow) | Layout animation with `Animate`: a sidebar, a re-sorting list, a changing split, a panel coming and going, and a layer following the selection | [Layout animation](/motion/layout-animation) |
+| [dashboard](https://github.com/lrstanley/bloom/tree/master/_examples/dashboard) | Everything together at 120 frames a second, with the time each frame takes | [Rendering and performance](/concepts/rendering) |
+
+Each example's comment at the top of `main.go` lists its keys. Most quit with <kbd>q</kbd> or <kbd>ctrl+c</kbd>.
+
+The examples' tests drive each program end to end with [steep](/resources/related-libraries#steep), and can record
+a GIF of each one:
+
+```console
+STEEP_EXPORT_DIR=/tmp STEEP_EXPORT_MODE=on go test -count 1 ./...
+```
