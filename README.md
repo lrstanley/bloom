@@ -24,7 +24,6 @@
   </a>
 
 
-
   <a href="https://codecov.io/gh/lrstanley/bloom">
     <img title="Code Coverage" src="https://img.shields.io/codecov/c/github/lrstanley/bloom/master?style=flat-square">
   </a>
@@ -59,6 +58,7 @@
 
   - [Features](#sparkles-features)
   - [Usage](#gear-usage)
+    - [Related libraries](#related-libraries)
   - [Support &amp; Assistance](#raising_hand_man-support--assistance)
   - [Contributing](#handshake-contributing)
   - [License](#balance_scale-license)
