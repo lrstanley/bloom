@@ -56,9 +56,7 @@ var (
 	danger    = dialog.BorderForeground(warn)
 	toastBox  = rounded.BorderForeground(good).Padding(0, 1)
 	statusBar = lipgloss.NewStyle().Foreground(muted)
-
-	// The vex backdrop: everything beneath the top dialog in two colors.
-	backdrop = fx.Recolor{Fg: lipgloss.Color("#3b4261"), Bg: lipgloss.Color("#16161e")}
+	backdrop  = fx.Recolor{Fg: lipgloss.Color("#3b4261"), Bg: lipgloss.Color("#16161e")}
 )
 
 // control is the ID of a node that can take focus: an input, or a button,
@@ -117,7 +115,8 @@ type model struct {
 	saved  int
 
 	confirm   anim.Presence
-	overwrite anim.Presence // a spring, so it overshoots
+	overwrite anim.Presence // fades the overwrite dialog and its backdrop
+	drop      anim.Presence // a spring, so it overshoots, for where it sits
 	toast     anim.Presence
 }
 
@@ -126,17 +125,20 @@ func newModel() *model {
 		ui:        bloom.New(),
 		values:    make(map[control]string),
 		confirm:   anim.NewPresence(anim.Duration(200 * time.Millisecond)),
-		overwrite: anim.NewPresence(anim.Spring(9, 0.35)),
+		overwrite: anim.NewPresence(anim.Duration(200 * time.Millisecond)),
+		drop:      anim.NewPresence(anim.Spring(9, 0.35)),
 		toast:     anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear)),
 	}
 	m.focus.Set(fieldName)
 	return m
 }
 
-func (m *model) Init() tea.Cmd { return nil }
+// Init asks the terminal for its colors, which the backdrop and fades blend
+// cells without a background from.
+func (m *model) Init() tea.Cmd { return m.ui.Init() }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{m.ui.Update(msg)}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -147,7 +149,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case bloom.MouseMsg:
 		cmds = append(cmds, m.mouse(msg))
 	}
-	cmds = append(cmds, anim.Update(msg, &m.confirm, &m.overwrite, &m.toast))
+	cmds = append(cmds, anim.Update(msg, &m.confirm, &m.overwrite, &m.drop, &m.toast))
 	return m, tea.Batch(cmds...)
 }
 
@@ -215,7 +217,7 @@ func (m *model) press(b control) tea.Cmd {
 		}
 		m.focus.Push(scopeOverwrite)
 		m.focus.Set(buttonBack)
-		return m.overwrite.Show()
+		return tea.Batch(m.overwrite.Show(), m.drop.Show())
 	case buttonOverwrite:
 		return m.save()
 	case buttonCancel, buttonBack:
@@ -231,7 +233,7 @@ func (m *model) closeTop() tea.Cmd {
 	switch m.focus.Scope() {
 	case scopeOverwrite:
 		m.focus.Pop()
-		return m.overwrite.Hide()
+		return tea.Batch(m.overwrite.Hide(), m.drop.Hide())
 	case scopeConfirm:
 		m.focus.Pop()
 		return m.confirm.Hide()
@@ -358,19 +360,17 @@ func (m *model) layers() []bloom.LayerNode {
 		bloom.Fixed(1, nil),
 		m.buttons(buttonCancel, buttonConfirm),
 	)
+
 	confirm := bloom.Layer(bloom.Box(dialog, confirmBody)).
 		ID(scopeConfirm).
 		Modal().
-		Shadow(2, 1, fx.Dim{Amount: 0.7}).
+		Backdrop(backdrop).
+		Shadow(1, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.confirm, fx.Fade{}, fx.Slide{From: fx.Bottom})
-	// Like vex, only the top dialog has a backdrop, which recolors the
-	// dialogs beneath it too.
-	if !m.overwrite.Visible() {
-		confirm = confirm.Backdrop(backdrop)
-	}
 
-	// The spring overshoots 1, which bounces the dialog past its place.
-	drop := int(math.Round((1 - m.overwrite.Float()) * -10))
+	// The spring overshoots 1, which bounces the dialog past its place. It
+	// only moves the dialog: its fade and backdrop follow an eased presence.
+	drop := int(math.Round((1 - m.drop.Float()) * -10))
 	overwriteBody := bloom.Column(
 		bloom.Text("Overwrite the saved profile?").Style(heading.Foreground(warn)),
 		bloom.Text(fmt.Sprintf("It was saved %d time(s) before.", m.saved)),

@@ -39,12 +39,12 @@ func TestForms(t *testing.T) {
 	h.WaitNot("Profile saved") // the toast hides itself, which keeps the snapshot below steady
 
 	// The second save asks again, on top.
-	h.Key("enter").Wait("Save profile?").Sleep(300 * time.Millisecond)
-	h.Key("enter").Wait("Overwrite the saved profile?").Wait("dialogs open: 2").Sleep(900 * time.Millisecond)
+	h.Key("enter").Wait("Save profile?").Sleep(800 * time.Millisecond)
+	h.Key("enter").Wait("Overwrite the saved profile?").Wait("dialogs open: 2").Sleep(1 * time.Second)
 	h.AssertSnapshot(snapshot.WithSuffix("stacked"))
 
 	// esc closes the top dialog, a click outside the next.
-	h.Key("esc").WaitNot("Overwrite the saved profile?").Wait("focus: confirm").Sleep(500 * time.Millisecond)
+	h.Key("esc").WaitNot("Overwrite the saved profile?").Wait("focus: confirm").Sleep(1 * time.Second)
 	h.LeftClick(1, 1).WaitNot("Save profile?").Wait("focus: save").Sleep(600 * time.Millisecond)
 
 	h.Key("ctrl+c")
