@@ -25,6 +25,7 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 var (
@@ -73,9 +74,6 @@ var stocks = []stock{
 	{"Wayne Enterprises", 301.75, 1.9},
 	{"Soylent Nutritional Sciences, Incorporated", 19.48, -1.1},
 }
-
-// itemID is the ID rows are given, for mouse events.
-type itemID int
 
 type model struct {
 	ui       *bloom.Root
@@ -136,12 +134,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.w, m.h = msg.Width, msg.Height
 	case tea.KeyPressMsg:
 		cmds = append(cmds, m.key(msg.String()))
-	case bloom.MouseMsg:
-		if _, click := msg.Msg.(tea.MouseClickMsg); click {
-			if id, ok := msg.Target[itemID](); ok {
-				cmds = append(cmds, m.selectItem(int(id)))
-			}
-		}
 	}
 	cmds = append(cmds, anim.Update(msg, &m.headline, &m.name, &m.pulse, &m.alert))
 	return m, tea.Batch(cmds...)
@@ -249,10 +241,10 @@ func (m *model) watchlist() bloom.Child {
 		price := bloom.Text(fmt.Sprintf("%.2f", s.price)).Style(right)
 		change := bloom.Text(fmt.Sprintf("%+.1f%%", s.change)).Style(right.Foreground(tint))
 		rows = append(rows, bloom.Row(
-			bloom.Fill(bloom.Marquee(s.name, phase).Style(st)).ID(itemID(i)),
-			bloom.Fixed(11, price).ID(itemID(i)),
-			bloom.Fixed(9, change).ID(itemID(i)),
-		))
+			bloom.Fill(bloom.Marquee(s.name, phase).Style(st)),
+			bloom.Fixed(11, price),
+			bloom.Fixed(9, change),
+		).On(on.Click(func() tea.Cmd { return m.selectItem(i) })))
 	}
 	rows = append(rows, bloom.Space())
 	return bloom.Column(rows...)

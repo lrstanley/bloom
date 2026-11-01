@@ -13,10 +13,10 @@ Each time `m.ui.View` runs, bloom:
 3. **Composites** the nodes in tree order, each clipped to its parent, then each layer of an overlay on top.
 4. **Runs effects**: a transition's effects run on a node's own cells before they're composited, and a backdrop's
    effects run on the frame beneath its layer.
-5. **Records geometry**: where each node with an ID went, which nodes can take focus, and what the mouse can hit.
-   That's the `Frame` returned by `m.ui.Frame()`.
+5. **Records geometry**: where each node with an ID went, which nodes can take focus, and what the mouse can hit,
+   with the nodes' mouse handlers. That's the `Frame` returned by `m.ui.Frame()`.
 6. **Returns a `tea.View`** with the content, the terminal cursor if a node placed one, and an `OnMouse` handler that
-   routes mouse events using the recorded geometry.
+   runs the handlers of the nodes under the pointer, using the recorded geometry.
 
 ## What's cached
 

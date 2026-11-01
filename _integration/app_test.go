@@ -15,6 +15,7 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 	"github.com/lrstanley/x/term/steep"
 )
 
@@ -32,13 +33,15 @@ type app struct {
 }
 
 func newApp() *app {
-	return &app{ui: bloom.New(), selected: -1, help: anim.NewPresence(anim.Duration(120 * time.Millisecond))}
+	m := &app{selected: -1, help: anim.NewPresence(anim.Duration(120 * time.Millisecond))}
+	m.ui = bloom.New(bloom.WithFocus(&m.focus))
+	return m
 }
 
 func (m *app) Init() tea.Cmd { return m.ui.Init() }
 
 func (m *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	m.ui.Update(msg)
+	cmd := m.ui.Update(msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -49,23 +52,10 @@ func (m *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab":
 			m.focus.Next(m.ui.Frame())
 		case "?":
-			cmd := m.toggleHelp()
-			return m, cmd
+			return m, tea.Batch(cmd, m.toggleHelp())
 		}
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
-			break
-		}
-		if msg.Outside {
-			cmd := m.toggleHelp()
-			return m, cmd
-		}
-		if it, ok := msg.Target[item](); ok {
-			m.selected = int(it)
-		}
-		m.focus.Click(msg)
 	}
-	return m, m.help.Update(msg)
+	return m, tea.Batch(cmd, m.help.Update(msg))
 }
 
 func (m *app) toggleHelp() tea.Cmd {
@@ -84,7 +74,8 @@ func (m *app) View() tea.View {
 		if m.focus.Is(item(i)) {
 			label = ">" + label[1:]
 		}
-		items = append(items, bloom.Text(label).ID(item(i)).Focusable())
+		items = append(items, bloom.Text(label).ID(item(i)).Focusable().
+			On(on.Click(func() tea.Cmd { m.selected = i; return nil })))
 	}
 	items = append(items, bloom.Space())
 
@@ -107,6 +98,7 @@ func (m *app) View() tea.View {
 		layers = append(layers, bloom.Layer(bloom.Box(border.Padding(0, 1), bloom.Text("Keyboard help\n\ntab  focus\n?    close"))).
 			ID("help").
 			Modal().
+			On(on.ClickOutside(m.toggleHelp)).
 			Backdrop(fx.Dim{Amount: 0.5}).
 			Transition(m.help.Progress(), fx.Slide{From: fx.Bottom}, fx.Fade{}))
 	}

@@ -98,22 +98,16 @@ in a [collapsed slot](/layout/responsive), or a layer that's hidden, isn't.
 
 ## Scroll with the mouse wheel
 
-Wheel events arrive as a `bloom.MouseMsg`, like clicks. Check the pointer is over the reader, so the wheel only
-scrolls what it's over:
+Put an [`on.Scroll`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Scroll) handler on the reader, so the wheel
+only scrolls what it's over. `dy` is `1` for each step down and `-1` for each step up:
 
 ```go
-	case bloom.MouseMsg:
-		if wheel, ok := msg.Msg.(tea.MouseWheelMsg); ok {
-			if _, over := msg.Target[pane](); over {
-				switch wheel.Button {
-				case tea.MouseWheelDown:
-					m.offset += 3
-				case tea.MouseWheelUp:
-					m.offset -= 3
-				}
-			}
-		}
+reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
+	ID(paneReader).
+	On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; return nil }))
 ```
+
+The handler runs just before `Update` gets the wheel event, so clamp the offset in `Update` as you do for keys.
 
 Remember to turn on mouse reporting in `View` with `v.MouseMode = tea.MouseModeCellMotion`.
 

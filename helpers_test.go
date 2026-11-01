@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 func TestTextTruncate(t *testing.T) {
@@ -208,35 +209,63 @@ func focused[K comparable](f *Focus[K]) K {
 
 func TestFocusUpdate(t *testing.T) {
 	t.Parallel()
-	r := New()
-	v := r.View(10, 2, Row(Text("a").ID("a").Focusable(), Auto(Text("b").ID("b").Focusable()).ID("scope").Scope()))
 	var f Focus[string]
+	pressed := 0
+	r := New(WithFocus(&f))
+	r.Render(10, 2, Row(
+		Text("a").ID("a").Focusable(),
+		Auto(Text("b").ID("b").Focusable().On(on.Press(func() tea.Cmd { pressed++; return nil }))).ID("scope").Scope(),
+	))
 	for _, tt := range []struct {
 		msg     tea.Msg
 		handled bool
 		want    string
 	}{
 		{tea.KeyPressMsg{Code: tea.KeyTab}, true, "a"},
+		{tea.KeyPressMsg{Code: tea.KeyEnter}, false, "a"}, // a has no Press handler
 		{tea.KeyPressMsg{Code: tea.KeyTab}, true, "b"},
 		{tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}, true, "a"},
 		{tea.KeyReleaseMsg{Code: tea.KeyTab}, false, "a"},
 		{tea.KeyPressMsg{Code: 'x'}, false, "a"},
-		{v.OnMouse(tea.MouseClickMsg{X: 1, Y: 0, Button: tea.MouseLeft})(), true, "b"},
-		{v.OnMouse(tea.MouseMotionMsg{X: 0, Y: 0})(), false, "b"},
+		{tea.MouseClickMsg{X: 1, Y: 0, Button: tea.MouseLeft}, false, "b"},
+		{tea.KeyPressMsg{Code: tea.KeyEnter}, true, "b"},
+		{tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}, true, "b"},
 	} {
-		if got := f.Update(tt.msg, r.Frame()); got != tt.handled || !f.Is(tt.want) {
-			t.Fatalf("%T: handled %v, focus %v; want %v, %s", tt.msg, got, focused(&f), tt.handled, tt.want)
+		r.Update(tt.msg)
+		if _, got := f.Update(tt.msg, r.Frame()); got != tt.handled || !f.Is(tt.want) {
+			t.Fatalf("%T %v: handled %v, focus %v; want %v, %s", tt.msg, tt.msg, got, focused(&f), tt.handled, tt.want)
 		}
 	}
+	if pressed != 2 {
+		t.Fatalf("enter and space pressed b %d times, want 2", pressed)
+	}
 	f.Push("scope")
-	if !f.Update(tea.KeyPressMsg{Code: tea.KeyTab}, r.Frame()) || !f.Within(r.Frame(), "scope") {
+	if _, ok := f.Update(tea.KeyPressMsg{Code: tea.KeyTab}, r.Frame()); !ok || !f.Within(r.Frame(), "scope") {
 		t.Fatal("tab escaped scope")
 	}
-	if f.Update(v.OnMouse(tea.MouseClickMsg{X: 0, Y: 0, Button: tea.MouseLeft})(), r.Frame()) {
+	r.ClickAt(0, 0)
+	if !f.Is("b") {
 		t.Fatal("click escaped scope")
 	}
-	if !f.Update(tea.KeyPressMsg{Code: tea.KeyTab}, nil) {
+	if _, ok := f.Update(tea.KeyPressMsg{Code: tea.KeyTab}, nil); !ok {
 		t.Fatal("tab not handled without frame")
+	}
+	if _, ok := f.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, nil); ok {
+		t.Fatal("enter handled without frame")
+	}
+	// Focused, but outside the scope pushed, b can't be pressed.
+	f.Set("b")
+	f.Push("elsewhere")
+	f.Set("b")
+	if _, ok := f.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, r.Frame()); ok || pressed != 2 {
+		t.Fatal("enter pressed a node outside the scope")
+	}
+
+	// Nor once it is no longer focusable, as a disabled button would be.
+	f.Pop()
+	r.Render(10, 2, Text("b").ID("b").On(on.Press(func() tea.Cmd { pressed++; return nil })))
+	if _, ok := f.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, r.Frame()); ok || pressed != 2 {
+		t.Fatal("enter pressed a node that can't be focused")
 	}
 }
 

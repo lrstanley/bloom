@@ -12,10 +12,7 @@ of the node with that ID, aligned with its start.
 Give the input an ID, then anchor a layer to its bottom edge:
 
 ```go
-type (
-	fieldID  string
-	optionID int // the index of a suggestion
-)
+type fieldID string
 
 const fieldLanguage fieldID = "language"
 
@@ -29,7 +26,10 @@ func (m *model) View() tea.View {
 	if matches := m.suggestions(); len(matches) > 0 {
 		options := make([]bloom.Child, len(matches))
 		for i, match := range matches {
-			options[i] = bloom.Text(match).Style(optionStyle).ID(optionID(i))
+			options[i] = bloom.Text(match).Style(optionStyle).On(on.Click(func() tea.Cmd {
+				m.language = match
+				return nil
+			}))
 		}
 		layers = append(layers, bloom.Layer(bloom.Box(menuStyle, bloom.Column(options...))).
 			AnchorTo(fieldLanguage, bloom.Bottom))
@@ -43,16 +43,17 @@ func (m *model) View() tea.View {
 
 `m.suggestions()` stands for your own matching: it returns the options that match what's been typed.
 
-The dropdown isn't modal, so the rest of the screen still gets clicks. Clicks on an option arrive as a
-`bloom.MouseMsg` like any other:
+The dropdown isn't modal, so the rest of the screen still gets clicks. A click on an option runs its handler,
+like a click on anything else.
+
+## Close it on a click elsewhere
+
+A menu that stays open until dismissed can close itself with
+[`on.ClickOutside`](https://pkg.go.dev/github.com/lrstanley/bloom/on#ClickOutside), which runs when a button goes
+down anywhere but on the layer. The click still reaches what it's on:
 
 ```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
-			if i, ok := msg.Target[optionID](); ok {
-				m.language = m.suggestions()[i]
-			}
-		}
+bloom.Layer(menu).AnchorTo(fieldLanguage, bloom.Bottom).On(on.ClickOutside(m.closeMenu))
 ```
 
 ## Choose a side
@@ -80,22 +81,21 @@ hidden too.
 
 ## Tooltips
 
-A tooltip is the same thing, shown while the pointer is over a node. Mouse motion events need
+A tooltip is the same thing, shown while the pointer is over a node. Following the pointer needs
 `v.MouseMode = tea.MouseModeAllMotion`.
 
-bloom only sends a `bloom.MouseMsg` when the pointer is over a node with an ID. To find out when it leaves a
-button for empty space, give the whole screen an ID too. Every motion event then arrives as a `bloom.MouseMsg`,
-and `Target` reports whether a button is under the pointer:
+[`on.Hover`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Hover) runs when the pointer moves onto a node and
+off it. Note which button it's over:
 
 ```go
-screen := bloom.Column(bloom.Fill(content).ID("screen"))
-```
-
-```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseMotionMsg); ok {
-			m.hovered, _ = msg.Target[buttonID]() // "" when not over a button
-		}
+bloom.Text("deploy").Style(button).ID(buttonDeploy).On(on.Hover(func(over bool) tea.Cmd {
+	if over {
+		m.hovered = buttonDeploy
+	} else if m.hovered == buttonDeploy {
+		m.hovered = ""
+	}
+	return nil
+}))
 ```
 
 Then anchor a small layer to the hovered button:

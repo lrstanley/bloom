@@ -110,13 +110,16 @@ sits still.
 dialog appears to open out of it. Find the button in the last frame when it's pressed:
 
 ```go
-case bloom.MouseMsg:
-	if id, ok := msg.Target[buttonID](); ok && id == buttonShare {
-		if r, ok := m.ui.Frame().Rect(buttonShare); ok {
-			m.shareFrom = image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
-		}
-		cmd = m.share.Show()
+bloom.Text("share").ID(buttonShare).On(on.Press(m.openShare))
+```
+
+```go
+func (m *model) openShare() tea.Cmd {
+	if r, ok := m.ui.Frame().Rect(buttonShare); ok {
+		m.shareFrom = image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
 	}
+	return m.share.Show()
+}
 ```
 
 ```go

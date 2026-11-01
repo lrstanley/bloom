@@ -33,8 +33,9 @@
 // into cells once and cached, nodes are composited in tree order with every
 // node clipped to its parent, and [fx] effects run on a node's cells or on
 // the frame beneath a layer. A frame identical to the previous one is not
-// composited again. Mouse events are routed to the node under the pointer as
-// [MouseMsg]s, using the geometry of the frame on screen.
+// composited again. Mouse events run the handlers of the nodes under the
+// pointer, given with On and made by package [on], using the geometry of
+// the frame on screen.
 //
 // Layout is a pure function of the tree, so [Solve] can compute the same
 // rectangles in Update, for components that need their size there.
@@ -49,7 +50,11 @@
 package bloom
 
 import (
+	"slices"
+
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom/on"
 )
 
 // Child is anything that can be placed in a layout: every node of this
@@ -119,11 +124,20 @@ func (a Align) offset(n, avail int) int {
 	return 0
 }
 
-// meta is what any node can be given for input: an ID to route mouse events
-// and focus by, whether it can be focused, and the cursor it shows.
+// meta is what any node can be given for input: an ID for focus and lookups,
+// whether it can be focused, the cursor it shows, its mouse handlers, and
+// the style it has while hovered.
 type meta struct {
 	id        any
 	focusable bool
 	scope     bool
 	cursor    *tea.Cursor
+	handlers  []on.Handler
+	hover     *lipgloss.Style
+}
+
+// with returns handlers with more added, without changing a slice that a
+// copy of the node may share.
+func with(handlers, more []on.Handler) []on.Handler {
+	return append(slices.Clip(handlers), more...)
 }

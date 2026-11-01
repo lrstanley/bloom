@@ -1,6 +1,6 @@
 ---
 title: Focus and keyboard navigation
-description: Track keyboard focus with bloom.Focus, move it with tab and clicks, confine it to dialogs and panels with scopes, and show the terminal cursor.
+description: Track keyboard focus with bloom.Focus, move it with tab and clicks, press buttons with enter, confine it to dialogs and panels with scopes, and show the terminal cursor.
 ---
 
 [`bloom.Focus`](https://pkg.go.dev/github.com/lrstanley/bloom#Focus) keeps track of which node has keyboard focus,
@@ -47,24 +47,50 @@ such as `bloom.Fill(m.editor).ID(paneEditor).Focusable()`, which makes a whole p
 
 ## Move focus with tab and clicks
 
-`m.focus.Update(msg, m.ui.Frame())` handles <kbd>tab</kbd> and <kbd>shift+tab</kbd>, and moves focus to a node
-when it's clicked. It reports whether it handled the message:
+`m.focus.Update(msg, m.ui.Frame())` handles <kbd>tab</kbd> and <kbd>shift+tab</kbd>. It returns a command, and
+reports whether it handled the message:
 
 ```go
 	case tea.KeyPressMsg:
-		if m.focus.Update(msg, m.ui.Frame()) {
-			break // tab or shift+tab moved focus
+		cmd, ok := m.focus.Update(msg, m.ui.Frame())
+		if !ok {
+			cmd = m.key(msg) // other keys, for whatever has focus
 		}
-		// handle other keys for whatever has focus
-	case bloom.MouseMsg:
-		m.focus.Update(msg, m.ui.Frame())
+		return m, tea.Batch(cmd, m.ui.Update(msg))
 ```
 
 `m.ui.Frame()` is the layout of the last frame drawn, which has the nodes that can be focused and their order.
 Focus wraps around from the last node to the first.
 
+To move focus to what's clicked, give the root your focus with `bloom.WithFocus`:
+
+```go
+func newModel() *model {
+	m := &model{}
+	m.ui = bloom.New(bloom.WithFocus(&m.focus))
+	return m
+}
+```
+
+A click then focuses the innermost focusable node under the pointer, before any [mouse handler](/input/mouse) for
+the click runs, so a handler can move focus on from there, as a "next" button would. The root keeps a pointer to
+your `Focus`, so keep the model behind a pointer too.
+
 You can also move focus yourself: `Set(id)`, `Next(frame)`, `Prev(frame)`, and `Clear()`. `Set` takes an ID of the
 focus's type, so `m.focus.Set("cancel")` sets the `control` `"cancel"`.
+
+## Press buttons with the keyboard
+
+A button made with [`on.Press`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Press) runs its handler when
+clicked, and when <kbd>enter</kbd> or <kbd>space</kbd> is pressed while it has focus. `m.focus.Update` runs it for
+the keys, and returns its command with `ok` set:
+
+```go
+bloom.Text("save").Style(button).ID(buttonSave).Focusable().On(on.Press(m.save))
+```
+
+Enter and space on a focused node without a `Press` handler aren't handled, so they reach your own key handling,
+such as to type a space into an input.
 
 ## Style the focused node
 
@@ -90,10 +116,6 @@ the type's zero value, which matches none of your constants:
 		switch id {
 		case fieldName, fieldEmail:
 			m.values[id] += msg.Text
-		case buttonSave:
-			if msg.String() == "enter" {
-				return m, m.save()
-			}
 		}
 ```
 

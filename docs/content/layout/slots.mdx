@@ -90,9 +90,9 @@ bloom.Column(
 
 ## Give a slot an ID
 
-Slots are where the other per-child options live: `ID` for mouse events and lookups, `Focusable` and `Scope` for
-[focus](/input/focus), `Align` for the cross axis, and `Animate` for
-[layout animation](/motion/layout-animation).
+Slots are where the other per-child options live: `ID` for focus and lookups, `On` for
+[mouse handlers](/input/mouse), `Focusable` and `Scope` for [focus](/input/focus), `Align` for the cross axis, and
+`Animate` for [layout animation](/motion/layout-animation).
 
 ```go
 bloom.Fixed(24, sidebar).ID(paneSidebar).Collapsible(1)

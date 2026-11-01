@@ -6,6 +6,7 @@ package bloom
 
 import (
 	"image"
+	"slices"
 	"strings"
 	"testing"
 	"unsafe"
@@ -86,46 +87,32 @@ func mouseTree(modal bool) Child {
 	return Overlay(base, Layer(Text("modal")).ID("modal").Modal().Anchor(End, End))
 }
 
-func click(t *testing.T, v tea.View, x, y int) (MouseMsg, bool) {
-	t.Helper()
-	cmd := v.OnMouse(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
-	if cmd == nil {
-		return MouseMsg{}, false
-	}
-	msg, ok := cmd().(MouseMsg)
-	if !ok {
-		t.Fatalf("OnMouse sent %T", cmd())
-	}
-	return msg, true
-}
-
-func TestMouse(t *testing.T) {
+func TestHit(t *testing.T) {
 	t.Parallel()
 
-	v := New().View(20, 4, mouseTree(false))
-	msg, ok := click(t, v, 2, 1)
-	if !ok {
-		t.Fatal("no message for a click on an item")
+	f := Solve(mouseTree(false), 20, 4)
+	if got := f.Hit(2, 1); !slices.Equal(got, []any{"list", itemID(1)}) {
+		t.Fatalf("Hit on item 1 = %v", got)
 	}
-	if id, found := msg.Target[itemID](); !found || id != 1 || msg.X != 2 || msg.Y != 0 {
-		t.Fatalf("click on item 1 routed to %v at %d,%d", msg.Path, msg.X, msg.Y)
-	}
-	if len(msg.Path) != 2 || msg.Path[0] != "list" {
-		t.Fatalf("path = %v", msg.Path)
-	}
-	if _, found := click(t, v, 2, 3); !found {
-		t.Fatal("a click on the list below its items was dropped")
+	if got := f.Hit(2, 3); !slices.Equal(got, []any{"list"}) {
+		t.Fatalf("Hit on the list below its items = %v", got)
 	}
 
-	v = New().View(20, 4, mouseTree(true))
-	msg, ok = click(t, v, 2, 1)
-	if !ok || !msg.Outside || len(msg.Path) != 1 || msg.Path[0] != "modal" {
-		t.Fatalf("click outside a modal = %+v, %v", msg, ok)
+	f = Solve(mouseTree(true), 20, 4)
+	if got := f.Hit(2, 1); got != nil {
+		t.Fatalf("Hit outside a modal = %v, want nil", got)
 	}
-	msg, ok = click(t, v, 18, 3)
-	if !ok || msg.Outside || msg.Path[0] != "modal" {
-		t.Fatalf("click on a modal = %+v, %v", msg, ok)
+	if got := f.Hit(18, 3); !slices.Equal(got, []any{"modal"}) {
+		t.Fatalf("Hit on a modal = %v", got)
 	}
+}
+
+// topHit returns the ID of the topmost node at x, y, or nil.
+func topHit(f *Frame, x, y int) any {
+	if path := f.Hit(x, y); len(path) > 0 {
+		return path[len(path)-1]
+	}
+	return nil
 }
 
 func TestSlideMovesHits(t *testing.T) {
@@ -142,8 +129,8 @@ func TestSlideMovesHits(t *testing.T) {
 	if v.Cursor == nil || v.Cursor.Y != got.Min.Y || v.Cursor.X != got.Min.X+1 {
 		t.Fatalf("cursor at %+v, want it in the slid layer at %v", v.Cursor, got)
 	}
-	if msg, ok := click(t, v, got.Min.X, got.Min.Y); !ok || msg.Path[0] != "up" {
-		t.Fatalf("a click on the slid layer went to %v", msg.Path)
+	if hit := topHit(r.Frame(), got.Min.X, got.Min.Y); hit != "up" {
+		t.Fatalf("a click on the slid layer went to %v", hit)
 	}
 
 	// Drawing the same frame again is skipped, but must not lose the slide.
@@ -161,13 +148,13 @@ func TestSlidingLayerHits(t *testing.T) {
 	tree := Overlay(Text("base").ID("base"),
 		Layer(Text("ABCD")).ID("layer").Anchor(Start, Start).Offset(-2, 0).Transition(0.5, fx.Slide{From: fx.Right}))
 	r := New()
-	v := r.View(8, 1, tree)
+	r.Render(8, 1, tree)
 	col := strings.Index(r.r.canvas.String(), "A")
 	if col < 0 {
 		t.Fatalf("layer not drawn: %q", r.r.canvas.String())
 	}
-	if msg, ok := click(t, v, col, 0); !ok || msg.Path[0] != "layer" {
-		t.Fatalf("a click on the layer's A at %d went to %v", col, msg.Path)
+	if hit := topHit(r.Frame(), col, 0); hit != "layer" {
+		t.Fatalf("a click on the layer's A at %d went to %v", col, hit)
 	}
 }
 
@@ -294,9 +281,9 @@ func focusTree(dialog bool) Child {
 func TestFocus(t *testing.T) {
 	t.Parallel()
 
-	r := New()
-	r.Render(20, 5, focusTree(false))
 	var f Focus[string]
+	r := New(WithFocus(&f))
+	r.Render(20, 5, focusTree(false))
 	for _, want := range []string{"a", "b", "a"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
@@ -323,9 +310,10 @@ func TestFocus(t *testing.T) {
 		t.Fatal("focus is not within the dialog")
 	}
 
-	v := r.View(20, 5, focusTree(true))
-	if msg, ok := click(t, v, 0, 0); ok && f.Click(msg) {
-		t.Fatal("a click outside the dialog moved focus")
+	r.Render(20, 5, focusTree(true))
+	r.ClickAt(0, 0)
+	if !f.Is("ok") {
+		t.Fatalf("a click outside the dialog focused %v", focused(&f))
 	}
 
 	f.Pop()
@@ -334,7 +322,8 @@ func TestFocus(t *testing.T) {
 	}
 
 	r.Render(20, 5, focusTree(false))
-	if msg, ok := click(t, r.View(20, 5, focusTree(false)), 0, 0); !ok || !f.Click(msg) || !f.Is("a") {
+	r.ClickAt(0, 0)
+	if !f.Is("a") {
 		t.Fatalf("clicking a focused %v", focused(&f))
 	}
 }

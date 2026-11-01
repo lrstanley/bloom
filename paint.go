@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 // opKind is what an op does to the frame.
@@ -123,6 +124,8 @@ type renderer struct {
 	ops      []op
 	prevOps  []op
 	entries  []entry
+	handlers [][]on.Handler // by entry
+	hovered  []mouseTarget  // the hoverable nodes under the pointer, kept by Root
 	cursor   *tea.Cursor
 	cursorAt int // index of the op drawn after the cursor was placed
 	out      string
@@ -172,7 +175,8 @@ func (r *renderer) render(c Child, w, h int) string {
 // root box.
 func (r *renderer) paintTree(c Child, w, h int) int {
 	clear(r.entries)
-	r.ops, r.entries, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.fxs[:0], nil
+	clear(r.handlers)
+	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
 	r.frames++
 	root := r.layout(c, w, h)
 	if root >= 0 {
@@ -290,12 +294,15 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 	if b.hidden || vis.Empty() {
 		return
 	}
-	if b.meta.id != nil {
+	if hasEntry(b) {
 		parent = r.addEntry(b, vis, clip, parent)
 	}
 
 	switch n := b.child.(type) {
 	case TextNode:
+		if n.hover != nil && r.isHovered(b) {
+			n.style, n.styled = *n.hover, true
+		}
 		var text string
 		if r.parse {
 			text = r.textAt(i, n, b.rect.Dx(), b.rect.Dy())
@@ -312,9 +319,13 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		if b.cramped {
 			return
 		}
+		style := n.style
+		if n.hover != nil && r.isHovered(b) {
+			style = *n.hover
+		}
 		var frame string
 		if r.parse {
-			frame = r.textAt(i, TextNode{style: n.style, styled: true}, b.rect.Dx(), b.rect.Dy())
+			frame = r.textAt(i, TextNode{style: style, styled: true}, b.rect.Dx(), b.rect.Dy())
 		}
 		r.blit(frame, b.rect, vis)
 		r.paint(r.firstKid(i), vis, parent)
@@ -378,7 +389,7 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 		r.ops = append(r.ops, op{kind: opEffects, rect: shadow, viewport: clip, t: n.t, effects: r.snapshot(n.shadow)})
 	}
 	from := len(r.entries)
-	if b.meta.id != nil || b.modal {
+	if hasEntry(b) {
 		// A layer with effects may move; placeEntries clips it once moved.
 		vis := b.rect.Intersect(clip)
 		if len(n.effects) > 0 {
@@ -396,6 +407,12 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	}
 	r.ops = append(r.ops, op{kind: opClear, rect: b.rect.Intersect(clip)})
 	r.paint(r.firstKid(i), b.rect.Intersect(clip), parent)
+}
+
+// isHovered reports whether the pointer was over box b when the mouse was
+// last routed.
+func (r *renderer) isHovered(b *box) bool {
+	return len(r.hovered) > 0 && containsKey(r.hovered, b.key())
 }
 
 // placeCursor shows c, relative to origin, if that cell is inside clip.

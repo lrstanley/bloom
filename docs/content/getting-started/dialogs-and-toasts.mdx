@@ -145,7 +145,7 @@ the effects with its progress: here it fades in while sliding up from the bottom
 Two more options are set here:
 
 - `Modal()` makes the dialog take every mouse event while it's open. Clicks outside it don't reach the notes
-  underneath; you get a `bloom.MouseMsg` with `Outside` set instead.
+  underneath.
 - `Backdrop(fx.Dim{Amount: 0.6})` dims everything beneath the dialog. It follows the presence too, so the screen
   darkens as the dialog appears.
 
@@ -173,7 +173,9 @@ between buttons:
 	focus bloom.Focus[buttonID]
 ```
 
-A button is text with an ID that's marked `Focusable`, styled by whether it has focus:
+A button is text with an ID that's marked `Focusable`, styled by whether it has focus. `on.Press` (from
+`github.com/lrstanley/bloom/on`) makes it press when it's clicked, or when <kbd>enter</kbd> or <kbd>space</kbd> is
+pressed while it has focus:
 
 ```go
 func (m *model) button(id buttonID, label string) bloom.Child {
@@ -181,7 +183,8 @@ func (m *model) button(id buttonID, label string) bloom.Child {
 	if m.focus.Is(id) {
 		style = buttonOn
 	}
-	return bloom.Text(label).Style(style).ID(id).Focusable()
+	return bloom.Text(label).Style(style).ID(id).Focusable().
+		On(on.Press(func() tea.Cmd { return m.press(id) }))
 }
 ```
 
@@ -209,40 +212,31 @@ func (m *model) closeDialog() tea.Cmd {
 ```
 
 `m.focus.Update(msg, m.ui.Frame())` handles <kbd>tab</kbd> and <kbd>shift+tab</kbd>, using the layout of the last
-frame drawn. It reports whether it handled the message, so only look at other keys when it didn't. Keep the
-command your own key handling returns in a `cmd` variable, declared with `var cmd tea.Cmd` at the top of
-`Update`, and add it to the batch you return:
+frame drawn, and presses the focused button for <kbd>enter</kbd> and <kbd>space</kbd>. It returns the button's
+command, and reports whether it handled the message, so only look at other keys when it didn't. Keep the command
+in a `cmd` variable, declared with `var cmd tea.Cmd` at the top of `Update`, and add it to the batch you return:
 
 ```go
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if !m.focus.Update(msg, m.ui.Frame()) {
+		var ok bool
+		if cmd, ok = m.focus.Update(msg, m.ui.Frame()); !ok {
 			cmd = m.key(msg)
 		}
 ```
 
-In `key`, <kbd>enter</kbd> presses whichever button has focus. `m.focus.Current()` returns the focused button's
-ID, and whether one is focused:
+A click on the backdrop, outside the modal dialog, should close it. `on.ClickOutside` on the dialog's layer runs
+for exactly that:
 
 ```go
-		case "enter":
-			if id, ok := m.focus.Current(); ok {
-				return m.press(id)
-			}
-```
-
-Clicks work the same way, with `msg.Target[buttonID]()`. A click on the backdrop, outside the modal dialog,
-closes it:
-
-```go
-	if msg.Outside {
-		return m.closeDialog()
-	}
-	if id, ok := msg.Target[buttonID](); ok {
-		return m.press(id)
-	}
+	dialog := bloom.Layer(bloom.Box(dialogBox, content)).
+		ID(confirmDialog).
+		Modal().
+		On(on.ClickOutside(m.closeDialog)).
+		Backdrop(fx.Dim{Amount: 0.6}).
+		Presence(m.confirm, fx.Fade{}, fx.Slide{From: bloom.Bottom})
 ```
 
 </Step>
@@ -306,18 +300,15 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 type note struct {
 	title, body string
 }
 
-type (
-	// noteID identifies a note in the sidebar.
-	noteID int
-	// buttonID identifies a button in the dialog.
-	buttonID string
-)
+// buttonID identifies a button in the dialog.
+type buttonID string
 
 // confirmDialog is the ID of the dialog's layer, which is also its focus scope.
 const confirmDialog = "confirm"
@@ -381,24 +372,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		if !m.focus.Update(msg, m.ui.Frame()) {
+		var ok bool
+		if cmd, ok = m.focus.Update(msg, m.ui.Frame()); !ok {
 			cmd = m.key(msg)
 		}
-	case bloom.MouseMsg:
-		cmd = m.mouse(msg)
 	}
 	return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm, &m.toast))
 }
 
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.confirm.Shown() {
-		switch msg.String() {
-		case "esc":
+		if msg.String() == "esc" {
 			return m.closeDialog()
-		case "enter":
-			if id, ok := m.focus.Current(); ok {
-				return m.press(id)
-			}
 		}
 		return nil
 	}
@@ -412,22 +397,6 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.selected = min(m.selected+1, len(m.notes)-1)
 	case "d":
 		return m.openDialog()
-	}
-	return nil
-}
-
-func (m *model) mouse(msg bloom.MouseMsg) tea.Cmd {
-	if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
-		return nil
-	}
-	if msg.Outside {
-		return m.closeDialog()
-	}
-	if id, ok := msg.Target[buttonID](); ok {
-		return m.press(id)
-	}
-	if id, ok := msg.Target[noteID](); ok {
-		m.selected = int(id)
 	}
 	return nil
 }
@@ -464,7 +433,8 @@ func (m *model) button(id buttonID, label string) bloom.Child {
 	if m.focus.Is(id) {
 		style = buttonOn
 	}
-	return bloom.Text(label).Style(style).ID(id).Focusable()
+	return bloom.Text(label).Style(style).ID(id).Focusable().
+		On(on.Press(func() tea.Cmd { return m.press(id) }))
 }
 
 func (m *model) View() tea.View {
@@ -474,7 +444,10 @@ func (m *model) View() tea.View {
 		if i == m.selected {
 			style = selected
 		}
-		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
+		items[i] = bloom.Text(n.title).Style(style).On(on.Click(func() tea.Cmd {
+			m.selected = i
+			return nil
+		}))
 	}
 
 	sidebar := bloom.Box(panel, bloom.Column(items...))
@@ -514,6 +487,7 @@ func (m *model) View() tea.View {
 	dialog := bloom.Layer(bloom.Box(dialogBox, content)).
 		ID(confirmDialog).
 		Modal().
+		On(on.ClickOutside(m.closeDialog)).
 		Backdrop(fx.Dim{Amount: 0.6}).
 		Presence(m.confirm, fx.Fade{}, fx.Slide{From: bloom.Bottom})
 
@@ -539,7 +513,8 @@ func main() {
 ## What you learned
 
 - `Overlay` draws `Layer`s over a base layout, and `Anchor` and `Margin` place them.
-- `Modal` routes every mouse event to a layer, and `Backdrop` applies an effect to everything beneath it.
+- `Modal` keeps every mouse event from what's beneath a layer, `on.ClickOutside` runs for a click on its
+  backdrop, and `Backdrop` applies an effect to everything beneath it.
 - An `anim.Presence` animates showing and hiding; `Layer(...).Presence(p, effects...)` uses it as a transition.
   Pass every message to `anim.Update` so animations keep moving.
 - `bloom.Focus` tracks keyboard focus, and `Push` and `Pop` confine it to a dialog while it's open.

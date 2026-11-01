@@ -11,6 +11,7 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 // TextNode is a string, optionally styled. Build one with [Text].
@@ -41,8 +42,23 @@ func (n TextNode) Truncate() TextNode {
 	return n
 }
 
-// ID sets the ID mouse events and focus refer to the node by.
+// ID sets the ID that focus and [Frame.Rect] refer to the node by.
 func (n TextNode) ID[K comparable](id K) TextNode { n.id = id; return n }
+
+// On adds mouse handlers to the node, made by package [on].
+func (n TextNode) On(handlers ...on.Handler) TextNode {
+	n.handlers = with(n.handlers, handlers)
+	return n
+}
+
+// HoverStyle renders the text with style instead of its own while the
+// pointer is over it, which needs no state in the model. It should take the
+// same space as the node's style, changing only how it looks. See
+// [on.Hover] for when the pointer is followed.
+func (n TextNode) HoverStyle(style lipgloss.Style) TextNode {
+	n.hover = &style
+	return n
+}
 
 // Focusable makes the node one that [Focus] can move to.
 func (n TextNode) Focusable() TextNode { n.focusable = true; return n }
@@ -121,8 +137,15 @@ func (n SlotNode) Collapsible(priority int) SlotNode { n.collapse = max(priority
 // Align overrides the container's cross-axis alignment for this slot.
 func (n SlotNode) Align(a Align) SlotNode { n.align, n.aligned = a, true; return n }
 
-// ID sets the ID mouse events and focus refer to the slot by.
+// ID sets the ID that focus, layout animation, and [Frame.Rect] refer to
+// the slot by.
 func (n SlotNode) ID[K comparable](id K) SlotNode { n.id = id; return n }
+
+// On adds mouse handlers to the slot, made by package [on].
+func (n SlotNode) On(handlers ...on.Handler) SlotNode {
+	n.handlers = with(n.handlers, handlers)
+	return n
+}
 
 // Animate smoothly moves and resizes the slot when layout changes, reflowing
 // its child at each intermediate size. It needs an ID and a retained [Root];
@@ -178,6 +201,8 @@ func (n SlotNode) track(natural, avail int) flex.Track {
 // FlexNode lays children out in a row or column. Build one with [Row] or
 // [Column].
 type FlexNode struct {
+	meta
+
 	children []Child
 	vertical bool
 	gap      int
@@ -201,12 +226,24 @@ func (n FlexNode) Justify(j flex.Justify) FlexNode { n.justify = j; return n }
 // [Stretch].
 func (n FlexNode) Align(a Align) FlexNode { n.align = a; return n }
 
+// ID sets the ID that [Frame.Rect] refers to the node by.
+func (n FlexNode) ID[K comparable](id K) FlexNode { n.id = id; return n }
+
+// On adds mouse handlers to the node, made by package [on]. They take
+// events on the gaps between children too.
+func (n FlexNode) On(handlers ...on.Handler) FlexNode {
+	n.handlers = with(n.handlers, handlers)
+	return n
+}
+
 // View implements [Child], drawing the node at its natural size.
 func (n FlexNode) View() string { return Render(n, 0, 0) }
 
 // BoxNode draws a Lip Gloss style's frame, its margins, border, padding, and
 // background, around a child. Build one with [Box].
 type BoxNode struct {
+	meta
+
 	style lipgloss.Style
 	child Child
 }
@@ -215,6 +252,26 @@ type BoxNode struct {
 // given less space than its frame takes is not drawn, rather than drawn
 // broken.
 func Box(style lipgloss.Style, child Child) BoxNode { return BoxNode{style: style, child: child} }
+
+// ID sets the ID that [Frame.Rect] refers to the box by.
+func (n BoxNode) ID[K comparable](id K) BoxNode { n.id = id; return n }
+
+// On adds mouse handlers to the box, made by package [on]. The box takes
+// events on its frame as well as inside it, and the positions handlers are
+// given are relative to its outer corner.
+func (n BoxNode) On(handlers ...on.Handler) BoxNode {
+	n.handlers = with(n.handlers, handlers)
+	return n
+}
+
+// HoverStyle draws the box's frame with style instead of its own while the
+// pointer is over it. It should take the same space as the box's style,
+// changing only how it looks. See [on.Hover] for when the pointer is
+// followed.
+func (n BoxNode) HoverStyle(style lipgloss.Style) BoxNode {
+	n.hover = &style
+	return n
+}
 
 // View implements [Child], drawing the node at its natural size.
 func (n BoxNode) View() string { return Render(n, 0, 0) }
@@ -389,8 +446,9 @@ func (n LayerNode) AnchorTo[K comparable](id K, side Edge) LayerNode {
 	return n
 }
 
-// Modal makes the layer take every mouse event: those outside it are
-// reported as [MouseMsg]s with Outside set. It is also a focus scope, for
+// Modal makes the layer take every mouse event from what is beneath it.
+// Clicks outside it run its [on.ClickOutside] handlers, such as to close a
+// dialog when its backdrop is clicked. It is also a focus scope, for
 // [Focus.Push].
 func (n LayerNode) Modal() LayerNode { n.modal, n.scope = true, true; return n }
 
@@ -419,8 +477,15 @@ func (n LayerNode) Presence(p anim.Presence, effects ...fx.Effect) LayerNode {
 	return n.Transition(p.Progress(), effects...)
 }
 
-// ID sets the ID mouse events and focus refer to the layer by.
+// ID sets the ID that focus, layout animation, anchoring, and [Frame.Rect]
+// refer to the layer by.
 func (n LayerNode) ID[K comparable](id K) LayerNode { n.id = id; return n }
+
+// On adds mouse handlers to the layer, made by package [on].
+func (n LayerNode) On(handlers ...on.Handler) LayerNode {
+	n.handlers = with(n.handlers, handlers)
+	return n
+}
 
 // Animate smoothly moves and resizes the layer when layout changes. It needs
 // an ID and a retained [Root]; without either it does nothing. Options default

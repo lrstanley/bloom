@@ -28,6 +28,7 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 const service = "payments"
@@ -149,7 +150,6 @@ func newModel() *model {
 		return anim.NewValue(1, anim.Duration(d), anim.Ease(anim.Linear))
 	}
 	m := &model{
-		ui:       bloom.New(),
 		shimmer:  anim.NewLoop(shimmerPeriod),
 		every:    time.Second,
 		roll:     effect(700 * time.Millisecond),
@@ -162,6 +162,7 @@ func newModel() *model {
 	for i, c := range cards {
 		m.vals[i], m.prev[i] = c.start, c.start
 	}
+	m.ui = bloom.New(bloom.WithFocus(&m.focus))
 	m.focus.Set(inputConfirm)
 	return m
 }
@@ -201,15 +202,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.roll.Play(0, 1), m.schedule())
 		}
 	case tea.KeyPressMsg:
-		if !m.focus.Update(msg, m.ui.Frame()) {
-			cmds = append(cmds, m.key(msg))
+		cmd, ok := m.focus.Update(msg, m.ui.Frame())
+		if !ok {
+			cmd = m.key(msg)
 		}
-	case bloom.MouseMsg:
-		if m.focus.Update(msg, m.ui.Frame()) {
-			if id, found := msg.Target[formID](); found && id == buttonDeploy {
-				cmds = append(cmds, m.deploy())
-			}
-		}
+		cmds = append(cmds, cmd)
 	}
 	cmds = append(
 		cmds,
@@ -362,7 +359,7 @@ func (m *model) form() bloom.Child {
 	case m.err != "":
 		msg = bloom.Text(m.err).Style(failure)
 	}
-	deploy := bloom.Text("deploy").Style(btn).ID(buttonDeploy).Focusable()
+	deploy := bloom.Text("deploy").Style(btn).ID(buttonDeploy).Focusable().On(on.Press(m.deploy))
 
 	return bloom.Column(
 		bloom.Text("Deploy "+service+" to production").Style(heading),

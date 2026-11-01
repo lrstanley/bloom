@@ -9,10 +9,13 @@ import (
 	"slices"
 
 	"github.com/lrstanley/bloom/flex"
+	"github.com/lrstanley/bloom/on"
 )
 
 // GridNode lays children out in equal-width columns. Build one with [Grid].
 type GridNode struct {
+	meta
+
 	children         []Child
 	cols, gapX, gapY int
 }
@@ -32,12 +35,23 @@ func (n GridNode) Gap(x, y int) GridNode {
 	return n
 }
 
+// ID sets the ID that [Frame.Rect] refers to the grid by.
+func (n GridNode) ID[K comparable](id K) GridNode { n.id = id; return n }
+
+// On adds mouse handlers to the grid, made by package [on].
+func (n GridNode) On(handlers ...on.Handler) GridNode {
+	n.handlers = with(n.handlers, handlers)
+	return n
+}
+
 // View implements [Child], drawing the grid at its natural size.
 func (n GridNode) View() string { return Render(n, 0, 0) }
 
 // WrapNode flows children at their natural sizes onto successive lines.
 // Build one with [Wrap].
 type WrapNode struct {
+	meta
+
 	children   []Child
 	gapX, gapY int
 }
@@ -51,6 +65,15 @@ func Wrap(children ...Child) WrapNode { return WrapNode{children: children} }
 // Gap sets the horizontal space between children and vertical space between lines.
 func (n WrapNode) Gap(x, y int) WrapNode {
 	n.gapX, n.gapY = max(x, 0), max(y, 0)
+	return n
+}
+
+// ID sets the ID that [Frame.Rect] refers to the flow by.
+func (n WrapNode) ID[K comparable](id K) WrapNode { n.id = id; return n }
+
+// On adds mouse handlers to the flow, made by package [on].
+func (n WrapNode) On(handlers ...on.Handler) WrapNode {
+	n.handlers = with(n.handlers, handlers)
 	return n
 }
 

@@ -49,17 +49,36 @@ Check each of these:
 
 - The view turns on mouse reporting: `v.MouseMode = tea.MouseModeCellMotion` (or `tea.MouseModeAllMotion` for
   hover).
-- The view comes from `m.ui.View(...)`. It installs the handler that sends `bloom.MouseMsg`. If you build the
-  `tea.View` yourself, or replace its `OnMouse`, the messages stop.
-- The node, or something it's inside, has an `ID`. Events over nodes without IDs aren't sent.
-- `msg.Target[T]()` uses the same type you gave the ID. `ID("save")` is a `string`; `ID(buttonID("save"))` is a
-  `buttonID`, and `Target[string]` won't find it.
+- The handler is on the node, or on something it's inside, with `On(...)`.
+- A node inside it doesn't have a handler of the same kind. The innermost one takes the event; see
+  [which node gets the event](/input/mouse#which-node-gets-the-event).
+- A click runs when the button comes up over the node it went down on. Releasing it elsewhere cancels the click.
 - A modal layer isn't open, taking the events.
+- The view comes from `m.ui.View(...)`, which installs the `OnMouse` handler that runs your handlers. If you build
+  the `tea.View` yourself or replace its `OnMouse`, pass every message to `m.ui.Update`, which then runs them.
+
+## A handler runs, but nothing changes
+
+Handlers are closures made in `View`, so they change whatever `View` captured. If that's a copy, the change is
+lost:
+
+- `View` has a value receiver, `func (m model) View()`. Use a pointer receiver, or have the handler send a message
+  with `on.Msg(msg)` and change the state in `Update`.
+- The handler is built in a component kept by value in its parent, such as a Bubbles-style list updated with
+  `m.list, cmd = m.list.Update(msg)`. Have the component send a message with `on.Msg` and handle it in its own
+  `Update`, or build the handler in the parent over `&m.list`.
+
+See [change state, or send a message](/input/mouse#change-state-or-send-a-message).
 
 ## Every click happens twice
 
-Both the original `tea.MouseClickMsg` and the `bloom.MouseMsg` made from it reach `Update`. Handle one or the other.
-See [Mouse events](/input/mouse#handle-a-mousemsg).
+Your handlers run, and the original `tea.MouseClickMsg` reaches `Update` too. If you also handle the raw mouse
+messages, don't act on an event a handler already handled.
+
+## The screen freezes after a click
+
+A handler runs on the Bubble Tea event loop, the same as `Update`, so it must not block: no sleeping, waiting, or
+I/O in the handler itself. Return a command for that work instead, which runs in the background.
 
 ## Animations don't move, or stop partway
 

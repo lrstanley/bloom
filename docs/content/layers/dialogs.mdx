@@ -52,18 +52,17 @@ return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
 
 ## Make it modal
 
-`Modal()` makes a layer take every mouse event. Clicks inside it go to its nodes as usual. Clicks outside arrive as
-a `bloom.MouseMsg` with `Outside` set, rather than reaching the screen behind, so you can close the dialog:
+`Modal()` makes a layer take every mouse event from what's beneath it. Clicks inside it go to its nodes as usual.
+Clicks outside don't reach the screen behind; they run the layer's
+[`on.ClickOutside`](https://pkg.go.dev/github.com/lrstanley/bloom/on#ClickOutside) handler, so you can close the
+dialog:
 
 ```go
-bloom.Layer(dialog).ID(confirmDialog).Modal().Presence(m.confirm, fx.Fade{})
-```
-
-```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); ok && msg.Outside {
-			return m, m.closeDialog()
-		}
+bloom.Layer(dialog).
+	ID(confirmDialog).
+	Modal().
+	On(on.ClickOutside(m.closeDialog)).
+	Presence(m.confirm, fx.Fade{})
 ```
 
 A modal layer with an ID is also a focus scope. See [focus and keyboard navigation](/input/focus#keep-focus-inside-a-dialog)

@@ -229,18 +229,19 @@ Then handle the arrow keys in `Update`, next to the quit keys:
 
 ### Make the notes clickable
 
-To find out what was clicked, give nodes an **ID**. An ID can be any comparable value, and using a type of your
-own for each kind of node makes clicks easy to tell apart. Add one for notes:
+Mouse handlers go on the nodes they're about, with `On`. The handlers come from the `on` package, so import it:
 
 ```go
-// noteID identifies a note in the sidebar, so a click can say which one it hit.
-type noteID int
+import "github.com/lrstanley/bloom/on"
 ```
 
-Give each sidebar item its ID in `View`:
+Give each sidebar item a click handler in `View`:
 
 ```go
-		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
+		items[i] = bloom.Text(n.title).Style(style).On(on.Click(func() tea.Cmd {
+			m.selected = i
+			return nil
+		}))
 ```
 
 And turn on mouse reporting, before returning the view:
@@ -249,21 +250,9 @@ And turn on mouse reporting, before returning the view:
 	v.MouseMode = tea.MouseModeCellMotion
 ```
 
-The root now sends a `bloom.MouseMsg` to `Update` for every mouse event over a node with an ID.
-`msg.Target[noteID]()` returns the `noteID` of the node under the pointer, if it has one. Handle clicks in
-`Update`:
-
-```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
-			if id, ok := msg.Target[noteID](); ok {
-				m.selected = int(id)
-			}
-		}
-```
-
-`msg.Msg` is the original Bubble Tea mouse event, so you can check whether it was a click, a release, the wheel,
-or motion. bloom has already worked out which node it landed on.
+A click on a note now runs its handler. bloom works out which node the pointer is over, and runs the handler on
+the Bubble Tea event loop just before `Update`, so it can change the model directly, as `Update` does. That works
+because `View` has a pointer receiver: the handler captures `m`, the model itself, not a copy.
 
 </Step>
 <Step>
@@ -301,6 +290,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/on"
 )
 
 type note struct {
@@ -312,9 +302,6 @@ var notes = []note{
 	{"Ideas", "A terminal garden that grows while you type."},
 	{"Reading", "The Elements of Typographic Style, chapter 2."},
 }
-
-// noteID identifies a note in the sidebar, so a click can say which one it hit.
-type noteID int
 
 var (
 	muted  = lipgloss.Color("#6e6a86")
@@ -354,12 +341,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down":
 			m.selected = min(m.selected+1, len(notes)-1)
 		}
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
-			if id, ok := msg.Target[noteID](); ok {
-				m.selected = int(id)
-			}
-		}
 	}
 	return m, m.ui.Update(msg)
 }
@@ -371,7 +352,10 @@ func (m *model) View() tea.View {
 		if i == m.selected {
 			style = selected
 		}
-		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
+		items[i] = bloom.Text(n.title).Style(style).On(on.Click(func() tea.Cmd {
+			m.selected = i
+			return nil
+		}))
 	}
 
 	current := notes[m.selected]
@@ -411,7 +395,8 @@ func main() {
 - `Row` and `Column` share space between children, and the slot a child is in decides its share: `Fixed`,
   `Fill`, or its natural size.
 - `Box` draws a Lip Gloss border around a child, and `Text(...).Style(...)` styles and wraps text.
-- Nodes with an `ID` receive `bloom.MouseMsg`s, and `msg.Target[T]()` finds the node you care about.
+- `On` attaches mouse handlers from the `on` package to the node they're about, and they can change the model
+  directly.
 - `Min` and `Collapsible` decide what gives way when space runs out.
 
 Next, [add a dialog and a toast](/getting-started/dialogs-and-toasts) to this app. For more on how rows and

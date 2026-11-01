@@ -53,7 +53,8 @@ Any value with a `View() string` method can also be a child.
 | `Min(n)`, `Max(n)` | clamp the size on the main axis |
 | `Collapsible(priority)` | allow dropping the slot when minimums don't fit, lowest priority first |
 | `Align(a)` | this slot's cross-axis placement |
-| `ID(id)` | the ID for mouse events, focus, and `Frame.Rect` |
+| `ID(id)` | the ID for focus, layout animation, and `Frame.Rect` |
+| `On(handlers...)` | [mouse handlers](/input/mouse) from the `on` package |
 | `Focusable()` | a stop in the focus order |
 | `Scope()` | a focus scope, for `Focus.Within` and `Focus.Push` |
 | `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
@@ -65,7 +66,11 @@ Any value with a `View() string` method can also be a child.
 | `Style(style)` | render with a Lip Gloss style at the node's size, wrapping long lines |
 | `Truncate()` | one line, cut short with "…" |
 | `Cursor(c)` | show the terminal cursor at `c`, relative to the node |
-| `ID(id)`, `Focusable()` | as for slots |
+| `HoverStyle(style)` | render with `style` while the pointer is over the node |
+| `ID(id)`, `Focusable()`, `On(handlers...)` | as for slots |
+
+Boxes, rows, columns, grids, and wraps have `ID(id)` and `On(handlers...)` too, and boxes have `HoverStyle(style)`
+for their frame.
 
 `Marquee` has `Style(style)` and `Gap(s)`, the text shown between loops. `Skeleton` has `Style(style)`, which
 colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
@@ -79,12 +84,13 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | `Offset(x, y)` | move from where it's anchored |
 | `Size(w, h)` | set the size; zero uses the natural size |
 | `Margin(n)` | stay `n` cells from the screen's edges |
-| `Modal()` | take every mouse event, and be a focus scope |
+| `Modal()` | take every mouse event from what's beneath, and be a focus scope |
 | `Backdrop(effects...)` | apply effects to everything beneath |
 | `Shadow(x, y, effects...)` | apply effects beneath, offset like a drop shadow |
 | `Presence(p, effects...)` | show while a presence is visible, with effects |
 | `Transition(t, effects...)` | draw with effects at progress `t` |
-| `ID(id)` | the ID for mouse events, focus, and `Frame.Rect` |
+| `ID(id)` | the ID for focus, anchoring, layout animation, and `Frame.Rect` |
+| `On(handlers...)` | mouse handlers; `on.ClickOutside` runs for a modal layer's backdrop |
 | `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
 
 ## Root
@@ -93,10 +99,11 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | --- | --- |
 | `bloom.New(opts...)` | make a root; keep it in your model by pointer |
 | `ui.Init()` | ask the terminal for its colors; return from `Init` |
-| `ui.Update(msg)` | hear the terminal, and run layout animation; pass every message, return the command |
-| `ui.View(w, h, tree)` | lay out, draw, and return a `tea.View` with mouse routing |
+| `ui.Update(msg)` | hear the terminal, run layout animation, and keep hover up to date; pass every message, return the command |
+| `ui.View(w, h, tree)` | lay out, draw, and return a `tea.View` that runs mouse handlers |
 | `ui.Render(w, h, tree)` | lay out and draw to a string; a height of zero uses the natural height |
 | `ui.Frame()` | the geometry of the last frame drawn |
+| `ui.Click(id)`, `ui.ClickAt(x, y)` | run the handlers for a click, for tests |
 
 ### Root options
 
@@ -106,7 +113,8 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`WithFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFPS) | 60 | the frame rate of layout animation |
 | [`WithUnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithUnfocusedFPS) | 10 | the frame rate of layout animation while the terminal isn't focused |
 | [`WithWidthMethod(m)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
-| [`WithClock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) | `time.Now` | the clock for layout animation, for tests |
+| [`WithClock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) | `time.Now` | the clock for layout animation and double clicks, for tests |
+| [`WithFocus(&m.focus)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFocus) | none | the focus that clicks move, before handlers run |
 
 ## Geometry and input
 
@@ -115,8 +123,26 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`Solve(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) | lay out without drawing, and return the `*Frame` |
 | [`Render(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) | lay out and draw to a string, without a root |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
-| `MouseMsg.Target[T]()` | the innermost ID of type `T` under the pointer |
-| `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Click`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
+| `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
+| [`ThrottleMouse(every)`](https://pkg.go.dev/github.com/lrstanley/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
+| `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
+
+## Mouse handlers
+
+From [`github.com/lrstanley/bloom/on`](https://pkg.go.dev/github.com/lrstanley/bloom/on), for `On(...)`:
+
+| Handler | Runs on |
+| --- | --- |
+| `on.Click(fn)`, `on.RightClick(fn)`, `on.MiddleClick(fn)` | a click with that button, when it comes up over the node |
+| `on.DoubleClick(fn)` | the second of two left clicks within 400ms |
+| `on.Press(fn)` | a left click, or enter or space while focused |
+| `on.ClickAt(fn)` | a left click, with an `on.Event` holding where |
+| `on.Scroll(fn)` | the wheel, as `dx, dy` |
+| `on.Hover(fn)` | the pointer moving onto or off the node |
+| `on.Drag(fn)` | a left-button drag that starts on the node, until the button comes up |
+| `on.ClickOutside(fn)` | a button going down anywhere else; a modal layer's backdrop |
+| `on.Mouse(fn)` | every mouse event over the node |
+| `on.Msg(msg)` | a handler function that sends `msg` to `Update` |
 
 Component interfaces: [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports a natural size,
 and [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a layout for the space given.

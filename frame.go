@@ -9,51 +9,92 @@ import (
 	"slices"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bloom/on"
 )
 
-// entry is a node of a frame that input refers to: one with an ID, or a
-// modal layer.
+// entry is a node of a frame that input refers to: one with an ID, mouse
+// handlers, or a hover style, or a modal layer.
 type entry struct {
 	id                      any
+	key                     nodeKey
 	rect                    image.Rectangle // where the node was laid out
 	vis                     image.Rectangle // the part of rect on screen
 	block                   image.Rectangle // for a modal layer, the area it takes events from
 	parent                  int             // nearest ancestor entry, or -1
 	focusable, scope, modal bool
+	hoverable               bool // the node has a hover style
+}
+
+// nodeKey is what a node is followed by from frame to frame: its ID, or
+// without one, where it is in the tree.
+type nodeKey struct {
+	id   any
+	path uint64
+}
+
+func (b *box) key() nodeKey {
+	if b.meta.id != nil {
+		return nodeKey{id: b.meta.id}
+	}
+	return nodeKey{path: b.path}
 }
 
 func (r *renderer) addEntry(b *box, vis, clip image.Rectangle, parent int) int {
 	e := entry{
-		id: b.meta.id, rect: b.rect, vis: vis, parent: parent,
+		id: b.meta.id, key: b.key(), rect: b.rect, vis: vis, parent: parent,
 		focusable: b.meta.focusable, scope: b.meta.scope, modal: b.modal,
+		hoverable: b.meta.hover != nil,
 	}
 	if b.modal {
 		e.block = clip
 	}
 	r.entries = append(r.entries, e)
+	r.handlers = append(r.handlers, b.meta.handlers)
 	return len(r.entries) - 1
 }
 
+// hasEntry reports whether box b needs an entry in the frame.
+func hasEntry(b *box) bool {
+	return b.meta.id != nil || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil
+}
+
 // Frame is the geometry of a laid-out frame: where each node with an ID
-// went, which nodes can be focused, and what the mouse can hit. It does not
-// change once made, so it is safe to keep.
+// went, which nodes can be focused, and what the mouse can hit, with the
+// mouse handlers nodes were given. It does not change once made, so it is
+// safe to keep.
 type Frame struct {
-	entries []entry
-	cursor  *tea.Cursor
+	entries  []entry
+	handlers [][]on.Handler // by entry
+	cursor   *tea.Cursor
 }
 
 // Rect returns where the node with ID id was laid out, which may be partly
 // off screen, and whether it is in the frame. Retained layout animations
 // report the visual rectangle drawn this frame.
 func (f *Frame) Rect[K comparable](id K) (image.Rectangle, bool) {
-	if f != nil {
-		for i := range f.entries {
-			if f.entries[i].id == any(id) {
-				return f.entries[i].rect, true
-			}
-		}
+	if i := f.index(id); i >= 0 {
+		return f.entries[i].rect, true
 	}
 	return image.Rectangle{}, false
+}
+
+// Hit returns the IDs of the nodes at x, y on screen that mouse events
+// there reach, outermost first, so the last is the topmost node hit. It is
+// nil when nothing with an ID is there, or when a modal layer takes the
+// point although it is outside the layer. It is for handling a
+// [tea.MouseMsg] in Update rather than with handlers.
+func (f *Frame) Hit(x, y int) []any {
+	if f == nil {
+		return nil
+	}
+	chain, _ := f.under(image.Pt(x, y), nil)
+	var path []any
+	for _, i := range slices.Backward(chain) {
+		if id := f.entries[i].id; id != nil {
+			path = append(path, id)
+		}
+	}
+	return path
 }
 
 // hit returns the entry the point p is on, the topmost one drawn, or -1.
@@ -72,65 +113,36 @@ func (f *Frame) hit(p image.Point) (entry int, outside bool) {
 	return -1, false
 }
 
-// path returns the IDs of entry i and its ancestors, outermost first.
-func (f *Frame) path(i int) []any {
-	var path []any
-	for ; i >= 0; i = f.entries[i].parent {
-		if id := f.entries[i].id; id != nil {
-			path = append(path, id)
+// under appends to chain the entries that events at p reach, innermost
+// first: the entry hit and those it is inside, stopping at the topmost
+// modal layer that takes p, whose index is floor, or 0 when there is none.
+// Nothing before floor takes events at p, besides the entries inside the
+// modal layer itself.
+func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
+	for i := len(f.entries) - 1; i >= 0; i-- {
+		if e := &f.entries[i]; e.modal && p.In(e.block) {
+			floor = i
+			break
 		}
 	}
-	slices.Reverse(path)
-	return path
+	i, outside := f.hit(p)
+	if outside {
+		return chain, floor
+	}
+	for ; i >= floor; i = f.entries[i].parent {
+		chain = append(chain, i)
+	}
+	return chain, floor
 }
 
-// MouseMsg is a mouse event routed to the node under the pointer, sent by
-// the [tea.View.OnMouse] handler [Root.View] installs. The [tea.MouseMsg]
-// it was made from is still sent to Update too, so handle one or the other.
-type MouseMsg struct {
-	// Msg is the original event, in screen coordinates.
-	Msg tea.MouseMsg
-	// Path holds the IDs of the node hit and of the nodes it is inside that
-	// have IDs, outermost first, so the last is the node hit.
-	Path []any
-	// X and Y are where the pointer is, relative to the node hit.
-	X, Y int
-	// Outside is set when a modal layer took an event outside it, such as a
-	// click on the backdrop; Path is the layer's.
-	Outside bool
-
-	frame *Frame
-	entry int
-}
-
-// Target returns the innermost ID in m.Path of type K, which lets a type of
-// ID stand for a kind of node, such as one per list item.
-func (m MouseMsg) Target[K comparable]() (K, bool) {
-	for _, v := range slices.Backward(m.Path) {
-		if id, ok := v.(K); ok {
-			return id, true
+// find returns the entry of the node with key k, or -1.
+func (f *Frame) find(k nodeKey) int {
+	for i := range f.entries {
+		if f.entries[i].key == k {
+			return i
 		}
 	}
-	var zero K
-	return zero, false
-}
-
-// onMouse routes msg to the node under the pointer as a [MouseMsg].
-func (f *Frame) onMouse(msg tea.MouseMsg) tea.Cmd {
-	m := msg.Mouse()
-	i, outside := f.hit(image.Pt(m.X, m.Y))
-	if i < 0 {
-		return nil
-	}
-	origin := f.entries[i].rect.Min
-	routed := MouseMsg{
-		Msg: msg, Path: f.path(i), X: m.X - origin.X, Y: m.Y - origin.Y,
-		Outside: outside, frame: f, entry: i,
-	}
-	if len(routed.Path) == 0 && !outside {
-		return nil
-	}
-	return func() tea.Msg { return routed }
+	return -1
 }
 
 // inScope reports whether entry i is inside the scope with ID scope.

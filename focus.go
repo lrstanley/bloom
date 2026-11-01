@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bloom/on"
 )
 
 // Focus is which node has the keyboard focus, by its ID, of type K. Keep it
@@ -146,19 +147,15 @@ func (f *Focus[K]) step(frame *Frame, dir int) bool {
 	return true
 }
 
-// Click focuses the innermost node that can be focused under a mouse event,
-// and reports whether there was one.
-func (f *Focus[K]) Click(m MouseMsg) bool {
-	if m.frame == nil || m.Outside {
-		return false
-	}
-	for i := m.entry; i >= 0; i = m.frame.entries[i].parent {
-		if id, ok := f.focusable(m.frame, i); ok {
+// click focuses the innermost node of chain that can be focused, for
+// [WithFocus].
+func (f *Focus[K]) click(frame *Frame, chain []int) {
+	for _, i := range chain {
+		if id, ok := f.focusable(frame, i); ok {
 			f.Set(id)
-			return true
+			return
 		}
 	}
-	return false
 }
 
 // focusable returns the ID of entry i of frame, if it can take focus now: it
@@ -174,24 +171,39 @@ func (f *Focus[K]) focusable(frame *Frame, i int) (K, bool) {
 	return id, scope == nil || frame.inScope(i, scope)
 }
 
-// Update handles tab and shift+tab key presses, and routed mouse clicks.
-// Tab keys are handled even when frame has no focusable nodes; clicks report
-// whether [Focus.Click] found a node in the current scope.
-func (f *Focus[K]) Update(msg tea.Msg, frame *Frame) bool {
-	switch m := msg.(type) {
-	case tea.KeyPressMsg:
-		switch m.String() {
-		case "tab":
-			f.Next(frame)
-			return true
-		case "shift+tab":
-			f.Prev(frame)
-			return true
-		}
-	case MouseMsg:
-		if _, ok := m.Msg.(tea.MouseClickMsg); ok {
-			return f.Click(m)
-		}
+// Update handles tab and shift+tab, which move the focus, and enter and
+// space, which run the [on.Press] handlers of the focused node in frame. It
+// returns their commands, and reports whether it handled msg: tab keys are
+// handled even when frame has no focusable nodes, and enter and space only
+// when the focused node has a Press handler. Clicks move the focus with
+// [WithFocus].
+func (f *Focus[K]) Update(msg tea.Msg, frame *Frame) (tea.Cmd, bool) {
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return nil, false
 	}
-	return false
+	switch key.String() {
+	case "tab":
+		f.Next(frame)
+		return nil, true
+	case "shift+tab":
+		f.Prev(frame)
+		return nil, true
+	case "enter", "space":
+		i := -1
+		if f.focused {
+			i = frame.index(f.current)
+		}
+		if i < 0 || !has(frame.handlers[i], kindsOf(on.KindPress)) {
+			return nil, false
+		}
+		if _, can := f.focusable(frame, i); !can {
+			// It can't take focus now, such as from outside the scope pushed.
+			return nil, false
+		}
+		var cmds []tea.Cmd
+		t := frame.target(i)
+		return tea.Batch(run(cmds, t.handlers, kindsOf(on.KindPress), on.Event{W: t.rect.Dx(), H: t.rect.Dy()})...), true
+	}
+	return nil, false
 }

@@ -1,10 +1,10 @@
 ---
 title: Mouse events
-description: Find out which node a click, wheel, or motion event landed on, using IDs of your own types, local coordinates, and modal layers.
+description: Attach click, wheel, hover, and drag handlers to the nodes they're about with the on package, change state directly or send a message, and use hover styles, drags, and modal layers.
 ---
 
-Bubble Tea reports mouse events in screen coordinates. bloom knows where it drew every node, so it can tell you
-which node an event landed on, and where inside it.
+Bubble Tea reports mouse events in screen coordinates. bloom knows where it drew every node, so you attach handlers
+to the nodes themselves, and bloom runs the right one with positions relative to that node.
 
 ## Turn on mouse reporting
 
@@ -16,124 +16,233 @@ v.MouseMode = tea.MouseModeCellMotion // clicks, the wheel, and drags
 return v
 ```
 
-Use `tea.MouseModeAllMotion` to also get motion while no button is pressed, for hover effects.
+Use `tea.MouseModeAllMotion` to also get motion while no button is pressed, for [hover](#hover).
 
-## Give nodes IDs
+## Attach handlers
 
-Only nodes with an ID receive events. Text, slots, and layers have an `ID` method:
-
-```go
-bloom.Text("Save").Style(button).ID(buttonID("save"))
-bloom.Fill(m.reader).ID(paneReader)
-bloom.Layer(dialog).ID(confirmDialog)
-```
-
-An ID can be any comparable value. Defining a type for each kind of node keeps them apart, and lets an ID carry
-data, such as an index:
+Every node has an `On` method, which takes handlers made by the
+[`on`](https://pkg.go.dev/github.com/lrstanley/bloom/on) package:
 
 ```go
-type (
-	paneID   string
-	buttonID string
-	rowID    int // the index of a row in a table
-)
+import "github.com/lrstanley/bloom/on"
 ```
-
-## Handle a MouseMsg
-
-`m.ui.View` installs a handler that turns each mouse event into a
-[`bloom.MouseMsg`](https://pkg.go.dev/github.com/lrstanley/bloom#MouseMsg) for the node under the pointer.
-`msg.Target[T]()` returns the innermost ID of type `T` that the pointer is inside:
 
 ```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
-			break
-		}
-		if row, ok := msg.Target[rowID](); ok {
-			m.selected = int(row)
-		}
+for i, s := range services {
+	rows[i] = bloom.Text(s).On(
+		on.Click(func() tea.Cmd { m.selected = i; return nil }),
+		on.DoubleClick(func() tea.Cmd { return m.open(i) }),
+		on.RightClick(on.Msg(menuMsg{i})),
+	)
+}
 ```
 
-The fields of a `MouseMsg`:
+No IDs are needed: the handler is already on the node it's about. Text, slots, boxes, rows, columns, grids, wraps,
+and layers all have `On`.
 
-| Field | Holds |
+| Handler | Runs on |
 | --- | --- |
-| `Msg` | the original Bubble Tea event: a `tea.MouseClickMsg`, `tea.MouseReleaseMsg`, `tea.MouseWheelMsg`, or `tea.MouseMotionMsg`, in screen coordinates |
-| `Path` | the IDs of the node hit and of the nodes with IDs it's inside, outermost first |
-| `X`, `Y` | where the pointer is, relative to the node hit |
-| `Outside` | set when a [modal layer](/layers/dialogs#make-it-modal) took an event outside itself |
+| `on.Click(fn)` | a left click: the button goes down and comes up over the node |
+| `on.RightClick(fn)`, `on.MiddleClick(fn)` | a click with those buttons |
+| `on.DoubleClick(fn)` | the second of two clicks within 400ms; both clicks still run `Click` |
+| `on.Press(fn)` | a left click, or <kbd>enter</kbd> or <kbd>space</kbd> while the node has [focus](/input/focus#press-buttons-with-the-keyboard) |
+| `on.ClickAt(fn)` | a left click, with where it happened |
+| `on.Scroll(fn)` | the wheel, as `dx, dy` steps |
+| `on.Hover(fn)` | the pointer moving onto the node (`true`) or off it (`false`) |
+| `on.Drag(fn)` | the button going down on the node, the pointer moving while it's held, and it coming up |
+| `on.ClickOutside(fn)` | a button going down anywhere but on the node |
+| `on.Mouse(fn)` | every mouse event over the node, for anything else |
 
-Because `Target` looks through the whole path, a click on a button inside a row inside a pane can be checked for
-each: `msg.Target[buttonID]()`, `msg.Target[rowID]()`, and `msg.Target[paneID]()` all succeed.
+Most take a `func() tea.Cmd`, so methods such as `m.save` can be passed as they are. Clicks run when the button
+comes up over the same node it went down on, like a real button: pressing a button and sliding off it before
+letting go doesn't click it.
 
-<Callout type="warn" title="You get both messages">
-  The original `tea.MouseClickMsg` (or other mouse message) still reaches `Update` too, as well as the
-  `bloom.MouseMsg` made from it. Handle one or the other, not both, or every click will count twice.
+## Change state, or send a message
+
+Handlers run on the Bubble Tea event loop, just before `Update` gets the same event, so a handler can change the
+model directly, the same way `Update` does: change state, then return a command. The command runs in the
+background, so a `tea.Tick` or I/O doesn't freeze the screen. Handlers themselves must not block.
+
+A handler can only change the real model if it reaches it. Handlers are closures made in `View`, so they capture
+whatever `View` had. With a pointer receiver, `func (m *model) View()`, that's the model itself. With a value
+receiver, it's a copy, and changes made to it are lost without warning.
+
+When a handler can't reach the state, have it send a message instead. `on.Msg(msg)` makes a handler function that
+sends `msg` to `Update`:
+
+```go
+bloom.Text(name).On(on.Click(on.Msg(openMsg(i))))
+```
+
+```go
+	case openMsg:
+		m.page = int(msg)
+```
+
+<Callout type="warn" title="Components kept by value">
+  This matters most for components. A Bubbles-style component is often kept by value in its parent
+  (`m.list, cmd = m.list.Update(msg)`), so a handler built in its own `View` that sets `l.selected` changes a copy,
+  even when the parent is a pointer. Have the component send a message with `on.Msg` and handle it in its own
+  `Update`, give it pointer receivers, or build the handler in the parent over `&m.list`.
 </Callout>
+
+Messages from separate events can arrive in any order, since Bubble Tea sends each in its own goroutine. Changes
+made directly in handlers happen in order.
+
+## Which node gets the event
+
+For each kind of event, the innermost node under the pointer with a handler for it takes it, and the nodes it's
+inside don't. A row's `Click` and its pane's `Scroll` work side by side, with no need to stop anything from
+spreading:
+
+```go
+pane := bloom.Column(rows...).On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; return nil }))
+```
+
+A click on a row runs the row's `Click`; the wheel over the same row scrolls the pane. A click on the pane where
+there's no row runs the pane's `Click`, if it has one. Gaps between the children of a row or column belong to the
+row or column, so a click anywhere along a list row's line can select it.
+
+Hover is the exception: every node under the pointer is hovered, as in CSS.
 
 ## Use the position inside a node
 
-`X` and `Y` are relative to the node hit, which is useful for things like a progress bar you can click to seek:
+`on.ClickAt` gets an [`on.Event`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Event), with `X` and `Y`
+relative to the node the handler is on, and `W` and `H`, its size. A seek bar needs nothing else:
 
 ```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); ok {
-			if _, ok := msg.Target[seekBar](); ok {
-				m.position = m.duration * time.Duration(msg.X) / time.Duration(m.seekWidth)
-			}
-		}
+bloom.Fixed(1, bar).On(on.ClickAt(func(e on.Event) tea.Cmd {
+	m.position = m.duration * time.Duration(e.X) / time.Duration(e.W)
+	return nil
+}))
 ```
 
-`X` and `Y` are relative to the innermost node with an ID, so give the seek bar the ID, not its container.
+The rectangle of a box includes its border and padding, so `X` and `Y` count from its outer corner.
 
 ## Scroll with the wheel
 
-Check which pane the pointer is over, so each pane scrolls on its own:
+`on.Scroll` gets `dy` as `1` for each step down and `-1` for each step up, and `dx` the same for left and right.
+Each pane scrolls on its own:
 
 ```go
-	case bloom.MouseMsg:
-		wheel, ok := msg.Msg.(tea.MouseWheelMsg)
-		if !ok {
-			break
-		}
-		delta := 3
-		if wheel.Button == tea.MouseWheelUp {
-			delta = -3
-		}
-		switch pane, _ := msg.Target[paneID](); pane {
-		case paneList:
-			m.listOffset += delta
-		case paneReader:
-			m.readerOffset += delta
-		}
+bloom.Fill(m.reader).On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; return nil }))
 ```
+
+Clamp the offset in `Update`, which gets the wheel event after the handler ran.
+
+## Hover
+
+`HoverStyle` on text and boxes swaps in a style while the pointer is over the node, with no state in the model:
+
+```go
+bloom.Text("save").Style(button).HoverStyle(buttonHover).On(on.Press(m.save))
+```
+
+Give it a style that takes the same space as the node's own, changing only its colors and attributes.
+
+For anything more, such as showing a tooltip, `on.Hover` runs when the pointer moves onto the node and off it:
+
+```go
+bloom.Text("deploy").On(on.Hover(func(over bool) tea.Cmd { m.tip = over; return nil }))
+```
+
+Both need `tea.MouseModeAllMotion` to follow the pointer while no button is down. A node stops being hovered when
+something covers it, such as a dialog opening over it, even without the pointer moving. bloom notices with the next
+message `m.ui.Update` gets after the new frame is drawn, such as an animation frame, a key, or the pointer moving. Terminals don't report the
+pointer leaving the window, so the hover also ends when the window loses focus, which needs `v.ReportFocus = true`.
+
+## Drag
+
+`on.Drag` runs when the left button goes down on the node, each time the pointer moves while it's held, and once
+more with `Done` set when it comes up. The node keeps getting the drag after the pointer leaves it, which a
+one-cell splitter needs:
+
+```go
+divider := bloom.Fixed(1, bloom.Text("│")).On(on.Drag(func(e on.Event) tea.Cmd {
+	m.split = e.Screen.X
+	return nil
+}))
+```
+
+`e.Screen` is where the pointer is on screen, `e.Start` is where the drag started, and `e.X` and `e.Y` are relative
+to the node, outside it when the pointer is.
+
+A drag also ends, with `Done` set, when the node leaves the frame or a modal layer opens over it, and when the
+release gets lost, such as outside the window. bloom follows the dragged node from frame to frame by where it is in
+the tree, or by its ID if it has one, so give a node that moves around in the tree while it's dragged an ID.
 
 ## Layers and the mouse
 
-Layers drawn on top get events first. A layer that's [modal](/layers/dialogs#make-it-modal) takes every event,
-including those outside it, which arrive with `Outside` set and the layer's ID as the path. That's how clicking
-the backdrop closes a dialog:
+Layers drawn on top get events first. A layer that's [modal](/layers/dialogs#make-it-modal) takes every event from
+what's beneath it. `on.ClickOutside` on a modal layer runs for a click on its backdrop, which is how a dialog closes
+when you click away from it:
 
 ```go
-	case bloom.MouseMsg:
-		if _, ok := msg.Msg.(tea.MouseClickMsg); ok && msg.Outside {
-			return m, m.closeDialog()
-		}
+bloom.Layer(dialog).Modal().On(on.ClickOutside(m.closeDialog))
 ```
+
+On a layer that isn't modal, such as a [dropdown](/layers/dropdowns), `on.ClickOutside` runs for a click anywhere
+else, and the click still reaches what it's on.
 
 A layer whose presence is hidden doesn't take events. One that's still animating out does, so a modal dialog keeps
 blocking clicks until it's gone.
 
-## Find where a node is
+## Handle raw events yourself
+
+The original `tea.MouseClickMsg` and the other mouse messages still reach `Update`. If you handle them as well as
+using handlers, don't act on the same event twice. To find what's under a point, `m.ui.Frame().Hit(x, y)` returns
+the IDs of the nodes there, outermost first:
+
+```go
+	case tea.MouseClickMsg:
+		if path := m.ui.Frame().Hit(msg.X, msg.Y); slices.Contains(path, any(paneLog)) {
+			m.follow = false
+		}
+```
 
 For things other than events, such as drawing an effect from a button's position, `m.ui.Frame().Rect(id)` returns
 where a node was drawn in the last frame, in screen coordinates:
 
 ```go
-if r, ok := m.ui.Frame().Rect(buttonID("deploy")); ok {
+if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
 	center := image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
 	// ...
+}
+```
+
+## Fewer frames for the mouse
+
+Terminals can send wheel and motion events faster than they're worth drawing. `bloom.ThrottleMouse` makes a
+Bubble Tea filter that drops those that come too soon after the last:
+
+```go
+p := tea.NewProgram(m, tea.WithFilter(bloom.ThrottleMouse(15*time.Millisecond)))
+```
+
+A dropped event isn't made up for: the wheel scrolls a little less, and if the pointer stops right after a dropped
+motion event, hover catches up when it moves again.
+
+## How it works
+
+`m.ui.View` installs a `tea.View.OnMouse` handler. Bubble Tea calls it on its event loop for each mouse event,
+before `Update` and the next `View`, which is what lets handlers change the model safely and have the change drawn
+right away. bloom runs the handlers there, and batches the commands they return, which Bubble Tea then runs in the
+background like any other.
+
+If the view doesn't come from `m.ui.View`, or something replaces its `OnMouse`, `m.ui.Update` runs the handlers
+instead when it gets the event, so pass it every message. It skips events that `OnMouse` already handled.
+
+## Test handlers
+
+`m.ui.Click(id)` clicks the middle of the node with an ID, and `m.ui.ClickAt(x, y)` clicks a point, running the
+handlers of the last frame drawn and returning their commands. `m.ui.Update` runs handlers for any other mouse
+message, so a test can drive hover, the wheel, and drags without a terminal:
+
+```go
+m.View()
+m.ui.Update(tea.MouseMotionMsg{X: 3, Y: 1})
+if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
+	t.Fatal("save was not pressed")
 }
 ```
 
@@ -141,3 +250,6 @@ if r, ok := m.ui.Frame().Rect(buttonID("deploy")); ok {
 
 - [Focus and keyboard navigation](/input/focus), which can focus the node you click
 - [Scrolling and sizing in Update](/layout/scrolling)
+- [`on` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/on)
+- The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double
+  clicks, the wheel, and a draggable divider

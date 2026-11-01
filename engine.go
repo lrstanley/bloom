@@ -25,7 +25,8 @@ type box struct {
 	parent   int
 	kidsOff  int
 	kidsLen  int
-	expanded int // root of a Layouter's subtree, or -1
+	expanded int    // root of a Layouter's subtree, or -1
+	path     uint64 // where the box is in the tree, kept from frame to frame
 
 	view   string // a component's View, called once per frame
 	viewOK bool
@@ -83,7 +84,7 @@ func (e *engine) layout(c Child, w, h int) int {
 		}
 		return -1
 	}
-	root := e.build(c, -1)
+	root := e.build(c, -1, 0)
 	if w <= 0 || h <= 0 {
 		avail := Size{W: w, H: h}
 		if w <= 0 {
@@ -106,10 +107,15 @@ func (e *engine) layout(c Child, w, h int) int {
 	return root
 }
 
-// build adds a box for c and its children, returning its index.
-func (e *engine) build(c Child, parent int) int {
+// build adds a box for c, the child at index slot of box parent, and its
+// children, returning its index.
+func (e *engine) build(c Child, parent, slot int) int {
 	i := len(e.boxes)
-	e.boxes = append(e.boxes, box{parent: parent, child: c, expanded: -1})
+	var path uint64
+	if parent >= 0 {
+		path = e.boxes[parent].path
+	}
+	e.boxes = append(e.boxes, box{parent: parent, child: c, expanded: -1, path: childPath(path, slot)})
 
 	var kids []Child
 	b := &e.boxes[i]
@@ -119,13 +125,13 @@ func (e *engine) build(c Child, parent int) int {
 	case SlotNode:
 		b.meta, kids = n.meta, []Child{n.child}
 	case FlexNode:
-		kids = n.children
+		b.meta, kids = n.meta, n.children
 	case GridNode:
-		kids = n.children
+		b.meta, kids = n.meta, n.children
 	case WrapNode:
-		kids = n.children
+		b.meta, kids = n.meta, n.children
 	case BoxNode:
-		kids = []Child{n.child}
+		b.meta, kids = n.meta, []Child{n.child}
 	case wrapNode:
 		kids = []Child{n.child}
 	case OverlayNode:
@@ -144,7 +150,7 @@ func (e *engine) build(c Child, parent int) int {
 
 	_, grid := c.(GridNode)
 	start := len(e.stack)
-	for _, k := range kids {
+	for j, k := range kids {
 		if k == nil || absent(k) {
 			continue
 		}
@@ -152,12 +158,25 @@ func (e *engine) build(c Child, parent int) int {
 			// A slot sizes its content within a grid cell as it would in a row.
 			k = Row(k)
 		}
-		e.stack = append(e.stack, e.build(k, i))
+		e.stack = append(e.stack, e.build(k, i, j))
 	}
 	e.boxes[i].kidsOff, e.boxes[i].kidsLen = len(e.kids), len(e.stack)-start
 	e.kids = append(e.kids, e.stack[start:]...)
 	e.stack = e.stack[:start]
 	return i
+}
+
+// childPath returns the path of the child at index slot of a box at path
+// parent. Slots count children that are absent, so that a child does not
+// move in the tree when one before it comes and goes.
+func childPath(parent uint64, slot int) uint64 {
+	// The splitmix64 finalizer, which spreads paths that differ by little.
+	x := parent ^ uint64(slot+1)*0x9e3779b97f4a7c15 //nolint:gosec // Wrapping is intended.
+	x ^= x >> 30
+	x *= 0xbf58476d1ce4e5b9
+	x ^= x >> 27
+	x *= 0x94d049bb133111eb
+	return x ^ x>>31
 }
 
 func (e *engine) kidsOf(i int) []int {
@@ -180,7 +199,7 @@ func (e *engine) expand(i int, l Layouter, avail Size) int {
 	}
 	root := -1
 	if child := l.Layout(Context{Width: avail.W, Height: avail.H}); child != nil {
-		root = e.build(child, i)
+		root = e.build(child, i, -1)
 	}
 	e.boxes[i].expanded, e.boxes[i].expandedFor = root, avail
 	return root

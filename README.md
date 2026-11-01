@@ -82,8 +82,8 @@ over.
   priority first, and components can build a different layout for the space they're given.
 - :card_index_dividers: **Real layers**: `Overlay` draws dialogs, dropdowns, popovers, and toasts over the screen,
   anchored to a corner or to another node, with backdrops, drop shadows, and modal input.
-- :computer_mouse: **Mouse routing**: clicks, the wheel, and motion arrive as messages for the node under the
-  pointer, found by IDs of your own types: `msg.Target[rowID]()`.
+- :computer_mouse: **Mouse handlers**: clicks, double clicks, the wheel, hover, and drags go to handlers on the
+  nodes they're about, `bloom.Text(name).On(on.Click(m.open))`, with hover styles and drag capture built in.
 - :keyboard: **Focus**: tab order from the layout, focused styles, the real terminal cursor, and focus scopes that
   keep <kbd>tab</kbd> inside a dialog until it closes.
 - :sparkles: **Animation kept in your model**: eased and spring values, presences for showing and hiding (with

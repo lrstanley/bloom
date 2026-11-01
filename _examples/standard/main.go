@@ -5,7 +5,9 @@
 // Command standard is the usual shape of a Bubble Tea program: a sidebar, a
 // reader, and a status bar. The sidebar builds its own layout with Layout,
 // the reader is a plain component with a View string, and the status bar
-// sizes itself.
+// sizes itself. The sidebar is kept by value, as components often are, so
+// a click on a page sends a message for Update to handle, rather than
+// changing the sidebar in the handler, which would only change a copy.
 package main
 
 import (
@@ -16,6 +18,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/on"
 )
 
 var (
@@ -28,7 +31,8 @@ var (
 	selected = item.Foreground(dark).Background(accent)
 )
 
-type page int
+// openMsg opens the page at an index of pages.
+type openMsg int
 
 var pages = []string{"Home", "Settings", "About"}
 
@@ -45,7 +49,7 @@ func (s sidebar) Layout(bloom.Context) bloom.Child {
 		if i == s.selected {
 			st = selected
 		}
-		items = append(items, bloom.Text(name).Style(st).ID(page(i)))
+		items = append(items, bloom.Text(name).Style(st).On(on.Click(on.Msg(openMsg(i)))))
 	}
 	items = append(items, bloom.Space(), bloom.Text("v1.0").Style(item))
 	return bloom.Box(panel, bloom.Column(items...))
@@ -81,6 +85,7 @@ func newModel() *model {
 func (m *model) Init() tea.Cmd { return nil }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmd := m.ui.Update(msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -88,16 +93,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-	case bloom.MouseMsg:
-		if click, ok := msg.Msg.(tea.MouseClickMsg); !ok || click.Button != tea.MouseLeft {
-			break
-		}
-		if p, ok := msg.Target[page](); ok {
-			m.sidebar.selected, m.reader.page = int(p), int(p)
-			m.status.msg = "opened " + pages[p]
-		}
+	case openMsg:
+		m.sidebar.selected, m.reader.page = int(msg), int(msg)
+		m.status.msg = "opened " + pages[msg]
 	}
-	return m, nil
+	return m, cmd
 }
 
 func (m *model) View() tea.View {

@@ -29,6 +29,7 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 var (
@@ -90,11 +91,8 @@ func isField(c control) bool {
 	return ok
 }
 
-// The IDs of the language suggestions, and of the focus scopes.
-type (
-	optionID int
-	scopeID  string
-)
+// scopeID is the ID of a focus scope.
+type scopeID string
 
 const (
 	scopeForm      scopeID = "form"
@@ -122,13 +120,14 @@ type model struct {
 
 func newModel() *model {
 	m := &model{
-		ui:        bloom.New(),
 		values:    make(map[control]string),
 		confirm:   anim.NewPresence(anim.Duration(200 * time.Millisecond)),
 		overwrite: anim.NewPresence(anim.Duration(200 * time.Millisecond)),
 		drop:      anim.NewPresence(anim.Spring(9, 0.35)),
 		toast:     anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear)),
 	}
+	// Clicks move the focus, before the handler of what was clicked runs.
+	m.ui = bloom.New(bloom.WithFocus(&m.focus))
 	m.focus.Set(fieldName)
 	return m
 }
@@ -143,31 +142,27 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		if !m.focus.Update(msg, m.ui.Frame()) {
-			cmds = append(cmds, m.key(msg))
+		// Tab moves the focus, and enter and space press a focused button.
+		cmd, ok := m.focus.Update(msg, m.ui.Frame())
+		if !ok {
+			cmd = m.key(msg)
 		}
-	case bloom.MouseMsg:
-		cmds = append(cmds, m.mouse(msg))
+		cmds = append(cmds, cmd)
 	}
 	cmds = append(cmds, anim.Update(msg, &m.confirm, &m.overwrite, &m.drop, &m.toast))
 	return m, tea.Batch(cmds...)
 }
 
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
-	c, focused := m.focus.Current()
+	c, _ := m.focus.Current()
 	switch msg.String() {
 	case "ctrl+c":
 		return tea.Quit
 	case "esc":
 		return m.closeTop()
 	case "enter":
-		switch {
-		case c == fieldLanguage:
-			if s := m.suggestions(); len(s) > 0 {
-				m.values[fieldLanguage] = s[0]
-			}
-		case focused && !isField(c):
-			return m.press(c)
+		if s := m.suggestions(); c == fieldLanguage && len(s) > 0 {
+			m.values[fieldLanguage] = s[0]
 		}
 	case "backspace":
 		if isField(c) {
@@ -177,25 +172,6 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 	default:
 		if isField(c) && msg.Text != "" {
 			m.values[c] += msg.Text
-		}
-	}
-	return nil
-}
-
-func (m *model) mouse(msg bloom.MouseMsg) tea.Cmd {
-	if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
-		return nil
-	}
-	switch {
-	case msg.Outside:
-		return m.closeTop()
-	case m.focus.Update(msg, m.ui.Frame()):
-		if c, ok := msg.Target[control](); ok && !isField(c) {
-			return m.press(c)
-		}
-	default:
-		if o, ok := msg.Target[optionID](); ok {
-			m.values[fieldLanguage] = m.suggestions()[o]
 		}
 	}
 	return nil
@@ -289,7 +265,8 @@ func (m *model) button(id control) bloom.Child {
 	if m.focus.Is(id) {
 		st = buttonOn
 	}
-	return bloom.Text(string(id)).Style(st).ID(id).Focusable()
+	return bloom.Text(string(id)).Style(st).ID(id).Focusable().
+		On(on.Press(func() tea.Cmd { return m.press(id) }))
 }
 
 // buttons is a row of buttons, at its end.
@@ -345,7 +322,10 @@ func (m *model) layers() []bloom.LayerNode {
 	if s := m.suggestions(); m.focus.Is(fieldLanguage) && len(s) > 0 {
 		opts := make([]bloom.Child, len(s))
 		for i, l := range s {
-			opts[i] = bloom.Text(l).Style(option).ID(optionID(i))
+			opts[i] = bloom.Text(l).Style(option).On(on.Click(func() tea.Cmd {
+				m.values[fieldLanguage] = l
+				return nil
+			}))
 		}
 		menu := bloom.Layer(bloom.Box(dropdown, bloom.Column(opts...))).
 			AnchorTo(fieldLanguage, bloom.Bottom)
@@ -364,6 +344,7 @@ func (m *model) layers() []bloom.LayerNode {
 	confirm := bloom.Layer(bloom.Box(dialog, confirmBody)).
 		ID(scopeConfirm).
 		Modal().
+		On(on.ClickOutside(m.closeTop)).
 		Backdrop(backdrop).
 		Shadow(1, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.confirm, fx.Fade{}, fx.Slide{From: fx.Bottom})
@@ -380,6 +361,7 @@ func (m *model) layers() []bloom.LayerNode {
 	overwrite := bloom.Layer(bloom.Box(danger, overwriteBody)).
 		ID(scopeOverwrite).
 		Modal().
+		On(on.ClickOutside(m.closeTop)).
 		Offset(0, drop).
 		Backdrop(backdrop).
 		Shadow(2, 1, fx.Dim{Amount: 0.7}).

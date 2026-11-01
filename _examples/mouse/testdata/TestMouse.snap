@@ -1,0 +1,14 @@
+╭──────────────╮┃╭─────────────────────────────────────────────╮
+│ main.go      │┃│ update.go                                   │
+│ model.go     │┃│  4  // line 4 of update.go                  │
+│ view.go      │┃│  5  // line 5 of update.go                  │
+│ update.go    │┃│  6  // line 6 of update.go                  │
+│ styles.go    │┃│  7  // line 7 of update.go                  │
+│ keys.go      │┃│  8  // line 8 of update.go                  │
+│              │┃│  9  // line 9 of update.go                  │
+│              │┃│ 10  // line 10 of update.go                 │
+│              │┃│ 11  // line 11 of update.go                 │
+│              │┃│ 12  // line 12 of update.go                 │
+│              │┃│ 13  // line 13 of update.go                 │
+╰──────────────╯┃╰─────────────────────────────────────────────╯
+ the sidebar is 16 cells                                        

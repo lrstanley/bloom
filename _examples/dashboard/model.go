@@ -16,6 +16,7 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/on"
 )
 
 var (
@@ -55,12 +56,8 @@ var services = []string{
 	"ingest", "mailer", "search", "storage", "worker",
 }
 
-// The IDs nodes are given, for mouse events and focus.
-type (
-	serviceID int
-	buttonID  bool // true for "restart", false for "cancel"
-	paneID    string
-)
+// paneID is the ID of a pane, for focus and layout animation.
+type paneID string
 
 const (
 	paneSidebar paneID = "sidebar"
@@ -103,7 +100,6 @@ type model struct {
 
 func newModel() *model {
 	m := &model{
-		ui:      bloom.New(bloom.WithColors(fg, bg)),
 		sidebar: true,
 		confirm: anim.NewPresence(anim.Duration(220*time.Millisecond), anim.FPS(120)),
 		toast: anim.NewPresence(
@@ -112,6 +108,7 @@ func newModel() *model {
 			anim.FPS(120),
 		),
 	}
+	m.ui = bloom.New(bloom.WithColors(fg, bg), bloom.WithFocus(&m.focus))
 	m.focus.Set(paneTable)
 	return m
 }
@@ -136,11 +133,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, tick())
 	case tea.KeyPressMsg:
-		if m.confirm.Shown() || !m.focus.Update(msg, m.ui.Frame()) {
+		if m.confirm.Shown() {
+			cmds = append(cmds, m.key(msg.String()))
+		} else if cmd, ok := m.focus.Update(msg, m.ui.Frame()); ok {
+			cmds = append(cmds, cmd)
+		} else {
 			cmds = append(cmds, m.key(msg.String()))
 		}
-	case bloom.MouseMsg:
-		cmds = append(cmds, m.mouse(msg))
 	}
 	cmds = append(cmds, anim.Update(msg, &m.confirm, &m.toast))
 	return m, tea.Batch(cmds...)
@@ -175,23 +174,6 @@ func (m *model) key(k string) tea.Cmd {
 		m.effect = int(k[0] - '1')
 		return m.toast.ShowFor(1500 * time.Millisecond)
 	}
-	return nil
-}
-
-func (m *model) mouse(msg bloom.MouseMsg) tea.Cmd {
-	if _, ok := msg.Msg.(tea.MouseClickMsg); !ok {
-		return nil
-	}
-	if msg.Outside {
-		return m.closeDialog(false)
-	}
-	if b, ok := msg.Target[buttonID](); ok {
-		return m.closeDialog(bool(b))
-	}
-	if s, ok := msg.Target[serviceID](); ok {
-		m.selected = int(s)
-	}
-	m.focus.Update(msg, m.ui.Frame())
 	return nil
 }
 
@@ -280,7 +262,8 @@ func (m *model) serviceList() bloom.Child {
 		if i == m.selected {
 			st = selected
 		}
-		items = append(items, bloom.Text("● "+name).Style(st).ID(serviceID(i)).Truncate())
+		items = append(items, bloom.Text("● "+name).Style(st).Truncate().
+			On(on.Click(func() tea.Cmd { m.selected = i; return nil })))
 	}
 	items = append(items, bloom.Space())
 	return bloom.Column(items...)
@@ -320,14 +303,15 @@ func (m *model) confirmLayer() bloom.LayerNode {
 		bloom.Text("In-flight requests will be drained first.").Style(dialogText),
 		bloom.Fixed(1, nil),
 		bloom.Row(
-			bloom.Text("restart").Style(restart).ID(buttonID(true)),
-			bloom.Text("cancel").Style(cancel).ID(buttonID(false)),
+			bloom.Text("restart").Style(restart).On(on.Click(func() tea.Cmd { return m.closeDialog(true) })),
+			bloom.Text("cancel").Style(cancel).On(on.Click(func() tea.Cmd { return m.closeDialog(false) })),
 		).Gap(2).Justify(flex.End),
 	)
 
 	return bloom.Layer(bloom.Box(dialog, body)).
 		ID(paneDialog).
 		Modal().
+		On(on.ClickOutside(func() tea.Cmd { return m.closeDialog(false) })).
 		Backdrop(fx.Dim{Amount: 0.55}, fx.Desaturate{Amount: 0.7}).
 		Shadow(2, 1, fx.Dim{Amount: 0.6}).
 		Presence(m.confirm, fx.Slide{From: fx.Bottom}, fx.Fade{})

@@ -68,7 +68,8 @@ lives inside them:
 - A `*bloom.Root` in your model renders the tree in `View` and returns the `tea.View`.
 - Any component with a `View() string` method, including [Bubbles](https://github.com/charmbracelet/bubbles)
   components and your own, can be placed in the tree as is.
-- Mouse clicks come back to `Update` as `bloom.MouseMsg`, already resolved to the node you clicked.
+- Mouse handlers go on the nodes they're about, such as `bloom.Text("save").On(on.Click(m.save))`, and bloom runs
+  the one under the pointer.
 - Animations are values in your model, advanced by messages like any other Bubble Tea state.
 
 ## Where to go next

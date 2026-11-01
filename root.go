@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lrstanley/bloom/on"
 )
 
 // Root renders a layout as a model's [tea.View], keeping what it can between
@@ -24,6 +25,9 @@ type Root struct {
 	unfocused time.Duration // the interval while the terminal is blurred
 	blurred   bool
 	pending   bool
+	now       func() time.Time
+	focus     focusTarget
+	mouse     mouse
 }
 
 // Option configures a [Root].
@@ -35,6 +39,7 @@ type config struct {
 	fps          int
 	unfocusedFPS int
 	now          func() time.Time
+	focus        focusTarget
 }
 
 // WithWidthMethod sets how the width of graphemes is measured. It must match
@@ -61,8 +66,16 @@ func WithFPS(n int) Option { return func(c *config) { c.fps = max(n, 1) } }
 // [Root.View]; until they do, the root counts the terminal as focused.
 func WithUnfocusedFPS(n int) Option { return func(c *config) { c.unfocusedFPS = max(n, 1) } }
 
-// WithClock sets the layout animation clock, for tests. It must not be nil.
+// WithClock sets the clock for layout animations and for telling double
+// clicks apart, for tests. It must not be nil.
 func WithClock(now func() time.Time) Option { return func(c *config) { c.now = now } }
+
+// WithFocus lets clicks move the model's focus: a click focuses the
+// innermost node under the pointer that f can focus, as [Focus.Next]
+// would, before any handler for the click runs, so a handler can move the
+// focus on from there. f must stay where it is, as a field of a model used
+// by pointer does.
+func WithFocus[K comparable](f *Focus[K]) Option { return func(c *config) { c.focus = f } }
 
 // New returns a Root.
 func New(opts ...Option) *Root {
@@ -74,6 +87,8 @@ func New(opts ...Option) *Root {
 		r:         newRenderer(c.method),
 		interval:  time.Second / time.Duration(c.fps),
 		unfocused: time.Second / time.Duration(min(c.unfocusedFPS, c.fps)),
+		now:       c.now,
+		focus:     c.focus,
 	}
 	r.r.motion = &layoutMotion{now: c.now}
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
@@ -91,7 +106,11 @@ func (r *Root) Init() tea.Cmd {
 // Update notes what the terminal reports about itself: its default colors,
 // color profile, and focus. Pass every message to Update and return its
 // command: it schedules frames while layout animations run, fewer while the
-// terminal is not focused (see [WithUnfocusedFPS]).
+// terminal is not focused (see [WithUnfocusedFPS]), and returns the commands
+// of mouse handlers it runs. It runs them for mouse events that the OnMouse
+// handler of [Root.View] did not see, such as when the view is built some
+// other way, and runs [on.Hover] handlers as nodes move under the pointer or
+// the window loses focus.
 func (r *Root) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
@@ -105,6 +124,12 @@ func (r *Root) Update(msg tea.Msg) tea.Cmd {
 	case tea.BlurMsg:
 		r.blurred = true
 	}
+	return tea.Batch(r.input(msg), r.tick(msg))
+}
+
+// tick returns the command for the next layout animation frame, if one is
+// due.
+func (r *Root) tick(msg tea.Msg) tea.Cmd {
 	if tick, ok := msg.(layoutFrameMsg); ok {
 		if tick.root != r {
 			return nil
@@ -139,12 +164,15 @@ func (r *Root) Render(w, h int, c Child) string {
 }
 
 // View lays out and draws c in a w×h frame, and returns a view showing it,
-// with an OnMouse handler routing mouse events as [MouseMsg]s and the cursor
-// of the [TextNode] that placed one.
+// with the cursor of the [TextNode] that placed one, and an OnMouse handler
+// that runs the mouse handlers of the nodes under the pointer in this
+// frame, which is the one on screen when Bubble Tea calls it. It runs them
+// on the event loop, before Update gets the event, so they can change the
+// model, and returns their commands to run in the background.
 func (r *Root) View(w, h int, c Child) tea.View {
 	v := tea.NewView(r.Render(w, h, c))
 	f := r.r.frame
-	v.OnMouse = f.onMouse
+	v.OnMouse = func(msg tea.MouseMsg) tea.Cmd { return r.mouseEvent(f, msg) }
 	v.Cursor = f.cursor
 	return v
 }
@@ -156,12 +184,30 @@ func (r *Root) Frame() *Frame {
 }
 
 // updateFrame makes the Frame for the frame just drawn, keeping the last one
-// when nothing about it changed.
+// when nothing about it changed. Handlers are closures made by the latest
+// View, so a frame with any is made again, sharing what did not change.
 func (r *renderer) updateFrame() {
-	if f := r.frame; f != nil && slices.Equal(f.entries, r.entries) && sameCursor(f.cursor, r.cursor) {
+	f := r.frame
+	same := f != nil && slices.Equal(f.entries, r.entries) && sameCursor(f.cursor, r.cursor)
+	if same && !hasHandlers(f.handlers) && !hasHandlers(r.handlers) {
 		return
 	}
-	r.frame = &Frame{entries: slices.Clone(r.entries), cursor: r.cursor}
+	entries, cursor := r.entries, r.cursor
+	if same {
+		entries, cursor = f.entries, f.cursor
+	} else {
+		entries = slices.Clone(entries)
+	}
+	r.frame = &Frame{entries: entries, handlers: slices.Clone(r.handlers), cursor: cursor}
+}
+
+func hasHandlers(handlers [][]on.Handler) bool {
+	for _, h := range handlers {
+		if len(h) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func sameCursor(a, b *tea.Cursor) bool {
@@ -201,5 +247,5 @@ func Solve(c Child, w, h int) *Frame {
 	r.paintTree(c, w, h)
 	r.placeEntries()
 	r.cache.EndFrame(w * h)
-	return &Frame{entries: slices.Clone(r.entries), cursor: r.cursor}
+	return &Frame{entries: slices.Clone(r.entries), handlers: slices.Clone(r.handlers), cursor: r.cursor}
 }

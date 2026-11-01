@@ -21,6 +21,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/on"
 )
 
 var (
@@ -45,10 +46,8 @@ var (
 	note     = lipgloss.NewStyle().Foreground(muted)
 )
 
-type (
-	paneID    string
-	articleID int
-)
+// paneID is the ID of a pane, for finding its size with bloom.Solve.
+type paneID string
 
 const (
 	paneNav     paneID = "nav"
@@ -149,6 +148,7 @@ func newModel() *model { return &model{ui: bloom.New()} }
 func (m *model) Init() tea.Cmd { return nil }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmd := m.ui.Update(msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -169,24 +169,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "pgup":
 			m.offset -= m.geometry().page
 		}
-	case bloom.MouseMsg:
-		switch ev := msg.Msg.(type) {
-		case tea.MouseWheelMsg:
-			if p, ok := msg.Target[paneID](); ok && (p == paneReader || p == paneContent) {
-				if ev.Button == tea.MouseWheelDown {
-					m.offset += 3
-				} else {
-					m.offset -= 3
-				}
-			}
-		case tea.MouseClickMsg:
-			if a, ok := msg.Target[articleID](); ok {
-				m.pick(int(a))
-			}
-		}
 	}
+	// The wheel's handler scrolled before Update, which clamps it here too.
 	m.offset = min(max(m.offset, 0), m.geometry().maxOffset)
-	return m, nil
+	return m, cmd
 }
 
 func (m *model) pick(i int) {
@@ -231,7 +217,8 @@ func (m *model) layout(status statusbar) bloom.Child {
 	content := bloom.Text(art.body).Style(prose).ID(paneContent)
 	reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
 		ID(paneReader).
-		Min(40)
+		Min(40).
+		On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; return nil }))
 
 	paragraphs := fmt.Sprintf("%d paragraphs", strings.Count(art.body, "§"))
 	info := bloom.Column(
@@ -261,7 +248,7 @@ func (m *model) articleList() bloom.Child {
 		if i == m.selected {
 			st = selected
 		}
-		items = append(items, bloom.Text(a.title).Style(st).ID(articleID(i)))
+		items = append(items, bloom.Text(a.title).Style(st).On(on.Click(func() tea.Cmd { m.pick(i); return nil })))
 	}
 	items = append(items, bloom.Space())
 	return bloom.Column(items...)
