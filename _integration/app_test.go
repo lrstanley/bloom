@@ -27,7 +27,7 @@ type app struct {
 	ui       *bloom.Root
 	w, h     int
 	selected int
-	focus    bloom.Focus
+	focus    bloom.Focus[item]
 	help     anim.Presence
 }
 
@@ -88,13 +88,18 @@ func (m *app) View() tea.View {
 	}
 	items = append(items, bloom.Space())
 
+	focus := "none"
+	if it, ok := m.focus.Current(); ok {
+		focus = fmt.Sprint(int(it))
+	}
+
 	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 	base := bloom.Column(
 		bloom.Fill(bloom.Row(
 			bloom.Fixed(14, bloom.Box(border, bloom.Column(items...))).ID("sidebar").Collapsible(1),
 			bloom.Fill(bloom.Box(border, bloom.Text(fmt.Sprintf("selected: %d", m.selected)))).Min(24),
 		)),
-		bloom.Text(fmt.Sprintf("focus: %v", m.focus.Current())),
+		bloom.Text("focus: "+focus),
 	)
 
 	var layers []bloom.LayerNode
@@ -128,7 +133,7 @@ func TestApp(t *testing.T) {
 	h.AssertSnapshot()
 
 	// Focus is confined to the dialog, which has nothing to focus.
-	h.Key("tab").Wait("focus: <nil>")
+	h.Key("tab").Wait("focus: none")
 
 	// A click on the backdrop closes the dialog and gives focus back.
 	h.LeftClick(1, 1).WaitNot("Keyboard help").Wait("focus: 0")

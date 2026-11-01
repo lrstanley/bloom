@@ -113,7 +113,7 @@ type (
 type model struct {
 	ui    *bloom.Root
 	w, h  int
-	focus bloom.Focus
+	focus bloom.Focus[formID]
 
 	loaded  bool
 	shimmer anim.Sequence // loops until the data arrives.

@@ -157,7 +157,7 @@ Open it with <kbd>d</kbd> by returning `m.confirm.Show()` from `Update`, and you
 ### Move focus into the dialog
 
 The buttons should respond to <kbd>tab</kbd> and <kbd>enter</kbd>, and focus shouldn't escape to the screen
-behind while the dialog is open. Add a `bloom.Focus` and a button ID type:
+behind while the dialog is open. Add a button ID type:
 
 ```go
 type buttonID string
@@ -166,8 +166,11 @@ type buttonID string
 const confirmDialog = "confirm"
 ```
 
+And a `bloom.Focus` to the model. Its type parameter is the type of the IDs it moves between, so this one moves
+between buttons:
+
 ```go
-	focus bloom.Focus
+	focus bloom.Focus[buttonID]
 ```
 
 A button is text with an ID that's marked `Focusable`, styled by whether it has focus:
@@ -192,7 +195,7 @@ func (m *model) openDialog() tea.Cmd {
 		return nil
 	}
 	m.focus.Push(confirmDialog)
-	m.focus.Set(buttonID("cancel"))
+	m.focus.Set("cancel")
 	return m.confirm.Show()
 }
 
@@ -220,12 +223,12 @@ command your own key handling returns in a `cmd` variable, declared with `var cm
 		}
 ```
 
-In `key`, <kbd>enter</kbd> presses whichever button has focus. `m.focus.Current()` returns the focused node's ID,
-and a type assertion tells you whether it's a button:
+In `key`, <kbd>enter</kbd> presses whichever button has focus. `m.focus.Current()` returns the focused button's
+ID, and whether one is focused:
 
 ```go
 		case "enter":
-			if id, ok := m.focus.Current().(buttonID); ok {
+			if id, ok := m.focus.Current(); ok {
 				return m.press(id)
 			}
 ```
@@ -346,7 +349,7 @@ type model struct {
 	notes         []note
 	selected      int
 
-	focus   bloom.Focus
+	focus   bloom.Focus[buttonID]
 	confirm anim.Presence
 	toast   anim.Presence
 	deleted string
@@ -393,7 +396,7 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 		case "esc":
 			return m.closeDialog()
 		case "enter":
-			if id, ok := m.focus.Current().(buttonID); ok {
+			if id, ok := m.focus.Current(); ok {
 				return m.press(id)
 			}
 		}
@@ -434,7 +437,7 @@ func (m *model) openDialog() tea.Cmd {
 		return nil
 	}
 	m.focus.Push(confirmDialog)
-	m.focus.Set(buttonID("cancel"))
+	m.focus.Set("cancel")
 	return m.confirm.Show()
 }
 

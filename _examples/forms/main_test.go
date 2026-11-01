@@ -18,7 +18,7 @@ func TestForms(t *testing.T) {
 	t.Parallel()
 
 	h := steep.NewHarness(t, newModel(), demo.Options("forms", 100, 26)...)
-	h.Wait("Profile").Wait("focus: 0").Sleep(500 * time.Millisecond)
+	h.Wait("Profile").Wait("focus: name").Sleep(500 * time.Millisecond)
 
 	h.Type("Ada Lovelace", reel.Delay(40*time.Millisecond)).Wait("Ada Lovelace").Sleep(300 * time.Millisecond)
 	h.Key("tab").Type("ada@example.com", reel.Delay(40*time.Millisecond)).Wait("ada@example.com")

@@ -296,27 +296,27 @@ func TestFocus(t *testing.T) {
 
 	r := New()
 	r.Render(20, 5, focusTree(false))
-	var f Focus
+	var f Focus[string]
 	for _, want := range []string{"a", "b", "a"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
-			t.Fatalf("Next focused %v, want %v", f.Current(), want)
+			t.Fatalf("Next focused %v, want %v", focused(&f), want)
 		}
 	}
 	f.Prev(r.Frame())
 	if !f.Is("b") {
-		t.Fatalf("Prev focused %v", f.Current())
+		t.Fatalf("Prev focused %v", focused(&f))
 	}
 
 	r.Render(20, 5, focusTree(true))
 	f.Push("dialog")
-	if f.Current() != nil || f.Scope() != "dialog" {
+	if _, ok := f.Current(); ok || f.Scope() != "dialog" {
 		t.Fatal("Push did not clear the focus")
 	}
 	for _, want := range []string{"ok", "cancel", "ok"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
-			t.Fatalf("Next inside the dialog focused %v, want %v", f.Current(), want)
+			t.Fatalf("Next inside the dialog focused %v, want %v", focused(&f), want)
 		}
 	}
 	if !f.Within(r.Frame(), "dialog") {
@@ -330,11 +330,53 @@ func TestFocus(t *testing.T) {
 
 	f.Pop()
 	if !f.Is("b") || f.Within(r.Frame(), "dialog") {
-		t.Fatalf("Pop focused %v, want b", f.Current())
+		t.Fatalf("Pop focused %v, want b", focused(&f))
 	}
 
 	r.Render(20, 5, focusTree(false))
 	if msg, ok := click(t, r.View(20, 5, focusTree(false)), 0, 0); !ok || !f.Click(msg) || !f.Is("a") {
-		t.Fatalf("clicking a focused %v", f.Current())
+		t.Fatalf("clicking a focused %v", focused(&f))
+	}
+}
+
+// TestFocusType checks that focus only moves between nodes with IDs of its
+// type, and that untyped constants convert to it.
+func TestFocusType(t *testing.T) {
+	t.Parallel()
+
+	type field int
+	type button string
+	tree := Row(
+		Text("name").ID(field(0)).Focusable(),
+		Text("x").ID("other").Focusable(),
+		Text("ok").ID(button("ok")).Focusable(),
+		Text("email").ID(field(1)).Focusable(),
+	)
+	r := New()
+	r.Render(30, 1, tree)
+
+	var f Focus[field]
+	if id, ok := f.Current(); ok || f.Is(0) {
+		t.Fatalf("a zero Focus has %v focused", id)
+	}
+	for _, want := range []field{0, 1, 0} {
+		f.Next(r.Frame())
+		if !f.Is(want) {
+			t.Fatalf("Next focused %v, want %v", focused(&f), want)
+		}
+	}
+
+	var buttons Focus[button]
+	buttons.Set("ok")
+	if id, ok := buttons.Current(); !ok || id != "ok" {
+		t.Fatalf("Set an untyped constant: %v, %v", id, ok)
+	}
+
+	var all Focus[any]
+	for _, want := range []any{field(0), "other", button("ok"), field(1)} {
+		all.Next(r.Frame())
+		if !all.Is(want) {
+			t.Fatalf("Focus[any] focused %v, want %v", focused(&all), want)
+		}
 	}
 }

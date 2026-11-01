@@ -61,18 +61,41 @@ var (
 	backdrop = fx.Recolor{Fg: lipgloss.Color("#3b4261"), Bg: lipgloss.Color("#16161e")}
 )
 
-// The IDs nodes are given.
-type (
-	fieldID  int
-	buttonID string
-	optionID int
-	scopeID  string
+// control is the ID of a node that can take focus: an input, or a button,
+// which shows its ID as its label.
+type control string
+
+// The form's inputs and buttons.
+const (
+	fieldName     control = "name"
+	fieldEmail    control = "email"
+	fieldLanguage control = "language"
+
+	buttonReset     control = "reset"
+	buttonSave      control = "save"
+	buttonCancel    control = "cancel"
+	buttonConfirm   control = "confirm"
+	buttonBack      control = "back"
+	buttonOverwrite control = "overwrite"
 )
 
-const (
-	fieldName fieldID = iota
-	fieldEmail
-	fieldLanguage
+// fields are the labels and placeholders of the form's inputs.
+var fields = map[control]struct{ label, placeholder string }{ //nolint:exhaustive // Only inputs have labels.
+	fieldName:     {"Name", "Ada Lovelace"},
+	fieldEmail:    {"Email", "ada@example.com"},
+	fieldLanguage: {"Language", "start typing…"},
+}
+
+// isField reports whether c is an input, rather than a button.
+func isField(c control) bool {
+	_, ok := fields[c]
+	return ok
+}
+
+// The IDs of the language suggestions, and of the focus scopes.
+type (
+	optionID int
+	scopeID  string
 )
 
 const (
@@ -81,20 +104,16 @@ const (
 	scopeOverwrite scopeID = "overwrite"
 )
 
-var (
-	fieldLabels  = []string{"Name", "Email", "Language"}
-	placeholders = []string{"Ada Lovelace", "ada@example.com", "start typing…"}
-	languages    = []string{
-		"Go", "Rust", "Python", "TypeScript", "Zig",
-		"Haskell", "OCaml", "Elixir", "Gleam", "Kotlin",
-	}
-)
+var languages = []string{
+	"Go", "Rust", "Python", "TypeScript", "Zig",
+	"Haskell", "OCaml", "Elixir", "Gleam", "Kotlin",
+}
 
 type model struct {
 	ui     *bloom.Root
 	w, h   int
-	focus  bloom.Focus
-	values [3]string
+	focus  bloom.Focus[control]
+	values map[control]string
 	saved  int
 
 	confirm   anim.Presence
@@ -105,6 +124,7 @@ type model struct {
 func newModel() *model {
 	m := &model{
 		ui:        bloom.New(),
+		values:    make(map[control]string),
 		confirm:   anim.NewPresence(anim.Duration(200 * time.Millisecond)),
 		overwrite: anim.NewPresence(anim.Spring(9, 0.35)),
 		toast:     anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear)),
@@ -132,28 +152,29 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	c, focused := m.focus.Current()
 	switch msg.String() {
 	case "ctrl+c":
 		return tea.Quit
 	case "esc":
 		return m.closeTop()
 	case "enter":
-		if b, ok := m.focus.Current().(buttonID); ok {
-			return m.press(b)
-		}
-		if m.focus.Is(fieldLanguage) {
+		switch {
+		case c == fieldLanguage:
 			if s := m.suggestions(); len(s) > 0 {
 				m.values[fieldLanguage] = s[0]
 			}
+		case focused && !isField(c):
+			return m.press(c)
 		}
 	case "backspace":
-		if f, ok := m.focus.Current().(fieldID); ok {
-			v := []rune(m.values[f])
-			m.values[f] = string(v[:max(len(v)-1, 0)])
+		if isField(c) {
+			v := []rune(m.values[c])
+			m.values[c] = string(v[:max(len(v)-1, 0)])
 		}
 	default:
-		if f, ok := m.focus.Current().(fieldID); ok && msg.Text != "" {
-			m.values[f] += msg.Text
+		if isField(c) && msg.Text != "" {
+			m.values[c] += msg.Text
 		}
 	}
 	return nil
@@ -167,8 +188,8 @@ func (m *model) mouse(msg bloom.MouseMsg) tea.Cmd {
 	case msg.Outside:
 		return m.closeTop()
 	case m.focus.Update(msg, m.ui.Frame()):
-		if b, ok := msg.Target[buttonID](); ok {
-			return m.press(b)
+		if c, ok := msg.Target[control](); ok && !isField(c) {
+			return m.press(c)
 		}
 	default:
 		if o, ok := msg.Target[optionID](); ok {
@@ -178,26 +199,29 @@ func (m *model) mouse(msg bloom.MouseMsg) tea.Cmd {
 	return nil
 }
 
-func (m *model) press(b buttonID) tea.Cmd {
+// press presses the button with ID b.
+func (m *model) press(b control) tea.Cmd {
 	switch b {
-	case "save":
+	case buttonSave:
 		m.focus.Push(scopeConfirm)
-		m.focus.Set(buttonID("confirm"))
+		m.focus.Set(buttonConfirm)
 		return m.confirm.Show()
-	case "reset":
-		m.values = [3]string{}
+	case buttonReset:
+		clear(m.values)
 		m.focus.Set(fieldName)
-	case "confirm":
+	case buttonConfirm:
 		if m.saved == 0 {
 			return m.save()
 		}
 		m.focus.Push(scopeOverwrite)
-		m.focus.Set(buttonID("back"))
+		m.focus.Set(buttonBack)
 		return m.overwrite.Show()
-	case "overwrite":
+	case buttonOverwrite:
 		return m.save()
-	case "cancel", "back":
+	case buttonCancel, buttonBack:
 		return m.closeTop()
+	case fieldName, fieldEmail, fieldLanguage:
+		// Inputs are typed into, not pressed.
 	}
 	return nil
 }
@@ -238,10 +262,10 @@ func (m *model) View() tea.View {
 	return v
 }
 
-func (m *model) field(id fieldID) bloom.Child {
+func (m *model) field(id control) bloom.Child {
 	text, st := m.values[id], input
 	if text == "" {
-		text, st = placeholders[id], hint
+		text, st = fields[id].placeholder, hint
 	}
 	in := bloom.Text(text).Style(st).ID(id).Focusable()
 	if m.focus.Is(id) {
@@ -253,12 +277,12 @@ func (m *model) field(id fieldID) bloom.Child {
 		in = in.Style(st).Cursor(tea.NewCursor(1+ansi.StringWidth(m.values[id]), 0))
 	}
 	return bloom.Row(
-		bloom.Fixed(10, bloom.Text(fieldLabels[id]).Style(label)),
+		bloom.Fixed(10, bloom.Text(fields[id].label).Style(label)),
 		bloom.Fill(in),
 	)
 }
 
-func (m *model) button(id buttonID) bloom.Child {
+func (m *model) button(id control) bloom.Child {
 	st := button
 	if m.focus.Is(id) {
 		st = buttonOn
@@ -267,7 +291,7 @@ func (m *model) button(id buttonID) bloom.Child {
 }
 
 // buttons is a row of buttons, at its end.
-func (m *model) buttons(ids ...buttonID) bloom.Child {
+func (m *model) buttons(ids ...control) bloom.Child {
 	row := []bloom.Child{bloom.Space()}
 	for _, id := range ids {
 		row = append(row, m.button(id))
@@ -285,12 +309,13 @@ func (m *model) layout() bloom.Child {
 		bloom.Fixed(1, nil),
 		m.field(fieldLanguage),
 		bloom.Fixed(1, nil),
-		m.buttons("reset", "save"),
+		m.buttons(buttonReset, buttonSave),
 	))
 
+	focused, _ := m.focus.Current()
 	status := fmt.Sprintf(
-		" focus: %v · in the form: %v · dialogs open: %d · saved %d times",
-		m.focus.Current(), m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
+		" focus: %s · in the form: %v · dialogs open: %d · saved %d times",
+		focused, m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
 	)
 
 	base := bloom.Column(
@@ -331,7 +356,7 @@ func (m *model) layers() []bloom.LayerNode {
 		bloom.Text("Save profile?").Style(heading),
 		bloom.Text(profile),
 		bloom.Fixed(1, nil),
-		m.buttons("cancel", "confirm"),
+		m.buttons(buttonCancel, buttonConfirm),
 	)
 	confirm := bloom.Layer(bloom.Box(dialog, confirmBody)).
 		ID(scopeConfirm).
@@ -350,7 +375,7 @@ func (m *model) layers() []bloom.LayerNode {
 		bloom.Text("Overwrite the saved profile?").Style(heading.Foreground(warn)),
 		bloom.Text(fmt.Sprintf("It was saved %d time(s) before.", m.saved)),
 		bloom.Fixed(1, nil),
-		m.buttons("back", "overwrite"),
+		m.buttons(buttonBack, buttonOverwrite),
 	)
 	overwrite := bloom.Layer(bloom.Box(danger, overwriteBody)).
 		ID(scopeOverwrite).

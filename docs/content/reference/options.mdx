@@ -115,7 +115,7 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`Render(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) | lay out and draw to a string, without a root |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `MouseMsg.Target[T]()` | the innermost ID of type `T` under the pointer |
-| `Focus` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Click`, `Push`, `Pop`, `Scope`, `Within` |
+| `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Click`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
 
 Component interfaces: [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports a natural size,
 and [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a layout for the space given.

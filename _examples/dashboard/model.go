@@ -88,7 +88,7 @@ type tickMsg time.Time
 type model struct {
 	ui       *bloom.Root
 	w, h     int
-	focus    bloom.Focus
+	focus    bloom.Focus[paneID]
 	selected int
 	restart  bool // the dialog's selected button
 	frame    int

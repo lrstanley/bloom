@@ -200,11 +200,17 @@ func TestLayerPresence(t *testing.T) {
 	}
 }
 
+// focused returns the ID of the node f has focused, for test messages.
+func focused[K comparable](f *Focus[K]) K {
+	id, _ := f.Current()
+	return id
+}
+
 func TestFocusUpdate(t *testing.T) {
 	t.Parallel()
 	r := New()
 	v := r.View(10, 2, Row(Text("a").ID("a").Focusable(), Auto(Text("b").ID("b").Focusable()).ID("scope").Scope()))
-	var f Focus
+	var f Focus[string]
 	for _, tt := range []struct {
 		msg     tea.Msg
 		handled bool
@@ -219,7 +225,7 @@ func TestFocusUpdate(t *testing.T) {
 		{v.OnMouse(tea.MouseMotionMsg{X: 0, Y: 0})(), false, "b"},
 	} {
 		if got := f.Update(tt.msg, r.Frame()); got != tt.handled || !f.Is(tt.want) {
-			t.Fatalf("%T: handled %v, focus %v; want %v, %s", tt.msg, got, f.Current(), tt.handled, tt.want)
+			t.Fatalf("%T: handled %v, focus %v; want %v, %s", tt.msg, got, focused(&f), tt.handled, tt.want)
 		}
 	}
 	f.Push("scope")
