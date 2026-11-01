@@ -6,7 +6,10 @@ package anim
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 func (s *Sequence) frameMsg() FrameMsg { return FrameMsg{id: s.v.id, gen: s.v.gen} }
@@ -327,4 +330,21 @@ func TestNewLoop(t *testing.T) {
 	if !near(s.Float(), 0.25) || !s.Animating() {
 		t.Fatalf("a period later: %v, animating %v", s.Float(), s.Animating())
 	}
+}
+
+func TestSequenceUnfocusedFPS(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		c := &clock{now: time.Unix(0, 0)}
+		s := NewLoop(time.Hour, FPS(1000), UnfocusedFPS(4), Clock(c.Now))
+		s.Update(tea.BlurMsg{})
+		if d := delay(s.Loop()); d != 250*ms {
+			t.Fatalf("blurred frame waited %v", d)
+		}
+		s.Update(tea.FocusMsg{})
+		if d := delay(s.Update(s.frameMsg())); d != ms {
+			t.Fatalf("refocused frame waited %v", d)
+		}
+	})
 }

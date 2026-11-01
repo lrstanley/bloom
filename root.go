@@ -19,19 +19,22 @@ import (
 // frames. Keep one in the root model, by pointer, and pass it the model's
 // layout from View. Pass every message to [Root.Update] and return its command.
 type Root struct {
-	r        *renderer
-	interval time.Duration
-	pending  bool
+	r         *renderer
+	interval  time.Duration
+	unfocused time.Duration // the interval while the terminal is blurred
+	blurred   bool
+	pending   bool
 }
 
 // Option configures a [Root].
 type Option func(*config)
 
 type config struct {
-	method ansi.Method
-	fg, bg color.Color
-	fps    int
-	now    func() time.Time
+	method       ansi.Method
+	fg, bg       color.Color
+	fps          int
+	unfocusedFPS int
+	now          func() time.Time
 }
 
 // WithWidthMethod sets how the width of graphemes is measured. It must match
@@ -52,16 +55,26 @@ func WithColors(fg, bg color.Color) Option {
 // Values below one use one frame per second.
 func WithFPS(n int) Option { return func(c *config) { c.fps = max(n, 1) } }
 
+// WithUnfocusedFPS sets the layout animation tick rate while the terminal is
+// not focused, defaulting to 10, and never above [WithFPS]. Terminals report
+// focus only while [tea.View] ReportFocus is set, as on the view from
+// [Root.View]; until they do, the root counts the terminal as focused.
+func WithUnfocusedFPS(n int) Option { return func(c *config) { c.unfocusedFPS = max(n, 1) } }
+
 // WithClock sets the layout animation clock, for tests. It must not be nil.
 func WithClock(now func() time.Time) Option { return func(c *config) { c.now = now } }
 
 // New returns a Root.
 func New(opts ...Option) *Root {
-	c := config{method: ansi.GraphemeWidth, fps: 60, now: time.Now}
+	c := config{method: ansi.GraphemeWidth, fps: 60, unfocusedFPS: 10, now: time.Now}
 	for _, opt := range opts {
 		opt(&c)
 	}
-	r := &Root{r: newRenderer(c.method), interval: time.Second / time.Duration(c.fps)}
+	r := &Root{
+		r:         newRenderer(c.method),
+		interval:  time.Second / time.Duration(c.fps),
+		unfocused: time.Second / time.Duration(min(c.unfocusedFPS, c.fps)),
+	}
 	r.r.motion = &layoutMotion{now: c.now}
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
 	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)
@@ -75,9 +88,10 @@ func (r *Root) Init() tea.Cmd {
 	return tea.Batch(tea.RequestBackgroundColor, tea.RequestForegroundColor)
 }
 
-// Update notes what the terminal reports about itself: its default colors
-// and color profile. Pass every message to Update and return its command:
-// it schedules frames while layout animations run.
+// Update notes what the terminal reports about itself: its default colors,
+// color profile, and focus. Pass every message to Update and return its
+// command: it schedules frames while layout animations run, fewer while the
+// terminal is not focused (see [WithUnfocusedFPS]).
 func (r *Root) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
@@ -86,6 +100,10 @@ func (r *Root) Update(msg tea.Msg) tea.Cmd {
 		r.r.env.Fg = msg.Color
 	case tea.ColorProfileMsg:
 		r.r.env.Profile = msg.Profile
+	case tea.FocusMsg:
+		r.blurred = false
+	case tea.BlurMsg:
+		r.blurred = true
 	}
 	if tick, ok := msg.(layoutFrameMsg); ok {
 		if tick.root != r {
@@ -100,7 +118,11 @@ func (r *Root) Update(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 	r.pending = true
-	return tea.Tick(r.interval, func(time.Time) tea.Msg { return layoutFrameMsg{root: r} })
+	d := r.interval
+	if r.blurred {
+		d = r.unfocused
+	}
+	return tea.Tick(d, func(time.Time) tea.Msg { return layoutFrameMsg{root: r} })
 }
 
 // Render lays out and draws c in a w×h frame and returns it as a string. A

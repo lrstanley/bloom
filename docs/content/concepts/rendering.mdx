@@ -61,6 +61,10 @@ fast terminals, raise both: `tea.WithFPS(120)` on the program, and `anim.FPS(120
 `bloom.WithFPS(120)` on the root for layout animation. Nothing is scheduled while nothing moves, so an idle program
 stays idle.
 
+With `ReportFocus` set on the view, animations drop to 10 frames a second while the terminal isn't focused. Change
+it with `anim.UnfocusedFPS(n)` and `bloom.WithUnfocusedFPS(n)`; see
+[Animating values](/motion/animating-values#frame-rate).
+
 ## Render without a program
 
 [`bloom.Render`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) lays out and draws a tree once, and returns

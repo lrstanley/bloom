@@ -194,6 +194,8 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	v.BackgroundColor = bg
+	// The loops slow down while the terminal is not focused.
+	v.ReportFocus = true
 	return v
 }
 

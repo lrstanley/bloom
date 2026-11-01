@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 )
 
 // integrate solves the spring's equation of motion, where acceleration is
@@ -58,5 +59,24 @@ func TestSpringStepWithoutFrequency(t *testing.T) {
 		if p, v := springStep(3, 2, 10, 0.1, omega, 1); p != 3 || v != 2 {
 			t.Fatalf("omega=%v moved the spring to %v, %v", omega, p, v)
 		}
+	}
+}
+
+// A spring is where the clock says, however far apart its frames are.
+func TestSpringFrameRateIndependent(t *testing.T) {
+	t.Parallel()
+
+	start := time.Unix(0, 0)
+	smooth, choppy := NewValue(0, Spring(8, 0.5)), NewValue(0, Spring(8, 0.5))
+	smooth.SetTarget(10, start)
+	choppy.SetTarget(10, start)
+	for at := 16 * time.Millisecond; at <= 960*time.Millisecond; at += 16 * time.Millisecond {
+		smooth.Advance(start.Add(at))
+	}
+	for at := 240 * time.Millisecond; at <= 960*time.Millisecond; at += 240 * time.Millisecond {
+		choppy.Advance(start.Add(at))
+	}
+	if ok := math.Abs(smooth.Float()-choppy.Float()) <= 1e-9; !ok {
+		t.Fatalf("at 4 fps = %v, at 60 fps = %v", choppy.Float(), smooth.Float())
 	}
 }

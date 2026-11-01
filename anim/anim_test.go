@@ -7,7 +7,10 @@ package anim
 import (
 	"math"
 	"testing"
+	"testing/synctest"
 	"time"
+
+	tea "charm.land/bubbletea/v2"
 )
 
 // clock is a fake source of time.
@@ -235,4 +238,39 @@ func TestUpdate(t *testing.T) {
 	if Update(a.frameMsg(), &a, &b) == nil || a.Float() == 0 {
 		t.Fatal("the value's frame did not advance it")
 	}
+}
+
+// delay runs cmd and returns how long its tick waited. Call it inside a
+// synctest bubble, whose clock moves only once everything waits.
+func delay(cmd tea.Cmd) time.Duration {
+	start := time.Now()
+	cmd()
+	return time.Since(start)
+}
+
+func TestUnfocusedFPS(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		c := &clock{now: time.Unix(0, 0)}
+		v := NewValue(0, Duration(time.Hour), FPS(1000), UnfocusedFPS(4), Clock(c.Now))
+		if d := delay(v.To(1)); d != time.Millisecond {
+			t.Fatalf("focused frame waited %v", d)
+		}
+		v.Update(tea.BlurMsg{})
+		if d := delay(v.Update(v.frameMsg())); d != 250*time.Millisecond {
+			t.Fatalf("blurred frame waited %v", d)
+		}
+		v.Update(tea.FocusMsg{})
+		if d := delay(v.Update(v.frameMsg())); d != time.Millisecond {
+			t.Fatalf("refocused frame waited %v", d)
+		}
+
+		// The unfocused rate never speeds a value up.
+		slow := NewValue(0, Duration(time.Hour), FPS(4), UnfocusedFPS(1000), Clock(c.Now))
+		slow.Update(tea.BlurMsg{})
+		if d := delay(slow.To(1)); d != 250*time.Millisecond {
+			t.Fatalf("blurred frame of a slower value waited %v", d)
+		}
+	})
 }

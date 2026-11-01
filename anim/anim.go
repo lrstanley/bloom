@@ -12,6 +12,10 @@
 // animation is done. Progress follows the clock, not the number of frames, so
 // a slow frame does not slow an animation down.
 //
+// While the terminal is not focused, animations ask for fewer frames (see
+// [UnfocusedFPS]). Terminals report focus only to programs that enable it
+// with [tea.View] ReportFocus.
+//
 // See the [documentation] for guides and examples. It is also available for
 // LLMs and agents as [llms.txt].
 //
@@ -85,6 +89,16 @@ func FPS(n int) Option {
 	return func(v *Value) { v.interval = time.Second / time.Duration(max(n, 1)) }
 }
 
+// UnfocusedFPS sets how many frames per second the value asks for while the
+// terminal is not focused, 10 by default, as an animation nobody is looking
+// at need not be smooth. It never asks for more than [FPS]. The value learns
+// of focus from the [tea.FocusMsg] and [tea.BlurMsg] passed to its Update,
+// which Bubble Tea sends only while [tea.View] ReportFocus is set; until
+// then, a value counts the terminal as focused.
+func UnfocusedFPS(n int) Option {
+	return func(v *Value) { v.unfocused = time.Second / time.Duration(max(n, 1)) }
+}
+
 // Clock sets the value's source of time, for tests.
 func Clock(now func() time.Time) Option {
 	return func(v *Value) { v.now = now }
@@ -108,6 +122,8 @@ type Value struct {
 	frequency float64
 	damping   float64
 	interval  time.Duration
+	unfocused time.Duration // the interval while the terminal is blurred
+	blurred   bool
 	now       func() time.Time
 }
 
@@ -117,7 +133,7 @@ func NewValue(v float64, opts ...Option) Value {
 	val := Value{
 		id: ids.Add(1), current: v, target: v,
 		duration: 250 * time.Millisecond, ease: OutCubic,
-		interval: time.Second / 60, now: time.Now,
+		interval: time.Second / 60, unfocused: time.Second / 10, now: time.Now,
 	}
 	for _, opt := range opts {
 		opt(&val)
@@ -190,8 +206,10 @@ func (v *Value) Advance(now time.Time) bool {
 }
 
 // Update advances the value for its own [FrameMsg], returning the command for
-// the next frame while it is animating.
+// the next frame while it is animating. It notes [tea.FocusMsg] and
+// [tea.BlurMsg] for [UnfocusedFPS].
 func (v *Value) Update(msg tea.Msg) tea.Cmd {
+	v.noteFocus(msg)
 	f, ok := msg.(FrameMsg)
 	if !ok || f.id != v.id || f.gen != v.gen || !v.running {
 		return nil
@@ -202,14 +220,25 @@ func (v *Value) Update(msg tea.Msg) tea.Cmd {
 	return v.frame()
 }
 
-func (v *Value) frame() tea.Cmd {
-	msg := FrameMsg{id: v.id, gen: v.gen}
-	return tea.Tick(v.interval, func(time.Time) tea.Msg { return msg })
+// noteFocus notes whether the terminal is focused. A frame already scheduled
+// keeps its time, so the full rate comes back from the next one.
+func (v *Value) noteFocus(msg tea.Msg) {
+	switch msg.(type) {
+	case tea.FocusMsg:
+		v.blurred = false
+	case tea.BlurMsg:
+		v.blurred = true
+	}
 }
 
-// maxStep bounds the time a spring advances in one frame, so a long pause
-// does not throw it off.
-const maxStep = 100 * time.Millisecond
+func (v *Value) frame() tea.Cmd {
+	msg := FrameMsg{id: v.id, gen: v.gen}
+	d := v.interval
+	if v.blurred {
+		d = max(d, v.unfocused)
+	}
+	return tea.Tick(d, func(time.Time) tea.Msg { return msg })
+}
 
 // advance moves the value to where it is at now, reporting whether it is
 // done.
@@ -223,7 +252,9 @@ func (v *Value) advance(now time.Time) bool {
 		return p >= 1
 	}
 
-	dt := min(now.Sub(v.last), maxStep)
+	// The spring is solved exactly, so it keeps to the clock however far
+	// apart frames are, as while the terminal is not focused.
+	dt := now.Sub(v.last)
 	v.last = now
 	if dt <= 0 {
 		return false

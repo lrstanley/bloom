@@ -7,8 +7,10 @@ package bloom
 import (
 	"image"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/lrstanley/bloom/anim"
 )
 
@@ -269,4 +271,32 @@ func TestLayoutAnimationNestedMovesWithParent(t *testing.T) {
 	// eighth of the way, by its own slower animation, to where it is going.
 	requireRect(t, r, "pane", image.Rect(20, 0, 40, 10))
 	requireRect(t, r, "item", image.Rect(20, 1, 40, 2))
+}
+
+func TestLayoutAnimationUnfocusedFPS(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		now := time.Unix(1, 0)
+		r := New(WithClock(func() time.Time { return now }), WithFPS(1000), WithUnfocusedFPS(4))
+		tree := func(x int) Child {
+			return Row(Fixed(x, nil), Fixed(5, Text("x")).ID("x").Animate(anim.Duration(time.Hour)))
+		}
+		r.View(80, 10, tree(0))
+		r.View(80, 10, tree(20))
+
+		delay := func(cmd tea.Cmd) time.Duration {
+			start := time.Now()
+			cmd()
+			return time.Since(start)
+		}
+		if d := delay(r.Update(tea.BlurMsg{})); d != 250*time.Millisecond {
+			t.Fatalf("blurred tick waited %v", d)
+		}
+		r.Update(tea.FocusMsg{})
+		if d := delay(r.Update(layoutFrameMsg{root: r})); d != time.Millisecond {
+			t.Fatalf("refocused tick waited %v", d)
+		}
+	})
+	if slow := New(WithFPS(4), WithUnfocusedFPS(1000)); slow.unfocused != slow.interval {
+		t.Fatalf("unfocused interval %v is faster than the focused %v", slow.unfocused, slow.interval)
+	}
 }

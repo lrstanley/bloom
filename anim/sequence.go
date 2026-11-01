@@ -70,13 +70,13 @@ func NewSequence(start float64, steps ...Step) Sequence {
 }
 
 // With sets the options steps start from, such as [Duration] and [Ease], and
-// [FPS] and [Clock] for the whole sequence. It returns the changed sequence,
+// [FPS], [UnfocusedFPS], and [Clock] for the whole sequence. It returns the changed sequence,
 // to be used before it is played.
 func (s Sequence) With(opts ...Option) Sequence {
 	for _, opt := range opts {
 		opt(&s.base)
 	}
-	s.v.interval, s.v.now = s.base.interval, s.base.now
+	s.v.interval, s.v.unfocused, s.v.now = s.base.interval, s.base.unfocused, s.base.now
 	return s
 }
 
@@ -124,8 +124,9 @@ func (s *Sequence) Stop() {
 }
 
 // Update advances the sequence for its own [FrameMsg], returning the command
-// for the next one while it is running.
+// for the next one while it is running. It notes focus as [Value.Update] does.
 func (s *Sequence) Update(msg tea.Msg) tea.Cmd {
+	s.v.noteFocus(msg)
 	f, ok := msg.(FrameMsg)
 	if !ok || f.id != s.v.id || f.gen != s.v.gen || !s.running {
 		return nil

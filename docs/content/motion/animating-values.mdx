@@ -173,6 +173,22 @@ too, with `tea.WithFPS(n)` when you create the program, or the extra frames won'
 
 Nothing is scheduled while no animation is running, so an idle program doesn't wake up.
 
+While the terminal isn't focused, values ask for 10 frames a second instead, as an animation nobody is looking at
+needn't be smooth, and a loop such as a shimmer then costs a fraction of the CPU. Bubble Tea reports focus only
+when the view sets `ReportFocus`:
+
+```go
+func (m model) View() tea.View {
+	v := m.ui.View(m.width, m.height, m.layout())
+	v.ReportFocus = true
+	return v
+}
+```
+
+Use `anim.UnfocusedFPS(n)` to change the rate. Values learn of focus from the `tea.FocusMsg` and `tea.BlurMsg`
+passed to their `Update`, so a value made while the terminal is blurred runs at its full rate until the next
+change. The full rate comes back from the frame after focus returns.
+
 ## Related
 
 - [Transitions](/motion/transitions), for using these values with effects
