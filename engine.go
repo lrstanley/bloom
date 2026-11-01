@@ -358,10 +358,18 @@ func (e *engine) slotOf(i int) SlotNode {
 // measureFlex returns the natural size of a row or column: the natural sizes
 // of its children on the main axis, and on the cross axis, the largest of
 // its children at the sizes they get when it is that long.
+//
+// Growing children share the space left by the others in proportion to
+// their weights rather than to their natural sizes, so they are given the
+// least space in which every one of their shares fits its child: the most
+// any of them needs for each unit of its weight, times all their weights.
 func (e *engine) measureFlex(i int, n FlexNode, avail Size) Size {
 	mainAvail, crossAvail := axes(avail, n.vertical)
 	kids := e.kidsOf(i)
 	main, visible := 0, 0
+	// needs/per is the most a growing child needs for each unit of its
+	// weight, and weights is all their weights.
+	needs, per, weights := 0, 1, 0
 	for _, k := range kids {
 		sl := e.slotOf(k)
 		m := sl.track(0, mainAvail).Basis
@@ -377,11 +385,19 @@ func (e *engine) measureFlex(i int, n FlexNode, avail Size) Size {
 		if sl.max > 0 {
 			m = min(m, sl.max)
 		}
-		main += m
+		if sl.sizing == sizeFill && sl.n > 0 {
+			if m*per > needs*sl.n {
+				needs, per = m, sl.n
+			}
+			weights += sl.n
+		} else {
+			main += m
+		}
 		if !sl.track(m, mainAvail).Empty() {
 			visible++
 		}
 	}
+	main += (needs*weights + per - 1) / per
 	main = min(main+n.gap*max(visible-1, 0), mainAvail)
 
 	sizes, _, mark := e.planFlex(i, n, main, crossAvail)

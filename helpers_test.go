@@ -289,6 +289,32 @@ func TestEmptySlotTakesNoGap(t *testing.T) {
 	}
 }
 
+// TestFillNaturalSize checks that growing children, which share space by
+// weight rather than by size, each get at least their natural size when
+// their row is at its natural size.
+func TestFillNaturalSize(t *testing.T) {
+	t.Parallel()
+	wraps := lipgloss.NewStyle() // Styled text wraps where plain text is cut.
+	row := Row(
+		Fill(Text("ab").Style(wraps)).ID("a"),
+		Fill(Text("abcdef").Style(wraps)).ID("b"),
+		Grow(2, Text("abcd").Style(wraps)).ID("c"),
+	).Gap(1)
+	// b needs 6 cells for each unit of its weight, so the 4 units need 24.
+	f := Solve(row, 0, 0)
+	expectRect(t, f, "a", image.Rect(0, 0, 6, 1))
+	expectRect(t, f, "b", image.Rect(7, 0, 13, 1))
+	expectRect(t, f, "c", image.Rect(14, 0, 26, 1))
+
+	// A column measures the row's height at that size, so the row is as tall
+	// stretched across the column as it is at its natural size.
+	for _, w := range []int{0, 40} {
+		if r, _ := Solve(Column(row, Text("end").ID("end")), w, 0).Rect("end"); r.Min.Y != 1 {
+			t.Fatalf("at width %d, the row is %d lines tall; want 1", w, r.Min.Y)
+		}
+	}
+}
+
 func TestGridRowHeights(t *testing.T) {
 	t.Parallel()
 	grid := Grid(1, Text("a").ID("a"), Text("b\nc\nd").ID("b"))

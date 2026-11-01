@@ -32,24 +32,29 @@ import (
 )
 
 var (
-	fg     = lipgloss.Color("#c0caf5")
-	muted  = lipgloss.Color("#565f89")
-	accent = lipgloss.Color("#bb9af7")
-	warn   = lipgloss.Color("#ff9e64")
+	fg      = lipgloss.Color("#c0caf5")
+	muted   = lipgloss.Color("#565f89")
+	accent  = lipgloss.Color("#bb9af7")
+	warn    = lipgloss.Color("#ff9e64")
+	good    = lipgloss.Color("#9ece6a")
+	dark    = lipgloss.Color("#1a1b26")
+	field   = lipgloss.Color("#24283b")
+	fieldOn = lipgloss.Color("#414868")
 
-	panel     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(1, 2)
+	rounded   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
+	panel     = rounded.BorderForeground(muted).Padding(1, 2)
 	heading   = lipgloss.NewStyle().Bold(true).Foreground(accent)
 	label     = lipgloss.NewStyle().Foreground(muted)
-	input     = lipgloss.NewStyle().Foreground(fg).Background(lipgloss.Color("#24283b")).Padding(0, 1)
-	inputOn   = input.Background(lipgloss.Color("#414868"))
+	input     = lipgloss.NewStyle().Foreground(fg).Background(field).Padding(0, 1)
+	inputOn   = input.Background(fieldOn)
 	hint      = input.Foreground(muted)
 	button    = lipgloss.NewStyle().Foreground(fg).Background(muted).Padding(0, 2)
-	buttonOn  = button.Foreground(lipgloss.Color("#1a1b26")).Background(accent).Bold(true)
+	buttonOn  = button.Foreground(dark).Background(accent).Bold(true)
 	dropdown  = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(accent)
 	option    = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
 	dialog    = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(accent).Padding(1, 3)
 	danger    = dialog.BorderForeground(warn)
-	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ece6a")).Padding(0, 1)
+	toastBox  = rounded.BorderForeground(good).Padding(0, 1)
 	statusBar = lipgloss.NewStyle().Foreground(muted)
 
 	// The vex backdrop: everything beneath the top dialog in two colors.
@@ -79,7 +84,10 @@ const (
 var (
 	fieldLabels  = []string{"Name", "Email", "Language"}
 	placeholders = []string{"Ada Lovelace", "ada@example.com", "start typing…"}
-	languages    = []string{"Go", "Rust", "Python", "TypeScript", "Zig", "Haskell", "OCaml", "Elixir", "Gleam", "Kotlin"}
+	languages    = []string{
+		"Go", "Rust", "Python", "TypeScript", "Zig",
+		"Haskell", "OCaml", "Elixir", "Gleam", "Kotlin",
+	}
 )
 
 type model struct {
@@ -244,15 +252,27 @@ func (m *model) field(id fieldID) bloom.Child {
 		}
 		in = in.Style(st).Cursor(tea.NewCursor(1+ansi.StringWidth(m.values[id]), 0))
 	}
-	return bloom.Row(bloom.Fixed(10, bloom.Text(fieldLabels[id]).Style(label)), bloom.Fill(in))
+	return bloom.Row(
+		bloom.Fixed(10, bloom.Text(fieldLabels[id]).Style(label)),
+		bloom.Fill(in),
+	)
 }
 
-func (m *model) button(id buttonID, text string) bloom.Child {
+func (m *model) button(id buttonID) bloom.Child {
 	st := button
 	if m.focus.Is(id) {
 		st = buttonOn
 	}
-	return bloom.Text(text).Style(st).ID(id).Focusable()
+	return bloom.Text(string(id)).Style(st).ID(id).Focusable()
+}
+
+// buttons is a row of buttons, at its end.
+func (m *model) buttons(ids ...buttonID) bloom.Child {
+	row := []bloom.Child{bloom.Space()}
+	for _, id := range ids {
+		row = append(row, m.button(id))
+	}
+	return bloom.Row(row...).Gap(2)
 }
 
 func (m *model) layout() bloom.Child {
@@ -265,13 +285,17 @@ func (m *model) layout() bloom.Child {
 		bloom.Fixed(1, nil),
 		m.field(fieldLanguage),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), m.button("reset", "reset"), m.button("save", "save")).Gap(2),
+		m.buttons("reset", "save"),
 	))
+
+	status := fmt.Sprintf(
+		" focus: %v · in the form: %v · dialogs open: %d · saved %d times",
+		m.focus.Current(), m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
+	)
 
 	base := bloom.Column(
 		bloom.Fill(bloom.Centered(bloom.Row(bloom.Fixed(60, form).ID(scopeForm).Scope()))),
-		bloom.Fixed(1, bloom.Text(fmt.Sprintf(" focus: %v · in the form: %v · dialogs open: %d · saved %d times",
-			m.focus.Current(), m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved)).Style(statusBar)),
+		bloom.Fixed(1, bloom.Text(status).Style(statusBar)),
 	)
 	return bloom.Overlay(base, m.layers()...)
 }
@@ -296,16 +320,23 @@ func (m *model) layers() []bloom.LayerNode {
 		for i, l := range s {
 			opts[i] = bloom.Text(l).Style(option).ID(optionID(i))
 		}
-		layers = append(layers, bloom.Layer(bloom.Box(dropdown, bloom.Column(opts...))).
-			AnchorTo(fieldLanguage, bloom.Bottom))
+		menu := bloom.Layer(bloom.Box(dropdown, bloom.Column(opts...))).
+			AnchorTo(fieldLanguage, bloom.Bottom)
+		layers = append(layers, menu)
 	}
 
-	confirm := bloom.Layer(bloom.Box(dialog, bloom.Column(
+	profile := fmt.Sprintf("%s <%s>, %s",
+		m.values[fieldName], m.values[fieldEmail], m.values[fieldLanguage])
+	confirmBody := bloom.Column(
 		bloom.Text("Save profile?").Style(heading),
-		bloom.Text(fmt.Sprintf("%s <%s>, %s", m.values[fieldName], m.values[fieldEmail], m.values[fieldLanguage])),
+		bloom.Text(profile),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), m.button("cancel", "cancel"), m.button("confirm", "confirm")).Gap(2),
-	))).ID(scopeConfirm).Modal().Shadow(2, 1, fx.Dim{Amount: 0.7}).
+		m.buttons("cancel", "confirm"),
+	)
+	confirm := bloom.Layer(bloom.Box(dialog, confirmBody)).
+		ID(scopeConfirm).
+		Modal().
+		Shadow(2, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.confirm, fx.Fade{}, fx.Slide{From: fx.Bottom})
 	// Like vex, only the top dialog has a backdrop, which recolors the
 	// dialogs beneath it too.
@@ -314,17 +345,24 @@ func (m *model) layers() []bloom.LayerNode {
 	}
 
 	// The spring overshoots 1, which bounces the dialog past its place.
-	overwrite := bloom.Layer(bloom.Box(danger, bloom.Column(
+	drop := int(math.Round((1 - m.overwrite.Float()) * -10))
+	overwriteBody := bloom.Column(
 		bloom.Text("Overwrite the saved profile?").Style(heading.Foreground(warn)),
 		bloom.Text(fmt.Sprintf("It was saved %d time(s) before.", m.saved)),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), m.button("back", "back"), m.button("overwrite", "overwrite")).Gap(2),
-	))).ID(scopeOverwrite).Modal().Offset(0, int(math.Round((1-m.overwrite.Float())*-10))).
-		Backdrop(backdrop).Shadow(2, 1, fx.Dim{Amount: 0.7}).
+		m.buttons("back", "overwrite"),
+	)
+	overwrite := bloom.Layer(bloom.Box(danger, overwriteBody)).
+		ID(scopeOverwrite).
+		Modal().
+		Offset(0, drop).
+		Backdrop(backdrop).
+		Shadow(2, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.overwrite, fx.Fade{})
 
 	toast := bloom.Layer(bloom.Box(toastBox, bloom.Text("✓ Profile saved"))).
-		Anchor(bloom.End, bloom.End).Margin(1).
+		Anchor(bloom.End, bloom.End).
+		Margin(1).
 		Presence(m.toast, fx.Typewriter{}, fx.Fade{})
 
 	return append(layers, confirm, overwrite, toast)

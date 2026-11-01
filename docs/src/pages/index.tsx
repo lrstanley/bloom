@@ -58,6 +58,12 @@ const chores = [
         href: "/layers/toasts",
     },
     {
+        title: "Showing data that's still loading",
+        without: "Placeholder strings sized to match the content by hand, and a tick loop to shimmer them.",
+        code: "bloom.Skeleton(8, 0, 5, 11).Shimmer(t)",
+        href: "/motion/feedback-effects#skeleton-loading-placeholders",
+    },
+    {
         title: "Knowing what was clicked",
         without: "Turn an X and Y back into whichever list item or button you drew there.",
         code: "id, ok := msg.Target[noteID]()",

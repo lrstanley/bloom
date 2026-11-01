@@ -68,23 +68,30 @@ Replace `notes` with `m.notes` everywhere, and start the program with `tea.NewPr
 `bloom.Overlay(base, layers...)` draws each layer over the base, without taking any space from it. A layer
 made with `bloom.Layer(child)` sits in the middle of the screen at its natural size.
 
-Add styles for the dialog and its buttons:
+Add a color, and styles for the dialog and its buttons, to the `var` block:
 
 ```go
-	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#eb6f92")).Padding(1, 2)
-	button    = lipgloss.NewStyle().Padding(0, 2).Background(lipgloss.Color("#393552"))
-	buttonOn  = button.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92")).Bold(true)
+	surface = lipgloss.Color("#393552")
+
+	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(rose).Padding(1, 2)
+	button    = lipgloss.NewStyle().Padding(0, 2).Background(surface)
+	buttonOn  = button.Foreground(dark).Background(rose).Bold(true)
 ```
 
 Then, in `View`, keep the column you already have as `base`, build the dialog, and render both:
 
 ```go
-	dialog := bloom.Layer(bloom.Box(dialogBox, bloom.Column(
+	content := bloom.Column(
 		bloom.Text(fmt.Sprintf("Delete %q?", title)).Style(heading),
 		bloom.Text("This can't be undone."),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), bloom.Text("Cancel").Style(button), bloom.Text("Delete").Style(button)).Gap(2),
-	)))
+		bloom.Row(
+			bloom.Space(),
+			bloom.Text("Cancel").Style(button),
+			bloom.Text("Delete").Style(button),
+		).Gap(2),
+	)
+	dialog := bloom.Layer(bloom.Box(dialogBox, content))
 
 	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog))
 ```
@@ -125,7 +132,7 @@ message to any number of animations and returns their commands. Return it from `
 	return m, tea.Batch(m.ui.Update(msg), anim.Update(msg, &m.confirm))
 ```
 
-Now give the layer to the presence (`content` here is the column from the previous step). `Presence(p, effects...)` shows the layer only while `p` is visible, and runs
+Now give the layer to the presence. `Presence(p, effects...)` shows the layer only while `p` is visible, and runs
 the effects with its progress: here it fades in while sliding up from the bottom of the screen.
 
 ```go
@@ -240,10 +247,12 @@ closes it:
 
 ### Add a toast
 
-A toast is one more layer. Add a style for it next to the others:
+A toast is one more layer. Add a color and a style for it next to the others:
 
 ```go
-	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ccfd8")).Padding(0, 1)
+	teal = lipgloss.Color("#9ccfd8")
+
+	toastBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(teal).Padding(0, 1)
 ```
 
 The layer is anchored to the bottom-right corner with a one-cell margin. `Anchor(x, y)` takes where
@@ -311,16 +320,24 @@ type (
 const confirmDialog = "confirm"
 
 var (
-	panel     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+	muted   = lipgloss.Color("#6e6a86")
+	subtle  = lipgloss.Color("#908caa")
+	rose    = lipgloss.Color("#eb6f92")
+	gold    = lipgloss.Color("#f6c177")
+	dark    = lipgloss.Color("#191724")
+	surface = lipgloss.Color("#393552")
+	teal    = lipgloss.Color("#9ccfd8")
+
+	panel     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item      = lipgloss.NewStyle().Padding(0, 1)
-	selected  = item.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92"))
-	heading   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f6c177"))
+	selected  = item.Foreground(dark).Background(rose)
+	heading   = lipgloss.NewStyle().Bold(true).Foreground(gold)
 	prose     = lipgloss.NewStyle().Padding(0, 1)
-	status    = lipgloss.NewStyle().Foreground(lipgloss.Color("#908caa"))
-	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#eb6f92")).Padding(1, 2)
-	button    = lipgloss.NewStyle().Padding(0, 2).Background(lipgloss.Color("#393552"))
-	buttonOn  = button.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92")).Bold(true)
-	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ccfd8")).Padding(0, 1)
+	status    = lipgloss.NewStyle().Foreground(subtle)
+	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(rose).Padding(1, 2)
+	button    = lipgloss.NewStyle().Padding(0, 2).Background(surface)
+	buttonOn  = button.Foreground(dark).Background(rose).Bold(true)
+	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(teal).Padding(0, 1)
 )
 
 type model struct {
@@ -457,19 +474,22 @@ func (m *model) View() tea.View {
 		items[i] = bloom.Text(n.title).Style(style).ID(noteID(i))
 	}
 
-	reader := bloom.Child(bloom.Text("Nothing here.").Style(prose))
+	sidebar := bloom.Box(panel, bloom.Column(items...))
+
+	body := bloom.Child(bloom.Text("Nothing here.").Style(prose))
 	if len(m.notes) > 0 {
 		current := m.notes[m.selected]
-		reader = bloom.Column(
+		body = bloom.Column(
 			bloom.Text(current.title).Style(heading.Padding(0, 1)),
 			bloom.Text(current.body).Style(prose),
 		)
 	}
+	reader := bloom.Box(panel, body)
 
 	base := bloom.Column(
 		bloom.Fill(bloom.Row(
-			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).Collapsible(1),
-			bloom.Fill(bloom.Box(panel, reader)).Min(30),
+			bloom.Fixed(24, sidebar).Collapsible(1),
+			bloom.Fill(reader).Min(30),
 		)),
 		bloom.Text(" ↑/↓ choose, d delete, q quit").Style(status).Truncate(),
 	)
@@ -478,12 +498,17 @@ func (m *model) View() tea.View {
 	if len(m.notes) > 0 {
 		title = m.notes[m.selected].title
 	}
-	dialog := bloom.Layer(bloom.Box(dialogBox, bloom.Column(
+	content := bloom.Column(
 		bloom.Text(fmt.Sprintf("Delete %q?", title)).Style(heading),
 		bloom.Text("This can't be undone."),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), m.button("cancel", "Cancel"), m.button("delete", "Delete")).Gap(2),
-	))).
+		bloom.Row(
+			bloom.Space(),
+			m.button("cancel", "Cancel"),
+			m.button("delete", "Delete"),
+		).Gap(2),
+	)
+	dialog := bloom.Layer(bloom.Box(dialogBox, content)).
 		ID(confirmDialog).
 		Modal().
 		Backdrop(fx.Dim{Amount: 0.6}).

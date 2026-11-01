@@ -1,6 +1,6 @@
 ---
 title: Feedback effects
-description: Shake rejected input, shimmer loading placeholders, roll changing numbers, burst confetti, glitch a badge, spotlight a tour step, and scroll text that doesn't fit.
+description: Shake rejected input, show skeleton placeholders that shimmer while loading, roll changing numbers, burst confetti, glitch a badge, spotlight a tour step, and scroll text that doesn't fit.
 ---
 
 Some effects aren't entrances. They respond to something happening: input rejected, data loading, a number
@@ -36,10 +36,13 @@ if m.shake.Animating() {
 `Amount` is how many cells it moves at most (2 by default), and `Times` is how many times it swings each way (4 by
 default).
 
-## Shimmer loading placeholders
+## Skeleton loading placeholders
 
-`fx.Shimmer` sweeps a highlight band across a node. Draw placeholder bars while data loads, and loop the shimmer's
-position with `anim.NewLoop`:
+[`bloom.Skeleton`](https://pkg.go.dev/github.com/lrstanley/bloom#Skeleton) draws placeholder bars while data
+loads. Each number is a line: a bar that many cells wide, or `0` for a blank line. Give it the same number of lines
+as the content it stands in for, so nothing moves when the content arrives.
+
+`Shimmer` sweeps a band of light across the bars. Its phase comes from a looping sequence in your model:
 
 ```go
 shimmer: anim.NewLoop(1400 * time.Millisecond),
@@ -47,24 +50,36 @@ shimmer: anim.NewLoop(1400 * time.Millisecond),
 
 ```go
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.ui.Init(), m.shimmer.Loop(), fetchStats) // fetchStats is your command that loads the data
+	// fetchStats is your command that loads the data.
+	return tea.Batch(m.ui.Init(), m.shimmer.Loop(), fetchStats)
 }
 
 // when the data arrives
+m.loaded = true
 m.shimmer.Stop()
 
-// in View
+// in View: four lines, as the loaded card has four
 if !m.loaded {
-	bars := bloom.Column(
-		bloom.Text(strings.Repeat("█", 8)).Style(skeleton),
-		bloom.Text(strings.Repeat("█", 12)).Style(skeleton),
-	)
-	return bloom.Transition(m.shimmer.Float(), bloom.Box(card, bars), fx.Shimmer{Color: accent, Width: 10})
+	return bloom.Box(card, bloom.Skeleton(8, 0, 5, 11).Shimmer(m.shimmer.Float()))
 }
+return bloom.Box(card, bloom.Column(
+	bloom.Text("Requests").Style(heading),
+	bloom.Fixed(1, nil),
+	bloom.Text(strconv.Itoa(m.requests)).Style(big),
+	bloom.Text("per minute").Style(label),
+))
 ```
 
-The band starts just off one side and ends just off the other, so the loop restarts without a visible jump.
-`Color` defaults to the terminal's foreground.
+Bars are drawn in the terminal's foreground faded most of the way into its background, so they suit any theme.
+`Style` colors them yourself, and bars wider than the space they're given are cut to fit.
+
+The band starts just off one side and ends just off the other, so the loop restarts without a visible jump. It's
+[`fx.Shimmer`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shimmer), which works on any node. For a band of
+another color or width, or to shimmer a whole card, draw it in a transition instead:
+
+```go
+bloom.Transition(m.shimmer.Float(), placeholder, fx.Shimmer{Color: accent, Width: 10})
+```
 
 ## Roll changing numbers
 

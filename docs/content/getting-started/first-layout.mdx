@@ -157,12 +157,18 @@ var notes = []note{
 }
 
 var (
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+	muted  = lipgloss.Color("#6e6a86")
+	subtle = lipgloss.Color("#908caa")
+	rose   = lipgloss.Color("#eb6f92")
+	gold   = lipgloss.Color("#f6c177")
+	dark   = lipgloss.Color("#191724")
+
+	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item     = lipgloss.NewStyle().Padding(0, 1)
-	selected = item.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92"))
-	heading  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f6c177"))
+	selected = item.Foreground(dark).Background(rose)
+	heading  = lipgloss.NewStyle().Bold(true).Foreground(gold)
 	prose    = lipgloss.NewStyle().Padding(0, 1)
-	status   = lipgloss.NewStyle().Foreground(lipgloss.Color("#908caa"))
+	status   = lipgloss.NewStyle().Foreground(subtle)
 )
 ```
 
@@ -180,15 +186,19 @@ func (m *model) View() tea.View {
 	}
 
 	current := notes[m.selected]
+	sidebar := bloom.Box(panel, bloom.Column(items...))
+	reader := bloom.Box(panel, bloom.Column(
+		bloom.Text(current.title).Style(heading.Padding(0, 1)),
+		bloom.Text(current.body).Style(prose),
+	))
+	hints := fmt.Sprintf(" %d notes, ↑/↓ or click to choose, q to quit", len(notes))
+
 	layout := bloom.Column(
 		bloom.Fill(bloom.Row(
-			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))),
-			bloom.Fill(bloom.Box(panel, bloom.Column(
-				bloom.Text(current.title).Style(heading.Padding(0, 1)),
-				bloom.Text(current.body).Style(prose),
-			))),
+			bloom.Fixed(24, sidebar),
+			bloom.Fill(reader),
 		)),
-		bloom.Text(fmt.Sprintf(" %d notes, ↑/↓ or click to choose, q to quit", len(notes))).Style(status).Truncate(),
+		bloom.Text(hints).Style(status).Truncate(),
 	)
 
 	v := m.ui.View(m.width, m.height, layout)
@@ -267,11 +277,8 @@ Make the terminal very narrow and the reader gets squeezed until its text barely
 
 ```go
 		bloom.Fill(bloom.Row(
-			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).Collapsible(1),
-			bloom.Fill(bloom.Box(panel, bloom.Column(
-				bloom.Text(current.title).Style(heading.Padding(0, 1)),
-				bloom.Text(current.body).Style(prose),
-			))).Min(30),
+			bloom.Fixed(24, sidebar).Collapsible(1),
+			bloom.Fill(reader).Min(30),
 		)),
 ```
 
@@ -310,12 +317,18 @@ var notes = []note{
 type noteID int
 
 var (
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+	muted  = lipgloss.Color("#6e6a86")
+	subtle = lipgloss.Color("#908caa")
+	rose   = lipgloss.Color("#eb6f92")
+	gold   = lipgloss.Color("#f6c177")
+	dark   = lipgloss.Color("#191724")
+
+	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item     = lipgloss.NewStyle().Padding(0, 1)
-	selected = item.Foreground(lipgloss.Color("#191724")).Background(lipgloss.Color("#eb6f92"))
-	heading  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f6c177"))
+	selected = item.Foreground(dark).Background(rose)
+	heading  = lipgloss.NewStyle().Bold(true).Foreground(gold)
 	prose    = lipgloss.NewStyle().Padding(0, 1)
-	status   = lipgloss.NewStyle().Foreground(lipgloss.Color("#908caa"))
+	status   = lipgloss.NewStyle().Foreground(subtle)
 )
 
 type model struct {
@@ -362,15 +375,19 @@ func (m *model) View() tea.View {
 	}
 
 	current := notes[m.selected]
+	sidebar := bloom.Box(panel, bloom.Column(items...))
+	reader := bloom.Box(panel, bloom.Column(
+		bloom.Text(current.title).Style(heading.Padding(0, 1)),
+		bloom.Text(current.body).Style(prose),
+	))
+	hints := fmt.Sprintf(" %d notes, ↑/↓ or click to choose, q to quit", len(notes))
+
 	layout := bloom.Column(
 		bloom.Fill(bloom.Row(
-			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).Collapsible(1),
-			bloom.Fill(bloom.Box(panel, bloom.Column(
-				bloom.Text(current.title).Style(heading.Padding(0, 1)),
-				bloom.Text(current.body).Style(prose),
-			))).Min(30),
+			bloom.Fixed(24, sidebar).Collapsible(1),
+			bloom.Fill(reader).Min(30),
 		)),
-		bloom.Text(fmt.Sprintf(" %d notes, ↑/↓ or click to choose, q to quit", len(notes))).Style(status).Truncate(),
+		bloom.Text(hints).Style(status).Truncate(),
 	)
 
 	v := m.ui.View(m.width, m.height, layout)

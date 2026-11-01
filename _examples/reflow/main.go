@@ -23,12 +23,25 @@ import (
 )
 
 var (
-	panel         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#565f89"))
-	heading       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7aa2f7"))
-	itemStyle     = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#c0caf5"))
+	fg     = lipgloss.Color("#c0caf5")
+	muted  = lipgloss.Color("#565f89")
+	accent = lipgloss.Color("#7aa2f7")
+	good   = lipgloss.Color("#9ece6a")
+
+	panel         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
+	heading       = lipgloss.NewStyle().Bold(true).Foreground(accent)
+	itemStyle     = lipgloss.NewStyle().Padding(0, 1).Foreground(fg)
 	selectedStyle = itemStyle.Background(lipgloss.Color("#414868"))
-	markerStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a")).Bold(true)
+	markerStyle   = lipgloss.NewStyle().Foreground(good).Bold(true)
 )
+
+const (
+	sidebarText = "Workspace\n\nProjects\nActivity\nSettings"
+	previewText = "Preview\n\nChildren reflow at the current visual size.\n\nTry b, s, r and d."
+	help        = "b sidebar / s sort / r ratio / d details / up,down select / q quit"
+)
+
+var names = []string{"Atlas", "Birch", "Cedar", "Delta", "Ember"}
 
 type model struct {
 	ui                         *bloom.Root
@@ -36,8 +49,6 @@ type model struct {
 	sidebar, details, reversed bool
 	ratio, selected            int
 }
-
-var names = []string{"Atlas", "Birch", "Cedar", "Delta", "Ember"}
 
 func newModel() *model {
 	return &model{ui: bloom.New(), sidebar: true, details: true, ratio: 30}
@@ -75,6 +86,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() tea.View {
+	v := m.ui.View(m.w, m.h, m.layout())
+	v.AltScreen = true
+	return v
+}
+
+func (m *model) layout() bloom.Child {
 	sidebarWidth, detailsHeight := 0, 0
 	if m.sidebar {
 		sidebarWidth = 18
@@ -82,43 +99,67 @@ func (m *model) View() tea.View {
 	if m.details {
 		detailsHeight = 5
 	}
+
+	// Every pane has an ID and animates, so it glides to its new place and
+	// size, with its content reflowing as it goes.
+	sidebar := bloom.Fixed(sidebarWidth, bloom.Box(panel, bloom.Text(sidebarText))).
+		ID("sidebar").
+		Animate(anim.Spring(16, 0.85))
+	list := bloom.Percent(m.ratio, bloom.Box(panel, m.list())).
+		ID("list").
+		Animate()
+	preview := bloom.Fill(bloom.Box(panel, bloom.Text(previewText))).
+		ID("preview").
+		Animate()
+	selection := bloom.Text("Details\nSelected: " + names[m.selected])
+	details := bloom.Fixed(detailsHeight, bloom.Box(panel, selection)).
+		ID("details").
+		Animate()
+	content := bloom.Fill(bloom.Column(bloom.Fill(bloom.Row(list, preview)), details)).
+		ID("content").
+		Animate()
+
+	status := fmt.Sprintf(
+		"sidebar: %t | reverse: %t | ratio: %d | details: %t | selected: %s",
+		m.sidebar, m.reversed, m.ratio, m.details, names[m.selected],
+	)
+
+	base := bloom.Column(
+		bloom.Text("Reflow / automatic layout animations").Style(heading),
+		bloom.Fill(bloom.Row(sidebar, content)),
+		bloom.Text(status).Truncate(),
+		bloom.Text(help).Truncate(),
+	)
+
+	// The marker follows the selected item wherever it moves.
+	marker := bloom.Layer(bloom.Text("< selected").Style(markerStyle)).
+		Size(10, 1).
+		AnchorTo(names[m.selected], bloom.Right).
+		ID("selection").
+		Animate(anim.Spring(20, 1))
+
+	return bloom.Overlay(base, marker)
+}
+
+// list is the items in their current order. Each has an ID and animates, so
+// it slides to its new place when the order changes.
+func (m *model) list() bloom.Child {
 	order := []int{0, 1, 2, 3, 4}
 	if m.reversed {
 		slices.Reverse(order)
 	}
+
 	items := make([]bloom.Child, 0, len(order)+1)
 	for _, i := range order {
 		style := itemStyle
 		if i == m.selected {
 			style = selectedStyle
 		}
-		items = append(items, bloom.Fixed(2, bloom.Text(names[i]).Style(style)).
-			ID(names[i]).Animate())
+		item := bloom.Text(names[i]).Style(style)
+		items = append(items, bloom.Fixed(2, item).ID(names[i]).Animate())
 	}
 	items = append(items, bloom.Space())
-	base := bloom.Column(
-		bloom.Text("Reflow / automatic layout animations").Style(heading),
-		bloom.Fill(bloom.Row(
-			bloom.Fixed(sidebarWidth, bloom.Box(panel, bloom.Text("Workspace\n\nProjects\nActivity\nSettings"))).
-				ID("sidebar").Animate(anim.Spring(16, 0.85)),
-			bloom.Fill(bloom.Column(
-				bloom.Fill(bloom.Row(
-					bloom.Percent(m.ratio, bloom.Box(panel, bloom.Column(items...))).ID("list").Animate(),
-					bloom.Fill(bloom.Box(panel, bloom.Text("Preview\n\nChildren reflow at the current visual size.\n\nTry b, s, r and d."))).ID("preview").Animate(),
-				)),
-				bloom.Fixed(detailsHeight, bloom.Box(panel, bloom.Text("Details\nSelected: "+names[m.selected]))).ID("details").Animate(),
-			)).ID("content").Animate(),
-		)),
-		bloom.Text(fmt.Sprintf("sidebar: %t | reverse: %t | ratio: %d | details: %t | selected: %s",
-			m.sidebar, m.reversed, m.ratio, m.details, names[m.selected])).Truncate(),
-		bloom.Text("b sidebar / s sort / r ratio / d details / up,down select / q quit").Truncate(),
-	)
-	v := m.ui.View(m.w, m.h, bloom.Overlay(base,
-		bloom.Layer(bloom.Text("< selected").Style(markerStyle)).Size(10, 1).
-			AnchorTo(names[m.selected], bloom.Right).ID("selection").Animate(anim.Spring(20, 1)),
-	))
-	v.AltScreen = true
-	return v
+	return bloom.Column(items...)
 }
 
 func main() {

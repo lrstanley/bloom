@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 // apricot, and effects in cream. It's rendered on the server, so the homepage ships no highlighter.
 
 const token =
-    /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|\b(bloom|fx|anim)\b(?=\.)|(?<=\bfx\.)([A-Z]\w*)|(?<=\.)([A-Z]\w*)(?=\()|\b(func|return|if|else|var|type|range|for)\b|\b(\d+(?:\.\d+)?)\b/g;
+    /(\/\/[^\n]*)|("(?:[^"\\]|\\.)*")|(?<!\.)\b(bloom|fx|anim)\b(?=\.)|(?<=\bfx\.)([A-Z]\w*)|(?<=\.)([A-Z]\w*)(?=\()|\b(func|return|if|else|var|type|range|for)\b|\b(\d+(?:\.\d+)?)\b/g;
 
 const classes = [
     "text-fd-muted-foreground italic", // comment

@@ -19,9 +19,13 @@ import (
 )
 
 var (
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#565f89"))
+	muted  = lipgloss.Color("#565f89")
+	accent = lipgloss.Color("#7aa2f7")
+	dark   = lipgloss.Color("#1a1b26")
+
+	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item     = lipgloss.NewStyle().Padding(0, 1)
-	selected = item.Foreground(lipgloss.Color("#1a1b26")).Background(lipgloss.Color("#7aa2f7"))
+	selected = item.Foreground(dark).Background(accent)
 )
 
 type page int
@@ -43,14 +47,16 @@ func (s sidebar) Layout(bloom.Context) bloom.Child {
 		}
 		items = append(items, bloom.Text(name).Style(st).ID(page(i)))
 	}
-	return bloom.Box(panel, bloom.Column(append(items, bloom.Space(), bloom.Text("v1.0").Style(item))...))
+	items = append(items, bloom.Space(), bloom.Text("v1.0").Style(item))
+	return bloom.Box(panel, bloom.Column(items...))
 }
 
 // reader is a plain Bubble Tea component.
 type reader struct{ page int }
 
 func (r reader) View() string {
-	return fmt.Sprintf("# %s\n\n%s", pages[r.page], strings.Repeat("Lorem ipsum dolor sit amet. ", 3))
+	body := strings.Repeat("Lorem ipsum dolor sit amet. ", 3)
+	return fmt.Sprintf("# %s\n\n%s", pages[r.page], body)
 }
 
 // statusbar knows its own height, so it measures itself.

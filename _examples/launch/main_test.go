@@ -26,6 +26,16 @@ func column(view, text string) int {
 	return -1
 }
 
+// row returns the screen line text is first on, or -1.
+func row(view, text string) int {
+	for i, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, text) {
+			return i
+		}
+	}
+	return -1
+}
+
 // seen polls the screen for d, reporting everything f returns for it.
 func seen[T comparable](h *steep.Harness, d time.Duration, f func(view string) T) map[T]bool {
 	out := map[T]bool{}
@@ -44,9 +54,14 @@ func TestLaunch(t *testing.T) {
 	m.every = time.Hour
 	h := steep.NewHarness(t, m, demo.Options("launch", 100, 28)...)
 
-	// Cards shimmer as placeholders until the data arrives.
+	// Cards shimmer as placeholders until the data arrives, which takes
+	// their place without moving anything.
 	h.Wait("deploy").Wait("████").WaitNot("Requests").Sleep(600 * time.Millisecond)
+	loading := row(h.View(), "╰")
 	h.Wait("Requests").Wait("1,021").Wait("updates: 0").Sleep(600 * time.Millisecond)
+	if loaded := row(h.View(), "╰"); loaded != loading {
+		t.Fatalf("the cards' bottom moved from line %d to %d as the data arrived", loading, loaded)
+	}
 	h.AssertSnapshot(snapshot.WithSuffix("loaded"))
 
 	// An update rolls the numbers to their new values. Pausing ignores the

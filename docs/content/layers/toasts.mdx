@@ -121,7 +121,10 @@ import (
 	"github.com/lrstanley/bloom/fx"
 )
 
-var toastBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#9ccfd8")).Padding(0, 1)
+var toastBox = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#9ccfd8")).
+	Padding(0, 1)
 
 type toast struct {
 	text     string
@@ -172,12 +175,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() tea.View {
 	stack := make([]bloom.Child, len(m.toasts))
 	for i, t := range m.toasts {
-		stack[i] = bloom.Present(t.presence, bloom.Box(toastBox, bloom.Text(t.text)), fx.Slide{From: bloom.Right})
+		box := bloom.Box(toastBox, bloom.Text(t.text))
+		stack[i] = bloom.Present(t.presence, box, fx.Slide{From: bloom.Right})
 	}
+
+	toasts := bloom.Layer(bloom.Column(stack...).Align(bloom.End)).
+		Anchor(bloom.End, bloom.End).
+		Margin(1)
 
 	v := m.ui.View(m.width, m.height, bloom.Overlay(
 		bloom.Text("press n for a notification, q to quit"),
-		bloom.Layer(bloom.Column(stack...).Align(bloom.End)).Anchor(bloom.End, bloom.End).Margin(1),
+		toasts,
 	))
 	v.AltScreen = true
 	return v

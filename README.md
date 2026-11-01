@@ -91,6 +91,8 @@ over.
 - :art: **25+ cell effects**: `Fade`, `Slide`, `Iris`, `Unfold`, `Decode`, `Glitch`, and more as transitions; `Dim`,
   `Desaturate`, `Tint`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst` for feedback; and
   combinators to stagger, delay, reverse, and ease them. Or write your own.
+- :hourglass_flowing_sand: **Loading placeholders**: `Skeleton(8, 0, 5, 11)` draws shimmering bars in place of
+  content that's still loading, a line for each line of the content, so nothing jumps when it arrives.
 - :jigsaw: **Works with what you have**: anything with a `View() string` method, including
   [Bubbles](https://github.com/charmbracelet/bubbles) components, is a leaf in the tree.
 - :zap: **Fast**: strings are parsed once, Lip Gloss renders are cached, and unchanged frames aren't composited

@@ -16,6 +16,7 @@ is on [pkg.go.dev](https://pkg.go.dev/github.com/lrstanley/bloom).
 | [`Wrap(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Wrap) | children flowing onto new lines at their natural sizes |
 | [`Text(s)`](https://pkg.go.dev/github.com/lrstanley/bloom#Text) | a string, optionally styled |
 | [`Marquee(s, phase)`](https://pkg.go.dev/github.com/lrstanley/bloom#Marquee) | one line that scrolls, or is cut short, when it doesn't fit |
+| [`Skeleton(lines...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Skeleton) | placeholder bars for content still loading, a line for each width, 0 for a blank line |
 | [`Box(style, child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Box) | a Lip Gloss frame around a child |
 | [`Centered(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Centered) | a child at its natural size in the middle of its space |
 | [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset` |
@@ -66,7 +67,8 @@ Any value with a `View() string` method can also be a child.
 | `Cursor(c)` | show the terminal cursor at `c`, relative to the node |
 | `ID(id)`, `Focusable()` | as for slots |
 
-`Marquee` has `Style(style)` and `Gap(s)`, the text shown between loops.
+`Marquee` has `Style(style)` and `Gap(s)`, the text shown between loops. `Skeleton` has `Style(style)`, which
+colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 
 ## Layers
 

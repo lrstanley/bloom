@@ -19,6 +19,8 @@ import (
 )
 
 var (
+	fg      = lipgloss.Color("#c0caf5")
+	text    = lipgloss.Color("#a9b1d6")
 	accent  = lipgloss.Color("#7aa2f7")
 	muted   = lipgloss.Color("#565f89")
 	good    = lipgloss.Color("#9ece6a")
@@ -26,19 +28,32 @@ var (
 	bg      = lipgloss.Color("#1a1b26")
 	panelBg = lipgloss.Color("#24283b")
 
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Background(bg)
+	// On the screen's background.
+	onBg     = lipgloss.NewStyle().Background(bg)
+	panel    = onBg.Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	focused  = panel.BorderForeground(accent)
-	header   = lipgloss.NewStyle().Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
-	status   = lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b1d6")).Background(panelBg).Padding(0, 1)
-	item     = lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b1d6")).Background(bg).Padding(0, 1)
+	header   = onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
+	item     = onBg.Foreground(text).Padding(0, 1)
 	selected = item.Foreground(bg).Background(accent).Bold(true)
-	dialog   = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(warn).Background(panelBg).Padding(1, 2)
-	button   = lipgloss.NewStyle().Foreground(lipgloss.Color("#c0caf5")).Background(muted).Padding(0, 2)
-	active   = button.Foreground(bg).Background(warn).Bold(true)
-	toast    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(good).Background(panelBg).Padding(0, 1)
+	label    = onBg.Foreground(muted)
+	spark    = onBg.Foreground(good)
+	logText  = onBg.Foreground(lipgloss.Color("#9aa5ce")).AlignVertical(lipgloss.Bottom)
+
+	// On the raised background of the status bar, dialog, and toast.
+	onPanel     = lipgloss.NewStyle().Background(panelBg)
+	status      = onPanel.Foreground(text).Padding(0, 1)
+	dialog      = onPanel.Border(lipgloss.ThickBorder()).BorderForeground(warn).Padding(1, 2)
+	dialogTitle = onPanel.Bold(true)
+	dialogText  = onPanel.Foreground(muted)
+	button      = onPanel.Foreground(fg).Background(muted).Padding(0, 2)
+	active      = button.Foreground(bg).Background(warn).Bold(true)
+	toast       = onPanel.Border(lipgloss.RoundedBorder()).BorderForeground(good).Padding(0, 1)
 )
 
-var services = []string{"api", "auth", "billing", "cache", "gateway", "ingest", "mailer", "search", "storage", "worker"}
+var services = []string{
+	"api", "auth", "billing", "cache", "gateway",
+	"ingest", "mailer", "search", "storage", "worker",
+}
 
 // The IDs nodes are given, for mouse events and focus.
 type (
@@ -88,10 +103,14 @@ type model struct {
 
 func newModel() *model {
 	m := &model{
-		ui:      bloom.New(bloom.WithColors(lipgloss.Color("#c0caf5"), bg)),
+		ui:      bloom.New(bloom.WithColors(fg, bg)),
 		sidebar: true,
 		confirm: anim.NewPresence(anim.Duration(220*time.Millisecond), anim.FPS(120)),
-		toast:   anim.NewPresence(anim.Duration(500*time.Millisecond), anim.Ease(anim.Linear), anim.FPS(120)),
+		toast: anim.NewPresence(
+			anim.Duration(500*time.Millisecond),
+			anim.Ease(anim.Linear),
+			anim.FPS(120),
+		),
 	}
 	m.focus.Set(paneTable)
 	return m
@@ -111,7 +130,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		m.frame++
 		if m.frame%6 == 0 {
-			m.log(fmt.Sprintf("%s  %-8s %3dms  200 OK", time.Time(msg).Format("15:04:05"), services[m.frame%len(services)], 8+m.frame%91))
+			at := time.Time(msg).Format("15:04:05")
+			svc := services[m.frame%len(services)]
+			m.log(fmt.Sprintf("%s  %-8s %3dms  200 OK", at, svc, 8+m.frame%91))
 		}
 		cmds = append(cmds, tick())
 	case tea.KeyPressMsg:
@@ -207,6 +228,52 @@ func (m *model) panel(id paneID) lipgloss.Style {
 }
 
 func (m *model) layout() bloom.Child {
+	title := fmt.Sprintf("◆ fleet  ·  %d services  ·  %s", len(services), services[m.selected])
+
+	// The sidebar and the content beside it move together as the sidebar
+	// springs open and shut.
+	spring := []anim.Option{anim.Spring(14, 0.8), anim.FPS(120)}
+	sidebarWidth := 0
+	if m.sidebar {
+		sidebarWidth = 22
+	}
+	sidebar := bloom.Fixed(sidebarWidth, bloom.Box(m.panel(paneSidebar), m.serviceList())).
+		ID(paneSidebar).
+		Focusable().
+		Collapsible(1).
+		Animate(spring...)
+
+	requests := bloom.Fill(bloom.Box(m.panel(paneTable), bloom.Scroll(table(m.frame), m.selected))).
+		ID(paneTable).
+		Focusable().
+		Min(30)
+	logs := bloom.Fixed(46, bloom.Box(m.panel(paneLogs), m.logView())).
+		ID(paneLogs).
+		Focusable().
+		Collapsible(2)
+	content := bloom.Fill(bloom.Column(
+		bloom.Row(m.cards()...).Gap(1),
+		bloom.Fill(bloom.Row(requests, logs).Gap(1)),
+	)).ID(paneMain).Min(40).Animate(spring...)
+
+	// The key hints give way (and are cut off) before the timing.
+	hints := "↑↓ select · enter restart · tab focus · ctrl+b sidebar · 1-6 effects · q quit"
+	timing := fmt.Sprintf("frame %.2fms · %.1f%% of 120fps", ms(m.drawn), 100*ms(m.drawn)/8.33)
+	statusBar := bloom.Row(
+		bloom.Fill(bloom.Text(hints).Style(status).Truncate()),
+		bloom.Text(timing).Style(status),
+	)
+
+	base := bloom.Column(
+		bloom.Text(title).Style(header),
+		bloom.Fill(bloom.Row(sidebar, content).Gap(1)),
+		statusBar,
+	)
+	return bloom.Overlay(base, m.toastLayer(), m.confirmLayer())
+}
+
+// serviceList is the sidebar's list of services, which can be clicked.
+func (m *model) serviceList() bloom.Child {
 	items := make([]bloom.Child, 0, len(services)+1)
 	for i, name := range services {
 		st := item
@@ -216,49 +283,29 @@ func (m *model) layout() bloom.Child {
 		items = append(items, bloom.Text("● "+name).Style(st).ID(serviceID(i)).Truncate())
 	}
 	items = append(items, bloom.Space())
+	return bloom.Column(items...)
+}
 
-	cards := make([]bloom.Child, 0, 4)
-	for i, label := range []string{"requests/s", "p99 latency", "errors", "saturation"} {
-		cards = append(cards, bloom.Fill(bloom.Box(panel, bloom.Column(
-			bloom.Text(label).Style(lipgloss.NewStyle().Foreground(muted).Background(bg)),
-			bloom.Text(sparkline(m.frame, i, 40)).Style(lipgloss.NewStyle().Foreground(good).Background(bg)),
-		))))
+// cards are the metrics along the top, each with a live sparkline.
+func (m *model) cards() []bloom.Child {
+	names := []string{"requests/s", "p99 latency", "errors", "saturation"}
+	cards := make([]bloom.Child, len(names))
+	for i, name := range names {
+		cards[i] = bloom.Fill(bloom.Box(panel, bloom.Column(
+			bloom.Text(name).Style(label),
+			bloom.Text(sparkline(m.frame, i, 40)).Style(spark),
+		)))
 	}
-
-	// The sidebar and the main column move together as the sidebar springs
-	// open and shut.
-	spring := []anim.Option{anim.Spring(14, 0.8), anim.FPS(120)}
-	sidebarWidth := 0
-	if m.sidebar {
-		sidebarWidth = 22
-	}
-	base := bloom.Column(
-		bloom.Text(fmt.Sprintf("◆ fleet  ·  %d services  ·  %s", len(services), services[m.selected])).Style(header),
-		bloom.Fill(bloom.Row(
-			bloom.Fixed(sidebarWidth, bloom.Box(m.panel(paneSidebar), bloom.Column(items...))).
-				ID(paneSidebar).Focusable().Collapsible(1).Animate(spring...),
-			bloom.Fill(bloom.Column(
-				bloom.Row(cards...).Gap(1),
-				bloom.Fill(bloom.Row(
-					bloom.Fill(bloom.Box(m.panel(paneTable), bloom.Scroll(table(m.frame), m.selected))).
-						ID(paneTable).Focusable().Min(30),
-					bloom.Fixed(46, bloom.Box(m.panel(paneLogs), m.logView())).ID(paneLogs).Focusable().Collapsible(2),
-				).Gap(1)),
-			)).ID(paneMain).Min(40).Animate(spring...),
-		).Gap(1)),
-		// The key hints give way (and are cut off) before the timing.
-		bloom.Row(
-			bloom.Fill(bloom.Text("↑↓ select · enter restart · tab focus · ctrl+b sidebar · 1-6 effects · q quit").Style(status).Truncate()),
-			bloom.Text(fmt.Sprintf("frame %.2fms · %.1f%% of 120fps", ms(m.drawn), 100*ms(m.drawn)/8.33)).Style(status),
-		),
-	)
-	return bloom.Overlay(base, m.toastLayer(), m.confirmLayer())
+	return cards
 }
 
 func (m *model) toastLayer() bloom.LayerNode {
 	e := toastEffects[m.effect]
-	return bloom.Layer(bloom.Box(toast, bloom.Text(fmt.Sprintf("✓ %s\nan effect on a layer's cells", e.name)))).
-		Anchor(bloom.End, bloom.End).Margin(2).
+	text := bloom.Text("✓ " + e.name + "\nan effect on a layer's cells")
+
+	return bloom.Layer(bloom.Box(toast, text)).
+		Anchor(bloom.End, bloom.End).
+		Margin(2).
 		Presence(m.toast, e.fx...)
 }
 
@@ -267,25 +314,29 @@ func (m *model) confirmLayer() bloom.LayerNode {
 	if m.restart {
 		restart, cancel = active, button
 	}
+
 	body := bloom.Column(
-		bloom.Text(fmt.Sprintf("Restart %s?", services[m.selected])).Style(lipgloss.NewStyle().Bold(true).Background(panelBg)),
-		bloom.Text("In-flight requests will be drained first.").Style(lipgloss.NewStyle().Foreground(muted).Background(panelBg)),
+		bloom.Text("Restart "+services[m.selected]+"?").Style(dialogTitle),
+		bloom.Text("In-flight requests will be drained first.").Style(dialogText),
 		bloom.Fixed(1, nil),
 		bloom.Row(
 			bloom.Text("restart").Style(restart).ID(buttonID(true)),
 			bloom.Text("cancel").Style(cancel).ID(buttonID(false)),
 		).Gap(2).Justify(flex.End),
 	)
+
 	return bloom.Layer(bloom.Box(dialog, body)).
-		ID(paneDialog).Modal().
+		ID(paneDialog).
+		Modal().
 		Backdrop(fx.Dim{Amount: 0.55}, fx.Desaturate{Amount: 0.7}).
 		Shadow(2, 1, fx.Dim{Amount: 0.6}).
 		Presence(m.confirm, fx.Slide{From: fx.Bottom}, fx.Fade{})
 }
 
+// logView is the latest lines of the log, kept at the bottom of the panel.
 func (m *model) logView() bloom.Child {
-	return bloom.Text(strings.Join(m.logs[max(len(m.logs)-60, 0):], "\n")).
-		Style(lipgloss.NewStyle().Foreground(lipgloss.Color("#9aa5ce")).Background(bg).AlignVertical(lipgloss.Bottom))
+	recent := m.logs[max(len(m.logs)-60, 0):]
+	return bloom.Text(strings.Join(recent, "\n")).Style(logText)
 }
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
@@ -295,18 +346,27 @@ var bars = []rune("▁▂▃▄▅▆▇█")
 func sparkline(frame, series, n int) string {
 	var b strings.Builder
 	for i := range n {
-		v := math.Sin(float64(frame+i)/(4+float64(series))+float64(series)) + math.Sin(float64(frame+i*3)/7)
-		b.WriteRune(bars[int((v+2)/4*float64(len(bars)-1))])
+		slow := math.Sin(float64(frame+i)/(4+float64(series)) + float64(series))
+		fast := math.Sin(float64(frame+i*3) / 7)
+		b.WriteRune(bars[int((slow+fast+2)/4*float64(len(bars)-1))])
 	}
 	return b.String()
 }
 
 func table(frame int) bloom.Child {
+	// The rows are colored with escape codes rather than styles, as there are
+	// many of them, redrawn every frame.
+	const dim, green, reset = "\x1b[38;2;86;95;137m", "\x1b[38;2;158;206;106m", "\x1b[m"
+
 	var b strings.Builder
 	for i := range 120 {
 		svc := services[i%len(services)]
-		fmt.Fprintf(&b, "\x1b[38;2;86;95;137m%04d\x1b[m  %-8s  \x1b[38;2;158;206;106m%5d rps\x1b[m  %3dms  %s\n",
-			i, svc, 900+(i*37+frame)%400, 5+(i*13+frame)%90, strings.Repeat("▪", 1+(i+frame/8)%12))
+		rps := 900 + (i*37+frame)%400
+		latency := 5 + (i*13+frame)%90
+		load := strings.Repeat("▪", 1+(i+frame/8)%12)
+
+		fmt.Fprintf(&b, "%s%04d%s  %-8s  ", dim, i, reset, svc)
+		fmt.Fprintf(&b, "%s%5d rps%s  %3dms  %s\n", green, rps, reset, latency, load)
 	}
 	return bloom.Text(strings.TrimSuffix(b.String(), "\n"))
 }

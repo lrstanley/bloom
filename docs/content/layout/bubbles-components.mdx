@@ -96,7 +96,9 @@ const (
 	paneInput pane = "input"
 )
 
-var panel = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#6e6a86"))
+var panel = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#6e6a86"))
 
 type model struct {
 	ui            *bloom.Root
@@ -119,9 +121,10 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) layout() bloom.Child {
+	field := bloom.Text(m.input.View()).Cursor(m.input.Cursor())
 	return bloom.Column(
 		bloom.Fill(bloom.Box(panel, m.log)).ID(paneLog),
-		bloom.Auto(bloom.Box(panel, bloom.Text(m.input.View()).Cursor(m.input.Cursor()))).ID(paneInput),
+		bloom.Auto(bloom.Box(panel, field)).ID(paneInput),
 	)
 }
 
@@ -134,7 +137,8 @@ func (m *model) resize() {
 	}
 	if r, ok := frame.Rect(paneInput); ok {
 		// Leave room for the prompt, and for the cursor after the last character.
-		m.input.SetWidth(r.Dx() - panel.GetHorizontalFrameSize() - lipgloss.Width(m.input.Prompt) - 1)
+		inner := r.Dx() - panel.GetHorizontalFrameSize()
+		m.input.SetWidth(inner - lipgloss.Width(m.input.Prompt) - 1)
 	}
 }
 

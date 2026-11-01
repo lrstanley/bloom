@@ -28,15 +28,21 @@ import (
 )
 
 var (
-	ink   = lipgloss.Color("#c0caf5")
-	muted = lipgloss.Color("#565f89")
+	ink     = lipgloss.Color("#c0caf5")
+	muted   = lipgloss.Color("#565f89")
+	accent  = lipgloss.Color("#7aa2f7")
+	cyan    = lipgloss.Color("#7dcfff")
+	warn    = lipgloss.Color("#e0af68")
+	surface = lipgloss.Color("#2f334d")
 
-	card     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	name     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7dcfff"))
-	sample   = lipgloss.NewStyle().Foreground(ink).Background(lipgloss.Color("#2f334d")).Padding(0, 1)
-	overlay  = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(lipgloss.Color("#e0af68")).Padding(1, 3)
-	sampleTx = "The quick brown fox\njumps over the lazy\ndog. 0123456789 ✓"
+	card    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
+	name    = lipgloss.NewStyle().Bold(true).Foreground(cyan)
+	sample  = lipgloss.NewStyle().Foreground(ink).Background(surface).Padding(0, 1)
+	overlay = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(warn).Padding(1, 3)
+	status  = lipgloss.NewStyle().Foreground(muted)
 )
+
+const sampleText = "The quick brown fox\njumps over the lazy\ndog. 0123456789 ✓"
 
 // rainbow is a custom effect: glyphs take a hue by column that fades to
 // their own color as t reaches 1.
@@ -62,7 +68,7 @@ var sweep = fx.Func(func(s *canvas.Surface, t float64) {
 			if d := math.Abs(float64(x+y) - pos); d < 3 {
 				c := s.Cell(x, y)
 				c.Style.Fg = s.Mix(s.Fg(c), color.White, 1-d/3)
-				c.Style.Bg = s.Mix(s.Bg(c), lipgloss.Color("#7aa2f7"), (1-d/3)*0.6)
+				c.Style.Bg = s.Mix(s.Bg(c), accent, (1-d/3)*0.6)
 			}
 		}
 	}
@@ -82,8 +88,14 @@ func (p plasma) Draw(scr uv.Screen, area uv.Rectangle) {
 	phase := p.t * 20 * math.Pi // whole cycles of every wave, so the loop is seamless
 	for y := area.Min.Y; y < area.Max.Y; y++ {
 		for x := area.Min.X; x < area.Max.X; x++ {
+			// v is the field's value at this column, for a row of half
+			// blocks: three waves, across, diagonally, and down.
 			v := func(row float64) float64 {
-				return math.Sin(float64(x)/4+phase) + math.Sin((float64(x)+row)/6+phase*1.3) + math.Sin(row/3-phase)
+				col := float64(x)
+				across := math.Sin(col/4 + phase)
+				diagonal := math.Sin((col+row)/6 + phase*1.3)
+				down := math.Sin(row/3 - phase)
+				return across + diagonal + down
 			}
 			top, bottom := v(float64(2*y)), v(float64(2*y+1))
 			scr.SetCell(x, y, &uv.Cell{Content: "▀", Width: 1, Style: uv.Style{
@@ -123,7 +135,7 @@ var backdrops = []struct {
 }{
 	{"Dim", fx.Dim{Amount: 0.6}},
 	{"Desaturate", fx.Desaturate{Amount: 1}},
-	{"Tint", fx.Tint{Color: lipgloss.Color("#7aa2f7"), Amount: 0.45}},
+	{"Tint", fx.Tint{Color: accent, Amount: 0.45}},
 	{"Recolor", fx.Recolor{Fg: lipgloss.Color("#414868"), Bg: lipgloss.Color("#16161e")}},
 }
 
@@ -200,20 +212,25 @@ func (m *model) layout() bloom.Child {
 	t := m.t.Float()
 	cards := make([]bloom.Child, 0, len(gallery)+1)
 	for _, g := range gallery {
-		cards = append(cards, m.card(g.name, bloom.Transition(t, bloom.Text(sampleTx).Style(sample), g.effects...)))
+		text := bloom.Text(sampleText).Style(sample)
+		cards = append(cards, m.card(g.name, bloom.Transition(t, text, g.effects...)))
 	}
-	cards = append(cards, m.card("Drawable + Fade", bloom.Transition(t, bloom.Drawable(plasma{t: m.phase.Float()}), fx.Fade{})))
+	drawing := bloom.Drawable(plasma{t: m.phase.Float()})
+	cards = append(cards, m.card("Drawable + Fade", bloom.Transition(t, drawing, fx.Fade{})))
 
-	status := fmt.Sprintf(" t = %.2f · b: backdrop (%s) · space: pause · q: quit", t, m.backdropName())
+	hints := fmt.Sprintf(" t = %.2f · b: backdrop (%s) · space: pause · q: quit",
+		t, m.backdropName())
 	base := bloom.Column(
 		bloom.Fill(bloom.Grid(3, cards...).Gap(1, 0)),
-		bloom.Text(status).Style(lipgloss.NewStyle().Foreground(muted)).Truncate(),
+		bloom.Text(hints).Style(status).Truncate(),
 	)
 
 	b := backdrops[m.backdrop]
-	return bloom.Overlay(base, bloom.Layer(bloom.Box(overlay, bloom.Text("Backdrop: "+b.name).Style(name))).
+	label := bloom.Layer(bloom.Box(overlay, bloom.Text("Backdrop: "+b.name).Style(name))).
 		Backdrop(b.effect).
-		Presence(m.overlay, fx.Fade{}))
+		Presence(m.overlay, fx.Fade{})
+
+	return bloom.Overlay(base, label)
 }
 
 func (m *model) backdropName() string {

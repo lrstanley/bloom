@@ -20,7 +20,6 @@ import (
 	"image"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -41,13 +40,15 @@ var (
 	warn   = lipgloss.Color("#ff9e64")
 	dark   = lipgloss.Color("#1a1b26")
 
+	field   = lipgloss.Color("#24283b")
+	fieldOn = lipgloss.Color("#414868")
+
 	card     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(0, 2)
 	heading  = lipgloss.NewStyle().Bold(true).Foreground(accent)
 	label    = lipgloss.NewStyle().Foreground(muted)
 	big      = lipgloss.NewStyle().Bold(true).Foreground(fg)
-	skeleton = lipgloss.NewStyle().Foreground(lipgloss.Color("#2b3048"))
-	input    = lipgloss.NewStyle().Foreground(fg).Background(lipgloss.Color("#24283b")).Padding(0, 1)
-	inputOn  = input.Background(lipgloss.Color("#414868"))
+	input    = lipgloss.NewStyle().Foreground(fg).Background(field).Padding(0, 1)
+	inputOn  = input.Background(fieldOn)
 	hint     = input.Foreground(muted)
 	button   = lipgloss.NewStyle().Foreground(fg).Background(muted).Padding(0, 2)
 	buttonOn = button.Foreground(dark).Background(accent).Bold(true)
@@ -71,16 +72,25 @@ const (
 	buttonDeploy formID = "deploy"
 )
 
-// cards describe the statistics shown, with their values at the start.
+// cards describe the statistics shown, with their values at the start, and
+// next, their values after n updates.
 var cards = [...]struct {
 	title, unit string
 	start       int
-	// next is the value after n updates.
-	next func(n int) int
+	next        func(n int) int
 }{
-	{"Requests", "per minute", 1021, func(n int) int { return 1021 + n*37 + (n*n*11)%53 }},
-	{"p95 latency", "milliseconds", 148, func(n int) int { return 120 + (n*37)%61 }},
-	{"Errors", "per hour", 7, func(n int) int { return 3 + (n*5)%9 }},
+	{
+		title: "Requests", unit: "per minute", start: 1021,
+		next: func(n int) int { return 1021 + n*37 + (n*n*11)%53 },
+	},
+	{
+		title: "p95 latency", unit: "milliseconds", start: 148,
+		next: func(n int) int { return 120 + (n*37)%61 },
+	},
+	{
+		title: "Errors", unit: "per hour", start: 7,
+		next: func(n int) int { return 3 + (n*5)%9 },
+	},
 }
 
 // tourSteps are what the tour says about each card.
@@ -133,16 +143,21 @@ type model struct {
 }
 
 func newModel() *model {
+	// Effects that play once run from 0 to 1 at a steady pace, and rest at 1,
+	// where they have finished.
+	effect := func(d time.Duration) anim.Value {
+		return anim.NewValue(1, anim.Duration(d), anim.Ease(anim.Linear))
+	}
 	m := &model{
 		ui:       bloom.New(),
 		shimmer:  anim.NewLoop(shimmerPeriod),
 		every:    time.Second,
-		roll:     anim.NewValue(1, anim.Duration(700*time.Millisecond), anim.Ease(anim.Linear)),
-		shake:    anim.NewValue(1, anim.Duration(450*time.Millisecond), anim.Ease(anim.Linear)),
-		burst:    anim.NewValue(1, anim.Duration(1800*time.Millisecond), anim.Ease(anim.Linear)),
-		badge:    anim.NewValue(1, anim.Duration(700*time.Millisecond), anim.Ease(anim.Linear)),
+		roll:     effect(700 * time.Millisecond),
+		shake:    effect(450 * time.Millisecond),
+		burst:    effect(1800 * time.Millisecond),
+		badge:    effect(700 * time.Millisecond),
 		tourOn:   anim.NewPresence(anim.Duration(250 * time.Millisecond)),
-		tourText: anim.NewValue(1, anim.Duration(800*time.Millisecond), anim.Ease(anim.Linear)),
+		tourText: effect(800 * time.Millisecond),
 	}
 	for i, c := range cards {
 		m.vals[i], m.prev[i] = c.start, c.start
@@ -196,8 +211,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	cmds = append(cmds, m.ui.Update(msg), anim.Update(msg, &m.shimmer, &m.roll, &m.shake, &m.burst,
-		&m.badge, &m.tourOn, &m.tourText))
+	cmds = append(
+		cmds,
+		m.ui.Update(msg),
+		anim.Update(msg, &m.shimmer, &m.roll, &m.shake, &m.burst, &m.badge, &m.tourOn, &m.tourText),
+	)
 	return m, tea.Batch(cmds...)
 }
 
@@ -284,19 +302,22 @@ func number(n int) string {
 // data arrives, then its number, rolling from the previous one while it
 // changes.
 func (m *model) card(i int) bloom.Child {
-	c := cards[i]
 	if !m.loaded {
-		bar := func(n int) bloom.Child { return bloom.Text(strings.Repeat("█", n)).Style(skeleton) }
-		return bloom.Transition(m.shimmer.Float(), bloom.Box(card, bloom.Column(
-			bar(8), bloom.Fixed(1, nil), bar(5), bar(11),
-		)), fx.Shimmer{Color: accent, Width: 10})
+		// A line for each of the card's below, so nothing moves when the
+		// data arrives.
+		return bloom.Box(card, bloom.Skeleton(8, 0, 5, 11).Shimmer(m.shimmer.Float()))
 	}
+
+	c := cards[i]
 	num := bloom.Child(bloom.Text(number(m.vals[i])).Style(big))
 	if m.roll.Animating() {
 		num = bloom.Transition(m.roll.Float(), num, fx.Roll{From: number(m.prev[i])})
 	}
 	return bloom.Box(card, bloom.Column(
-		bloom.Text(c.title).Style(heading), bloom.Fixed(1, nil), num, bloom.Text(c.unit).Style(label),
+		bloom.Text(c.title).Style(heading),
+		bloom.Fixed(1, nil),
+		num,
+		bloom.Text(c.unit).Style(label),
 	))
 }
 
@@ -341,11 +362,13 @@ func (m *model) form() bloom.Child {
 	case m.err != "":
 		msg = bloom.Text(m.err).Style(failure)
 	}
+	deploy := bloom.Text("deploy").Style(btn).ID(buttonDeploy).Focusable()
+
 	return bloom.Column(
 		bloom.Text("Deploy "+service+" to production").Style(heading),
 		bloom.Text("Type the service name to confirm.").Style(label),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Fill(field), bloom.Text("deploy").Style(btn).ID(buttonDeploy).Focusable()).Gap(2),
+		bloom.Row(bloom.Fill(field), deploy).Gap(2),
 		msg,
 	)
 }
@@ -355,28 +378,39 @@ func (m *model) layout() bloom.Child {
 	for i := range cards {
 		slots[i] = bloom.Fill(m.card(i)).ID(cardID(i))
 	}
-	cardRow := bloom.Row(slots...).Gap(2)
+
+	header := bloom.Row(
+		bloom.Text("◆ deploy").Style(heading),
+		bloom.Text("· production").Style(label),
+		bloom.Space(),
+		m.badgeNode(),
+	).Gap(1)
 
 	paused := ""
 	if m.paused {
 		paused = " (paused)"
 	}
+	hints := fmt.Sprintf(
+		"ctrl+t tour · ctrl+p pause · ctrl+r reset · updates: %d%s · tour: %d",
+		m.updates, paused, m.step,
+	)
+
 	base := bloom.Child(bloom.Column(
-		bloom.Row(bloom.Text("◆ deploy").Style(heading), bloom.Text("· production").Style(label), bloom.Space(), m.badgeNode()).Gap(1),
+		header,
 		bloom.Fixed(1, nil),
-		cardRow,
+		bloom.Row(slots...).Gap(2),
 		bloom.Fixed(1, nil),
 		m.form(),
 		bloom.Space(),
-		bloom.Text(fmt.Sprintf("ctrl+t tour · ctrl+p pause · ctrl+r reset · updates: %d%s · tour: %d", m.updates, paused, m.step)).Style(status),
+		bloom.Text(hints).Style(status),
 	))
 
 	// Confetti bursts from the middle of the button, over everything.
 	if m.deployed && m.burst.Animating() {
 		if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
-			base = bloom.Transition(m.burst.Float(), base, fx.Burst{
-				At: image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2), Count: 90, Seed: m.bursts,
-			})
+			center := image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
+			burst := fx.Burst{At: center, Count: 90, Seed: m.bursts}
+			base = bloom.Transition(m.burst.Float(), base, burst)
 		}
 	}
 	return bloom.Overlay(base, m.tourLayer())
@@ -385,12 +419,20 @@ func (m *model) layout() bloom.Child {
 // tourLayer is the tour's: a note at the bottom, over a backdrop that
 // leaves only the card it explains lit.
 func (m *model) tourLayer() bloom.LayerNode {
-	step := min(max(m.step, 1), len(cards)) // while the last note animates out, it stays on the last card.
-	note := bloom.Box(tour, bloom.Transition(m.tourText.Float(), bloom.Column(
-		bloom.Text(tourSteps[step-1][0]).Style(heading),
-		bloom.Text(tourSteps[step-1][1]),
-	), fx.Decode{Seed: uint32(step)})) //nolint:gosec // step is small.
-	l := bloom.Layer(note).Anchor(bloom.Center, bloom.End).Margin(2).Presence(m.tourOn, fx.Fade{})
+	// While the last note animates out, it stays on the last card.
+	step := min(max(m.step, 1), len(cards))
+	title, text := tourSteps[step-1][0], tourSteps[step-1][1]
+
+	note := bloom.Column(
+		bloom.Text(title).Style(heading),
+		bloom.Text(text),
+	)
+	decode := fx.Decode{Seed: uint32(step)} //nolint:gosec // step is small.
+
+	l := bloom.Layer(bloom.Box(tour, bloom.Transition(m.tourText.Float(), note, decode))).
+		Anchor(bloom.Center, bloom.End).
+		Margin(2).
+		Presence(m.tourOn, fx.Fade{})
 	if r, ok := m.ui.Frame().Rect(cardID(step - 1)); ok {
 		l = l.Backdrop(fx.Spotlight{Rect: r.Inset(-1), Soft: 5})
 	}

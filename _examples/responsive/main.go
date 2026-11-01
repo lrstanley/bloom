@@ -24,17 +24,25 @@ import (
 )
 
 var (
+	fg     = lipgloss.Color("#c0caf5")
+	text   = lipgloss.Color("#a9b1d6")
+	subtle = lipgloss.Color("#9aa5ce")
 	accent = lipgloss.Color("#7dcfff")
+	purple = lipgloss.Color("#bb9af7")
 	muted  = lipgloss.Color("#565f89")
+	dark   = lipgloss.Color("#1a1b26")
+	barBg  = lipgloss.Color("#24283b")
 
 	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	bar      = lipgloss.NewStyle().Foreground(lipgloss.Color("#c0caf5")).Background(lipgloss.Color("#24283b"))
+	bar      = lipgloss.NewStyle().Foreground(fg).Background(barBg)
 	title    = bar.Bold(true).Foreground(accent).Padding(0, 1)
-	action   = bar.Foreground(lipgloss.Color("#9aa5ce")).Padding(0, 1)
-	item     = lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b1d6")).Padding(0, 1)
-	selected = item.Foreground(lipgloss.Color("#1a1b26")).Background(accent).Bold(true)
-	prose    = lipgloss.NewStyle().Foreground(lipgloss.Color("#c0caf5")).Padding(0, 1)
-	chip     = lipgloss.NewStyle().Foreground(lipgloss.Color("#1a1b26")).Background(lipgloss.Color("#bb9af7")).Padding(0, 1)
+	action   = bar.Foreground(subtle).Padding(0, 1)
+	item     = lipgloss.NewStyle().Foreground(text).Padding(0, 1)
+	selected = item.Foreground(dark).Background(accent).Bold(true)
+	prose    = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
+	chip     = lipgloss.NewStyle().Foreground(dark).Background(purple).Padding(0, 1)
+	bold     = lipgloss.NewStyle().Bold(true)
+	note     = lipgloss.NewStyle().Foreground(muted)
 )
 
 type (
@@ -56,16 +64,37 @@ type article struct {
 }
 
 var articles = []article{
-	{"Constraints go down", []string{"layout", "design", "flutter", "gio"}, essay("constraints", 18)},
-	{"Sizes come up", []string{"sizing", "measure"}, essay("measurement", 26)},
-	{"Parents place", []string{"arrange", "flex", "slots", "collapse", "ownership"}, essay("placement", 22)},
-	{"Cells, not pixels", []string{"terminal", "unicode", "compositor"}, essay("cells", 30)},
+	{
+		title: "Constraints go down",
+		tags:  []string{"layout", "design", "flutter", "gio"},
+		body:  essay("constraints", 18),
+	},
+	{
+		title: "Sizes come up",
+		tags:  []string{"sizing", "measure"},
+		body:  essay("measurement", 26),
+	},
+	{
+		title: "Parents place",
+		tags:  []string{"arrange", "flex", "slots", "collapse", "ownership"},
+		body:  essay("placement", 22),
+	},
+	{
+		title: "Cells, not pixels",
+		tags:  []string{"terminal", "unicode", "compositor"},
+		body:  essay("cells", 30),
+	},
 }
 
+// essay returns numbered paragraphs about topic, long enough to wrap at most
+// widths, so that the reader reflows them as the terminal narrows and widens.
 func essay(topic string, paragraphs int) string {
+	const text = "§%d. A paragraph about %s, long enough to wrap at most widths so that " +
+		"the reader has to reflow it as the terminal narrows and widens.\n\n"
+
 	var b strings.Builder
 	for i := range paragraphs {
-		fmt.Fprintf(&b, "§%d. A paragraph about %s, long enough to wrap at most widths so that the reader has to reflow it as the terminal narrows and widens.\n\n", i+1, topic)
+		fmt.Fprintf(&b, text, i+1, topic)
 	}
 	return strings.TrimSpace(b.String())
 }
@@ -78,7 +107,10 @@ func (t toolbar) View() string { return t.title }
 
 func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 	actions := []string{"⟳ refresh", "✎ edit", "⇪ share", "⚙ settings"}
-	children := []bloom.Child{bloom.Text("◆ " + t.title).Style(title), bloom.Fill(bloom.Text("").Style(bar))}
+	children := []bloom.Child{
+		bloom.Text("◆ " + t.title).Style(title),
+		bloom.Fill(bloom.Text("").Style(bar)),
+	}
 	for _, a := range actions {
 		if ctx.Width < 70 {
 			a, _, _ = strings.Cut(a, " ")
@@ -191,6 +223,38 @@ func (m *model) geometry() geometry {
 func (m *model) layout(status statusbar) bloom.Child {
 	art := articles[m.selected]
 
+	// The details collapse first as the terminal narrows, then the list.
+	nav := bloom.Fixed(24, bloom.Box(panel, m.articleList())).
+		ID(paneNav).
+		Collapsible(2)
+
+	content := bloom.Text(art.body).Style(prose).ID(paneContent)
+	reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
+		ID(paneReader).
+		Min(40)
+
+	paragraphs := fmt.Sprintf("%d paragraphs", strings.Count(art.body, "§"))
+	info := bloom.Column(
+		bloom.Text(art.title).Style(bold),
+		bloom.Fixed(1, nil),
+		chips(art.tags),
+		bloom.Space(),
+		bloom.Text(paragraphs).Style(note),
+	)
+	details := bloom.Percent(28, bloom.Box(panel.Padding(0, 1), info)).
+		ID(paneDetails).
+		Min(28).
+		Collapsible(1)
+
+	return bloom.Column(
+		toolbar{title: "reader"},
+		bloom.Fill(bloom.Row(nav, reader, details).Gap(1)),
+		status,
+	)
+}
+
+// articleList is the list of articles, which can be clicked.
+func (m *model) articleList() bloom.Child {
 	items := make([]bloom.Child, 0, len(articles)+1)
 	for i, a := range articles {
 		st := item
@@ -200,29 +264,16 @@ func (m *model) layout(status statusbar) bloom.Child {
 		items = append(items, bloom.Text(a.title).Style(st).ID(articleID(i)))
 	}
 	items = append(items, bloom.Space())
-
-	return bloom.Column(
-		toolbar{title: "reader"},
-		bloom.Fill(bloom.Row(
-			bloom.Fixed(24, bloom.Box(panel, bloom.Column(items...))).ID(paneNav).Collapsible(2),
-			bloom.Fill(bloom.Box(panel, bloom.Scroll(bloom.Text(art.body).Style(prose).ID(paneContent), m.offset))).
-				ID(paneReader).Min(40),
-			bloom.Percent(28, bloom.Box(panel.Padding(0, 1), bloom.Column(
-				bloom.Text(art.title).Style(lipgloss.NewStyle().Bold(true)),
-				bloom.Fixed(1, nil),
-				chips(art.tags),
-				bloom.Space(),
-				bloom.Text(fmt.Sprintf("%d paragraphs", strings.Count(art.body, "§"))).Style(lipgloss.NewStyle().Foreground(muted)),
-			))).ID(paneDetails).Min(28).Collapsible(1),
-		).Gap(1)),
-		status,
-	)
+	return bloom.Column(items...)
 }
 
 func (m *model) status() statusbar {
 	g := m.geometry()
-	return statusbar{text: fmt.Sprintf("%d×%d · showing %s · row %d of %d · page %d",
-		m.w, m.h, strings.Join(g.panes, ", "), m.offset+1, g.maxOffset+1, g.page)}
+	text := fmt.Sprintf(
+		"%d×%d · showing %s · row %d of %d · page %d",
+		m.w, m.h, strings.Join(g.panes, ", "), m.offset+1, g.maxOffset+1, g.page,
+	)
+	return statusbar{text: text}
 }
 
 func (m *model) View() tea.View {

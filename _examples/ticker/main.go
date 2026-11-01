@@ -37,14 +37,16 @@ var (
 	bg      = lipgloss.Color("#1a1b26")
 	panelBg = lipgloss.Color("#24283b")
 
-	header   = lipgloss.NewStyle().Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
-	bar      = lipgloss.NewStyle().Foreground(fg).Background(panelBg).Padding(0, 1)
-	badge    = lipgloss.NewStyle().Foreground(bg).Background(warn).Bold(true).Padding(0, 1)
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Background(bg)
-	item     = lipgloss.NewStyle().Foreground(fg).Background(bg).Padding(0, 1)
+	onBg     = lipgloss.NewStyle().Background(bg)
+	onPanel  = lipgloss.NewStyle().Background(panelBg)
+	header   = onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
+	bar      = onPanel.Foreground(fg).Padding(0, 1)
+	badge    = onBg.Foreground(bg).Background(warn).Bold(true).Padding(0, 1)
+	panel    = onBg.Border(lipgloss.RoundedBorder()).BorderForeground(muted)
+	item     = onBg.Foreground(fg).Padding(0, 1)
 	selected = item.Foreground(bg).Background(accent).Bold(true)
-	status   = lipgloss.NewStyle().Foreground(muted).Background(bg).Padding(0, 1)
-	banner   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(warn).Background(panelBg).Padding(0, 1)
+	status   = onBg.Foreground(muted).Padding(0, 1)
+	banner   = onPanel.Border(lipgloss.RoundedBorder()).BorderForeground(warn).Padding(0, 1)
 )
 
 // headlines scroll along the headline bar, one after the other.
@@ -95,12 +97,19 @@ func newModel() *model {
 		headline: anim.NewLoop(24*time.Second, anim.FPS(60)),
 		// The name waits a moment, truncated, before it starts to scroll.
 		name: anim.NewSequence(0,
-			anim.Jump(0), anim.Hold(900*time.Millisecond), anim.To(1, anim.Duration(7*time.Second)),
+			anim.Jump(0),
+			anim.Hold(900*time.Millisecond),
+			anim.To(1, anim.Duration(7*time.Second)),
 		).With(linear...),
 		pulse: anim.NewSequence(0,
-			anim.To(1, anim.Duration(900*time.Millisecond)), anim.To(0, anim.Duration(900*time.Millisecond)),
+			anim.To(1, anim.Duration(900*time.Millisecond)),
+			anim.To(0, anim.Duration(900*time.Millisecond)),
 		).With(anim.Ease(anim.InOutQuad), anim.FPS(30)),
-		alert: anim.NewPresence(anim.Duration(400*time.Millisecond), anim.Ease(anim.OutCubic), anim.FPS(60)),
+		alert: anim.NewPresence(
+			anim.Duration(400*time.Millisecond),
+			anim.Ease(anim.OutCubic),
+			anim.FPS(60),
+		),
 	}
 }
 
@@ -189,6 +198,40 @@ func (m *model) View() tea.View {
 }
 
 func (m *model) layout() bloom.Child {
+	pulse := blend(muted, good, m.phase(&m.pulse))
+	title := bloom.Row(
+		bloom.Fill(bloom.Text("◆ markets").Style(header)),
+		bloom.Text("•").Style(header.Foreground(pulse).Padding(0)),
+		bloom.Text(" live").Style(header.PaddingLeft(0)),
+	)
+
+	const sep = "  ◆  "
+	feed := bloom.Marquee(strings.Join(headlines, sep), m.phase(&m.headline)).Gap(sep).Style(bar)
+	news := bloom.Row(
+		bloom.Text("NEWS").Style(badge),
+		bloom.Fill(feed),
+	)
+
+	base := bloom.Column(
+		title,
+		news,
+		bloom.Fill(bloom.Box(panel, m.watchlist())),
+		bloom.Text("↑↓ select · b banner · space pause · q quit").Style(status).Truncate(),
+	)
+
+	alert := fmt.Sprintf("◆ Alert %d: %s", m.alerts, stocks[m.selected].name)
+	alertLayer := bloom.Layer(bloom.Box(banner, bloom.Text(alert).Style(onPanel))).
+		Anchor(bloom.End, bloom.Start).
+		Offset(0, 3).
+		Margin(1).
+		Presence(m.alert, fx.Slide{From: fx.Right}, fx.Fade{})
+
+	return bloom.Overlay(base, alertLayer)
+}
+
+// watchlist is a row for each stock, which can be clicked. Long names are
+// cut off, except for the selected one, which scrolls.
+func (m *model) watchlist() bloom.Child {
 	rows := make([]bloom.Child, 0, len(stocks)+1)
 	for i, s := range stocks {
 		st, phase := item, 0.0
@@ -199,33 +242,18 @@ func (m *model) layout() bloom.Child {
 		if s.change < 0 {
 			tint = bad
 		}
+
+		right := st.Align(lipgloss.Right)
+		price := bloom.Text(fmt.Sprintf("%.2f", s.price)).Style(right)
+		change := bloom.Text(fmt.Sprintf("%+.1f%%", s.change)).Style(right.Foreground(tint))
 		rows = append(rows, bloom.Row(
 			bloom.Fill(bloom.Marquee(s.name, phase).Style(st)).ID(itemID(i)),
-			bloom.Fixed(11, bloom.Text(fmt.Sprintf("%.2f", s.price)).Style(st.Align(lipgloss.Right))).ID(itemID(i)),
-			bloom.Fixed(9, bloom.Text(fmt.Sprintf("%+.1f%%", s.change)).Style(st.Foreground(tint).Align(lipgloss.Right))).ID(itemID(i)),
+			bloom.Fixed(11, price).ID(itemID(i)),
+			bloom.Fixed(9, change).ID(itemID(i)),
 		))
 	}
 	rows = append(rows, bloom.Space())
-
-	pulse := blend(muted, good, m.phase(&m.pulse))
-	base := bloom.Column(
-		bloom.Row(
-			bloom.Fill(bloom.Text("◆ markets").Style(header)),
-			bloom.Text("•").Style(header.Foreground(pulse).Padding(0)),
-			bloom.Text(" live").Style(header.PaddingLeft(0)),
-		),
-		bloom.Row(
-			bloom.Text("NEWS").Style(badge),
-			bloom.Fill(bloom.Marquee(strings.Join(headlines, "  ◆  "), m.phase(&m.headline)).Gap("  ◆  ").Style(bar)),
-		),
-		bloom.Fill(bloom.Box(panel, bloom.Column(rows...))),
-		bloom.Text("↑↓ select · b banner · space pause · q quit").Style(status).Truncate(),
-	)
-
-	return bloom.Overlay(base, bloom.Layer(bloom.Box(banner,
-		bloom.Text(fmt.Sprintf("◆ Alert %d: %s", m.alerts, stocks[m.selected].name)).Style(lipgloss.NewStyle().Background(panelBg)))).
-		Anchor(bloom.End, bloom.Start).Offset(0, 3).Margin(1).
-		Presence(m.alert, fx.Slide{From: fx.Right}, fx.Fade{}))
+	return bloom.Column(rows...)
 }
 
 // blend returns the color t of the way from a to b.

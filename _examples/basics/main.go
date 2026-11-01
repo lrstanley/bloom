@@ -6,7 +6,8 @@
 // bloom.Render, one for each way children share a row or column: fixed,
 // filling, weighted, percentage, natural, and clamped sizes, gaps,
 // justification, alignment, spacers, frames, wrapping, and centering; and
-// the grid, flow, spacer, and truncating text helpers. The last shows that a layout is also just a string to Lip Gloss.
+// the grid, flow, spacer, and truncating text helpers. The last shows that a
+// layout is also just a string to Lip Gloss.
 package main
 
 import (
@@ -19,13 +20,25 @@ import (
 )
 
 var (
-	border  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#7aa2f7"))
-	chip    = lipgloss.NewStyle().Foreground(lipgloss.Color("#1a1b26")).Background(lipgloss.Color("#9ece6a")).Padding(0, 1)
-	heading = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#e0af68"))
+	accent = lipgloss.Color("#7aa2f7")
+	good   = lipgloss.Color("#9ece6a")
+	warn   = lipgloss.Color("#e0af68")
+	dark   = lipgloss.Color("#1a1b26")
+	prose  = lipgloss.Color("#a9b1d6")
+
+	border  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent)
+	chip    = lipgloss.NewStyle().Foreground(dark).Background(good).Padding(0, 1)
+	heading = lipgloss.NewStyle().Bold(true).Foreground(warn)
 )
+
+const paragraph = "Text with a style is rendered at the size it is given, so long " +
+	"lines wrap to fit and the background fills the space."
 
 // card is text in a rounded frame.
 func card(s string) bloom.Child { return bloom.Box(border, bloom.Text(s)) }
+
+// tag is text on a colored background.
+func tag(s string) bloom.Child { return bloom.Text(s).Style(chip) }
 
 type example struct {
 	title string
@@ -37,12 +50,10 @@ func examples() []example {
 	justify := func(j flex.Justify, name string) bloom.Child {
 		return bloom.Row(
 			bloom.Fixed(14, bloom.Text(name)),
-			bloom.Fill(bloom.Row(
-				bloom.Text("a").Style(chip), bloom.Text("b").Style(chip), bloom.Text("c").Style(chip),
-			).Justify(j)),
+			bloom.Fill(bloom.Row(tag("a"), tag("b"), tag("c")).Justify(j)),
 		)
 	}
-	paragraph := "Text with a style is rendered at the size it is given, so long lines wrap to fit and the background fills the space."
+	stretched := chip.Align(lipgloss.Center, lipgloss.Center)
 
 	return []example{
 		{"Fixed, Fill, and Auto (a bare child is Auto)", 60, 3, bloom.Row(
@@ -75,10 +86,10 @@ func examples() []example {
 		)},
 		{"Align on the cross axis: the row centers, slots override it", 60, 5, bloom.Row(
 			card("tall\ncard\nhere"),
-			bloom.Auto(bloom.Text("start").Style(chip)).Align(bloom.Start),
-			bloom.Text("center").Style(chip),
-			bloom.Auto(bloom.Text("end").Style(chip)).Align(bloom.End),
-			bloom.Fill(bloom.Text("stretch").Style(chip.Align(lipgloss.Center, lipgloss.Center))).Align(bloom.Stretch),
+			bloom.Auto(tag("start")).Align(bloom.Start),
+			tag("center"),
+			bloom.Auto(tag("end")).Align(bloom.End),
+			bloom.Fill(bloom.Text("stretch").Style(stretched)).Align(bloom.Stretch),
 		).Align(bloom.Center).Gap(1)},
 		{"Space takes what is left", 24, 6, bloom.Box(border, bloom.Column(
 			bloom.Text("top"),
@@ -87,10 +98,14 @@ func examples() []example {
 		))},
 		{"Box with padding, around wrapping text", 36, 9, bloom.Box(
 			border.Padding(1, 2),
-			bloom.Text(paragraph).Style(lipgloss.NewStyle().Foreground(lipgloss.Color("#a9b1d6"))),
+			bloom.Text(paragraph).Style(lipgloss.NewStyle().Foreground(prose)),
 		)},
 		{"Fixed(n, nil) and Space(): fixed and growing gaps", 30, 3, bloom.Row(
-			card("a"), bloom.Fixed(4, nil), card("b"), bloom.Space(), card("c"),
+			card("a"),
+			bloom.Fixed(4, nil),
+			card("b"),
+			bloom.Space(),
+			card("c"),
 		)},
 		{"Truncate: one line, cut off with an ellipsis", 30, 4, bloom.Box(border, bloom.Column(
 			bloom.Text("A long line that will not fit").Truncate(),
@@ -101,11 +116,15 @@ func examples() []example {
 			card("one"), card("two"), card("three"), card("four"), card("five"),
 		).Gap(1, 0)},
 		{"Wrap: natural sizes, flowing onto new lines", 36, 3, bloom.Wrap(
-			bloom.Text("layout").Style(chip), bloom.Text("flex").Style(chip), bloom.Text("grid").Style(chip),
-			bloom.Text("wrap").Style(chip), bloom.Text("truncate").Style(chip), bloom.Text("spacer").Style(chip),
+			tag("layout"), tag("flex"), tag("grid"),
+			tag("wrap"), tag("truncate"), tag("spacer"),
 		).Gap(1, 1)},
-		{"Centered", 36, 5, bloom.Box(border, bloom.Centered(bloom.Text("in the middle").Style(chip)))},
-		{"Natural size: no width or height given", 0, 0, bloom.Row(card("a"), card("bb\nbb"), card("ccc\nccc\nccc")).Gap(1)},
+		{"Centered", 36, 5, bloom.Box(border, bloom.Centered(tag("in the middle")))},
+		{"Natural size: no width or height given", 0, 0, bloom.Row(
+			card("a"),
+			card("bb\nbb"),
+			card("ccc\nccc\nccc"),
+		).Gap(1)},
 		{"A layout is a string to Lip Gloss too", 0, 0, bloom.Text(lipgloss.JoinHorizontal(
 			lipgloss.Center,
 			bloom.Column(card("node"), card("tree")).View(),

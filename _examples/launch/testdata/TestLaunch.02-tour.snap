@@ -5,14 +5,14 @@
 │                              │  │                              │  │                              │
 │  1,069                       │  │  157                         │  │  8                           │
 │  per minute                  │  │  milliseconds                │  │  per hour                    │
-│                              │  │                              │  │                              │
-│                              │  │                              │  │                              │
 ╰──────────────────────────────╯  ╰──────────────────────────────╯  ╰──────────────────────────────╯
                                                                                                     
 Deploy payments to production                                                                       
 Type the service name to confirm.                                                                   
                                                                                                     
  payments                                                                                   deploy  
+                                                                                                    
+                                                                                                    
                                                                                                     
                                                                                                     
                                                                                                     
