@@ -6,8 +6,8 @@
 // bubbletint themes. Choosing a tint in the sidebar recolors everything: the
 // panes wave back in with the new colors, and a toast decodes the tint's
 // name. A pane dragged by its title floats under the pointer while the
-// others glide out of its way, and a double click on the title zooms the
-// pane to the full width. As the terminal narrows, panes collapse by
+// others fly out of its way, and a double click on the title zooms the pane
+// to the full width. As the terminal narrows, panes collapse by
 // priority, and a tour spotlights each part of the screen in turn.
 //
 // Keys: t and T cycle the tints, ? steps the tour, esc ends it, and q or
@@ -67,6 +67,7 @@ type model struct {
 
 	order    []paneID // the panes right of the sidebar, left to right.
 	zoomed   paneID   // the pane taking the full width, if any.
+	zooming  bool     // the panes glide, through a zoom, rather than fly.
 	selected int      // the selected service.
 
 	// The pane being dragged by its title, if any: where it was grabbed,
@@ -187,17 +188,23 @@ func (m *model) drag(id paneID, e on.Event) tea.Cmd {
 		if !ok || m.zoomed != "" || e.Screen == e.Start {
 			return nil
 		}
-		m.dragging, m.grab, m.size = id, e.Start.Sub(r.Min), r.Size()
+		m.dragging, m.grab, m.size, m.zooming = id, e.Start.Sub(r.Min), r.Size(), false
 	}
 	m.at = e.Screen
 
-	// The pane goes after each of the others whose middle the pointer is
-	// past.
+	// The pane goes after the last of the others on screen whose middle the
+	// pointer is past, or before the first on screen if it is past none, so
+	// panes collapsed out of sight keep their places around it.
 	others := slices.DeleteFunc(slices.Clone(m.order), func(p paneID) bool { return p == id })
-	i := 0
-	for _, p := range others {
-		if r, ok := m.ui.Frame().Rect(p); ok && (r.Min.X+r.Max.X)/2 < e.Screen.X {
-			i++
+	i, placed := slices.Index(m.order, id), false
+	for j, p := range others {
+		r, ok := m.ui.Frame().Rect(p)
+		switch {
+		case !ok:
+		case (r.Min.X+r.Max.X)/2 < e.Screen.X:
+			i, placed = j+1, true
+		case !placed:
+			i, placed = j, true
 		}
 	}
 	m.order = slices.Insert(others, i, id)
@@ -206,6 +213,7 @@ func (m *model) drag(id paneID, e on.Event) tea.Cmd {
 
 // zoom gives pane id the full width, or gives the others theirs back.
 func (m *model) zoom(id paneID) tea.Cmd {
+	m.zooming = true
 	if m.zoomed == id {
 		m.zoomed = ""
 		return nil

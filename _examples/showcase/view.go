@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"math"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -75,9 +76,14 @@ var paneSizes = map[paneID]struct{ fixed, grow, min, collapse int }{
 	paneServices: {grow: 3, min: 26},
 }
 
-// Panes glide to their new places and sizes as they are moved and zoomed,
-// and a dragged pane trails the pointer a little.
+// Panes glide to their new places and sizes as they are zoomed, and a
+// dragged pane trails the pointer a little, and glides into its place when
+// dropped.
 var glide = anim.Spring(14, 0.85)
+
+// Panes making way for a dragged pane fly to their new places: their cells
+// take off from where they were and land where they go, over this long.
+var flight = []anim.Option{anim.Duration(800 * time.Millisecond), anim.Ease(anim.Linear)}
 
 // titleID is the ID of a pane's title, by which bloom follows the drag of
 // it as the pane moves from the row to its own layer.
@@ -144,7 +150,7 @@ func (m *model) dragLayer() bloom.LayerNode {
 
 // slot is pane id's place in the row: sharing the width, all of it while
 // zoomed, or none while another pane is. While the pane is dragged, its
-// place is left empty, for the other panes to glide over as they move.
+// place is left empty, for the other panes to fly into as they move.
 func (m *model) slot(id paneID) bloom.SlotNode {
 	if id == m.dragging {
 		size := paneSizes[id]
@@ -164,7 +170,10 @@ func (m *model) slot(id paneID) bloom.SlotNode {
 	if m.zoomed == "" && size.collapse > 0 {
 		s = s.Collapsible(size.collapse)
 	}
-	return s.ID(id).Animate(glide)
+	if id == paneTints || m.zooming {
+		return s.ID(id).Animate(glide)
+	}
+	return s.ID(id).Animate(flight...).MoveWith(fx.Fly{Seed: uint32(len(id))}) //nolint:gosec // IDs are short.
 }
 
 // pane boxes the pane's content under its title, which, except for the

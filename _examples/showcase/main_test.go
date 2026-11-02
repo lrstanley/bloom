@@ -88,3 +88,23 @@ func TestShowcase(t *testing.T) {
 	h.Key("q")
 	h.WaitFinished()
 }
+
+// TestDragPastCollapsed drags a pane past another while the terminal is
+// narrow enough that a pane between them is collapsed out of sight.
+func TestDragPastCollapsed(t *testing.T) {
+	t.Parallel()
+
+	m := newModel()
+	h := steep.NewHarness(t, m, steep.WithWindowSize(96, 24))
+	h.Wait("billing").WaitNot("⠿ Palette").Sleep(800 * time.Millisecond)
+	x1, y1 := find(t, h, "⠿ Activity")
+	x2, y2 := find(t, h, "⠿ Services")
+	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+24, y2+4, reel.Delay(20*time.Millisecond))
+	h.Sleep(1200 * time.Millisecond)
+	a, _ := find(t, h, "⠿ Activity")
+	if s, _ := find(t, h, "⠿ Services"); a < s {
+		t.Fatalf("Activity did not move past Services, order %v:\n%s", m.order, h.View())
+	}
+	h.Key("q")
+	h.WaitFinished()
+}
