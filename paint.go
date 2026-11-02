@@ -41,6 +41,7 @@ type op struct {
 	viewport image.Rectangle
 	effects  []fx.Effect
 	t        float64
+	from     image.Rectangle // for opPop of a slot moving with effects: where it was
 
 	// For opPop: the index of its opPush, the frame entries drawn since it,
 	// and how far its effects moved what was drawn, known once executed.
@@ -52,7 +53,7 @@ type op struct {
 
 func (o *op) equal(p *op) bool {
 	if o.kind != p.kind || o.kind == opDraw || o.src != p.src || o.rect != p.rect ||
-		o.clip != p.clip || o.viewport != p.viewport || o.t != p.t || len(o.effects) != len(p.effects) {
+		o.clip != p.clip || o.viewport != p.viewport || o.t != p.t || o.from != p.from || len(o.effects) != len(p.effects) {
 		return false
 	}
 	for i := range o.effects {
@@ -123,6 +124,7 @@ type renderer struct {
 	targets  []target
 	ops      []op
 	prevOps  []op
+	moves    []deferredMove // slots moving with effects, painted last
 	entries  []entry
 	handlers [][]on.Handler // by entry
 	hovered  []mouseTarget  // the hoverable nodes under the pointer, kept by Root
@@ -181,6 +183,7 @@ func (r *renderer) paintTree(c Child, w, h int) int {
 	root := r.layout(c, w, h)
 	if root >= 0 {
 		r.paint(root, r.area, -1)
+		r.paintMoves(0)
 	}
 
 	// Memos for boxes not styled this frame would keep their strings alive.
@@ -291,11 +294,18 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 	}
 	b := &r.boxes[i]
 	vis := b.rect.Intersect(clip)
-	if b.hidden || vis.Empty() {
+	// A slot moving with effects is drawn on its way while where it was is
+	// in sight, though where it goes may not be.
+	travels := b.moving && b.from.Overlaps(clip)
+	if b.hidden || (vis.Empty() && !travels) {
 		return
 	}
-	if hasEntry(b) {
+	if hasEntry(b) && !vis.Empty() {
 		parent = r.addEntry(b, vis, clip, parent)
+	}
+	if b.moving {
+		r.moves = append(r.moves, deferredMove{box: i, clip: clip, parent: parent})
+		return
 	}
 
 	switch n := b.child.(type) {
@@ -337,7 +347,9 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		r.paint(r.firstKid(i), vis, parent)
 	case OverlayNode:
 		kids := r.kidsOf(i)
+		mark := len(r.moves)
 		r.paint(kids[0], vis, parent)
+		r.paintMoves(mark)
 		for _, k := range kids[1:] {
 			r.paintLayer(k, vis, parent)
 		}
@@ -360,10 +372,19 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 func (r *renderer) paintEffects(i int, rect, clip image.Rectangle, t float64, effects []fx.Effect, parent, from int) {
 	push := len(r.ops)
 	r.ops = append(r.ops, op{kind: opPush, rect: rect})
+	mark := len(r.moves)
 	r.paint(i, rect, parent)
+	r.paintMoves(mark)
+	r.popEffects(rect, clip, image.Rectangle{}, t, effects, push, from)
+}
+
+// popEffects ends the cells started at op push, which effects are applied to
+// for t, for a node at rect, moving from moved if it is moving with effects,
+// to be composited inside clip. Entries from index from on move with them.
+func (r *renderer) popEffects(rect, clip, moved image.Rectangle, t float64, effects []fx.Effect, push, from int) {
 	r.ops = append(r.ops, op{
-		kind: opPop, rect: rect, clip: clip, viewport: clip, t: t, effects: r.snapshot(effects),
-		push: push, entries: [2]int{from, len(r.entries)},
+		kind: opPop, rect: rect, clip: clip, viewport: clip, t: t, from: moved,
+		effects: r.snapshot(effects), push: push, entries: [2]int{from, len(r.entries)},
 	})
 }
 
@@ -401,12 +422,59 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	// A layer is opaque: whatever its child does not draw, such as a Space,
 	// is blank rather than showing the base through. Cells drawn for effects
 	// start out blank; otherwise the layer's rect is blanked first.
-	if len(n.effects) > 0 {
-		r.paintEffects(r.firstKid(i), b.rect, clip, n.t, n.effects, parent, from)
-		return
+	// A layer moving with effects is drawn into cells of its own, among the
+	// layers, unlike a slot, which waits for the rest of its container.
+	// Its cells are drawn whole, as its effects draw it on its way from
+	// where it was, which may be in sight though where it goes is not.
+	push, area := -1, clip
+	if b.moving {
+		push, area = r.beginTravel(b, clip), clip.Union(b.rect)
 	}
-	r.ops = append(r.ops, op{kind: opClear, rect: b.rect.Intersect(clip)})
-	r.paint(r.firstKid(i), b.rect.Intersect(clip), parent)
+	if len(n.effects) > 0 {
+		r.paintEffects(r.firstKid(i), b.rect, area, n.t, n.effects, parent, from)
+	} else {
+		r.ops = append(r.ops, op{kind: opClear, rect: b.rect.Intersect(area)})
+		mark := len(r.moves)
+		r.paint(r.firstKid(i), b.rect.Intersect(area), parent)
+		r.paintMoves(mark)
+	}
+	if b.moving {
+		r.popEffects(b.rect, clip, b.from, b.moveT, n.moves, push, from)
+	}
+}
+
+// deferredMove is a slot moving with effects, whose painting waits until
+// the rest of what it is drawn with has been painted, so that its cells
+// pass over its neighbors: box i, inside clip, its container's visible area,
+// and its nearest ancestor with an entry.
+type deferredMove struct {
+	box, parent int
+	clip        image.Rectangle
+}
+
+// paintMoves paints the slots moving with effects deferred since mark, each
+// into its own cells covering where it was and where it is, to have its
+// effects draw it on its way from one to the other.
+func (r *renderer) paintMoves(mark int) {
+	for k := mark; k < len(r.moves); k++ {
+		mv := r.moves[k]
+		b := &r.boxes[mv.box]
+		n, _ := b.child.(SlotNode)
+		push, from := r.beginTravel(b, mv.clip), len(r.entries)
+		inner := len(r.moves)
+		r.paint(r.firstKid(mv.box), b.rect, mv.parent)
+		r.paintMoves(inner)
+		r.popEffects(b.rect, mv.clip, b.from, b.moveT, n.moves, push, from)
+	}
+	r.moves = r.moves[:mark]
+}
+
+// beginTravel starts drawing box b, moving with effects, into cells of its
+// own covering where it was and where it is, inside clip, returning the
+// index of the op that starts them.
+func (r *renderer) beginTravel(b *box, clip image.Rectangle) int {
+	r.ops = append(r.ops, op{kind: opPush, rect: b.rect.Union(b.from).Intersect(clip).Union(b.rect)})
+	return len(r.ops) - 1
 }
 
 // isHovered reports whether the pointer was over box b when the mouse was
@@ -477,7 +545,13 @@ func (r *renderer) execute() {
 		case opPop:
 			r.targets = r.targets[:len(r.targets)-1]
 			parent := r.targets[len(r.targets)-1]
-			s := t.c.Layer(o.rect.Sub(parent.origin), o.viewport.Sub(parent.origin), parent.c, r.env, &r.mixer)
+			// Its cells cover what was pushed, which for a slot moving with
+			// effects is more than its rect: where it was, too.
+			node := o.rect.Sub(r.ops[o.push].rect.Min)
+			s := t.c.TravelLayer(node, o.rect.Sub(parent.origin), o.viewport.Sub(parent.origin), parent.c, r.env, &r.mixer)
+			if !o.from.Empty() {
+				s.From = o.from.Sub(parent.origin)
+			}
 			for _, e := range o.effects {
 				e.Apply(s, o.t)
 			}

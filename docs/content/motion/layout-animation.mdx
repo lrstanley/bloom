@@ -78,10 +78,37 @@ screen. The frame rate and clock come from the root, set with
 [`bloom.WithUnfocusedFPS`](https://pkg.go.dev/github.com/lrstanley/bloom#WithUnfocusedFPS), and
 [`bloom.WithClock`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock).
 
+## Move with effects
+
+Rather than gliding, a slot or layer can snap to its new place and have effects draw it on its way there. Add
+`MoveWith` after `Animate`, whose options then time the effects, as their progress runs from 0 to 1:
+
+```go
+bloom.Fill(pane).
+	ID(id).
+	Animate(anim.Duration(800*time.Millisecond), anim.Ease(anim.Linear)).
+	MoveWith(fx.Fly{})
+```
+
+[`fx.Fly`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fly) starts the slot out whole where it was, then flies
+its cells over, a column at a time, as bright glyphs that arc over and land where it goes. A slot that changed size
+starts out squeezed or stretched to the size it was.
+
+The slot is laid out where it goes from the first frame, so its content lays out once, at its new size, and
+`m.ui.Frame().Rect(id)` reports its new place. Only its cells are on their way, drawn over the rest of its
+container, such as the panes it passes; a layer's are drawn over the layers before it, and under those after it.
+A slot or layer at rest costs no more than any other, and nothing is kept between frames to draw it on its way.
+
+A slot still gliding finishes its glide first, such as a [dragged](/input/mouse#drag) layer with the same ID that was
+just dropped into its place. A slot that changes between gliding and moving with effects carries on from where it
+was last laid out. To move slots your own way, write an effect that
+[draws a node on its way](/motion/custom-effects#draw-a-node-on-its-way).
+
 ## Geometry while animating
 
 `m.ui.Frame().Rect(id)` reports where a node was drawn on screen, so mid-animation it's the in-between
-rectangle. `bloom.Solve` reports where the layout is headed. Use `Solve` when you need final sizes in `Update`,
+rectangle. A node that [moves with effects](#move-with-effects) is laid out where it goes from the first frame, so
+it reports that. `bloom.Solve` reports where the layout is headed. Use `Solve` when you need final sizes in `Update`,
 such as to [size a Bubbles component](/layout/bubbles-components).
 
 ## When to use a Value instead
@@ -92,7 +119,9 @@ rectangle.
 
 ## Related
 
-- [`SlotNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.Animate) and
-  [`LayerNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.Animate) API reference
+- [`SlotNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.Animate),
+  [`LayerNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.Animate),
+  [`SlotNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.MoveWith), and
+  [`LayerNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.MoveWith) API reference
 - The [`reflow` example](https://github.com/lrstanley/bloom/tree/master/_examples/reflow): a sidebar, a re-sorting
   list, a changing split, a panel coming and going, and a marker following the selection

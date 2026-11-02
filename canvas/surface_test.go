@@ -8,6 +8,8 @@ import (
 	"image"
 	"strings"
 	"testing"
+
+	uv "github.com/charmbracelet/ultraviolet"
 )
 
 // shown returns the text of s's shown cells, one line per row, with hidden
@@ -165,5 +167,90 @@ func TestMoveInSubKeepsGlyphsWhole(t *testing.T) {
 			}
 			x += w
 		}
+	}
+}
+
+func TestTravelLayer(t *testing.T) {
+	t.Parallel()
+
+	// A node's cells, abc, drawn at 5,0 of cells covering 0,0 to 10,1, as
+	// for a node moving across them, composited at the same place.
+	c := Parse("     abc  ", method)
+	frame := Parse("..........", method)
+	s := c.TravelLayer(image.Rect(5, 0, 8, 1), image.Rect(5, 0, 8, 1), frame.Bounds(), frame, DefaultEnv, &Mixer{})
+
+	if s.Width() != 3 || s.Height() != 1 {
+		t.Fatalf("size = %dx%d, want the node's, 3x1", s.Width(), s.Height())
+	}
+	if want := image.Rect(-5, 0, 5, 1); s.Reach() != want {
+		t.Fatalf("reach = %v, want %v", s.Reach(), want)
+	}
+	if got := shown(s); got != "abc" {
+		t.Fatalf("shown = %q, want the node's cells", got)
+	}
+	if s.Visible(-1, 0) || s.Cell(-1, 0) == nil || s.Cell(5, 0) != nil {
+		t.Fatal("cells around the node are not reachable and hidden")
+	}
+
+	// Set draws anywhere in the reach, and shows the cell; Hide hides it.
+	x := uv.Cell{Content: "x", Width: 1}
+	s.Set(-5, 0, &x)
+	s.Set(4, 0, &x)
+	s.Set(5, 0, &x) // out of reach
+	s.Hide(1, 0)
+	if !s.Visible(-5, 0) || !s.Visible(4, 0) || s.Visible(1, 0) {
+		t.Fatal("Set did not show cells, or Hide did not hide one")
+	}
+	frame.Composite(s, frame.Bounds())
+	if got, want := frame.String(), "x....a.c.x"; got != want {
+		t.Fatalf("composited %q, want %q", got, want)
+	}
+
+	// Layer is a travel layer reaching only its own cells.
+	l := layerOf("ab")
+	if want := image.Rect(0, 0, 2, 1); l.Reach() != want {
+		t.Fatalf("layer reach = %v, want %v", l.Reach(), want)
+	}
+}
+
+func TestSetClipsToReach(t *testing.T) {
+	t.Parallel()
+
+	// A wide glyph set at the edge of a region, or of part of a layer, is
+	// drawn as blanks inside it rather than over the cell beside it.
+	c := Parse("abcd", method)
+	wide := uv.Cell{Content: "世", Width: 2}
+	c.Region(image.Rect(1, 0, 2, 1), DefaultEnv, &Mixer{}).Set(0, 0, &wide)
+	if got, want := c.String(), "a cd"; got != want {
+		t.Fatalf("region: %q, want %q", got, want)
+	}
+	s := layerOf("abcd")
+	s.Sub(image.Rect(1, 0, 3, 1)).Set(1, 0, &wide)
+	if got := shown(s); got != "ab d" {
+		t.Fatalf("sub: %q, want %q", got, "ab d")
+	}
+	s.Set(0, 0, &wide)
+	if got := shown(s); got != "世 d" {
+		t.Fatalf("whole: %q, want %q", got, "世 d")
+	}
+}
+
+func TestSubFrom(t *testing.T) {
+	t.Parallel()
+
+	// A part of a moving node was the matching part of where it was, scaled
+	// if its size changed.
+	s := layerOf("abcd\nefgh") // at 2,1, 4×2
+	s.From = image.Rect(10, 5, 14, 7)
+	if got, want := s.Sub(image.Rect(0, 1, 4, 2)).From, image.Rect(10, 6, 14, 7); got != want {
+		t.Fatalf("row 1 was at %v, want %v", got, want)
+	}
+	s.From = image.Rect(10, 5, 18, 9)
+	if got, want := s.Sub(image.Rect(2, 1, 4, 2)).From, image.Rect(14, 7, 18, 9); got != want {
+		t.Fatalf("resized, part was at %v, want %v", got, want)
+	}
+	s.From = image.Rectangle{}
+	if got := s.Sub(image.Rect(0, 0, 2, 1)).From; !got.Empty() {
+		t.Fatalf("not moving, part was at %v", got)
 	}
 }

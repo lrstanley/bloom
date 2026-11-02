@@ -66,6 +66,17 @@ drive them.
 | [`Roll`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Roll) | `From string` | turns digits over like an odometer, from the number in `From` |
 | [`Burst`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Burst) | `At image.Point`, `Count int` (default 40), `Seed` | throws confetti from `At`; `t` is its age, gone at 1 |
 
+## Moves
+
+These draw a slot or layer on its way to a new place, given to
+[`SlotNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.MoveWith) or
+[`LayerNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.MoveWith). See
+[Layout animation](/motion/layout-animation#move-with-effects).
+
+| Effect | Fields | Does |
+| --- | --- | --- |
+| [`Fly`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fly) | `Seed` | flies the node's cells over from where it was, a column at a time, as bright glyphs arcing to where they land |
+
 ## Combinators
 
 These wrap other effects.

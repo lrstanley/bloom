@@ -176,3 +176,30 @@ func BenchmarkRenderReflow(b *testing.B) {
 		r.View(benchW, benchH, tree(10+(i/30)%3*10))
 	}
 }
+
+// BenchmarkRenderMoving draws three panes trading places at 200×60, flying
+// over with fx.Fly, a turn every half second, so that every frame has panes
+// in flight.
+func BenchmarkRenderMoving(b *testing.B) {
+	now := time.Unix(1, 0)
+	r := New(WithClock(func() time.Time { return now }))
+	opts := []anim.Option{anim.Duration(time.Second), anim.Ease(anim.Linear)}
+	panes := []SlotNode{
+		Fixed(40, Box(benchBorder, Text("sidebar"))).ID("sidebar"),
+		Fill(benchTree(3, 0, -1)).ID("main"),
+		Fixed(50, Box(benchBorder, Text("details"))).ID("details"),
+	}
+	tree := func(turn int) Child {
+		row := make([]Child, len(panes))
+		for i, p := range panes {
+			row[(i+turn)%len(panes)] = p.Animate(opts...).MoveWith(fx.Fly{})
+		}
+		return Row(row...)
+	}
+	r.View(benchW, benchH, tree(0))
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		now = now.Add(time.Second / 120)
+		r.View(benchW, benchH, tree(1+i/60))
+	}
+}

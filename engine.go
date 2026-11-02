@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/flex"
+	"github.com/lrstanley/bloom/fx"
 )
 
 // box is a node of the tree being laid out, kept in the engine's arena and
@@ -40,6 +41,11 @@ type box struct {
 
 	rect   image.Rectangle // set by arrange; empty for boxes not laid out
 	hidden bool            // collapsed by its container
+	// A slot or layer moving with effects is drawn at rect, with them
+	// applied for moveT, from where it was, from.
+	moving bool
+	moveT  float64
+	from   image.Rectangle
 	// cramped marks a [BoxNode] given less space than its frame, which
 	// would show a broken piece of it, such as while a panel animates closed.
 	cramped bool
@@ -462,7 +468,7 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 		return
 	}
 	if n, ok := e.boxes[i].child.(SlotNode); ok && e.motion != nil && n.id != nil && n.animation != nil {
-		r = e.motion.rect(n.id, n.animation, r, e.moved)
+		r = e.animate(i, n.id, n.animation, n.moves, r)
 		defer func(at image.Point) { e.moved = at }(e.moved)
 		e.moved = r.Min
 	}
@@ -582,12 +588,24 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 
 	lr := image.Rectangle{Min: at, Max: at.Add(image.Pt(w, h))}
 	if e.motion != nil && n.id != nil && n.animation != nil {
-		lr = e.motion.rect(n.id, n.animation, lr, e.moved)
+		lr = e.animate(i, n.id, n.animation, n.moves, lr)
 		defer func(at image.Point) { e.moved = at }(e.moved)
 		e.moved = lr.Min
 	}
 	e.boxes[i].rect = lr
 	e.arrange(kid, lr)
+}
+
+// animate returns where box i, with ID id, is drawn on its way to target:
+// gliding there, or, moving with effects, at target, with its move noted on
+// the box for painting. A box still gliding finishes its glide first.
+func (e *engine) animate(i int, id any, cfg *layoutAnimation, moves []fx.Effect, target image.Rectangle) image.Rectangle {
+	if len(moves) > 0 && !e.motion.gliding(id) {
+		b := &e.boxes[i]
+		b.from, b.moveT, b.moving = e.motion.move(id, cfg, target, e.moved)
+		return target
+	}
+	return e.motion.rect(id, cfg, target, e.moved)
 }
 
 // rectOf returns the rectangle of the box with ID id, if some of it is on

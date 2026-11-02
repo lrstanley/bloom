@@ -84,6 +84,7 @@ changes. Coordinates are relative to its top-left cell.
 | --- | --- |
 | `Width()`, `Height()` | the size of the surface |
 | `Cell(x, y)` | the cell at a position, to change its glyph or style. Keep its width the same. |
+| `Set(x, y, c)` | replace a cell whole and show it, anywhere in `Reach()`, keeping wide glyphs whole |
 | `Fg(c)`, `Bg(c)` | the colors a cell shows, with unset colors resolved to the terminal's defaults |
 | `Mix(a, b, t)`, `Gray(c, t)` | blend two colors, or move one toward gray |
 | `Hide(x, y)` | don't draw a cell, so what's beneath shows through. Only on a node's own cells. |
@@ -92,11 +93,59 @@ changes. Coordinates are relative to its top-left cell.
 | `Move(r, d)` | shift the cells of a rectangle, keeping wide glyphs whole |
 | `Sub(r)` | a surface over part of this one, such as a row, for effects applied piece by piece |
 | `Offset` | moves the whole surface when it's drawn, as `fx.Slide` does |
+| `From`, `Reach()` | where a node moving with `MoveWith` was, and the cells around it that it passes over |
 | `Viewport` | the area the node is placed in, such as the screen for a dialog, which tells you how far it can move out of sight |
 | `Env` | the terminal's default colors and color profile |
 
 Cells are [Ultraviolet](https://github.com/charmbracelet/ultraviolet) cells: `c.Content` is the glyph, `c.Width`
 its width in columns, and `c.Style` its colors and attributes.
+
+## Draw a node on its way
+
+A slot that moves with [`MoveWith`](/motion/layout-animation#move-with-effects) is laid out where it goes, and its
+effects draw it on its way there. Its surface's `From` is where it was, in the same coordinates as `Rect()`, and
+`Reach()` covers the cells between the two, beyond the surface's own. Those start out hidden; `Set` draws a cell
+anywhere in the reach and shows it. This effect moves a node over a row at a time, each row on its own way, which
+moving the whole surface with `Offset` couldn't do. [`fx.Fly`](https://github.com/lrstanley/bloom/blob/master/fx/fly.go)
+works the same way, cell by cell:
+
+```go
+// Cascade moves a node over from where it was a row at a time, the top row
+// first.
+type Cascade struct{}
+
+// Apply implements fx.Effect.
+func (Cascade) Apply(s *canvas.Surface, t float64) {
+	if t >= 1 || s.From.Empty() {
+		return
+	}
+	d := s.From.Min.Sub(s.Rect().Min) // from where the node is to where it was
+
+	// The cells are copied before any are drawn, as where the node is may
+	// overlap where it was. Hidden cells stay hidden, and the rest of a wide
+	// glyph is drawn with it.
+	type cell struct {
+		x, y int
+		c    uv.Cell
+	}
+	var cells []cell
+	for y := range s.Height() {
+		for x := range s.Width() {
+			if c := s.Cell(x, y); s.Visible(x, y) && c.Width > 0 {
+				cells = append(cells, cell{x, y, *c})
+			}
+			s.Hide(x, y)
+		}
+	}
+	for _, c := range cells {
+		// Each row starts on its way a little after the one above it.
+		p := min(max(2*t-float64(c.y)/float64(s.Height()), 0), 1)
+		s.Set(c.x+int(float64(d.X)*(1-p)), c.y+int(float64(d.Y)*(1-p)), &c.c)
+	}
+}
+```
+
+To move a whole node in a straight line, set `Offset` instead, as `fx.Slide` does.
 
 ## Draw directly with Drawable
 

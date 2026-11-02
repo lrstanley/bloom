@@ -192,6 +192,9 @@ func debugSlot(n SlotNode) (kind string, attrs []string) {
 	if n.animation != nil {
 		attrs = append(attrs, "animate")
 	}
+	if len(n.moves) > 0 {
+		attrs = append(attrs, "moveWith="+strings.TrimPrefix(debugEffects(n.moves), "effects="))
+	}
 	return kind, attrs
 }
 
@@ -216,6 +219,9 @@ func debugLayer(n LayerNode) (attrs []string) {
 	}
 	if n.animation != nil {
 		attrs = append(attrs, "animate")
+	}
+	if len(n.moves) > 0 {
+		attrs = append(attrs, "moveWith="+strings.TrimPrefix(debugEffects(n.moves), "effects="))
 	}
 	return attrs
 }

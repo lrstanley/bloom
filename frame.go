@@ -70,7 +70,9 @@ type Frame struct {
 
 // Rect returns where the node with ID id was laid out, which may be partly
 // off screen, and whether it is in the frame. Retained layout animations
-// report the visual rectangle drawn this frame.
+// report the visual rectangle drawn this frame, except for a node moving
+// with effects, such as with [SlotNode.MoveWith], which is laid out where it
+// goes from the start.
 func (f *Frame) Rect[K comparable](id K) (image.Rectangle, bool) {
 	if i := f.index(id); i >= 0 {
 		return f.entries[i].rect, true

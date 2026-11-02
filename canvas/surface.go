@@ -25,6 +25,7 @@ type Surface struct {
 
 	under *Canvas         // the frame beneath a node's cells; nil for a region of the frame
 	rect  image.Rectangle // where the surface sits in the frame
+	reach image.Rectangle // the cells effects can draw, in the surface's coordinates
 
 	// Offset moves the surface when it is composited onto the frame. Effects
 	// that move a node, like a slide, set it; the next effect sees [Surface.Under]
@@ -34,6 +35,11 @@ type Surface struct {
 	// such as the screen for a dialog, which tells effects how far a node can
 	// move before it is out of sight.
 	Viewport image.Rectangle
+	// From is where the surface's node was in the frame, while it moves to
+	// [Surface.Rect] with effects, such as a slot laid out somewhere new; it
+	// is empty otherwise. Effects such as a flight draw the node's cells on
+	// their way from it, anywhere in [Surface.Reach].
+	From image.Rectangle
 	// Env describes the terminal, for resolving cells without a color.
 	Env Env
 
@@ -46,7 +52,7 @@ func (c *Canvas) Region(rect image.Rectangle, env Env, mixer *Mixer) *Surface {
 	rect = rect.Intersect(c.Bounds())
 	return &Surface{
 		c: c, origin: rect.Min, w: rect.Dx(), h: rect.Dy(),
-		rect: rect, Viewport: c.Bounds(), Env: env, mixer: mixer,
+		rect: rect, reach: image.Rect(0, 0, rect.Dx(), rect.Dy()), Viewport: c.Bounds(), Env: env, mixer: mixer,
 	}
 }
 
@@ -54,13 +60,28 @@ func (c *Canvas) Region(rect image.Rectangle, env Env, mixer *Mixer) *Surface {
 // which will be composited at rect of under, inside viewport. All of its
 // cells start out shown.
 func (c *Canvas) Layer(rect, viewport image.Rectangle, under *Canvas, env Env, mixer *Mixer) *Surface {
+	return c.TravelLayer(c.Bounds(), rect, viewport, under, env, mixer)
+}
+
+// TravelLayer is [Canvas.Layer] for a node that moves across more of c than
+// it covers, such as from where it was to where it is. Its cells are the
+// part node of c, in c's coordinates, which start out shown and will be
+// composited at rect of under. The rest of c is in the surface's
+// [Surface.Reach], hidden, for effects to draw the node on its way, and is
+// composited around rect as it is around node.
+func (c *Canvas) TravelLayer(node, rect, viewport image.Rectangle, under *Canvas, env Env, mixer *Mixer) *Surface {
+	node = node.Intersect(c.Bounds())
 	mask := make([]bool, c.w*c.h)
-	for i := range mask {
-		mask[i] = true
+	for y := node.Min.Y; y < node.Max.Y; y++ {
+		row := mask[y*c.w+node.Min.X : y*c.w+node.Max.X]
+		for i := range row {
+			row[i] = true
+		}
 	}
 	return &Surface{
-		c: c, w: c.w, h: c.h, mask: mask, stride: c.w, under: under,
-		rect: rect, Viewport: viewport, Env: env, mixer: mixer,
+		c: c, origin: node.Min, w: node.Dx(), h: node.Dy(),
+		mask: mask, maskAt: node.Min.Y*c.w + node.Min.X, stride: c.w, under: under,
+		rect: rect, reach: c.Bounds().Sub(node.Min), Viewport: viewport, Env: env, mixer: mixer,
 	}
 }
 
@@ -73,13 +94,57 @@ func (s *Surface) Height() int { return s.h }
 // Rect returns where the surface sits in the frame, before [Surface.Offset].
 func (s *Surface) Rect() image.Rectangle { return s.rect }
 
-// Cell returns the cell at x, y, or nil outside the surface. Effects may
-// change the cell's content and style, but must keep its width.
+// Reach returns the cells effects can draw, in the surface's coordinates:
+// its own, from 0,0 to its width and height, and, while its node moves from
+// [Surface.From], those around them that the node passes over. Cells in the
+// reach but not the surface's own start out hidden.
+func (s *Surface) Reach() image.Rectangle { return s.reach }
+
+// reaches reports whether x, y is in the surface's reach, checking the
+// surface's own cells, which effects ask about the most, first.
+func (s *Surface) reaches(x, y int) bool {
+	if uint(x) < uint(s.w) && uint(y) < uint(s.h) {
+		return true
+	}
+	return x >= s.reach.Min.X && y >= s.reach.Min.Y && x < s.reach.Max.X && y < s.reach.Max.Y
+}
+
+// Cell returns the cell at x, y, or nil outside the surface's reach.
+// Effects may change the cell's content and style, but must keep its width;
+// [Surface.Set] replaces a cell whole.
 func (s *Surface) Cell(x, y int) *uv.Cell {
-	if x < 0 || y < 0 || x >= s.w || y >= s.h {
+	if !s.reaches(x, y) {
 		return nil
 	}
-	return s.c.CellAt(s.origin.X+x, s.origin.Y+y)
+	return &s.c.cells[(s.origin.Y+y)*s.c.w+s.origin.X+x]
+}
+
+// Set replaces the cell at x, y, anywhere in the surface's reach, with c,
+// and shows it. A wide c that does not fit in the reach is drawn as blanks in
+// its style, as far as the reach goes. Overwriting part of a wide glyph
+// blanks the rest of it, which may be outside the reach, so that no glyph is
+// left broken.
+func (s *Surface) Set(x, y int, c *uv.Cell) {
+	if !s.reaches(x, y) {
+		return
+	}
+	line := s.c.lines[s.origin.Y+y]
+	if x+c.Width <= s.reach.Max.X {
+		s.show(line, x, y, c)
+		return
+	}
+	blank := blankLike(c)
+	for ; x < s.reach.Max.X; x++ {
+		s.show(line, x, y, &blank)
+	}
+}
+
+// show sets the cell at x, y, of row line, to c and shows it.
+func (s *Surface) show(line uv.Line, x, y int, c *uv.Cell) {
+	line.Set(s.origin.X+x, c)
+	if s.mask != nil {
+		s.mask[s.maskAt+y*s.stride+x] = true
+	}
 }
 
 // Under returns the frame's cell beneath x, y at the surface's current
@@ -95,7 +160,7 @@ func (s *Surface) Under(x, y int) *uv.Cell {
 
 // Visible reports whether the cell at x, y will be composited.
 func (s *Surface) Visible(x, y int) bool {
-	if x < 0 || y < 0 || x >= s.w || y >= s.h {
+	if !s.reaches(x, y) {
 		return false
 	}
 	if s.mask == nil {
@@ -107,15 +172,17 @@ func (s *Surface) Visible(x, y int) bool {
 // Hide stops the cell at x, y from being composited, so the frame beneath
 // shows through. It does nothing on a region of the frame.
 func (s *Surface) Hide(x, y int) {
-	if s.mask != nil && x >= 0 && y >= 0 && x < s.w && y < s.h {
+	if s.mask != nil && s.reaches(x, y) {
 		s.mask[s.maskAt+y*s.stride+x] = false
 	}
 }
 
 // Sub returns a surface over r, in s's coordinates, clipped to s. It shares
 // s's cells and which of them are shown, so what an effect does to it shows
-// in s. Its [Surface.Rect] is the matching part of the frame, and its
-// offset starts out as s's, which the effect may change without changing s's.
+// in s. Its [Surface.Rect] is the matching part of the frame, its
+// [Surface.From] the matching part of where s's node was, its reach its own
+// cells, and its offset starts out as s's, which the effect may change
+// without changing s's.
 func (s *Surface) Sub(r image.Rectangle) *Surface {
 	r = r.Intersect(image.Rect(0, 0, s.w, s.h))
 	if r.Empty() {
@@ -126,6 +193,15 @@ func (s *Surface) Sub(r image.Rectangle) *Surface {
 	sub.w, sub.h = r.Dx(), r.Dy()
 	sub.maskAt = s.maskAt + r.Min.Y*s.stride + r.Min.X
 	sub.rect = r.Add(s.rect.Min)
+	sub.reach = image.Rect(0, 0, r.Dx(), r.Dy())
+	if !s.From.Empty() && s.w > 0 && s.h > 0 {
+		// The part was as far into where the node was as it is into the node.
+		f := s.From
+		sub.From = image.Rect(
+			f.Min.X+r.Min.X*f.Dx()/s.w, f.Min.Y+r.Min.Y*f.Dy()/s.h,
+			f.Min.X+r.Max.X*f.Dx()/s.w, f.Min.Y+r.Max.Y*f.Dy()/s.h,
+		)
+	}
 	return &sub
 }
 
@@ -178,6 +254,15 @@ func (s *Surface) row(y int) (cells []uv.Cell, shown []bool) {
 	}
 	i := s.maskAt + y*s.stride
 	return cells, s.mask[i : i+s.w]
+}
+
+// reachRow returns the cells and the shown flags of row y across the
+// surface's reach, from its left edge.
+func (s *Surface) reachRow(y int) (cells []uv.Cell, shown []bool) {
+	x0 := s.origin.X + s.reach.Min.X
+	cells = s.c.lines[s.origin.Y+y][x0 : x0+s.reach.Dx()]
+	i := s.maskAt + y*s.stride + s.reach.Min.X
+	return cells, s.mask[i : i+s.reach.Dx()]
 }
 
 // blankSpan blanks row[x0:x1] and hides it.
@@ -238,14 +323,15 @@ func (s *Surface) Mix(a, b color.Color, t float64) color.Color { return s.mixer.
 // Gray returns c moved t of the way toward gray; see [Mixer.Gray].
 func (s *Surface) Gray(c color.Color, t float64) color.Color { return s.mixer.Gray(c, t) }
 
-// Composite copies the shown cells of s, a surface from [Canvas.Layer], onto
-// c at its rect moved by its offset, writing only inside clip. Wide glyphs
-// are copied whole or not at all, by the visibility of their first cell.
+// Composite copies the shown cells of s, a surface from [Canvas.Layer] or
+// [Canvas.TravelLayer], onto c at its rect moved by its offset, with the rest
+// of its reach around it, writing only inside clip. Wide glyphs are copied
+// whole or not at all, by the visibility of their first cell.
 func (c *Canvas) Composite(s *Surface, clip image.Rectangle) {
-	at := s.rect.Min.Add(s.Offset)
-	area := image.Rect(at.X, at.Y, at.X+s.w, at.Y+s.h).Intersect(clip).Intersect(c.Bounds())
+	at := s.rect.Min.Add(s.Offset).Add(s.reach.Min)
+	area := image.Rectangle{Min: at, Max: at.Add(s.reach.Size())}.Intersect(clip).Intersect(c.Bounds())
 	for y := area.Min.Y; y < area.Max.Y; y++ {
-		row, mask := s.row(y - at.Y)
+		row, mask := s.reachRow(y - at.Y + s.reach.Min.Y)
 		for x := area.Min.X; x < area.Max.X; x++ {
 			sx := x - at.X
 			cell := &row[sx]

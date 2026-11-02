@@ -94,6 +94,7 @@ type SlotNode struct {
 	align     Align
 	aligned   bool
 	animation *layoutAnimation
+	moves     []fx.Effect
 }
 
 // Fixed places child at exactly n cells on the main axis. A nil child is
@@ -154,6 +155,19 @@ func (n SlotNode) On(handlers ...on.Handler) SlotNode {
 // and are captured when the ID first appears. Root controls the clock and FPS.
 func (n SlotNode) Animate(opts ...anim.Option) SlotNode {
 	n.animation = &layoutAnimation{opts: opts}
+	return n
+}
+
+// MoveWith has [SlotNode.Animate] move the slot with effects rather than by
+// gliding: when layout changes where it goes, it snaps there, and effects
+// are applied to its cells as its animation runs from 0 to 1, with
+// [canvas.Surface.From] where it was. Its cells may be drawn anywhere
+// between the two, over the rest of its container, such as by [fx.Fly],
+// which flies them over. A slot still gliding, such as one that was a
+// dragged layer with the same ID, finishes its glide first. It does nothing
+// without Animate.
+func (n SlotNode) MoveWith(effects ...fx.Effect) SlotNode {
+	n.moves = effects
 	return n
 }
 
@@ -422,6 +436,7 @@ type LayerNode struct {
 	t         float64
 	effects   []fx.Effect
 	animation *layoutAnimation
+	moves     []fx.Effect
 }
 
 // Layer returns a layer showing child at its natural size, in the middle of
@@ -500,6 +515,15 @@ func (n LayerNode) On(handlers ...on.Handler) LayerNode {
 // the clock and FPS. A hidden anchor or removed layer disappears immediately.
 func (n LayerNode) Animate(opts ...anim.Option) LayerNode {
 	n.animation = &layoutAnimation{opts: opts}
+	return n
+}
+
+// MoveWith has [LayerNode.Animate] move the layer with effects rather than
+// by gliding, as [SlotNode.MoveWith] does a slot: it snaps to its new place,
+// and effects draw it on its way there from where it was, over the layers
+// before it. It does nothing without Animate.
+func (n LayerNode) MoveWith(effects ...fx.Effect) LayerNode {
+	n.moves = effects
 	return n
 }
 
