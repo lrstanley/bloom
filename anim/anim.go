@@ -90,7 +90,7 @@ func FPS(n int) Option {
 }
 
 // UnfocusedFPS sets how many frames per second the value asks for while the
-// terminal is not focused, 10 by default, as an animation nobody is looking
+// terminal is not focused, 20 by default, as an animation nobody is looking
 // at need not be smooth. It never asks for more than [FPS]. The value learns
 // of focus from the [tea.FocusMsg] and [tea.BlurMsg] passed to its Update,
 // which Bubble Tea sends only while [tea.View] ReportFocus is set; until
@@ -133,7 +133,7 @@ func NewValue(v float64, opts ...Option) Value {
 	val := Value{
 		id: ids.Add(1), current: v, target: v,
 		duration: 250 * time.Millisecond, ease: OutCubic,
-		interval: time.Second / 60, unfocused: time.Second / 10, now: time.Now,
+		interval: time.Second / 60, unfocused: time.Second / 20, now: time.Now,
 	}
 	for _, opt := range opts {
 		opt(&val)

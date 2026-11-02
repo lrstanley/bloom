@@ -111,7 +111,7 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | --- | --- | --- |
 | [`WithColors(fg, bg)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors) | white on black | the terminal colors effects blend with, until the terminal reports its own |
 | [`WithFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFPS) | 60 | the frame rate of layout animation |
-| [`WithUnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithUnfocusedFPS) | 10 | the frame rate of layout animation while the terminal isn't focused |
+| [`WithUnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithUnfocusedFPS) | 20 | the frame rate of layout animation while the terminal isn't focused |
 | [`WithWidthMethod(m)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
 | [`WithClock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) | `time.Now` | the clock for layout animation and double clicks, for tests |
 | [`WithFocus(&m.focus)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFocus) | none | the focus that clicks move, before handlers run |
@@ -157,7 +157,7 @@ For `anim.NewValue`, `anim.NewPresence`, `anim.NewLoop`, `Sequence.With`, `anim.
 | [`Ease(e)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Ease) | `OutCubic` | the easing curve |
 | [`Spring(frequency, damping)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Spring) | | move like a spring instead of easing |
 | [`FPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#FPS) | 60 | frames requested while animating |
-| [`UnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#UnfocusedFPS) | 10 | frames requested while the terminal isn't focused |
+| [`UnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#UnfocusedFPS) | 20 | frames requested while the terminal isn't focused |
 | [`Clock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Clock) | `time.Now` | the source of time, for tests |
 
 Easings: `Linear`, `InQuad`, `OutQuad`, `InOutQuad`, `OutCubic`, `InOutCubic`, `OutBack`, or any

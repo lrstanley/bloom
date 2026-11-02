@@ -173,7 +173,7 @@ too, with `tea.WithFPS(n)` when you create the program, or the extra frames won'
 
 Nothing is scheduled while no animation is running, so an idle program doesn't wake up.
 
-While the terminal isn't focused, values ask for 10 frames a second instead, as an animation nobody is looking at
+While the terminal isn't focused, values ask for 20 frames a second instead, as an animation nobody is looking at
 needn't be smooth, and a loop such as a shimmer then costs a fraction of the CPU. Bubble Tea reports focus only
 when the view sets `ReportFocus`:
 

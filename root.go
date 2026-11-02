@@ -61,7 +61,7 @@ func WithColors(fg, bg color.Color) Option {
 func WithFPS(n int) Option { return func(c *config) { c.fps = max(n, 1) } }
 
 // WithUnfocusedFPS sets the layout animation tick rate while the terminal is
-// not focused, defaulting to 10, and never above [WithFPS]. Terminals report
+// not focused, defaulting to 20, and never above [WithFPS]. Terminals report
 // focus only while [tea.View] ReportFocus is set, as on the view from
 // [Root.View]; until they do, the root counts the terminal as focused.
 func WithUnfocusedFPS(n int) Option { return func(c *config) { c.unfocusedFPS = max(n, 1) } }
@@ -79,7 +79,7 @@ func WithFocus[K comparable](f *Focus[K]) Option { return func(c *config) { c.fo
 
 // New returns a Root.
 func New(opts ...Option) *Root {
-	c := config{method: ansi.GraphemeWidth, fps: 60, unfocusedFPS: 10, now: time.Now}
+	c := config{method: ansi.GraphemeWidth, fps: 60, unfocusedFPS: 20, now: time.Now}
 	for _, opt := range opts {
 		opt(&c)
 	}
