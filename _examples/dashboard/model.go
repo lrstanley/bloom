@@ -17,17 +17,21 @@ import (
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintAtomOneDark
+
 var (
-	fg      = lipgloss.Color("#c0caf5")
-	text    = lipgloss.Color("#a9b1d6")
-	accent  = lipgloss.Color("#7aa2f7")
-	muted   = lipgloss.Color("#565f89")
-	good    = lipgloss.Color("#9ece6a")
-	warn    = lipgloss.Color("#e0af68")
-	bg      = lipgloss.Color("#1a1b26")
-	panelBg = lipgloss.Color("#24283b")
+	fg      = theme.Fg
+	text    = theme.White
+	accent  = theme.Blue
+	muted   = theme.BrightBlack
+	good    = theme.Green
+	warn    = theme.Yellow
+	bg      = theme.Bg
+	panelBg = lipgloss.Lighten(theme.Bg, 0.05)
 
 	// On the screen's background.
 	onBg     = lipgloss.NewStyle().Background(bg)
@@ -38,7 +42,7 @@ var (
 	selected = item.Foreground(bg).Background(accent).Bold(true)
 	label    = onBg.Foreground(muted)
 	spark    = onBg.Foreground(good)
-	logText  = onBg.Foreground(lipgloss.Color("#9aa5ce")).AlignVertical(lipgloss.Bottom)
+	logText  = onBg.Foreground(text).AlignVertical(lipgloss.Bottom)
 
 	// On the raised background of the status bar, dialog, and toast.
 	onPanel     = lipgloss.NewStyle().Background(panelBg)
@@ -117,7 +121,9 @@ func tick() tea.Cmd {
 	return tea.Tick(time.Second/30, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
-func (m *model) Init() tea.Cmd { return tea.Batch(m.ui.Init(), tick()) }
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
+func (m *model) Init() tea.Cmd { return tick() }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.ui.Update(msg)}

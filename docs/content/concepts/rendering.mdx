@@ -61,6 +61,10 @@ fast terminals, raise both: `tea.WithFPS(120)` on the program, and `anim.FPS(120
 `bloom.WithFPS(120)` on the root for layout animation. Nothing is scheduled while nothing moves, so an idle program
 stays idle.
 
+The [dashboard example](https://github.com/lrstanley/bloom/tree/master/_examples/dashboard) runs at 120 frames a second and shows the time each frame takes:
+
+![The dashboard example: selecting services, a restart dialog over a dimmed backdrop, toasts with each effect, the sidebar springing shut and open, and panels collapsing as the terminal narrows](/demos/dashboard.webp)
+
 With `ReportFocus` set on the view, animations drop to 10 frames a second while the terminal isn't focused. Change
 it with `anim.UnfocusedFPS(n)` and `bloom.WithUnfocusedFPS(n)`; see
 [Animating values](/motion/animating-values#frame-rate).

@@ -20,18 +20,22 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintNord
+
 var (
-	fg     = lipgloss.Color("#c0caf5")
-	muted  = lipgloss.Color("#565f89")
-	accent = lipgloss.Color("#7aa2f7")
-	good   = lipgloss.Color("#9ece6a")
+	fg     = theme.Fg
+	muted  = theme.BrightBlack
+	accent = theme.Blue
+	good   = theme.Green
 
 	panel         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	heading       = lipgloss.NewStyle().Bold(true).Foreground(accent)
 	itemStyle     = lipgloss.NewStyle().Padding(0, 1).Foreground(fg)
-	selectedStyle = itemStyle.Background(lipgloss.Color("#414868"))
+	selectedStyle = itemStyle.Background(lipgloss.Lighten(theme.Bg, 0.12))
 	markerStyle   = lipgloss.NewStyle().Foreground(good).Bold(true)
 )
 
@@ -51,10 +55,12 @@ type model struct {
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(), sidebar: true, details: true, ratio: 30}
+	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), sidebar: true, details: true, ratio: 30}
 }
 
-func (m *model) Init() tea.Cmd { return m.ui.Init() }
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
+func (m *model) Init() tea.Cmd { return nil }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmd := m.ui.Update(msg)
@@ -88,6 +94,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	return v
 }
 

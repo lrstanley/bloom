@@ -6,12 +6,12 @@ go 1.27.3
 exclude github.com/lrstanley/x/term/reel v0.0.0
 
 require (
-	charm.land/bubbletea/v2 v2.1.0
+	charm.land/bubbletea/v2 v2.1.1
 	charm.land/lipgloss/v2 v2.0.6
-	github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4
+	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
 	github.com/charmbracelet/x/ansi v0.11.9
-	github.com/lrstanley/x/term/reel v0.0.0-20261101062257-fade429c2ecd
-	github.com/lrstanley/x/term/steep v0.0.0-20261101062257-fade429c2ecd
+	github.com/lrstanley/x/term/reel v0.0.0-20261102020005-a6482435cbe1
+	github.com/lrstanley/x/term/steep v0.0.0-20261102020005-a6482435cbe1
 )
 
 require (
@@ -26,6 +26,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
+	github.com/lrstanley/bubbletint/v2 v2.0.4 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect

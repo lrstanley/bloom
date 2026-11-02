@@ -17,14 +17,18 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/flex"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintTokyoNight
+
 var (
-	accent = lipgloss.Color("#7aa2f7")
-	good   = lipgloss.Color("#9ece6a")
-	warn   = lipgloss.Color("#e0af68")
-	dark   = lipgloss.Color("#1a1b26")
-	prose  = lipgloss.Color("#a9b1d6")
+	accent = theme.Blue
+	good   = theme.Green
+	warn   = theme.Yellow
+	dark   = theme.Bg
+	prose  = theme.White
 
 	border  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent)
 	chip    = lipgloss.NewStyle().Foreground(dark).Background(good).Padding(0, 1)

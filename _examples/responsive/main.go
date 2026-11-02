@@ -22,22 +22,25 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintGruvboxDark
+
 var (
-	fg     = lipgloss.Color("#c0caf5")
-	text   = lipgloss.Color("#a9b1d6")
-	subtle = lipgloss.Color("#9aa5ce")
-	accent = lipgloss.Color("#7dcfff")
-	purple = lipgloss.Color("#bb9af7")
-	muted  = lipgloss.Color("#565f89")
-	dark   = lipgloss.Color("#1a1b26")
-	barBg  = lipgloss.Color("#24283b")
+	fg     = theme.Fg
+	text   = theme.White
+	accent = theme.Yellow
+	purple = theme.Purple
+	muted  = theme.BrightBlack
+	dark   = theme.Bg
+	barBg  = lipgloss.Lighten(theme.Bg, 0.05)
 
 	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	bar      = lipgloss.NewStyle().Foreground(fg).Background(barBg)
 	title    = bar.Bold(true).Foreground(accent).Padding(0, 1)
-	action   = bar.Foreground(subtle).Padding(0, 1)
+	action   = bar.Foreground(text).Padding(0, 1)
 	item     = lipgloss.NewStyle().Foreground(text).Padding(0, 1)
 	selected = item.Foreground(dark).Background(accent).Bold(true)
 	prose    = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
@@ -143,7 +146,7 @@ type model struct {
 	offset   int // the reader's scroll position, in rows
 }
 
-func newModel() *model { return &model{ui: bloom.New()} }
+func newModel() *model { return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg))} }
 
 func (m *model) Init() tea.Cmd { return nil }
 
@@ -266,6 +269,9 @@ func (m *model) status() statusbar {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout(m.status()))
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }

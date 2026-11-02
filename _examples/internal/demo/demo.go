@@ -3,7 +3,8 @@
 // the LICENSE file.
 
 // Package demo holds what the examples' tests share: the steep options for
-// a tour that is recorded when exporting is turned on, as with:
+// a tour that is recorded when exporting is turned on, as with "make demos"
+// from the repository root. Set STEEP_EXPORT_DIR to record somewhere else:
 //
 //	STEEP_EXPORT_DIR=/tmp/previews STEEP_EXPORT_MODE=on go test -count 1 ./...
 package demo
@@ -21,21 +22,25 @@ import (
 )
 
 // Options returns the steep options for a w×h true color tour, recorded to
-// name.gif when exporting is turned on.
-func Options(name string, w, h int) []steep.Option {
+// name.webp in docs/public/demos, where the docs pages load it from, when
+// exporting is turned on. The extra effects are drawn after the others, as
+// [effects.Mouse] must be.
+func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
 	return []steep.Option{
 		steep.WithWindowSize(w, h),
+		// Relative to the test's package directory, _examples/<example>.
+		steep.WithArtifacts("../../docs/public/demos"),
 		steep.WithTimeout(20 * time.Second),
 		steep.WithColor(steep.ColorTrueColor),
 		steep.WithRecording(reel.Profile{
-			Outputs: reel.MustFiles(name + ".gif"),
+			Outputs: reel.MustFiles(name + ".webp"),
 			Render: []render.Option{
 				render.WithWindowChrome(true),
 				render.WithPadding(10),
 				render.WithMargin(24, lipgloss.Color("#16161e")),
 				render.WithBorderRadius(10),
 			},
-			Effects: []reel.Effect{effects.Keys(time.Second), effects.Pause()},
+			Effects: append([]reel.Effect{effects.Keys(time.Second), effects.Pause()}, extra...),
 		}),
 	}
 }

@@ -497,6 +497,7 @@ pre {
 }
 
 .bloom-lede a,
+.bloom-section-lede a,
 .bloom-split a,
 .bloom-footer a {
   color: var(--color-fd-primary);
@@ -630,6 +631,14 @@ pre {
 
 .bloom-chore-with .brand-code {
   font-size: 0.78rem;
+}
+
+.bloom-showcase {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 1.75rem;
+  border-radius: 12px;
 }
 
 .bloom-split {

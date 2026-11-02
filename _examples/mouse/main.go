@@ -24,14 +24,18 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintCatppuccinMocha
+
 var (
-	fg     = lipgloss.Color("#c0caf5")
-	muted  = lipgloss.Color("#565f89")
-	accent = lipgloss.Color("#7aa2f7")
-	dark   = lipgloss.Color("#1a1b26")
-	raised = lipgloss.Color("#292e42")
+	fg     = theme.Fg
+	muted  = theme.BrightBlack
+	accent = theme.Blue
+	dark   = theme.Bg
+	raised = lipgloss.Lighten(theme.Bg, 0.08)
 
 	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item     = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
@@ -64,7 +68,7 @@ type model struct {
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(), split: 22, status: "hover, click, or double click a file; drag the divider"}
+	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), split: 22, status: "hover, click, or double click a file; drag the divider"}
 }
 
 func (m *model) Init() tea.Cmd { return nil }
@@ -106,6 +110,9 @@ func (m *model) contents() string {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	// All motion, not only while a button is held, for the hover styles.
 	v.MouseMode = tea.MouseModeAllMotion
 	return v

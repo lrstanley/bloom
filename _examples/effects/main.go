@@ -25,15 +25,19 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/fx"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintDracula
+
 var (
-	ink     = lipgloss.Color("#c0caf5")
-	muted   = lipgloss.Color("#565f89")
-	accent  = lipgloss.Color("#7aa2f7")
-	cyan    = lipgloss.Color("#7dcfff")
-	warn    = lipgloss.Color("#e0af68")
-	surface = lipgloss.Color("#2f334d")
+	ink     = theme.Fg
+	muted   = theme.BrightBlack
+	accent  = theme.Purple
+	cyan    = theme.Cyan
+	warn    = theme.Yellow
+	surface = lipgloss.Lighten(theme.Bg, 0.1)
 
 	card    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	name    = lipgloss.NewStyle().Bold(true).Foreground(cyan)
@@ -136,7 +140,7 @@ var backdrops = []struct {
 	{"Dim", fx.Dim{Amount: 0.6}},
 	{"Desaturate", fx.Desaturate{Amount: 1}},
 	{"Tint", fx.Tint{Color: accent, Amount: 0.45}},
-	{"Recolor", fx.Recolor{Fg: lipgloss.Color("#414868"), Bg: lipgloss.Color("#16161e")}},
+	{"Recolor", fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.17), Bg: lipgloss.Darken(theme.Bg, 0.3)}},
 }
 
 type model struct {
@@ -151,7 +155,7 @@ type model struct {
 
 func newModel() *model {
 	return &model{
-		ui: bloom.New(),
+		ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
 		t: anim.NewSequence(0,
 			anim.To(1), anim.Hold(700*time.Millisecond),
 			anim.To(0), anim.Hold(700*time.Millisecond),
@@ -198,6 +202,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	return v
 }
 

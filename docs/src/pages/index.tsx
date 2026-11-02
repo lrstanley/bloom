@@ -5,6 +5,7 @@ import { BrandCode } from "../components/brand-code";
 import { LlmsLinks } from "../components/llms-links";
 import { Logo } from "../components/logo";
 import { TerminalDemo } from "../components/terminal-demo";
+import { withBase } from "../lib/site";
 
 const tagline = "Layout, motion, and effects for Bubble Tea.";
 
@@ -30,6 +31,13 @@ const viewCode = `func (m *model) View() tea.View {
 				fx.Slide{From: bloom.Right}, fx.Typewriter{}),
 	))
 }`;
+
+const showcase = {
+    href: "https://github.com/lrstanley/bloom/tree/master/_examples/showcase",
+    src: "/demos/showcase.webp",
+    alt: "The showcase example: panes waving in with each bubbletint theme, a toast decoding the theme's name, a pane dragged across the others, which glide out of its way, a double click zooming a pane, a tour spotlighting each part, and panes collapsing as the terminal narrows",
+    body: "switches between bubbletint themes, waving the panes back in with each one's colors while a toast decodes its name. Drag a pane by its title and the others glide out of its way, double click it to zoom, narrow the terminal to collapse panes by priority, and take a tour that spotlights each part. It's a few hundred lines.",
+};
 
 // What a Bubble Tea program otherwise does by hand, next to the bloom code that replaces it.
 const chores = [
@@ -160,6 +168,12 @@ ${summary}
 go get github.com/lrstanley/bloom@latest
 \`\`\`
 
+## All of it in one program
+
+The [showcase example](${showcase.href}) ${showcase.body}
+
+![${showcase.alt}](${showcase.src})
+
 ## What bloom takes off your hands
 
 ${chores.map((c) => `- **${c.title}** ([guide](${c.href})): without bloom, ${c.without.charAt(0).toLowerCase()}${c.without.slice(1)} With bloom: \`${c.code}\``).join("\n")}
@@ -227,6 +241,18 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                     <div className="bloom-hero-demo">
                         <TerminalDemo />
                     </div>
+                </section>
+
+                <section className="bloom-section">
+                    <h2>All of it in one program</h2>
+                    <p className="bloom-section-lede">
+                        The{" "}
+                        <a href={showcase.href} target="_blank" rel="noreferrer">
+                            showcase example
+                        </a>{" "}
+                        {showcase.body}
+                    </p>
+                    <img className="bloom-showcase" src={withBase(showcase.src)} alt={showcase.alt} width={1238} height={578} loading="lazy" />
                 </section>
 
                 <section className="bloom-section">

@@ -19,12 +19,16 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintEverforestDarkMed
+
 var (
-	muted  = lipgloss.Color("#565f89")
-	accent = lipgloss.Color("#7aa2f7")
-	dark   = lipgloss.Color("#1a1b26")
+	muted  = theme.BrightBlack
+	accent = theme.Green
+	dark   = theme.Bg
 
 	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item     = lipgloss.NewStyle().Padding(0, 1)
@@ -79,7 +83,7 @@ type model struct {
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(), status: statusbar{msg: "click a page, or q to quit"}}
+	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), status: statusbar{msg: "click a page, or q to quit"}}
 }
 
 func (m *model) Init() tea.Cmd { return nil }
@@ -109,6 +113,9 @@ func (m *model) View() tea.View {
 		m.status,
 	))
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }

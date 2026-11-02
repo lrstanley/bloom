@@ -14,6 +14,10 @@ The pattern for one-shot effects is the same each time:
 2. When the event happens, `Play(0, 1)` and return its command.
 3. In `View`, wrap the node with `bloom.Transition` only while the value is animating.
 
+The [launch example](https://github.com/lrstanley/bloom/tree/master/_examples/launch) uses each of these in a deploy console:
+
+![The launch example: cards shimmer until their data arrives, numbers roll, a spotlight tour decodes each card, a wrong confirmation shakes, and the deploy bursts into confetti](/demos/launch.webp)
+
 ## Shake rejected input
 
 `fx.Shake` moves a node side to side with a decaying wobble. It's still at 0 and at 1.
@@ -190,6 +194,10 @@ bloom.Fill(bloom.Marquee(item.title, phase).Style(itemStyle))
 
 For a news ticker that always scrolls, use `anim.NewLoop(24 * time.Second)` as the phase, and `Gap` to set what's
 shown between the end of the text and its start: `bloom.Marquee(headlines, phase).Gap("  ◆  ")`.
+
+The [ticker example](https://github.com/lrstanley/bloom/tree/master/_examples/ticker) does both:
+
+![The ticker example: a scrolling news ticker above a list whose selected name scrolls when it doesn't fit, and a banner sliding in and out](/demos/ticker.webp)
 
 ## Related
 

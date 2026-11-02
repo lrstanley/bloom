@@ -24,17 +24,21 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintKanagawaWave
+
 var (
-	ink     = lipgloss.Color("#c0caf5")
-	muted   = lipgloss.Color("#565f89")
-	accent  = lipgloss.Color("#7dcfff")
-	blue    = lipgloss.Color("#7aa2f7")
-	warn    = lipgloss.Color("#e0af68")
-	dark    = lipgloss.Color("#1a1b26")
-	surface = lipgloss.Color("#2f334d")
-	raised  = lipgloss.Color("#3b4261")
+	ink     = theme.Fg
+	muted   = theme.BrightBlack
+	accent  = theme.Cyan
+	blue    = theme.Blue
+	warn    = theme.Yellow
+	dark    = theme.Bg
+	surface = lipgloss.Lighten(theme.Bg, 0.1)
+	raised  = lipgloss.Lighten(theme.Bg, 0.15)
 
 	card    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	name    = lipgloss.NewStyle().Bold(true).Foreground(accent)
@@ -104,7 +108,7 @@ type model struct {
 func newModel() *model {
 	open := []anim.Option{anim.Duration(500 * time.Millisecond), anim.Ease(anim.InOutCubic)}
 	return &model{
-		ui:     bloom.New(),
+		ui:     bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
 		t:      progress(0, false),
 		iris:   anim.NewPresence(open...),
 		unfold: anim.NewPresence(open...),
@@ -125,7 +129,9 @@ func progress(start float64, paused bool) anim.Sequence {
 		With(anim.Duration(1600*time.Millisecond), anim.Ease(anim.InOutCubic))
 }
 
-func (m *model) Init() tea.Cmd { return tea.Batch(m.ui.Init(), m.t.Loop()) }
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
+func (m *model) Init() tea.Cmd { return m.t.Loop() }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -175,6 +181,9 @@ func center(f *bloom.Frame, id buttonID) image.Point {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	return v
 }
 

@@ -13,6 +13,10 @@ docs-build: docs-prepare
 docs-preview: docs-build
 	cd docs && bun run preview
 
+# Records each example's tour to docs/public/demos/<example>.webp, for the docs pages. Needs ffmpeg.
+demos:
+	cd _examples/ && STEEP_EXPORT_MODE=on go test -count 1 ./...
+
 fetch:
 	go mod tidy
 

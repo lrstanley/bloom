@@ -29,20 +29,24 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
 const service = "payments"
 
-var (
-	fg     = lipgloss.Color("#c0caf5")
-	muted  = lipgloss.Color("#565f89")
-	accent = lipgloss.Color("#7aa2f7")
-	good   = lipgloss.Color("#9ece6a")
-	warn   = lipgloss.Color("#ff9e64")
-	dark   = lipgloss.Color("#1a1b26")
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintAyuMirage
 
-	field   = lipgloss.Color("#24283b")
-	fieldOn = lipgloss.Color("#414868")
+var (
+	fg     = theme.Fg
+	muted  = theme.BrightBlack
+	accent = theme.Blue
+	good   = theme.Green
+	warn   = theme.Red
+	dark   = theme.Bg
+
+	field   = lipgloss.Lighten(theme.Bg, 0.05)
+	fieldOn = lipgloss.Lighten(theme.Bg, 0.16)
 
 	card     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(0, 2)
 	heading  = lipgloss.NewStyle().Bold(true).Foreground(accent)
@@ -162,14 +166,15 @@ func newModel() *model {
 	for i, c := range cards {
 		m.vals[i], m.prev[i] = c.start, c.start
 	}
-	m.ui = bloom.New(bloom.WithFocus(&m.focus))
+	m.ui = bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithFocus(&m.focus))
 	m.focus.Set(inputConfirm)
 	return m
 }
 
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(
-		m.ui.Init(),
 		m.shimmer.Loop(),
 		tea.Tick(loadDelay, func(time.Time) tea.Msg { return loadedMsg{} }),
 	)
@@ -282,6 +287,9 @@ func (m *model) endTour() tea.Cmd {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }

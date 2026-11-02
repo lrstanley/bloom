@@ -10,6 +10,7 @@ import (
 
 	"github.com/lrstanley/bloom/_examples/internal/demo"
 	"github.com/lrstanley/x/term/reel"
+	"github.com/lrstanley/x/term/reel/effects"
 	"github.com/lrstanley/x/term/reel/vt"
 	"github.com/lrstanley/x/term/steep"
 )
@@ -17,7 +18,7 @@ import (
 func TestMouse(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("mouse", 64, 14)...)
+	h := steep.NewHarness(t, newModel(), demo.Options("mouse", 64, 14, effects.Mouse())...)
 	h.Wait("hover, click").Sleep(600 * time.Millisecond)
 
 	// The hover style follows the pointer down the list.

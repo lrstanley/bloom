@@ -30,17 +30,21 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintRosePine
+
 var (
-	fg      = lipgloss.Color("#c0caf5")
-	muted   = lipgloss.Color("#565f89")
-	accent  = lipgloss.Color("#bb9af7")
-	warn    = lipgloss.Color("#ff9e64")
-	good    = lipgloss.Color("#9ece6a")
-	dark    = lipgloss.Color("#1a1b26")
-	field   = lipgloss.Color("#24283b")
-	fieldOn = lipgloss.Color("#414868")
+	fg      = theme.Fg
+	muted   = theme.BrightBlack
+	accent  = theme.Purple
+	warn    = theme.Red
+	good    = theme.Cyan
+	dark    = theme.Bg
+	field   = lipgloss.Lighten(theme.Bg, 0.05)
+	fieldOn = lipgloss.Lighten(theme.Bg, 0.16)
 
 	rounded   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 	panel     = rounded.BorderForeground(muted).Padding(1, 2)
@@ -57,7 +61,7 @@ var (
 	danger    = dialog.BorderForeground(warn)
 	toastBox  = rounded.BorderForeground(good).Padding(0, 1)
 	statusBar = lipgloss.NewStyle().Foreground(muted)
-	backdrop  = fx.Recolor{Fg: lipgloss.Color("#3b4261"), Bg: lipgloss.Color("#16161e")}
+	backdrop  = fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.15), Bg: lipgloss.Darken(theme.Bg, 0.3)}
 )
 
 // control is the ID of a node that can take focus: an input, or a button,
@@ -127,14 +131,14 @@ func newModel() *model {
 		toast:     anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear)),
 	}
 	// Clicks move the focus, before the handler of what was clicked runs.
-	m.ui = bloom.New(bloom.WithFocus(&m.focus))
+	m.ui = bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithFocus(&m.focus))
 	m.focus.Set(fieldName)
 	return m
 }
 
-// Init asks the terminal for its colors, which the backdrop and fades blend
-// cells without a background from.
-func (m *model) Init() tea.Cmd { return m.ui.Init() }
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
+func (m *model) Init() tea.Cmd { return nil }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.ui.Update(msg)}
@@ -236,6 +240,9 @@ func (m *model) suggestions() []string {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = theme.Bg
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }

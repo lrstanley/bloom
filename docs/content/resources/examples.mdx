@@ -25,12 +25,20 @@ go run ./forms
 | [ticker](https://github.com/lrstanley/bloom/tree/master/_examples/ticker) | `Marquee` headlines and list items, and `anim.Sequence` for a banner and a pulse | [Feedback effects](/motion/feedback-effects#scroll-text-that-doesnt-fit), [Animating values](/motion/animating-values) |
 | [reflow](https://github.com/lrstanley/bloom/tree/master/_examples/reflow) | Layout animation with `Animate`: a sidebar, a re-sorting list, a changing split, a panel coming and going, and a layer following the selection | [Layout animation](/motion/layout-animation) |
 | [dashboard](https://github.com/lrstanley/bloom/tree/master/_examples/dashboard) | Everything together at 120 frames a second, with the time each frame takes | [Rendering and performance](/concepts/rendering) |
+| [showcase](https://github.com/lrstanley/bloom/tree/master/_examples/showcase) | A bit of everything, themed with bubbletint: tints that wave in with a decoding toast, panes that float under the pointer as they're dragged by their titles, and zoom with a double click, collapsing panes, and a spotlight tour | [Related libraries](/resources/related-libraries#bubbletint), [Layout animation](/motion/layout-animation), [Mouse events](/input/mouse) |
 
 Each example's comment at the top of `main.go` lists its keys. Most quit with <kbd>q</kbd> or <kbd>ctrl+c</kbd>.
 
-The examples' tests drive each program end to end with [steep](/resources/related-libraries#steep), and can record
-a GIF of each one:
+The examples' tests drive each program end to end with [steep](/resources/related-libraries#steep), and record
+the animations shown throughout these docs, as animated WebP. Run this from the repository root to record them
+again, into `docs/public/demos`. It needs [ffmpeg](https://ffmpeg.org) on your `PATH`:
 
 ```console
-STEEP_EXPORT_DIR=/tmp STEEP_EXPORT_MODE=on go test -count 1 ./...
+make demos
+```
+
+To record them somewhere else, set `STEEP_EXPORT_DIR`:
+
+```console
+STEEP_EXPORT_DIR=/tmp/demos make demos
 ```

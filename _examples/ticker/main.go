@@ -26,17 +26,21 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
+	tint "github.com/lrstanley/bubbletint/v2"
 )
 
+// theme is the bubbletint tint the example's colors come from.
+var theme = tint.TintNightOwl
+
 var (
-	fg      = lipgloss.Color("#c0caf5")
-	muted   = lipgloss.Color("#565f89")
-	accent  = lipgloss.Color("#7aa2f7")
-	good    = lipgloss.Color("#9ece6a")
-	bad     = lipgloss.Color("#f7768e")
-	warn    = lipgloss.Color("#e0af68")
-	bg      = lipgloss.Color("#1a1b26")
-	panelBg = lipgloss.Color("#24283b")
+	fg      = theme.Fg
+	muted   = theme.BrightBlack
+	accent  = theme.Blue
+	good    = theme.Green
+	bad     = theme.Red
+	warn    = theme.Yellow
+	bg      = theme.Bg
+	panelBg = lipgloss.Lighten(theme.Bg, 0.05)
 
 	onBg     = lipgloss.NewStyle().Background(bg)
 	onPanel  = lipgloss.NewStyle().Background(panelBg)
@@ -118,8 +122,10 @@ func main() {
 	}
 }
 
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.ui.Init(), m.play())
+	return m.play()
 }
 
 // play starts the motion that runs for as long as the feed is live.
@@ -232,14 +238,14 @@ func (m *model) watchlist() bloom.Child {
 		if i == m.selected {
 			st, phase = selected, m.phase(&m.name)
 		}
-		tint := good
+		trend := good
 		if s.change < 0 {
-			tint = bad
+			trend = bad
 		}
 
 		right := st.Align(lipgloss.Right)
 		price := bloom.Text(fmt.Sprintf("%.2f", s.price)).Style(right)
-		change := bloom.Text(fmt.Sprintf("%+.1f%%", s.change)).Style(right.Foreground(tint))
+		change := bloom.Text(fmt.Sprintf("%+.1f%%", s.change)).Style(right.Foreground(trend))
 		rows = append(rows, bloom.Row(
 			bloom.Fill(bloom.Marquee(s.name, phase).Style(st)),
 			bloom.Fixed(11, price),
