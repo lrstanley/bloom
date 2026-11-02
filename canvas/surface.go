@@ -47,18 +47,23 @@ type Surface struct {
 }
 
 // Region returns a surface over rect of c, whose cells effects change in
-// place. Cells of a region cannot be hidden.
+// place. Cells of a region cannot be hidden. The surface belongs to c, which
+// keeps it from frame to frame: it is valid until the next call to Region on
+// c.
 func (c *Canvas) Region(rect image.Rectangle, env Env, mixer *Mixer) *Surface {
 	rect = rect.Intersect(c.Bounds())
-	return &Surface{
+	c.region = Surface{
 		c: c, origin: rect.Min, w: rect.Dx(), h: rect.Dy(),
 		rect: rect, reach: image.Rect(0, 0, rect.Dx(), rect.Dy()), Viewport: c.Bounds(), Env: env, mixer: mixer,
 	}
+	return &c.region
 }
 
 // Layer returns a surface over all of c, a node's cells drawn on their own,
 // which will be composited at rect of under, inside viewport. All of its
-// cells start out shown.
+// cells start out shown. The surface, and which of its cells are shown,
+// belong to c, which keeps them from frame to frame: they are valid until
+// the next call to Layer on c.
 func (c *Canvas) Layer(rect, viewport image.Rectangle, under *Canvas, env Env, mixer *Mixer) *Surface {
 	return c.TravelLayer(c.Bounds(), rect, viewport, under, env, mixer)
 }
@@ -68,21 +73,28 @@ func (c *Canvas) Layer(rect, viewport image.Rectangle, under *Canvas, env Env, m
 // part node of c, in c's coordinates, which start out shown and will be
 // composited at rect of under. The rest of c is in the surface's
 // [Surface.Reach], hidden, for effects to draw the node on its way, and is
-// composited around rect as it is around node.
+// composited around rect as it is around node. Like the surface Layer
+// returns, the surface belongs to c, and is valid until the next call to
+// Layer or TravelLayer on c.
 func (c *Canvas) TravelLayer(node, rect, viewport image.Rectangle, under *Canvas, env Env, mixer *Mixer) *Surface {
 	node = node.Intersect(c.Bounds())
-	mask := make([]bool, c.w*c.h)
+	if cap(c.mask) < c.w*c.h {
+		c.mask = make([]bool, c.w*c.h)
+	}
+	mask := c.mask[:c.w*c.h]
+	clear(mask)
 	for y := node.Min.Y; y < node.Max.Y; y++ {
 		row := mask[y*c.w+node.Min.X : y*c.w+node.Max.X]
 		for i := range row {
 			row[i] = true
 		}
 	}
-	return &Surface{
+	c.layer = Surface{
 		c: c, origin: node.Min, w: node.Dx(), h: node.Dy(),
 		mask: mask, maskAt: node.Min.Y*c.w + node.Min.X, stride: c.w, under: under,
 		rect: rect, reach: c.Bounds().Sub(node.Min), Viewport: viewport, Env: env, mixer: mixer,
 	}
+	return &c.layer
 }
 
 // Width returns the number of columns.

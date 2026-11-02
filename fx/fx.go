@@ -9,7 +9,9 @@
 // to the node's own cells, and t runs from 0, as the node starts to enter, to
 // 1, when it is fully shown; at 1 a transition effect leaves the cells as
 // they are. Given to a backdrop, it is applied to everything drawn beneath a
-// layer, and t is the strength, following the layer's transition.
+// layer, and t is the strength, following the layer's transition. Given to a
+// box's border effects, it is applied to the box's frame; the effects made
+// for borders, such as [Chase], loop, and t is their phase.
 //
 // See the [documentation] for guides and examples. It is also available for
 // LLMs and agents as [llms.txt].

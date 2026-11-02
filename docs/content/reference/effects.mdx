@@ -11,6 +11,7 @@ progress `t` from 0 to 1:
 - As a **backdrop** or **shadow** (`Layer.Backdrop`, `Layer.Shadow`), it changes the frame beneath a layer. `t` is
   the strength, following the layer's transition.
 - Some take their own progress, such as a shake's or a burst's, and are applied with `bloom.Transition` while it runs.
+- As a **border effect** (`Box.BorderFx`), it changes only the box's frame, not what's inside it or on its edges.
 
 `Direction` fields take a side, `bloom.Top`, `bloom.Bottom`, `bloom.Left`, or `bloom.Right`, or a corner,
 `bloom.TopLeft`, `bloom.TopRight`, `bloom.BottomLeft`, or `bloom.BottomRight` (also available as `fx.Top` and so on).
@@ -76,6 +77,22 @@ These draw a slot or layer on its way to a new place, given to
 | Effect | Fields | Does |
 | --- | --- | --- |
 | [`Fly`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fly) | `Seed` | flies the node's cells over from where it was, a column at a time, as bright glyphs arcing to where they land |
+
+## Borders
+
+These change only the cells around the edge of what they're given, which for `Box.BorderFx` is the border. They
+loop: `t` is the phase, such as from `anim.NewLoop`, and they look the same at 0 and 1. See
+[Animate a border](/layout/text-and-boxes#animate-a-border).
+
+| Effect | Fields | Does |
+| --- | --- | --- |
+| [`Chase`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Chase) | `From, To color.Color`, `Cycles int` (default 1) | a gradient from `From` to `To` and back, travelling clockwise; more `Cycles` make a ripple of narrower bands |
+| [`Pulse`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Pulse) | `Color color.Color` | moves the whole border toward `Color` and back, reaching it at 0.5 |
+| [`Comet`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Comet) | `Color color.Color`, `Length int` (default 8) | sends a bright head with a fading tail once around |
+| [`March`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#March) | `Length int` (default 2) | marching ants: runs of line glyphs alternate with dashed ones and travel clockwise, a run each loop |
+
+A nil `From` is each cell's own color, and other nil colors are the terminal's foreground. Other effects work as
+border effects too, on the whole frame, such as `Tint` or `Shimmer`. Effects that move cells don't move the frame.
 
 ## Combinators
 

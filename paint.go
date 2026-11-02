@@ -5,8 +5,10 @@
 package bloom
 
 import (
+	"bytes"
 	"image"
 	"reflect"
+	"unsafe"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -39,6 +41,7 @@ type op struct {
 	rect     image.Rectangle
 	clip     image.Rectangle
 	viewport image.Rectangle
+	sub      image.Rectangle // for opPop: the part of rect effects apply to; empty for all of it
 	effects  []fx.Effect
 	t        float64
 	from     image.Rectangle // for opPop of a slot moving with effects: where it was
@@ -53,7 +56,7 @@ type op struct {
 
 func (o *op) equal(p *op) bool {
 	if o.kind != p.kind || o.kind == opDraw || o.src != p.src || o.rect != p.rect ||
-		o.clip != p.clip || o.viewport != p.viewport || o.t != p.t || o.from != p.from || len(o.effects) != len(p.effects) {
+		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.t != p.t || o.from != p.from || len(o.effects) != len(p.effects) {
 		return false
 	}
 	for i := range o.effects {
@@ -62,6 +65,22 @@ func (o *op) equal(p *op) bool {
 		}
 	}
 	return true
+}
+
+// sameStyle reports whether a and b render the same. Styles cannot be
+// compared with ==, so they are compared deeply, but first by their bytes,
+// which is far cheaper and matches the usual case of styles copied from the
+// same one each frame. A style with a transform function never matches, as
+// the function may give something else each time, and is rendered every time.
+func sameStyle(a, b *lipgloss.Style) bool {
+	if a.GetTransform() != nil || b.GetTransform() != nil {
+		return false
+	}
+	size := unsafe.Sizeof(*a)
+	if bytes.Equal(unsafe.Slice((*byte)(unsafe.Pointer(a)), size), unsafe.Slice((*byte)(unsafe.Pointer(b)), size)) {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // sameEffect reports whether a and b are equal, treating effects that cannot
@@ -112,6 +131,8 @@ type renderer struct {
 	engine
 
 	styled   []styledMemo   // by box index, from the last frames
+	columns  []columnMemo   // by twice the box index, for scrollbars
+	drag     scrollbarDrag  // the scrollbar being dragged, if any
 	frames   uint64         // frames painted, to retire unused memos
 	style    lipgloss.Style // scratch for comparing styles without allocating
 	fxs      []fx.Effect    // effects of this frame's ops, copied from the tree
@@ -192,6 +213,11 @@ func (r *renderer) paintTree(c Child, w, h int) int {
 			r.styled[i] = styledMemo{}
 		}
 	}
+	for i := range r.columns {
+		if r.columns[i].used != r.frames {
+			r.columns[i] = columnMemo{}
+		}
+	}
 	return root
 }
 
@@ -264,12 +290,10 @@ func (r *renderer) textAt(i int, n TextNode, w, h int) string {
 		r.styled = append(r.styled, make([]styledMemo, i+1-len(r.styled))...)
 	}
 	m := &r.styled[i]
-	// Styles are compared deeply, as they cannot be compared with ==; one
-	// with a transform function never matches, and is rendered every time.
 	// Comparing through pointers to storage that outlives the call keeps
-	// DeepEqual from copying the styles to the heap.
+	// the styles from being copied to the heap.
 	r.style = n.style
-	if m.ok && m.w == w && m.h == h && m.truncate == n.truncate && m.s == n.s && reflect.DeepEqual(&m.style, &r.style) {
+	if m.ok && m.w == w && m.h == h && m.truncate == n.truncate && m.s == n.s && sameStyle(&m.style, &r.style) {
 		m.used = r.frames
 		return m.out
 	}
@@ -321,7 +345,7 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		if n.cursor != nil {
 			r.placeCursor(n.cursor, b.rect.Min, vis)
 		}
-	case SlotNode, FlexNode, GridNode, WrapNode:
+	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode:
 		for _, k := range r.kidsOf(i) {
 			r.paint(k, vis, parent)
 		}
@@ -337,8 +361,24 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		if r.parse {
 			frame = r.textAt(i, TextNode{style: style, styled: true}, b.rect.Dx(), b.rect.Dy())
 		}
-		r.blit(frame, b.rect, vis)
-		r.paint(r.firstKid(i), vis, parent)
+		if border := n.bordered(b.rect); len(n.borderFx) > 0 && !border.Empty() {
+			// Drawn on its own, so the effects see only the frame, with the
+			// border as the outer cells of what they are given.
+			push := len(r.ops)
+			r.ops = append(r.ops, op{kind: opPush, rect: b.rect})
+			r.blit(frame, b.rect, b.rect)
+			r.ops = append(r.ops, op{
+				kind: opPop, rect: b.rect, clip: vis, viewport: clip, sub: border,
+				t: n.borderT, effects: r.snapshot(n.borderFx),
+				push: push, entries: [2]int{len(r.entries), len(r.entries)},
+			})
+		} else {
+			r.blit(frame, b.rect, vis)
+		}
+		// What is inside, then the children on its edges, over its border.
+		for _, k := range r.kidsOf(i) {
+			r.paint(k, vis, parent)
+		}
 	case wrapNode:
 		if n.kind == wrapTransition && len(n.effects) > 0 {
 			r.paintEffects(r.firstKid(i), b.rect, clip, n.t, n.effects, parent, len(r.entries))
@@ -355,6 +395,8 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		}
 	case drawableNode:
 		r.ops = append(r.ops, op{kind: opDraw, draw: n.d, rect: b.rect, clip: vis})
+	case ScrollbarNode:
+		r.paintScrollbar(i, b, n, clip, parent)
 	case LayerNode:
 		// Layers are painted by their overlay.
 	case Layouter:
@@ -552,8 +594,12 @@ func (r *renderer) execute() {
 			if !o.from.Empty() {
 				s.From = o.from.Sub(parent.origin)
 			}
+			applied := s
+			if !o.sub.Empty() {
+				applied = s.Sub(o.sub.Sub(o.rect.Min))
+			}
 			for _, e := range o.effects {
-				e.Apply(s, o.t)
+				e.Apply(applied, o.t)
 			}
 			parent.c.Composite(s, o.clip.Sub(parent.origin))
 			o.offset = s.Offset

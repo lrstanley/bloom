@@ -57,6 +57,90 @@ Use `Box` rather than calling `panel.Render(...)` yourself. A pre-rendered strin
 knows its frame and gives the right amount of space to its child at any size. A box given less space than its
 own border and padding is left out, rather than drawn broken.
 
+## Put titles and more on a border
+
+`Edge(side, align, child)` draws a child over one side of a box's border, such as a title, a counter, or help
+text, so it fits more on screen without taking space from what's inside:
+
+```go
+bloom.Box(panel, list).
+	Edge(bloom.Top, bloom.Start, bloom.Text("secrets").Style(title)).
+	Edge(bloom.Top, bloom.End, bloom.Text(fmt.Sprintf("%d/%d", m.selected+1, len(m.items)))).
+	Edge(bloom.Bottom, bloom.Center, bloom.Text("? help").Style(muted))
+```
+
+```
+╭─secrets───────────3/120─╮
+│kv/app/db                │
+│kv/app/redis             │
+╰─────────? help──────────╯
+```
+
+On the top and bottom, a child is one row tall and kept a cell away from the corners. On the left and right, it's
+one column wide, and a `Text` runs down the side, a character to a row. Children at `Start` and `End` go from that end inward, in the order you add them, one cell apart.
+Children at `Center` share the middle of whatever is left, and a child at `Stretch` takes all of it. A child is
+given no more room than is left, so a `Text` is clipped and a `Truncate`d one is cut short with "…", and a child
+with no room isn't shown. A side with no border shows nothing.
+
+Edge children are nodes like any other, so they can have IDs, [mouse handlers](/input/mouse), and hover styles.
+Tabs on a border can be clicked:
+
+```go
+tabs := bloom.Row(
+	bloom.Text("all").Style(tab).HoverStyle(onTab).On(on.Click(m.showAll)),
+	bloom.Text("kv").Style(tab).HoverStyle(onTab).On(on.Click(m.showKV)),
+).Gap(1)
+
+bloom.Box(panel, list).Edge(bloom.Top, bloom.End, tabs)
+```
+
+Single characters make good buttons on any side. Several at `Start` go down the left side one after another, a
+cell apart:
+
+```go
+for _, a := range actions { // such as + for new, ✎ for edit, ✕ for delete
+	box = box.Edge(bloom.Left, bloom.Start, bloom.Text(a.glyph).Style(icon).HoverStyle(hot).On(on.Click(a.run)))
+}
+box = box.Edge(bloom.Right, bloom.Center, bloom.Text("LOGS").Style(label)) // L, O, G, S down the right side
+```
+
+```
+╭─secrets────────╮
++kv/app/db       L
+│kv/app/redis    O
+✎kv/app/smtp     G
+│kv/infra/vault  S
+✕kv/infra/pki    │
+╰────────────────╯
+```
+
+A [scrollbar](/layout/scrolling#show-a-scrollbar) can go on a border too, where it shows only while there's
+more to scroll to, and can be dragged.
+
+## Animate a border
+
+`BorderFx(t, effects...)` applies [effects](/reference/effects#borders) to a box's frame, its border, padding, and
+background, leaving what's inside it and on its edges alone. The border effects in `fx` loop: `t` is the phase,
+such as from [`anim.NewLoop`](/motion/animating-values), and they look the same at 0 and 1, so the loop is
+seamless:
+
+```go
+type model struct {
+	ui    *bloom.Root
+	phase anim.Sequence // anim.NewLoop(4 * time.Second), started with m.phase.Loop() in Init
+	// ...
+}
+
+bloom.Box(panel, list).BorderFx(m.phase.Float(), fx.Chase{From: accent, To: pink})
+```
+
+The [borders example](https://github.com/lrstanley/bloom/tree/master/_examples/borders) puts it all together:
+
+![The borders example: a list with a title, clickable filter tabs, its position, and icon buttons on its border, its scrollbar being dragged and clicked, a log scrolled sideways with a horizontal scrollbar and its name down its side, next to boxes looping each border effect](/demos/borders.webp)
+
+To draw a static gradient, use Lip Gloss's own `BorderForegroundBlend` in the box's style. `fx.Chase` is for a
+gradient that moves, which would otherwise mean rendering the whole frame again on every frame.
+
 ## Center a node
 
 `bloom.Centered(child)` places a child at its natural size in the middle of its space:
@@ -134,4 +218,5 @@ hiding a child doesn't leave a double gap behind.
 - [`TextNode`](https://pkg.go.dev/github.com/lrstanley/bloom#TextNode),
   [`BoxNode`](https://pkg.go.dev/github.com/lrstanley/bloom#BoxNode), and
   [`FlexNode`](https://pkg.go.dev/github.com/lrstanley/bloom#FlexNode) API reference
+- [Border effects](/reference/effects#borders)
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss), for the styles themselves

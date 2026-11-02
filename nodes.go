@@ -5,9 +5,14 @@
 package bloom
 
 import (
+	"image"
+	"slices"
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
@@ -33,6 +38,32 @@ func Text(s string) TextNode { return TextNode{s: s} }
 func (n TextNode) Style(style lipgloss.Style) TextNode {
 	n.style, n.styled = style, true
 	return n
+}
+
+// stack returns s with a line for each of its graphemes, keeping its escape
+// sequences, for text running down a side. Its own line breaks are dropped.
+func stack(s string) string {
+	if seq, _, n, _ := ansi.DecodeSequence(s, 0, nil); n == len(s) && seq != "\n" && seq != "\r" {
+		return s // one glyph, as a button usually is
+	}
+	var b strings.Builder
+	b.Grow(2 * len(s))
+	var state byte
+	for glyphs := 0; s != ""; {
+		seq, width, n, next := ansi.DecodeSequence(s, state, nil)
+		switch {
+		case width > 0:
+			if glyphs > 0 {
+				b.WriteByte('\n')
+			}
+			glyphs++
+			b.WriteString(seq)
+		case seq != "\n" && seq != "\r":
+			b.WriteString(seq)
+		}
+		s, state = s[n:], next
+	}
+	return b.String()
 }
 
 // Truncate shows one line, replacing newlines with spaces and cutting text
@@ -258,7 +289,17 @@ func (n FlexNode) View() string { return Render(n, 0, 0) }
 type BoxNode struct {
 	meta
 
-	style lipgloss.Style
+	style    lipgloss.Style
+	child    Child
+	edges    []boxEdge
+	borderT  float64
+	borderFx []fx.Effect
+}
+
+// boxEdge is a child drawn over a side of a box's border.
+type boxEdge struct {
+	side  Direction
+	align Align
 	child Child
 }
 
@@ -287,16 +328,70 @@ func (n BoxNode) HoverStyle(style lipgloss.Style) BoxNode {
 	return n
 }
 
+// Edge draws child over side of the box's border, such as a title or a
+// counter on the top border, or a [Scrollbar] on the right one, without
+// taking space from what is inside. side is [Top], [Bottom], [Left], or
+// [Right]; a corner shows nothing. On the top and bottom, children are one
+// row tall and kept a cell from the corners; on the left and right, they are
+// one column wide, and a [Text] runs down the side, a character to a row.
+// Children at [Start] and [End] are placed from that end inward, in the
+// order given, and children at [Center] share the middle of what is left. A
+// [Stretch] child takes all of what is left. Children are given no more room
+// than is left, one cell apart, and one with no room is not shown. A side
+// without a border shows none.
+func (n BoxNode) Edge(side Direction, align Align, child Child) BoxNode {
+	if child == nil || absent(child) {
+		return n
+	}
+	if t, ok := child.(TextNode); ok && (side == Left || side == Right) {
+		t.s, t.truncate = stack(t.s), false
+		child = t
+	}
+	n.edges = append(slices.Clip(n.edges), boxEdge{side: side, align: align, child: child})
+	return n
+}
+
+// BorderFx applies effects to the box's frame for progress t, its border,
+// padding, and background, but not what is inside it or on its edges. The
+// effects of package [fx] made for borders, such as [fx.Chase], change only
+// the border's cells. Effects that move cells do not move the frame.
+func (n BoxNode) BorderFx(t float64, effects ...fx.Effect) BoxNode {
+	n.borderT, n.borderFx = t, effects
+	return n
+}
+
 // View implements [Child], drawing the node at its natural size.
 func (n BoxNode) View() string { return Render(n, 0, 0) }
 
-// inset returns the cells style's frame takes on each side.
-func (n BoxNode) inset() (left, top, right, bottom int) {
+// bordered returns the part of r, a rectangle the box was given, inside its
+// margins, whose outer cells are its border.
+func (n BoxNode) bordered(r image.Rectangle) image.Rectangle {
 	s := n.style
-	return s.GetMarginLeft() + s.GetBorderLeftSize() + s.GetPaddingLeft(),
-		s.GetMarginTop() + s.GetBorderTopSize() + s.GetPaddingTop(),
-		s.GetMarginRight() + s.GetBorderRightSize() + s.GetPaddingRight(),
-		s.GetMarginBottom() + s.GetBorderBottomSize() + s.GetPaddingBottom()
+	return image.Rect(r.Min.X+s.GetMarginLeft(), r.Min.Y+s.GetMarginTop(),
+		r.Max.X-s.GetMarginRight(), r.Max.Y-s.GetMarginBottom()).Intersect(r)
+}
+
+// frame is the cells a Lip Gloss style's frame takes.
+type frame struct {
+	l, t, r, b     int // margins, border, and padding on each side
+	mx, my         int // margins alone, across and down
+	bl, bt, br, bb int // the border alone on each side
+}
+
+// frameOf returns the cells style's frame takes. Lip Gloss works out border
+// sizes from the border's glyphs each time it is asked, so the layout keeps
+// this for each box rather than asking again.
+func frameOf(s lipgloss.Style) frame {
+	f := frame{
+		mx: s.GetHorizontalMargins(), my: s.GetVerticalMargins(),
+		bl: s.GetBorderLeftSize(), bt: s.GetBorderTopSize(),
+		br: s.GetBorderRightSize(), bb: s.GetBorderBottomSize(),
+	}
+	f.l = s.GetMarginLeft() + f.bl + s.GetPaddingLeft()
+	f.t = s.GetMarginTop() + f.bt + s.GetPaddingTop()
+	f.r = s.GetMarginRight() + f.br + s.GetPaddingRight()
+	f.b = s.GetMarginBottom() + f.bb + s.GetPaddingBottom()
+	return f
 }
 
 // wrapKind is what a [wrapNode] does with its child.
@@ -304,7 +399,6 @@ type wrapKind uint8
 
 const (
 	wrapCenter wrapKind = iota
-	wrapScroll
 	wrapTransition
 )
 
@@ -312,7 +406,6 @@ const (
 type wrapNode struct {
 	kind    wrapKind
 	child   Child
-	offset  int
 	t       float64
 	effects []fx.Effect
 }
@@ -324,12 +417,40 @@ func (n wrapNode) View() string { return Render(n, 0, 0) }
 // given.
 func Centered(child Child) Child { return wrapNode{kind: wrapCenter, child: child} }
 
+// ScrollNode shows part of a child bigger than the space it is given. Build
+// one with [Scroll].
+type ScrollNode struct {
+	child      Child
+	x, y       int
+	horizontal bool
+}
+
 // Scroll gives child as much height as it wants and shows it from row
 // offset, clipped to the space the scroll is given. The child is measured
 // and drawn whole, so content far larger than the screen, such as a long
 // log, is best windowed by the component itself.
-func Scroll(child Child, offset int) Child {
-	return wrapNode{kind: wrapScroll, child: child, offset: max(offset, 0)}
+func Scroll(child Child, offset int) ScrollNode {
+	return ScrollNode{child: child, y: max(offset, 0)}
+}
+
+// X scrolls the child sideways too: it gets as much width as it wants, such
+// as for lines that should not wrap, and is shown from column offset.
+// Without it, the child gets the scroll's width.
+func (n ScrollNode) X(offset int) ScrollNode {
+	n.x, n.horizontal = max(offset, 0), true
+	return n
+}
+
+// View implements [Child], drawing the node at its natural size.
+func (n ScrollNode) View() string { return Render(n, 0, 0) }
+
+// content returns the space the child of a scroll w cells wide is measured
+// in: unbounded down, and across too when it scrolls sideways.
+func (n ScrollNode) content(w int) Size {
+	if n.horizontal {
+		w = unbounded
+	}
+	return Size{W: w, H: unbounded}
 }
 
 // Transition draws child with effects applied to its cells for progress t,
@@ -361,6 +482,8 @@ func absent(c Child) bool {
 	case SlotNode:
 		return absent(n.child)
 	case wrapNode:
+		return absent(n.child)
+	case ScrollNode:
 		return absent(n.child)
 	case LayerNode:
 		return n.absent

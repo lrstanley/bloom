@@ -26,8 +26,8 @@ Most frames change little, so bloom avoids repeating work:
 - A Lip Gloss render is reused while the node's style, content, and size don't change.
 - A frame that would be identical to the last one isn't composited again at all.
 
-On a 200×60 dashboard, an unchanged frame takes about 0.04ms, a frame where most of the content changed about
-0.44ms, and a dialog animating in over a dimmed backdrop about 0.58ms. At 120 frames a second, each frame has
+On a 200×60 dashboard, an unchanged frame takes about 0.016ms, a frame where most of the content changed about
+0.29ms, and a dialog animating in over a dimmed backdrop about 0.44ms. At 120 frames a second, each frame has
 8.3ms. You can run the benchmarks yourself with `go test -bench . ./...` in the repository.
 
 ## Keep frames cheap to compare

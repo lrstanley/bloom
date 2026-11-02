@@ -19,7 +19,9 @@ is on [pkg.go.dev](https://pkg.go.dev/github.com/lrstanley/bloom).
 | [`Skeleton(lines...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Skeleton) | placeholder bars for content still loading, a line for each width, 0 for a blank line |
 | [`Box(style, child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Box) | a Lip Gloss frame around a child |
 | [`Centered(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Centered) | a child at its natural size in the middle of its space |
-| [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset` |
+| [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
+| [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
+| [`ScrollbarOf(id)`](https://pkg.go.dev/github.com/lrstanley/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in |
 | [`Overlay(base, layers...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Overlay) | layers drawn over a base |
 | [`Layer(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Layer) | a layer for an overlay, centered at its natural size |
 | [`Transition(t, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Transition) | a child drawn with effects at progress `t` |
@@ -36,6 +38,21 @@ Any value with a `View() string` method can also be a child.
 | `Gap(x, y)` | `Grid`, `Wrap` | space between columns and between rows |
 | `Align(a)` | `Row`, `Column` | cross-axis placement of children: `Stretch` (default), `Start`, `Center`, `End` |
 | `Justify(j)` | `Row`, `Column` | main-axis placement when nothing grows: `flex.Start`, `Center`, `End`, `SpaceBetween`, `SpaceAround`, `SpaceEvenly` |
+
+## Box options
+
+| Method | Does |
+| --- | --- |
+| `Edge(side, align, child)` | draws a child over a side of the border, such as a title, an icon button, or a scrollbar; a `Text` on the left or right runs down the side |
+| `BorderFx(t, effects...)` | applies effects to the frame only, such as the looping [border effects](/reference/effects#borders) |
+
+## Scrollbar options
+
+| Method | Does |
+| --- | --- |
+| `Horizontal()` | one row tall, for content scrolled sideways |
+| `OnScroll(fn)` | drag the thumb, or click to jump, calling `fn` with the offset to scroll to |
+| `Thumb(glyph, style)`, `Track(glyph, style)` | how the part in view and the rest look; no track glyph leaves what's beneath |
 
 ## Slots
 

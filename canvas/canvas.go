@@ -29,7 +29,12 @@ type Canvas struct {
 	cells    []uv.Cell
 	lines    []uv.Line // views into cells, one per row
 	method   ansi.Method
-	rendered int // length of the last Render, to size the next one
+	rendered int    // length of the last Render, to size the next one
+	sgr      []byte // scratch for the escape sequences of a Render
+
+	// The surfaces, and the mask, last handed out by Region and Layer.
+	region, layer Surface
+	mask          []bool
 }
 
 var _ uv.Screen = (*Canvas)(nil)
@@ -103,7 +108,7 @@ func (c *Canvas) Render() string {
 		if y > 0 {
 			b.WriteByte('\n')
 		}
-		renderLine(&b, l)
+		renderLine(&b, l, &c.sgr)
 	}
 	c.rendered = b.Len()
 	return b.String()
@@ -111,7 +116,7 @@ func (c *Canvas) Render() string {
 
 // renderLine writes l as [uv.Line.Render] does, into a builder the caller
 // sized, which saves the copies of growing one per line.
-func renderLine(b *strings.Builder, l uv.Line) {
+func renderLine(b *strings.Builder, l uv.Line, sgr *[]byte) {
 	var pen uv.Style
 	var link uv.Link
 	spaces := 0 // blanks not yet written, dropped at the end of the line
@@ -120,12 +125,12 @@ func renderLine(b *strings.Builder, l uv.Line) {
 		if c.Width == 0 && c.Content == "" {
 			continue // the tail of a wide glyph
 		}
-		if c.Content == " " && c.Width == 1 && c.Style.IsZero() && c.Link.IsZero() {
-			if !pen.IsZero() {
+		if c.Content == " " && c.Width == 1 && styleZero(&c.Style) && linkZero(&c.Link) {
+			if !styleZero(&pen) {
 				b.WriteString(ansi.ResetStyle)
 				pen = uv.Style{}
 			}
-			if !link.IsZero() {
+			if !linkZero(&link) {
 				b.WriteString(ansi.ResetHyperlink())
 				link = uv.Link{}
 			}
@@ -135,12 +140,13 @@ func renderLine(b *strings.Builder, l uv.Line) {
 		for ; spaces > 0; spaces-- {
 			b.WriteByte(' ')
 		}
-		if c.Style.IsZero() && !pen.IsZero() {
+		if styleZero(&c.Style) && !styleZero(&pen) {
 			b.WriteString(ansi.ResetStyle)
 			pen = uv.Style{}
 		}
-		if !c.Style.Equal(&pen) {
-			b.WriteString(uv.StyleDiff(&pen, &c.Style))
+		if !styleEqual(&c.Style, &pen) {
+			*sgr = appendStyleDiff((*sgr)[:0], &pen, &c.Style)
+			b.Write(*sgr)
 			pen = c.Style
 		}
 		if c.Link != link && link.URL != "" {
@@ -159,10 +165,21 @@ func renderLine(b *strings.Builder, l uv.Line) {
 	if link.URL != "" {
 		b.WriteString(ansi.ResetHyperlink())
 	}
-	if !pen.IsZero() {
+	if !styleZero(&pen) {
 		b.WriteString(ansi.ResetStyle)
 	}
 }
+
+// styleZero reports whether s has no style, as [uv.Style.IsZero] does, but
+// with a nil check for each color rather than comparing interfaces, which
+// adds up over every cell of a frame.
+func styleZero(s *uv.Style) bool {
+	return s.Fg == nil && s.Bg == nil && s.UnderlineColor == nil && s.Underline == 0 && s.Attrs == 0
+}
+
+// linkZero reports whether l is no link, as [uv.Link.IsZero] does, which
+// compares the whole struct and is measurably slower over every cell.
+func linkZero(l *uv.Link) bool { return l.URL == "" && l.Params == "" }
 
 // String returns the text of the canvas without styles, with trailing spaces
 // trimmed from each line.

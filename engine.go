@@ -9,6 +9,7 @@ import (
 	"image"
 	"slices"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/flex"
@@ -39,6 +40,10 @@ type box struct {
 	memoOK      bool
 	expandedFor Size
 
+	// frame is the frame of the box's style, for a box or a styled text.
+	frame   frame
+	frameOK bool
+
 	rect   image.Rectangle // set by arrange; empty for boxes not laid out
 	hidden bool            // collapsed by its container
 	// A slot or layer moving with effects is drawn at rect, with them
@@ -53,15 +58,18 @@ type box struct {
 
 // engine measures and arranges a tree. It is reused between frames.
 type engine struct {
-	method ansi.Method
-	cache  *canvas.Cache
-	memo   map[memoKey]Size // every measurement this frame
-	boxes  []box
-	kids   []int // children of each box, in spans
-	stack  []int // children of the boxes being built
-	tracks []flex.Track
-	ints   []int
-	motion *layoutMotion
+	method     ansi.Method
+	cache      *canvas.Cache
+	memo       map[memoKey]Size // every measurement this frame
+	boxes      []box
+	kids       []int          // children of each box, in spans
+	stack      []int          // children of the boxes being built
+	frameMemos []frameMemo    // by box index, from the last frame
+	layouts    uint64         // layouts done, to retire unused frames
+	scratch    lipgloss.Style // for comparing styles without allocating
+	tracks     []flex.Track
+	ints       []int
+	motion     *layoutMotion
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
@@ -83,6 +91,8 @@ func (e *engine) layout(c Child, w, h int) int {
 	clear(e.boxes)
 	clear(e.memo)
 	e.boxes, e.kids = e.boxes[:0], e.kids[:0]
+	e.layouts++
+	defer e.retireFrames()
 	if c == nil || absent(c) {
 		if e.motion != nil {
 			e.motion.begin(w, h)
@@ -140,6 +150,8 @@ func (e *engine) build(c Child, parent, slot int) int {
 		b.meta, kids = n.meta, []Child{n.child}
 	case wrapNode:
 		kids = []Child{n.child}
+	case ScrollNode:
+		kids = []Child{n.child}
 	case OverlayNode:
 		kids = make([]Child, 0, 1+len(n.layers))
 		base := n.base
@@ -165,6 +177,13 @@ func (e *engine) build(c Child, parent, slot int) int {
 			k = Row(k)
 		}
 		e.stack = append(e.stack, e.build(k, i, j))
+	}
+	if n, ok := c.(BoxNode); ok {
+		// Edge children follow what is inside, built here rather than
+		// gathered into kids, which would cost an allocation per frame.
+		for j, edge := range n.edges {
+			e.stack = append(e.stack, e.build(edge.child, i, 1+j))
+		}
 	}
 	e.boxes[i].kidsOff, e.boxes[i].kidsLen = len(e.kids), len(e.stack)-start
 	e.kids = append(e.kids, e.stack[start:]...)
@@ -277,7 +296,7 @@ func (e *engine) measure(i int, avail Size) Size {
 func (e *engine) measureChild(i int, avail Size) Size {
 	switch n := e.boxes[i].child.(type) {
 	case TextNode:
-		return e.measureText(n, avail)
+		return e.measureText(i, n, avail)
 	case FlexNode:
 		return e.measureFlex(i, n, avail)
 	case GridNode:
@@ -285,14 +304,17 @@ func (e *engine) measureChild(i int, avail Size) Size {
 	case WrapNode:
 		return e.flow(i, n, avail.W, image.Point{}, false)
 	case BoxNode:
-		l, t, r, b := n.inset()
-		s := e.measure(e.firstKid(i), Size{W: max(avail.W-l-r, 0), H: max(avail.H-t-b, 0)})
-		return Size{W: s.W + l + r, H: s.H + t + b}
-	case wrapNode:
-		if n.kind == wrapScroll {
-			s := e.measure(e.firstKid(i), Size{W: avail.W, H: unbounded})
-			return Size{W: s.W, H: min(s.H, avail.H)}
+		f := e.frameOf(i, n.style)
+		s := e.measure(e.boxContent(i, n), Size{W: max(avail.W-f.l-f.r, 0), H: max(avail.H-f.t-f.b, 0)})
+		return Size{W: s.W + f.l + f.r, H: s.H + f.t + f.b}
+	case ScrollbarNode:
+		if n.horizontal {
+			return Size{H: 1}
 		}
+		return Size{W: 1}
+	case ScrollNode:
+		return e.measure(e.firstKid(i), n.content(avail.W))
+	case wrapNode:
 		return e.measure(e.firstKid(i), avail)
 	case SlotNode, OverlayNode, LayerNode:
 		// A slot outside a row or column, an overlay, and a layer are as big
@@ -317,19 +339,19 @@ func (e *engine) measureChild(i int, avail Size) Size {
 // styled node is measured from its style's frame rather than rendered,
 // unless it is too wide and wraps, or its style changes it in ways only
 // rendering tells.
-func (e *engine) measureText(n TextNode, avail Size) Size {
+func (e *engine) measureText(i int, n TextNode, avail Size) Size {
 	w, h := e.cache.Size(n.s)
 	if !n.styled {
 		return Size{W: w, H: h}
 	}
 	// Lip Gloss's Width and Height include padding and borders, not margins.
-	st := n.style
+	st, f := n.style, e.frameOf(i, n.style)
 	if sw := st.GetWidth(); sw > 0 {
-		w = sw + st.GetHorizontalMargins()
+		w = sw + f.mx
 	} else {
-		w += st.GetHorizontalFrameSize()
+		w += f.l + f.r
 	}
-	h = max(h+st.GetVerticalPadding()+st.GetVerticalBorderSize(), st.GetHeight()) + st.GetVerticalMargins()
+	h = max(h+f.t+f.b-f.my, st.GetHeight()) + f.my
 	if n.truncate && st.GetTransform() == nil {
 		// A truncated line is cut to fit rather than wrapped, so its size
 		// follows from the style alone, without rendering a long line.
@@ -485,15 +507,27 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 	case BoxNode:
 		// Built directly, as image.Rect would swap the edges of a frame too
 		// big for r into a rectangle over the frame, rather than an empty one.
-		l, t, right, b := n.inset()
-		e.boxes[i].cramped = r.Dx() < l+right || r.Dy() < t+b
-		minX, minY := min(r.Min.X+l, r.Max.X), min(r.Min.Y+t, r.Max.Y)
-		e.arrange(e.firstKid(i), image.Rectangle{
+		f := e.frameOf(i, n.style)
+		e.boxes[i].cramped = r.Dx() < f.l+f.r || r.Dy() < f.t+f.b
+		minX, minY := min(r.Min.X+f.l, r.Max.X), min(r.Min.Y+f.t, r.Max.Y)
+		e.arrange(e.boxContent(i, n), image.Rectangle{
 			Min: image.Pt(minX, minY),
-			Max: image.Pt(max(r.Max.X-right, minX), max(r.Max.Y-b, minY)),
+			Max: image.Pt(max(r.Max.X-f.r, minX), max(r.Max.Y-f.b, minY)),
 		})
+		e.arrangeEdges(i, n, r)
 	case wrapNode:
 		e.arrangeWrap(i, n, r)
+	case ScrollNode:
+		// The child is laid out whole, moved by the offsets, and clipped to r
+		// when painted.
+		kid := e.firstKid(i)
+		s := e.measure(kid, n.content(r.Dx()))
+		at := image.Pt(r.Min.X-n.x, r.Min.Y-n.y)
+		w := r.Dx()
+		if n.horizontal {
+			w = max(s.W, w)
+		}
+		e.arrange(kid, image.Rectangle{Min: at, Max: at.Add(image.Pt(w, max(s.H, r.Dy())))})
 	case OverlayNode:
 		kids := e.kidsOf(i)
 		e.arrange(kids[0], r)
@@ -505,6 +539,180 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 	}
 }
 
+// frameOf returns the frame of style, the style of box i. It is worked out
+// once a frame, and kept from the last frame while the box at i has the same
+// style, as boxes usually do.
+func (e *engine) frameOf(i int, style lipgloss.Style) frame {
+	b := &e.boxes[i]
+	if b.frameOK {
+		return b.frame
+	}
+	if i >= len(e.frameMemos) {
+		e.frameMemos = append(e.frameMemos, make([]frameMemo, i+1-len(e.frameMemos))...)
+	}
+	m := &e.frameMemos[i]
+	if e.scratch = style; !m.ok || !sameStyle(&m.style, &e.scratch) {
+		*m = frameMemo{ok: true, style: style, frame: frameOf(style)}
+	}
+	m.used = e.layouts
+	b.frame, b.frameOK = m.frame, true
+	return m.frame
+}
+
+// retireFrames drops the frames not used by the last layout, whose styles
+// would otherwise keep what they refer to alive.
+func (e *engine) retireFrames() {
+	for i := range e.frameMemos {
+		if e.frameMemos[i].used != e.layouts {
+			e.frameMemos[i] = frameMemo{}
+		}
+	}
+}
+
+// frameMemo is the frame of the style a box had in the last frame.
+type frameMemo struct {
+	ok    bool
+	used  uint64 // the layout it was last used in
+	style lipgloss.Style
+	frame frame
+}
+
+// boxContent returns the box of what is inside box node n at index i, or -1
+// when it has none. The children on its edges come after it.
+func (e *engine) boxContent(i int, n BoxNode) int {
+	if kids := e.kidsOf(i); len(kids) > len(n.edges) {
+		return kids[0]
+	}
+	return -1
+}
+
+// boxEdges returns the boxes of the children on box node n's edges, in the
+// order of n.edges.
+func (e *engine) boxEdges(i int, n BoxNode) []int {
+	kids := e.kidsOf(i)
+	return kids[len(kids)-len(n.edges):]
+}
+
+// arrangeEdges places the children on the edges of box node n at index i,
+// laid out in r. See [BoxNode.Edge].
+func (e *engine) arrangeEdges(i int, n BoxNode, r image.Rectangle) {
+	if len(n.edges) == 0 {
+		return
+	}
+	kids, ring, f := e.boxEdges(i, n), n.bordered(r), e.frameOf(i, n.style)
+	for _, side := range [...]Direction{Top, Bottom, Left, Right} {
+		if l, ok := f.edgeLine(side, ring); ok && !e.boxes[i].cramped {
+			e.arrangeEdge(n, kids, side, l)
+			continue
+		}
+		for j, edge := range n.edges {
+			if edge.side == side {
+				e.boxes[kids[j]].hidden = true
+			}
+		}
+	}
+}
+
+// edgeLine is the row or column of a side of a box's border.
+type edgeLine struct {
+	vertical bool
+	at       int // the row, or column, of the side
+	lo, hi   int // the span of it that children share
+	mid      int // the middle of the side
+}
+
+// edgeLine returns the line of side of the border of a box with frame f,
+// the outer cells of ring, reporting false if that side has no border.
+func (f frame) edgeLine(side Direction, ring image.Rectangle) (edgeLine, bool) {
+	// Children on the top and bottom are kept a cell from the corners.
+	horizontal := edgeLine{lo: ring.Min.X + f.bl + 1, hi: ring.Max.X - f.br - 1, mid: (ring.Min.X + ring.Max.X) / 2}
+	vertical := edgeLine{vertical: true, lo: ring.Min.Y + f.bt, hi: ring.Max.Y - f.bb, mid: (ring.Min.Y + ring.Max.Y) / 2}
+	switch side { //nolint:exhaustive // A corner, or the zero value, is not a side.
+	case Top:
+		horizontal.at = ring.Min.Y
+		return horizontal, f.bt > 0
+	case Bottom:
+		horizontal.at = ring.Max.Y - 1
+		return horizontal, f.bb > 0
+	case Left:
+		vertical.at = ring.Min.X
+		return vertical, f.bl > 0
+	case Right:
+		vertical.at = ring.Max.X - 1
+		return vertical, f.br > 0
+	}
+	return edgeLine{}, false
+}
+
+// arrangeEdge places the children of box node n on side, whose line is l,
+// given their boxes, kids.
+func (e *engine) arrangeEdge(n BoxNode, kids []int, side Direction, l edgeLine) {
+	// The ends first, in order, from the corners inward.
+	for j, edge := range n.edges {
+		if edge.side != side || edge.align == Center {
+			continue
+		}
+		s := l.hi - l.lo
+		if edge.align != Stretch {
+			s = e.edgeSize(kids[j], l, s)
+		}
+		at := l.lo
+		if edge.align == End {
+			at = l.hi - s
+		}
+		if !e.placeEdge(kids[j], l, at, s) {
+			continue
+		}
+		if edge.align == End {
+			l.hi -= s + 1
+		} else {
+			l.lo += s + 1
+		}
+	}
+
+	// Then the middle, sized in order from what is left, and centered on the
+	// side as far as the ends allow. Measuring again in the same space is
+	// free.
+	total := -1
+	for j, edge := range n.edges {
+		if edge.side == side && edge.align == Center {
+			if s := e.edgeSize(kids[j], l, l.hi-l.lo-total-1); s > 0 {
+				total += s + 1
+			}
+		}
+	}
+	at, used := min(max(l.mid-total/2, l.lo), l.hi-total), -1
+	for j, edge := range n.edges {
+		if edge.side == side && edge.align == Center {
+			s := e.edgeSize(kids[j], l, l.hi-l.lo-used-1)
+			if e.placeEdge(kids[j], l, at, s) {
+				at, used = at+s+1, used+s+1
+			}
+		}
+	}
+}
+
+// edgeSize returns how much of room along line l box k takes.
+func (e *engine) edgeSize(k int, l edgeLine, room int) int {
+	main, _ := axes(e.measure(k, size(max(room, 0), 1, l.vertical)), l.vertical)
+	return main
+}
+
+// placeEdge arranges box k at at along line l, size cells long, or hides it
+// for a size of zero, reporting whether it was placed.
+func (e *engine) placeEdge(k int, l edgeLine, at, size int) bool {
+	switch {
+	case size <= 0:
+		e.boxes[k].hidden = true
+		return false
+	case l.vertical:
+		e.arrange(k, image.Rect(l.at, at, l.at+1, at+size))
+	default:
+		e.arrange(k, image.Rect(at, l.at, at+size, l.at+1))
+	}
+	return true
+}
+
 func (e *engine) arrangeWrap(i int, n wrapNode, r image.Rectangle) {
 	kid := e.firstKid(i)
 	switch n.kind {
@@ -512,10 +720,6 @@ func (e *engine) arrangeWrap(i int, n wrapNode, r image.Rectangle) {
 		s := e.measure(kid, Size{W: r.Dx(), H: r.Dy()})
 		at := r.Min.Add(image.Pt(Center.offset(s.W, r.Dx()), Center.offset(s.H, r.Dy())))
 		e.arrange(kid, image.Rectangle{Min: at, Max: at.Add(s.point())})
-	case wrapScroll:
-		s := e.measure(kid, Size{W: r.Dx(), H: unbounded})
-		top := r.Min.Y - n.offset
-		e.arrange(kid, image.Rect(r.Min.X, top, r.Max.X, top+max(s.H, r.Dy())))
 	case wrapTransition:
 		e.arrange(kid, r)
 	}
@@ -611,6 +815,15 @@ func (e *engine) animate(i int, id any, cfg *layoutAnimation, moves []fx.Effect,
 // rectOf returns the rectangle of the box with ID id, if some of it is on
 // screen: laid out, and not clipped away by the boxes it is in.
 func (e *engine) rectOf(id any) (image.Rectangle, bool) {
+	if i := e.shown(id); i >= 0 {
+		return e.boxes[i].rect, true
+	}
+	return image.Rectangle{}, false
+}
+
+// shown returns the index of the box with ID id, if some of it is on screen,
+// or -1.
+func (e *engine) shown(id any) int {
 	for i := range e.boxes {
 		b := &e.boxes[i]
 		if b.meta.id != id || b.hidden {
@@ -621,8 +834,8 @@ func (e *engine) rectOf(id any) (image.Rectangle, bool) {
 			vis = vis.Intersect(e.boxes[p].rect)
 		}
 		if !vis.Empty() {
-			return b.rect, true
+			return i
 		}
 	}
-	return image.Rectangle{}, false
+	return -1
 }

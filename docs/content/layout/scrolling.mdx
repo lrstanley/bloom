@@ -111,6 +111,72 @@ The handler runs just before `Update` gets the wheel event, so clamp the offset 
 
 Remember to turn on mouse reporting in `View` with `v.MouseMode = tea.MouseModeCellMotion`.
 
+## Scroll sideways
+
+`X(offset)` scrolls a `Scroll` sideways too: its child gets as much width as it wants, so long lines don't wrap,
+and is shown from column `offset`. It's what you want for logs and wide tables:
+
+```go
+bloom.Scroll(bloom.Text(m.log).ID(paneLog), m.offset).X(m.logX)
+```
+
+Without it, the child gets the scroll's width, as before.
+
+## Show a scrollbar
+
+`bloom.ScrollbarOf(id)` is a scrollbar for the `Scroll` that the node with that ID is in. It follows the scroll
+from the layout, so it needs no state of its own. Put it on the right side of the box's border with
+[`Edge`](/layout/text-and-boxes#put-titles-and-more-on-a-border), and it takes no space. It's only drawn while the
+content is taller than its view, so when everything fits, the plain border shows:
+
+```go
+bloom.Box(panel, bloom.Scroll(bloom.Text(m.article).Style(prose).ID(paneArticle), m.offset)).
+	Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneArticle))
+```
+
+```
+╭──────────────╮
+│there was a   │
+│border, and   ┃
+│the border was│
+╰──────────────╯
+```
+
+For content that a component windows itself, such as the [Bubbles viewport](/layout/bubbles-components), give
+`bloom.Scrollbar(total, visible, offset)` the numbers yourself:
+
+```go
+bloom.Scrollbar(m.viewport.TotalLineCount(), m.viewport.VisibleLineCount(), m.viewport.YOffset())
+```
+
+`Horizontal()` makes either one a row tall, for content scrolled sideways. Put it on the bottom of the border:
+
+```go
+bloom.Box(panel, bloom.Scroll(bloom.Text(m.log).ID(paneLog), 0).X(m.logX)).
+	Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal())
+```
+
+Either one can also go beside the content, in a `Row`, or under it in a `Column` when horizontal, where it takes a
+column or a row. `Thumb(glyph, style)` sets how the part for what's in view looks, `"┃"` by default, or `"━"`
+when horizontal. `Track(glyph, style)` sets the rest, which is not drawn by default, so a border beneath it shows
+through. A scrollbar's natural length is zero, so on a border use `Stretch`.
+
+### Drag and click a scrollbar
+
+`OnScroll(fn)` makes a scrollbar work with the mouse. `fn` gets the offset to scroll to, which you set in your
+model as you do for keys:
+
+```go
+bloom.ScrollbarOf(paneArticle).OnScroll(func(offset int) tea.Cmd {
+	m.offset = offset
+	return nil
+})
+```
+
+Pressing on the thumb and moving drags it, keeping the point you grabbed under the pointer. Pressing anywhere
+else on the scrollbar jumps so the thumb is centered there, and holding the button down keeps dragging. The
+scrollbar takes clicks only while it's drawn, so with nothing to scroll, clicks reach whatever is beneath it.
+
 ## Solve or Frame?
 
 There are two ways to get geometry, and they answer different questions:

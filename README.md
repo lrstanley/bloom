@@ -89,14 +89,17 @@ over.
 - :sparkles: **Animation kept in your model**: eased and spring values, presences for showing and hiding (with
   `ShowFor` for toasts that hide themselves), sequences of steps, and automatic layout animation with `Animate()`.
 - :art: **25+ cell effects**: `Fade`, `Slide`, `Iris`, `Unfold`, `Decode`, `Glitch`, and more as transitions; `Dim`,
-  `Desaturate`, `Tint`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst` for feedback; and
-  combinators to stagger, delay, reverse, and ease them. Or write your own.
+  `Desaturate`, `Tint`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst` for feedback;
+  `Chase`, `Pulse`, `Comet`, and `March` for looping borders; and combinators to stagger, delay, reverse, and ease
+  them. Or write your own.
+- :framed_picture: **More on a border**: titles, clickable tabs, icon buttons, and counters on a box's border with
+  `Edge`, and scrollbars there that can be dragged, which only show while there's more to scroll to.
 - :hourglass_flowing_sand: **Loading placeholders**: `Skeleton(8, 0, 5, 11)` draws shimmering bars in place of
   content that's still loading, a line for each line of the content, so nothing jumps when it arrives.
 - :jigsaw: **Works with what you have**: anything with a `View() string` method, including
   [Bubbles](https://github.com/charmbracelet/bubbles) components, is a leaf in the tree.
 - :zap: **Fast**: strings are parsed once, Lip Gloss renders are cached, and unchanged frames aren't composited
-  again. A 200×60 dashboard animating a dialog over a dimmed backdrop takes about 0.6ms a frame.
+  again. A 200×60 dashboard animating a dialog over a dimmed backdrop takes about 0.45ms a frame.
 
 ---
 

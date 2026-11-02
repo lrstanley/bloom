@@ -146,19 +146,25 @@ func debugNode(c Child) (kind string, attrs []string) {
 		return "Box", nil
 	case wrapNode:
 		switch n.kind {
-		case wrapScroll:
-			return "Scroll", []string{fmt.Sprintf("offset=%d", n.offset)}
 		case wrapTransition:
 			return "Transition", []string{fmt.Sprintf("t=%.2f", n.t), debugEffects(n.effects)}
 		case wrapCenter:
 		}
 		return "Centered", nil
+	case ScrollNode:
+		attrs = []string{fmt.Sprintf("offset=%d", n.y)}
+		if n.horizontal {
+			attrs = append(attrs, fmt.Sprintf("x=%d", n.x))
+		}
+		return "Scroll", attrs
 	case OverlayNode:
 		return "Overlay", nil
 	case LayerNode:
 		return "Layer", debugLayer(n)
 	case drawableNode:
 		return fmt.Sprintf("Drawable(%T)", n.d), nil
+	case ScrollbarNode:
+		return "Scrollbar", nil
 	default:
 		return fmt.Sprintf("%T", c), nil
 	}
