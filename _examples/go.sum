@@ -1,5 +1,3 @@
-charm.land/bubbletea/v2 v2.1.0 h1:A9fj9h5LFrvQhQHFNggp8K8rvY6CUfgn9dMbb6p2HIw=
-charm.land/bubbletea/v2 v2.1.0/go.mod h1:xWHeyxIX9/wiFU2kgPW04ojOZyTzrWf+8lGjUCaftiU=
 charm.land/bubbletea/v2 v2.1.1 h1:S1S9l37pCZGrj1JexBcr9x4Nr3MVeM42InqCYM/tDpU=
 charm.land/bubbletea/v2 v2.1.1/go.mod h1:xWHeyxIX9/wiFU2kgPW04ojOZyTzrWf+8lGjUCaftiU=
 charm.land/lipgloss/v2 v2.0.6 h1:EaGKeuA8FvF+v2BT5VmZd2LoYLaMZJXA5n34th8nCIQ=
@@ -8,8 +6,6 @@ github.com/aymanbagabas/go-udiff v0.4.1 h1:OEIrQ8maEeDBXQDoGCbbTTXYJMYRCRO1fnodZ
 github.com/aymanbagabas/go-udiff v0.4.1/go.mod h1:0L9PGwj20lrtmEMeyw4WKJ/TMyDtvAoK9bf2u/mNo3w=
 github.com/charmbracelet/colorprofile v0.4.3 h1:QPa1IWkYI+AOB+fE+mg/5/4HRMZcaXex9t5KX76i20Q=
 github.com/charmbracelet/colorprofile v0.4.3/go.mod h1:/zT4BhpD5aGFpqQQqw7a+VtHCzu+zrQtt1zhMt9mR4Q=
-github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4 h1:hISLzUbwcvJbGoNR6A3L/TpguRRnACBmZOee8LcHLJw=
-github.com/charmbracelet/ultraviolet v0.0.0-20261008173134-6b8d4baf91b4/go.mod h1:aJDVk+WOVM1K04rdc/71PMPoUGfjxjhvXfP3Pjz1Zio=
 github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f h1:D2JpB65eehsnkEwEG401dMBSNYtTDgvKXZZSl7ZCxWI=
 github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f/go.mod h1:aJDVk+WOVM1K04rdc/71PMPoUGfjxjhvXfP3Pjz1Zio=
 github.com/charmbracelet/x/ansi v0.11.9 h1:kIrqLBxtTVbLyyHO2Evoi93EjQo1mylWmpNEsfPxXAM=
@@ -38,15 +34,8 @@ github.com/google/jsonschema-go v0.4.3 h1:/DBOLZTfDow7pe2GmaJNhltueGTtDKICi8V8p+
 github.com/google/jsonschema-go v0.4.3/go.mod h1:r5quNTdLOYEz95Ru18zA0ydNbBuYoo9tgaYcxEYhJVE=
 github.com/lrstanley/bubbletint/v2 v2.0.4 h1:WZd1tEA3SgeYgSkaBlWLXOg1H56qpeiO7necuFapkK4=
 github.com/lrstanley/bubbletint/v2 v2.0.4/go.mod h1:HaBq3Yc6pcCrQDuW8huE+Bs1adVFUmg/O1B9Zu/kab4=
-github.com/lrstanley/x v0.0.0-20261101215243-283ecad96b94 h1:33PGXgMl0YIkA2MXnU9tdok8EInD+xl78vY3kS32LqY=
-github.com/lrstanley/x v0.0.0-20261102020005-a6482435cbe1 h1:uo0Qbhmo4MoWhPgOV0pExABGUR/yAZDSedO+qfJo7SM=
-github.com/lrstanley/x v0.0.0-20261102020005-a6482435cbe1/go.mod h1:PutBwRIyWx9Idmuk80pdjTxvJfRZB4LYvpFLUxYYxcI=
-github.com/lrstanley/x/term/reel v0.0.0-20261101215243-283ecad96b94 h1:RnFZVMNK1LVovUoiomLdxoFa+g9f+1O+DLkR/q4KL9I=
-github.com/lrstanley/x/term/reel v0.0.0-20261101215243-283ecad96b94/go.mod h1:tH2Gg6sZfOtW03Ma/LNPDRh1wSZ/f3OC56SHdGusRT4=
 github.com/lrstanley/x/term/reel v0.0.0-20261102020005-a6482435cbe1 h1:iOJc0pcxJD95oMqQpw3+Y1TN+Nmmo0CLAuVlh9AdBhM=
 github.com/lrstanley/x/term/reel v0.0.0-20261102020005-a6482435cbe1/go.mod h1:tH2Gg6sZfOtW03Ma/LNPDRh1wSZ/f3OC56SHdGusRT4=
-github.com/lrstanley/x/term/steep v0.0.0-20261101215243-283ecad96b94 h1:DgDccpy0Mc3SjlOPS8zutoTMZItTQ2EfHwr/HYNjLJc=
-github.com/lrstanley/x/term/steep v0.0.0-20261101215243-283ecad96b94/go.mod h1:PFmXQPHZdXNHalX+SP1RHlL/+9wtIMxpjsTJo9Z3gAA=
 github.com/lrstanley/x/term/steep v0.0.0-20261102020005-a6482435cbe1 h1:A4hg/Pwv7zI1NDSaMToRpG/BiJOcIq2QnDLOYtbrDCI=
 github.com/lrstanley/x/term/steep v0.0.0-20261102020005-a6482435cbe1/go.mod h1:PFmXQPHZdXNHalX+SP1RHlL/+9wtIMxpjsTJo9Z3gAA=
 github.com/lucasb-eyer/go-colorful v1.4.1 h1:1EO+WB73+EH8EVbzlrG3KLAfEypQWVHIBqlTf+2hNss=
@@ -57,8 +46,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
 github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-github.com/xo/terminfo v1.2.0 h1:d0ZTOCpuGE0lwSAOs0zcJjwz3jWQyqcRt9XbGJpCOl4=
-github.com/xo/terminfo v1.2.0/go.mod h1:lGzkSo8Fe7IRh/w+Gqz7n5mDog4FVXCj3gy/DYTBqio=
+github.com/xo/terminfo v1.3.0 h1:KstyePbNW6UaLq9y12+544VK4aTP3Eku/sym3a9+UgQ=
+github.com/xo/terminfo v1.3.0/go.mod h1:lGzkSo8Fe7IRh/w+Gqz7n5mDog4FVXCj3gy/DYTBqio=
 golang.org/x/image v0.47.0 h1:za/8gVz++PPZqmZJBNSISICN5Rrj5zixP/8K++fgmqo=
 golang.org/x/image v0.47.0/go.mod h1:IkN5o4A7vq55vXN8FWjjnhg9Rs2GOtffqsSi9mWAKYE=
 golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
