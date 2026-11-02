@@ -198,7 +198,7 @@ func debugSlot(n SlotNode) (kind string, attrs []string) {
 func debugLayer(n LayerNode) (attrs []string) {
 	switch {
 	case n.anchor != nil:
-		attrs = append(attrs, "anchorTo="+debugID(n.anchor)+"/"+debugName(edgeNames, n.side))
+		attrs = append(attrs, "anchorTo="+debugID(n.anchor)+"/"+debugName(directionNames, n.side))
 	case n.x != Center || n.y != Center:
 		attrs = append(attrs, "anchor="+debugName(alignNames, n.x)+","+debugName(alignNames, n.y))
 	}
@@ -223,7 +223,8 @@ func debugLayer(n LayerNode) (attrs []string) {
 var (
 	alignNames   = []string{"stretch", "start", "center", "end"}
 	justifyNames = []string{"start", "center", "end", "space-between", "space-around", "space-evenly"}
-	edgeNames    = []string{"bottom", "top", "left", "right"}
+	// The zero value of a layer's side is the default, Bottom.
+	directionNames = []string{"bottom", "bottom", "top", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"}
 )
 
 // debugName returns the name of v in names, or its number if it has none.

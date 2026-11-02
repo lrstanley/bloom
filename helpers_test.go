@@ -438,3 +438,34 @@ func TestTruncateMeasuresAsDrawn(t *testing.T) {
 		}
 	}
 }
+
+func TestAnchorToDirections(t *testing.T) {
+	t.Parallel()
+
+	// The anchor is 4×1 at 10,3, and the layer 2×1.
+	tests := []struct {
+		side Direction
+		want image.Point
+	}{
+		{0, image.Pt(10, 4)}, // the default, Bottom.
+		{Bottom, image.Pt(10, 4)},
+		{Top, image.Pt(10, 2)},
+		{Left, image.Pt(8, 3)},
+		{Right, image.Pt(14, 3)},
+		{TopLeft, image.Pt(8, 2)},
+		{TopRight, image.Pt(14, 2)},
+		{BottomLeft, image.Pt(8, 4)},
+		{BottomRight, image.Pt(14, 4)},
+	}
+	for _, tt := range tests {
+		r := New()
+		r.Render(30, 10, Overlay(
+			Column(Fixed(3, nil), Fixed(1, Row(Fixed(10, nil), Fixed(4, Text("anch")).ID("a")))),
+			Layer(Text("LL")).Size(2, 1).ID("l").AnchorTo("a", tt.side),
+		))
+		want := image.Rectangle{Min: tt.want, Max: tt.want.Add(image.Pt(2, 1))}
+		if got, ok := r.Frame().Rect("l"); !ok || got != want {
+			t.Errorf("side %d: layer at %v (%v), want %v", tt.side, got, ok, tt.want)
+		}
+	}
+}

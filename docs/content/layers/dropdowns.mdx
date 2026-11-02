@@ -63,10 +63,12 @@ bloom.Layer(menu).AnchorTo(fieldLanguage, bloom.Bottom).On(on.ClickOutside(m.clo
 
 ## Choose a side
 
-The side is `bloom.Bottom`, `bloom.Top`, `bloom.Left`, or `bloom.Right`:
+The side is `bloom.Bottom`, `bloom.Top`, `bloom.Left`, or `bloom.Right`, or a corner:
 
 - `Bottom` and `Top` put the layer below or above the node, lined up with its left edge.
 - `Left` and `Right` put it beside the node, lined up with its top edge.
+- `TopLeft`, `TopRight`, `BottomLeft`, and `BottomRight` put it diagonally off that corner, such as below the node
+  and to its right for `BottomRight`.
 
 The layer is shifted to stay on screen, so a menu anchored near the right edge moves left rather than being cut
 off. Use `Offset(x, y)` to nudge it, such as one row down to leave a gap.

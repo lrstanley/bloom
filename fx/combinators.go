@@ -5,6 +5,7 @@
 package fx
 
 import (
+	"cmp"
 	"image"
 
 	"github.com/lrstanley/bloom/canvas"
@@ -29,9 +30,10 @@ import (
 type Stagger struct {
 	Effect Effect
 	// From is where the first part is, and so which parts come first: Top
-	// and Bottom split the surface into rows, Left and Right into columns.
-	// The zero value is Bottom.
-	From Edge
+	// and Bottom split the surface into rows, Left and Right into columns. A
+	// corner is taken as its top or bottom side, as parts are whole rows or
+	// columns. The zero value is Bottom.
+	From Direction
 	// Spread is how much of t is spent starting the parts, from 0 to 1: 0.5
 	// has the last part start as the first is halfway, and 1 has each part
 	// run in an instant. Zero means 0.5.
@@ -50,9 +52,12 @@ func (e Stagger) Apply(s *canvas.Surface, t float64) {
 	spread = min(spread, 1)
 
 	w, h := s.Width(), s.Height()
-	vertical := e.From == Top || e.From == Bottom
+	dx, dy := cmp.Or(e.From, Bottom).Vector()
+	if dy != 0 {
+		dx = 0
+	}
 	n := w
-	if vertical {
+	if dy != 0 {
 		n = h
 	}
 	base := s.Offset
@@ -63,14 +68,14 @@ func (e Stagger) Apply(s *canvas.Surface, t float64) {
 			start = spread * float64(i) / float64(n-1)
 		}
 		var band image.Rectangle
-		switch e.From {
-		case Top:
+		switch {
+		case dy > 0:
 			band = image.Rect(0, i, w, i+1)
-		case Bottom:
+		case dy < 0:
 			band = image.Rect(0, h-1-i, w, h-i)
-		case Left:
+		case dx > 0:
 			band = image.Rect(i, 0, i+1, h)
-		case Right:
+		default:
 			band = image.Rect(w-1-i, 0, w-i, h)
 		}
 		part := s.Sub(band)

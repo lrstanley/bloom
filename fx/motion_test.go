@@ -341,7 +341,10 @@ func BenchmarkReset(b *testing.B) {
 	}
 }
 
-func BenchmarkDecodeFullScreen(b *testing.B)  { benchmarkLayer(b, Decode{Seed: 1}) }
+func BenchmarkDecodeFullScreen(b *testing.B) { benchmarkLayer(b, Decode{Seed: 1}) }
+func BenchmarkDecodeCornerFullScreen(b *testing.B) {
+	benchmarkLayer(b, Decode{From: TopRight, Seed: 1})
+}
 func BenchmarkGlitchFullScreen(b *testing.B)  { benchmarkLayer(b, Glitch{Seed: 1}) }
 func BenchmarkShakeFullScreen(b *testing.B)   { benchmarkLayer(b, Shake{}) }
 func BenchmarkShimmerFullScreen(b *testing.B) { benchmarkLayer(b, Shimmer{Color: red}) }

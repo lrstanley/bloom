@@ -47,7 +47,7 @@ func TestStagger(t *testing.T) {
 
 	t.Run("wipe by columns", func(t *testing.T) {
 		t.Parallel()
-		for _, from := range []Edge{Left, Right} {
+		for _, from := range []Direction{Left, Right} {
 			s := textLayerAt(gridText(8, 6), image.Pt(2, 2), 20, 10)
 			Stagger{Effect: Wipe{From: Top}, From: from, Spread: 0.8}.Apply(s, 0.5)
 			var cols [8]int
@@ -163,7 +163,7 @@ func TestStagger(t *testing.T) {
 
 	t.Run("wide glyphs", func(t *testing.T) {
 		t.Parallel()
-		for _, from := range []Edge{Top, Left} {
+		for _, from := range []Direction{Top, Left} {
 			for i := range 21 {
 				s := textLayerAt("世界世界\nab世cd\n世a世界", image.Pt(2, 2), 20, 10)
 				Stagger{Effect: Slide{From: Left}, From: from}.Apply(s, float64(i)/20)

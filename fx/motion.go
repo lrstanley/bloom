@@ -5,6 +5,7 @@
 package fx
 
 import (
+	"cmp"
 	"image"
 	"image/color"
 	"math"
@@ -19,12 +20,15 @@ const decodeGlyphs = `0123456789ABCDEF:=+*<>|/\`
 // decodeSteps is how many times per transition the leading glyphs change.
 const decodeSteps = 48
 
-// Decode reveals a node like digital rain settling into text: each column is
-// revealed from the top down, after a random delay. The leading cell of a
-// column shows a bright random glyph, the cells above it their own content,
-// and those below it nothing. The delays are the same for the same Seed. Only
-// single-width glyphs are replaced.
+// Decode reveals a node like digital rain settling into text: each lane, a
+// column for rain from the top or bottom, a row from the left or right, or a
+// diagonal from a corner, is revealed from From after a random delay. The
+// leading cell of a lane shows a bright random glyph, the cells behind it
+// their own content, and those ahead of it nothing. The delays are the same
+// for the same Seed. Only single-width glyphs are replaced.
 type Decode struct {
+	// From is where the rain starts. The zero value is Top.
+	From Direction
 	Seed uint32
 }
 
@@ -33,34 +37,45 @@ func (e Decode) Apply(s *canvas.Surface, t float64) {
 	if t >= 1 {
 		return
 	}
-	h := s.Height()
+	sw := newSweep(cmp.Or(e.From, Top), s.Width(), s.Height())
+	// The front runs a stride past the last cell, so each lane's leading
+	// glyph leaves it before t=1.
+	stride := float64(sw.stride())
+	span := float64(sw.steps()) + stride
 	step := uint32(max(t, 0) * decodeSteps)
-	for x := range s.Width() {
-		// Every column finishes by t=1, the later it starts the faster it falls.
-		delay := hash(x, -1, e.Seed) * 0.5
-		p := (t - delay) / (1 - delay)
-		head := int(p * float64(h+1))
-		if p < 0 {
-			head = -1
-		}
-		for y := range h {
-			if !s.Visible(x, y) {
+
+	// Every lane finishes by t=1, the later it starts the faster it falls.
+	lo, lanes := sw.lanes()
+	var buf [512]float64
+	fronts := buf[:0]
+	if lanes > len(buf) {
+		fronts = make([]float64, 0, lanes)
+	}
+	for i := range lanes {
+		delay := hash(lo+i, -1, e.Seed) * 0.5
+		fronts = append(fronts, (t-delay)/(1-delay)*span)
+	}
+
+	for y := range s.Height() {
+		a, dAlong, lane, dLane := sw.row(y)
+		for x := range s.Width() {
+			front, along := fronts[lane-lo], float64(a)
+			a, lane = a+dAlong, lane+dLane
+			if along+stride <= front || !s.Visible(x, y) {
 				continue
 			}
-			switch {
-			case y < head:
-			case y > head:
+			if along > front {
 				s.Hide(x, y)
-			default:
-				c := s.Cell(x, y)
-				if c.Width != 1 {
-					continue
-				}
-				i := int(hash(x, y, e.Seed^step*0x9e3779b9) * float64(len(decodeGlyphs)))
-				c.Content = decodeGlyphs[i : i+1]
-				c.Style.Fg = s.Env.Fg
-				c.Style.Attrs |= uv.AttrBold
+				continue
 			}
+			c := s.Cell(x, y)
+			if c.Width != 1 {
+				continue
+			}
+			i := int(hash(x, y, e.Seed^step*0x9e3779b9) * float64(len(decodeGlyphs)))
+			c.Content = decodeGlyphs[i : i+1]
+			c.Style.Fg = s.Env.Fg
+			c.Style.Attrs |= uv.AttrBold
 		}
 	}
 }
@@ -153,16 +168,20 @@ func (e Shake) Apply(s *canvas.Surface, t float64) {
 	s.Offset.X += int(math.Round(float64(amount) * math.Sin(2*math.Pi*float64(times)*t) * (1 - t)))
 }
 
-// Shimmer sweeps a highlight band across a node diagonally, for placeholders
-// shown while content loads. t is the band's position: it starts just off the
+// Shimmer sweeps a highlight band across a node, diagonally by default, for
+// placeholders shown while content loads. t is the band's position: it starts just off the
 // node and ends just off the other side, so a value that runs from 0 to 1 and
 // then jumps back to 0 loops seamlessly.
 type Shimmer struct {
 	// Color is what colors are mixed toward in the band; nil is the
 	// terminal's foreground.
 	Color color.Color
-	// Width is how wide the band is, in cells; zero is 6.
+	// Width is how wide the band is, in columns, a row counting as two; zero
+	// is 6.
 	Width int
+	// From is where the band starts. From a side, the band is parallel to
+	// it, and from a corner it is diagonal. The zero value is TopLeft.
+	From Direction
 }
 
 // shimmerStrength is how far colors in the middle of the band move toward
@@ -179,18 +198,34 @@ func (e Shimmer) Apply(s *canvas.Surface, t float64) {
 		width = 6
 	}
 	half := float64(width) / 2
-	// The band is a line at 45 degrees as the terminal draws it, as a cell
-	// is twice as tall as it is wide: position u = x + 2y.
-	span := float64(s.Width() + 2*s.Height())
-	center := -half + min(max(t, 0), 1)*(span+float64(width))
+	// The band's center travels across the surface in columns, rows counting
+	// double, from just before the start to just past the far side. Only the
+	// cells of a row within half of it are touched.
+	sw := newSweep(cmp.Or(e.From, TopLeft), s.Width(), s.Height())
+	center := -half + min(max(t, 0), 1)*(sw.extent()+float64(width))
 	for y := range s.Height() {
-		lo := max(int(math.Ceil(center-half))-2*y, 0)
-		hi := min(int(math.Floor(center+half))-2*y, s.Width()-1)
+		along, dAlong, _, _ := sw.row(y)
+		lo, hi := 0, s.Width()-1
+		if dAlong == 0 {
+			// From the top or bottom, the band covers whole rows.
+			if math.Abs(sw.cols*float64(along)-center) >= half {
+				continue
+			}
+		} else {
+			// The cells whose sweep step is within the band's reach, from the
+			// start of the row, which is the first or the last cell.
+			near, far := (center-half)/sw.cols-float64(along), (center+half)/sw.cols-float64(along)
+			if dAlong < 0 {
+				near, far = -far, -near
+			}
+			lo, hi = max(lo, int(math.Ceil(near))), min(hi, int(math.Floor(far)))
+		}
 		for x := lo; x <= hi; x++ {
 			if !s.Visible(x, y) {
 				continue
 			}
-			k := 1 - math.Abs(float64(x+2*y)-center)/half
+			u := sw.cols * float64(along+dAlong*x)
+			k := 1 - math.Abs(u-center)/half
 			if k <= 0 {
 				continue
 			}

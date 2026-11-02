@@ -384,15 +384,20 @@ func Overlay(base Child, layers ...LayerNode) OverlayNode {
 // View implements [Child], drawing the node at its natural size.
 func (n OverlayNode) View() string { return Render(n, 0, 0) }
 
-// Edge is a side of a node or of the screen.
-type Edge = fx.Edge
+// Direction is a side or a corner of a node or of the screen, such as where
+// a layer is anchored to a node, or where an effect starts from.
+type Direction = fx.Direction
 
-// The sides of a node or of the screen.
+// The sides and corners of a node or of the screen.
 const (
-	Bottom = fx.Bottom
-	Top    = fx.Top
-	Left   = fx.Left
-	Right  = fx.Right
+	Bottom      = fx.Bottom
+	Top         = fx.Top
+	Left        = fx.Left
+	Right       = fx.Right
+	TopLeft     = fx.TopLeft
+	TopRight    = fx.TopRight
+	BottomLeft  = fx.BottomLeft
+	BottomRight = fx.BottomRight
 )
 
 // LayerNode is a child of an [Overlay], such as a dialog, placed over the
@@ -407,7 +412,7 @@ type LayerNode struct {
 	margin    int
 	w, h      int
 	anchor    any
-	side      Edge
+	side      Direction
 	modal     bool
 	absent    bool
 	backdrop  []fx.Effect
@@ -439,9 +444,11 @@ func (n LayerNode) Size(w, h int) LayerNode { n.w, n.h = w, h; return n }
 
 // AnchorTo places the layer against side of the node with ID id in the
 // overlay's base, such as a dropdown below its input, and aligned with its
-// start, shifted to stay on screen. The layer is hidden while no such node
-// is on screen.
-func (n LayerNode) AnchorTo[K comparable](id K, side Edge) LayerNode {
+// start, shifted to stay on screen. A corner places the layer diagonally off
+// that corner of the node, such as below it and to its right for
+// BottomRight. The zero value is Bottom. The layer is hidden while no such
+// node is on screen.
+func (n LayerNode) AnchorTo[K comparable](id K, side Direction) LayerNode {
 	n.anchor, n.side = id, side
 	return n
 }

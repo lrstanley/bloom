@@ -5,6 +5,7 @@
 package fx
 
 import (
+	"cmp"
 	"image"
 
 	"github.com/lrstanley/bloom/canvas"
@@ -36,10 +37,11 @@ func (Fade) Apply(s *canvas.Surface, t float64) {
 	})
 }
 
-// Slide moves a node in from beyond an edge of its viewport, such as a
-// dialog rising from the bottom of the screen.
+// Slide moves a node in from beyond a side or corner of its viewport, such
+// as a dialog rising from the bottom of the screen.
 type Slide struct {
-	From Edge
+	// From is where the node comes from. The zero value is Bottom.
+	From Direction
 }
 
 // Apply implements [Effect].
@@ -48,23 +50,28 @@ func (e Slide) Apply(s *canvas.Surface, t float64) {
 		return
 	}
 	r, vp := s.Rect(), s.Viewport
+	// The node moves against the way from its side or corner.
+	dx, dy := cmp.Or(e.From, Bottom).Vector()
 	var off image.Point
-	switch e.From {
-	case Bottom:
-		off.Y = lerpInt(vp.Max.Y-r.Min.Y, 0, t)
-	case Top:
-		off.Y = lerpInt(vp.Min.Y-r.Max.Y, 0, t)
-	case Left:
+	switch {
+	case dx > 0:
 		off.X = lerpInt(vp.Min.X-r.Max.X, 0, t)
-	case Right:
+	case dx < 0:
 		off.X = lerpInt(vp.Max.X-r.Min.X, 0, t)
+	}
+	switch {
+	case dy > 0:
+		off.Y = lerpInt(vp.Min.Y-r.Max.Y, 0, t)
+	case dy < 0:
+		off.Y = lerpInt(vp.Max.Y-r.Min.Y, 0, t)
 	}
 	s.Offset = s.Offset.Add(off)
 }
 
-// Wipe reveals a node from one edge to the other.
+// Wipe reveals a node from one side or corner to the opposite one.
 type Wipe struct {
-	From Edge
+	// From is where the reveal starts. The zero value is Bottom.
+	From Direction
 }
 
 // Apply implements [Effect].
@@ -72,24 +79,17 @@ func (e Wipe) Apply(s *canvas.Surface, t float64) {
 	if t >= 1 {
 		return
 	}
-	w, h := s.Width(), s.Height()
-	shownX, shownY := int(float64(w)*t), int(float64(h)*t)
-	each(s, func(x, y int) {
-		var shown bool
-		switch e.From {
-		case Left:
-			shown = x < shownX
-		case Right:
-			shown = x >= w-shownX
-		case Top:
-			shown = y < shownY
-		case Bottom:
-			shown = y >= h-shownY
+	sw := newSweep(cmp.Or(e.From, Bottom), s.Width(), s.Height())
+	shown := int(float64(sw.steps()) * t)
+	for y := range s.Height() {
+		along, dAlong, _, _ := sw.row(y)
+		for x := range s.Width() {
+			if along >= shown && s.Visible(x, y) {
+				s.Hide(x, y)
+			}
+			along += dAlong
 		}
-		if !shown {
-			s.Hide(x, y)
-		}
-	})
+	}
 }
 
 // Dissolve reveals a node's cells in a random order, the same for the same

@@ -5,6 +5,7 @@
 package fx
 
 import (
+	"cmp"
 	"image"
 	"image/color"
 	"math"
@@ -134,10 +135,11 @@ func (e Shade) Apply(s *canvas.Surface, t float64) {
 // into slats of Size rows or columns, and every slat is revealed from its
 // leading edge at the same time.
 type Blinds struct {
-	// From is the edge slats open from: Top and Bottom cut the node into
-	// rows, Left and Right into columns. The slats are counted from that edge.
-	// The zero value is Bottom.
-	From Edge
+	// From is the side or corner slats open from: Top and Bottom cut the node
+	// into rows, Left and Right into columns, and a corner into diagonal
+	// slats, Size columns across. The slats are counted from there. The zero
+	// value is Bottom.
+	From Direction
 	// Size is the number of rows or columns in a slat. Zero means 3.
 	Size int
 }
@@ -151,32 +153,33 @@ func (e Blinds) Apply(s *canvas.Surface, t float64) {
 	if size <= 0 {
 		size = 3
 	}
-	w, h := s.Width(), s.Height()
+	sw := newSweep(cmp.Or(e.From, Bottom), s.Width(), s.Height())
 	shown := int(float64(size) * max(t, 0))
-	each(s, func(x, y int) {
-		var pos int // cells from the edge the slats open from
-		switch e.From {
-		case Top:
-			pos = y
-		case Bottom:
-			pos = h - 1 - y
-		case Left:
-			pos = x
-		case Right:
-			pos = w - 1 - x
+	for y := range s.Height() {
+		// How far into its slat each cell is, kept by adding, as a step
+		// along is -1, 0, or 1.
+		along, dAlong, _, _ := sw.row(y)
+		slat := along % size
+		for x := range s.Width() {
+			if slat >= shown && s.Visible(x, y) {
+				s.Hide(x, y)
+			}
+			slat += dAlong
+			if slat == size {
+				slat = 0
+			} else if slat < 0 {
+				slat = size - 1
+			}
 		}
-		if pos%size >= shown {
-			s.Hide(x, y)
-		}
-	})
+	}
 }
 
-// Wave reveals a node behind a front that sweeps in from an edge, wobbling
-// like a wave. The cells just behind the front form a crest, mixed toward
-// the terminal's foreground, which settles into their own colors.
+// Wave reveals a node behind a front that sweeps in from a side or corner,
+// wobbling like a wave. The cells just behind the front form a crest, mixed
+// toward the terminal's foreground, which settles into their own colors.
 type Wave struct {
-	// From is the edge the front starts at. The zero value is Bottom.
-	From Edge
+	// From is where the front starts. The zero value is Bottom.
+	From Direction
 }
 
 const (
@@ -191,56 +194,60 @@ func (e Wave) Apply(s *canvas.Surface, t float64) {
 		return
 	}
 	w, h := s.Width(), s.Height()
-	// Measures are in columns, so rows count double. The front travels along
-	// one axis and wobbles along the other.
-	along, across := float64(w), h
-	if e.From == Top || e.From == Bottom {
-		along, across = float64(2*h), w
+	sw := newSweep(cmp.Or(e.From, Bottom), w, h)
+
+	// Measures are in columns, so rows count double, from the middle of a
+	// cell, counted from the side or corner the front starts at. From a
+	// corner, the front and the way it travels are turned 45 degrees.
+	// Measures are in columns, from the middle of a cell. From a corner they
+	// are taken square to the front, which runs at 45 degrees, so they are
+	// shorter than along a row by √2.
+	norm := 1.0
+	if sw.diagonal() {
+		norm = 1 / math.Sqrt2
 	}
-	amp := min(3, along/6)
-	front := -amp + max(t, 0)*(along+2*amp+waveCrest)
+	length := sw.extent() * norm
+	// How far a cell's middle is is linear in its sweep step.
+	scale, shift := sw.cols*norm, sw.mid(0)*norm
+	amp := min(3, length/6)
+	front := -amp + max(t, 0)*(length+2*amp+waveCrest)
 	phase := t * waveSpeed * 2 * math.Pi
 
-	// The wobble of the front depends only on where across it a cell is.
-	var buf [256]float64
+	// The wobble of the front depends only on how far across it a cell is,
+	// which is the same for every cell of a lane.
+	lo, lanes := sw.lanes()
+	var buf [512]float64
 	wobble := buf[:0]
-	if across > len(buf) {
-		wobble = make([]float64, 0, across)
+	if lanes > len(buf) {
+		wobble = make([]float64, 0, lanes)
 	}
-	for i := range across {
-		pos := float64(i) + 0.5
-		if e.From == Left || e.From == Right {
-			pos *= 2
-		}
-		wobble = append(wobble, amp*math.Sin(pos*2*math.Pi/waveLength+phase))
+	for i := range lanes {
+		across := sw.laneMid(lo+i) * norm
+		wobble = append(wobble, amp*math.Sin(across*2*math.Pi/waveLength+phase))
 	}
 
 	glow := s.Env.Fg
 	if glow == nil {
 		glow = color.White
 	}
-	each(s, func(x, y int) {
-		var pos, cross float64 // from the edge of the front's start, and across
-		switch e.From {
-		case Top:
-			pos, cross = 2*float64(y)+1, wobble[x]
-		case Bottom:
-			pos, cross = 2*float64(h-1-y)+1, wobble[x]
-		case Left:
-			pos, cross = float64(x)+0.5, wobble[y]
-		case Right:
-			pos, cross = float64(w-1-x)+0.5, wobble[y]
+	for y := range h {
+		along, dAlong, lane, dLane := sw.row(y)
+		for x := range w {
+			behind := front + wobble[lane-lo] - (float64(along)*scale + shift)
+			along, lane = along+dAlong, lane+dLane
+			if !s.Visible(x, y) {
+				continue
+			}
+			switch {
+			case behind < 0:
+				s.Hide(x, y)
+			case behind < waveCrest:
+				c := s.Cell(x, y)
+				strength := 1 - behind/waveCrest
+				strength *= strength
+				c.Style.Fg = s.Mix(s.Fg(c), glow, 0.85*strength)
+				c.Style.Bg = s.Mix(s.Bg(c), glow, 0.4*strength)
+			}
 		}
-		behind := front + cross - pos
-		switch {
-		case behind < 0:
-			s.Hide(x, y)
-		case behind < waveCrest:
-			c := s.Cell(x, y)
-			strength := 1 - behind/waveCrest
-			strength *= strength
-			c.Style.Fg = s.Mix(s.Fg(c), glow, 0.85*strength)
-			c.Style.Bg = s.Mix(s.Bg(c), glow, 0.4*strength)
-		}
-	})
+	}
 }

@@ -81,13 +81,18 @@ func TestSlide(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		from Edge
+		from Direction
 		want image.Point
 	}{
 		{Bottom, image.Pt(0, 3)}, // from frame bottom (4) to the layer's top (1)
 		{Top, image.Pt(0, -3)},
 		{Left, image.Pt(-6, 0)},
 		{Right, image.Pt(6, 0)},
+		{TopLeft, image.Pt(-6, -3)},
+		{TopRight, image.Pt(6, -3)},
+		{BottomLeft, image.Pt(-6, 3)},
+		{BottomRight, image.Pt(6, 3)},
+		{0, image.Pt(0, 3)}, // the default, Bottom.
 	}
 	for _, tt := range tests {
 		s := layer()

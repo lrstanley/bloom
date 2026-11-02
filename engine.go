@@ -559,15 +559,21 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 			e.boxes[i].hidden = true
 			return
 		}
-		switch n.side {
-		case Bottom:
-			at = image.Pt(target.Min.X, target.Max.Y)
-		case Top:
-			at = image.Pt(target.Min.X, target.Min.Y-h)
-		case Right:
-			at = image.Pt(target.Max.X, target.Min.Y)
-		case Left:
-			at = image.Pt(target.Min.X-w, target.Min.Y)
+		// The layer goes beyond the side or corner, against the way from it
+		// across the node, and lines up with the node's start otherwise.
+		at = target.Min
+		dx, dy := cmp.Or(n.side, Bottom).Vector()
+		switch {
+		case dx < 0:
+			at.X = target.Max.X
+		case dx > 0:
+			at.X = target.Min.X - w
+		}
+		switch {
+		case dy < 0:
+			at.Y = target.Max.Y
+		case dy > 0:
+			at.Y = target.Min.Y - h
 		}
 		at.X = min(max(at.X, area.Min.X), area.Max.X-w)
 		at.Y = min(max(at.Y, area.Min.Y), area.Max.Y-h)

@@ -42,6 +42,21 @@ always there, or with progress you compute yourself:
 bloom.Transition(m.reveal.Float(), chart, fx.Typewriter{})
 ```
 
+## Pick a direction
+
+Effects that travel across a node, `Slide`, `Wipe`, `Decode`, `Blinds`, `Wave`, and `Shimmer`, take a `From`
+direction: a side, or a corner to run diagonally.
+
+```go
+fx.Wipe{From: bloom.TopLeft}       // reveals from the top left corner to the bottom right
+fx.Decode{From: bloom.Left}        // rows decode into place from the left
+fx.Slide{From: bloom.BottomRight}  // moves in from beyond the bottom right corner
+```
+
+Leaving `From` out uses the effect's default, such as `Bottom` for a slide and `Top` for `Decode`'s rain. Matching
+the direction to where something came from makes the motion read as a move: an item that shifts left to make room
+can decode in from the right.
+
 ## Showing and hiding use the same effects
 
 When a presence hides, its progress runs back from 1 to 0, so the effects play in reverse: a dialog that slides up
@@ -73,8 +88,8 @@ one item at a time:
 fx.Stagger{Effect: fx.Slide{From: bloom.Left}, From: bloom.Top}
 ```
 
-`From` is the edge the first part is at: `Top` and `Bottom` split the node into rows, and `Left` and `Right` into
-columns. `Spread` is how much of the progress is spent starting the parts; the default, 0.5, starts the last part
+`From` is the side the first part is at: `Top` and `Bottom` split the node into rows, and `Left` and `Right` into
+columns. Parts are whole rows or columns, so a corner is taken as its top or bottom side. `Spread` is how much of the progress is spent starting the parts; the default, 0.5, starts the last part
 when the first is halfway done.
 
 ### Run in sequence with Delay

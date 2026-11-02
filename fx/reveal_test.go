@@ -107,6 +107,13 @@ var revealEffects = map[string]Effect{
 	"wave left":    Wave{From: Left},
 	"wave top":     Wave{From: Top},
 	"wave right":   Wave{From: Right},
+
+	"blinds top left":     Blinds{From: TopLeft},
+	"blinds bottom right": Blinds{From: BottomRight, Size: 2},
+	"wave top left":       Wave{From: TopLeft},
+	"wave top right":      Wave{From: TopRight},
+	"wave bottom left":    Wave{From: BottomLeft},
+	"wave bottom right":   Wave{From: BottomRight},
 }
 
 func TestReveals(t *testing.T) {
@@ -377,7 +384,7 @@ func TestBlinds(t *testing.T) {
 func TestWave(t *testing.T) {
 	t.Parallel()
 
-	for _, from := range []Edge{Bottom, Top, Left, Right} {
+	for _, from := range []Direction{Bottom, Top, Left, Right} {
 		s := boxLayer(40, 12)
 		Wave{From: from}.Apply(s, 0.5)
 
@@ -392,6 +399,8 @@ func TestWave(t *testing.T) {
 			near, far = image.Pt(0, 6), image.Pt(39, 6)
 		case Right:
 			near, far = image.Pt(39, 6), image.Pt(0, 6)
+		case TopLeft, TopRight, BottomLeft, BottomRight:
+			t.Fatalf("no case for %d", from)
 		}
 		if !s.Visible(near.X, near.Y) || s.Visible(far.X, far.Y) {
 			t.Fatalf("from %d: near visible=%v, far visible=%v", from, s.Visible(near.X, near.Y), s.Visible(far.X, far.Y))
@@ -489,6 +498,10 @@ func BenchmarkBlindsFullScreen(b *testing.B) { benchReveal(b, Blinds{From: Top})
 func BenchmarkWaveFullScreen(b *testing.B)   { benchReveal(b, Wave{From: Left}) }
 func BenchmarkWaveTopFullScreen(b *testing.B) {
 	benchReveal(b, Wave{From: Top})
+}
+
+func BenchmarkWaveCornerFullScreen(b *testing.B) {
+	benchReveal(b, Wave{From: BottomRight})
 }
 
 func TestUnfoldInColumnsKeepsGlyphsWhole(t *testing.T) {
