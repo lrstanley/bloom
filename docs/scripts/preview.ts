@@ -1,9 +1,9 @@
-// Serves the built site under /bloom/, as GitHub Pages does, so base-path links resolve locally.
+// Serves the built site under BASE, as GitHub Pages does, so base-path links resolve locally.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 
-const BASE = "/bloom/";
+const BASE = "/";
 const ROOT = join(import.meta.dirname, "..", "dist", "public");
 const port = Number(process.env.PORT ?? 3000);
 

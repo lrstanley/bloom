@@ -102,10 +102,10 @@ over.
 
 ## :gear: Usage
 
-Take a look at the [official documentation](https://lrstanley.github.io/bloom/) for tutorials, guides, and
-reference, starting with [building your first layout](https://lrstanley.github.io/bloom/getting-started/first-layout).
-The documentation is also available for LLMs and agents as [llms.txt](https://lrstanley.github.io/bloom/llms.txt)
-and [llms-full.txt](https://lrstanley.github.io/bloom/llms-full.txt), and every page has a markdown version.
+Take a look at the [official documentation](https://bloomfx.dev/) for tutorials, guides, and
+reference, starting with [building your first layout](https://bloomfx.dev/getting-started/first-layout).
+The documentation is also available for LLMs and agents as [llms.txt](https://bloomfx.dev/llms.txt)
+and [llms-full.txt](https://bloomfx.dev/llms-full.txt), and every page has a markdown version.
 
 ```go
 func (m *model) View() tea.View {

@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import press from "fumapress/vite";
 import { fumadocsMdx } from "fumadocs-mdx/vite";
 
-// Served from GitHub Pages at https://lrstanley.github.io/bloom/.
+// Served from GitHub Pages at https://bloomfx.dev/.
 export default defineConfig({
-  plugins: [press({ basePath: "/bloom/" }), fumadocsMdx(), tailwindcss()],
+  plugins: [press({ basePath: "/" }), fumadocsMdx(), tailwindcss()],
 });

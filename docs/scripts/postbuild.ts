@@ -1,5 +1,5 @@
-// Post-build fixups and checks for the static site in dist/public, which is served from a sub-path on
-// GitHub Pages (https://lrstanley.github.io/bloom/).
+// Post-build fixups and checks for the static site in dist/public, which is served from GitHub Pages
+// (https://bloomfx.dev/).
 //
 //  1. The markdown outputs (llms.txt, llms-full.txt, /<page>.md) are generated with root-relative links
 //     (e.g. /guides/dialogs). Rewrite links to other pages to the absolute URL of their markdown version
@@ -10,8 +10,8 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const SITE = "https://lrstanley.github.io/bloom";
-const BASE = new URL(SITE).pathname; // "/bloom"
+const SITE = "https://bloomfx.dev";
+const BASE = new URL(SITE).pathname.replace(/\/$/, ""); // "" when served from the root
 const OUT = join(import.meta.dirname, "..", "dist", "public");
 
 function walk(dir: string): string[] {

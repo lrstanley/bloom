@@ -10,8 +10,8 @@
 // See the [documentation] for guides and examples. It is also available for
 // LLMs and agents as [llms.txt].
 //
-// [documentation]: https://lrstanley.github.io/bloom/
-// [llms.txt]: https://lrstanley.github.io/bloom/llms.txt
+// [documentation]: https://bloomfx.dev/
+// [llms.txt]: https://bloomfx.dev/llms.txt
 package canvas
 
 import (
