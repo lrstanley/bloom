@@ -120,6 +120,22 @@ func TestEventIsRelativeToHandlerNode(t *testing.T) {
 	}
 }
 
+func TestRightClickAt(t *testing.T) {
+	t.Parallel()
+
+	var got []on.Event
+	box := Text("menu").On(on.RightClickAt(func(e on.Event) tea.Cmd { got = append(got, e); return nil }))
+	r := New()
+	r.Render(30, 5, Row(Fixed(4, nil), Fixed(10, box)))
+
+	r.ClickAt(6, 0)
+	r.Update(tea.MouseClickMsg{X: 5, Y: 0, Button: tea.MouseRight})
+	r.Update(tea.MouseReleaseMsg{X: 7, Y: 0, Button: tea.MouseRight})
+	if len(got) != 1 || got[0].X != 3 || got[0].Screen != image.Pt(7, 0) || !got[0].Inside {
+		t.Fatalf("RightClickAt got %+v, want one event at 3,0 where the button came up", got)
+	}
+}
+
 func TestDoubleClick(t *testing.T) {
 	t.Parallel()
 

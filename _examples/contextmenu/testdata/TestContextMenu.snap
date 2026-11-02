@@ -1,0 +1,16 @@
+╭──────────────────────────────────────────────────────────────╮
+│ go.mod                  312 B     Open                       │
+│ main.go                2.1 kB     Duplicate                  │
+│ model.go               4.8 kB     Copy path                  │
+│ styles.go               920 B     ──────────────             │
+│ untitled-1.txt            0 B     Delete                     │
+│ update.go              1.7 kB                                │
+│ view copy.go           3.3 kB                                │
+│ view.go                3.3 kB                                │
+│                                                              │
+│                                                              │
+│                                                              │
+│                                                              │
+│                                                              │
+╰──────────────────────────────────────────────────────────────╯
+ selected go.mod                                                

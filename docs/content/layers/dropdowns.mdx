@@ -7,6 +7,11 @@ A dropdown is a layer placed against another node, rather than against the scree
 [`AnchorTo(id, side)`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.AnchorTo) puts a layer against a side
 of the node with that ID, aligned with its start.
 
+The [contextmenu example](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu) opens a menu
+where you right click instead, with `on.RightClickAt`, and closes it with a click outside:
+
+![The contextmenu example: right click menus on a file list and its empty space, duplicating, adding, sorting, and deleting files, with menus that open to the left near the edge](/demos/contextmenu.webp)
+
 ## Show suggestions below an input
 
 Give the input an ID, then anchor a layer to its bottom edge:

@@ -51,7 +51,7 @@ and layers all have `On`.
 | `on.RightClick(fn)`, `on.MiddleClick(fn)` | a click with those buttons |
 | `on.DoubleClick(fn)` | the second of two clicks within 400ms; both clicks still run `Click` |
 | `on.Press(fn)` | a left click, or <kbd>enter</kbd> or <kbd>space</kbd> while the node has [focus](/input/focus#press-buttons-with-the-keyboard) |
-| `on.ClickAt(fn)` | a left click, with where it happened |
+| `on.ClickAt(fn)`, `on.RightClickAt(fn)` | a left or right click, with where it happened |
 | `on.Scroll(fn)` | the wheel, as `dx, dy` steps |
 | `on.Hover(fn)` | the pointer moving onto the node (`true`) or off it (`false`) |
 | `on.Drag(fn)` | the button going down on the node, the pointer moving while it's held, and it coming up |
@@ -258,3 +258,5 @@ if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
 - [`on` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/on)
 - The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double
   clicks, the wheel, and a draggable divider
+- The [`contextmenu` example](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu), with right
+  click menus that open at the pointer

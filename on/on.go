@@ -62,7 +62,7 @@ type Kind uint8
 const (
 	KindClick Kind = iota + 1 // [Click] and [ClickAt]
 	KindPress
-	KindRightClick
+	KindRightClick // [RightClick] and [RightClickAt]
 	KindMiddleClick
 	KindDoubleClick
 	KindScroll
@@ -106,6 +106,10 @@ func ClickAt(fn func(e Event) tea.Cmd) Handler { return Handler{kind: KindClick,
 // RightClick runs fn when the right button is pressed and released over
 // the node.
 func RightClick(fn func() tea.Cmd) Handler { return simple(KindRightClick, fn) }
+
+// RightClickAt runs fn when the right button is pressed and released over
+// the node, with where it was released, such as to open a menu there.
+func RightClickAt(fn func(e Event) tea.Cmd) Handler { return Handler{kind: KindRightClick, fn: fn} }
 
 // MiddleClick runs fn when the middle button is pressed and released over
 // the node.
