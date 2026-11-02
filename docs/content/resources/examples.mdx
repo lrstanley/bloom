@@ -12,22 +12,145 @@ cd bloom/_examples
 go run ./forms
 ```
 
-| Example | Shows | Related pages |
-| --- | --- | --- |
-| [basics](https://github.com/lrstanley/bloom/tree/master/_examples/basics) | Layouts printed with `Render`, without a program: every slot, `Min` and `Max`, `Collapsible`, gaps, `Justify`, `Align`, `Space`, `Box`, wrapping text, `Centered`, and a layout inside Lip Gloss | [Sizing with slots](/layout/slots), [Text, boxes, and alignment](/layout/text-and-boxes) |
-| [standard](https://github.com/lrstanley/bloom/tree/master/_examples/standard) | The usual shape of a program: a sidebar that's a `Layouter`, a plain component as the reader, a `Measurer` status bar, and clicks | [Build your first layout](/getting-started/first-layout) |
-| [responsive](https://github.com/lrstanley/bloom/tree/master/_examples/responsive) | Panels collapsing by priority, `Percent`, a toolbar that rebuilds for its width, wrapping tags, paging with `Solve` in `Update`, and wheel scrolling | [Responsive layouts](/layout/responsive), [Scrolling](/layout/scrolling) |
-| [mouse](https://github.com/lrstanley/bloom/tree/master/_examples/mouse) | Mouse handlers with no IDs: hover styles, click and double click, wheel scrolling, a divider that keeps its drag, and `ThrottleMouse` | [Mouse events](/input/mouse) |
-| [contextmenu](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu) | Right click menus on a file list and its empty space: a layer opened at the pointer with `on.RightClickAt` that flips to stay on screen, hover styles, and `on.ClickOutside` to close it | [Mouse events](/input/mouse), [Dropdowns](/layers/dropdowns) |
-| [forms](https://github.com/lrstanley/bloom/tree/master/_examples/forms) | Focusable inputs with the cursor, an anchored autocomplete dropdown, stacked modal dialogs as focus scopes, recolored backdrops, shadows, a spring entrance, and a toast | [Dialogs and modals](/layers/dialogs), [Focus](/input/focus), [Dropdowns](/layers/dropdowns) |
-| [borders](https://github.com/lrstanley/bloom/tree/master/_examples/borders) | A list with a title, clickable filter tabs, icon buttons, and its position on its border, scrollbars on the border with `ScrollbarOf` that can be dragged, a log scrolled sideways with `X`, text down a side, and each looping border effect | [Text, boxes, and alignment](/layout/text-and-boxes#put-titles-and-more-on-a-border), [Scrolling](/layout/scrolling#show-a-scrollbar), [Effects reference](/reference/effects#borders) |
-| [effects](https://github.com/lrstanley/bloom/tree/master/_examples/effects) | Every effect as a looping transition, two custom effects, a `Drawable`, and each backdrop | [Effects reference](/reference/effects), [Custom effects](/motion/custom-effects) |
-| [transitions](https://github.com/lrstanley/bloom/tree/master/_examples/transitions) | `Unfold`, `Iris`, `Shade`, `Blinds`, `Wave`, the `Stagger`, `Delay`, `Reverse`, and `Ease` combinators, and dialogs opening from their button | [Transitions](/motion/transitions) |
-| [launch](https://github.com/lrstanley/bloom/tree/master/_examples/launch) | A deploy console: shimmering placeholders, rolling numbers, a shake on wrong input, a spotlight tour with `Decode`, confetti, and a glitching badge | [Feedback effects](/motion/feedback-effects) |
-| [ticker](https://github.com/lrstanley/bloom/tree/master/_examples/ticker) | `Marquee` headlines and list items, and `anim.Sequence` for a banner and a pulse | [Feedback effects](/motion/feedback-effects#scroll-text-that-doesnt-fit), [Animating values](/motion/animating-values) |
-| [reflow](https://github.com/lrstanley/bloom/tree/master/_examples/reflow) | Layout animation with `Animate`: a sidebar, a re-sorting list, a changing split, a panel coming and going, and a layer following the selection | [Layout animation](/motion/layout-animation) |
-| [dashboard](https://github.com/lrstanley/bloom/tree/master/_examples/dashboard) | Everything together at 120 frames a second, with the time each frame takes | [Rendering and performance](/concepts/rendering) |
-| [showcase](https://github.com/lrstanley/bloom/tree/master/_examples/showcase) | A bit of everything, themed with bubbletint: tints that wave in with a decoding toast, panes that float under the pointer as they're dragged by their titles, and zoom with a double click, collapsing panes, and a spotlight tour | [Related libraries](/resources/related-libraries#bubbletint), [Layout animation](/motion/layout-animation), [Mouse events](/input/mouse) |
+Every example except `basics` and `standard` has a recording of its tour below, made by its tests.
+
+## basics
+
+Layouts printed with `Render`, without a program: every slot, `Min` and `Max`, `Collapsible`, gaps, `Justify`,
+`Align`, `Space`, `Box`, wrapping text, `Centered`, and a layout inside Lip Gloss.
+
+See also: [Sizing with slots](/layout/slots), [Text, boxes, and alignment](/layout/text-and-boxes).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/basics), or `go run ./basics`.
+
+## standard
+
+The usual shape of a program: a sidebar that's a `Layouter`, a plain component as the reader, a `Measurer` status
+bar, and clicks.
+
+See also: [Build your first layout](/getting-started/first-layout).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/standard), or `go run ./standard`.
+
+## responsive
+
+![The responsive example: paging and scrolling the reader, then the toolbar dropping its labels, the details panel, and the navigation as the terminal narrows](/demos/responsive.webp)
+
+Panels collapsing by priority, `Percent`, a toolbar that rebuilds for its width, wrapping tags, paging with `Solve`
+in `Update`, and wheel scrolling.
+
+See also: [Responsive layouts](/layout/responsive), [Scrolling](/layout/scrolling).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/responsive), or `go run ./responsive`.
+
+## mouse
+
+![The mouse example: a hover style following the pointer down a list, a click and a double click opening a file, the wheel scrolling it, and the divider dragged wider and narrower](/demos/mouse.webp)
+
+Mouse handlers with no IDs: hover styles, click and double click, wheel scrolling, a divider that keeps its drag, and
+`ThrottleMouse`.
+
+See also: [Mouse events](/input/mouse). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), or
+`go run ./mouse`.
+
+## contextmenu
+
+![The contextmenu example: right click menus on a file list and its empty space, duplicating, adding, sorting, and deleting files, with menus that open to the left near the edge](/demos/contextmenu.webp)
+
+Right click menus on a file list and its empty space: a layer opened at the pointer with `on.RightClickAt` that flips
+to stay on screen, hover styles, and `on.ClickOutside` to close it.
+
+See also: [Mouse events](/input/mouse), [Dropdowns](/layers/dropdowns).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu), or `go run ./contextmenu`.
+
+## forms
+
+![The forms example: a form with an autocomplete dropdown, then two stacked modal dialogs over a recolored backdrop](/demos/forms.webp)
+
+Focusable inputs with the cursor, an anchored autocomplete dropdown, stacked modal dialogs as focus scopes, recolored
+backdrops, shadows, a spring entrance, and a toast.
+
+See also: [Dialogs and modals](/layers/dialogs), [Focus](/input/focus), [Dropdowns](/layers/dropdowns).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/forms), or `go run ./forms`.
+
+## borders
+
+![The borders example: a list with a title, clickable filter tabs, its position, and icon buttons on its border, its scrollbar being dragged and clicked, a log scrolled sideways with a horizontal scrollbar and its name down its side, next to boxes looping each border effect](/demos/borders.webp)
+
+A list with a title, clickable filter tabs, icon buttons, and its position on its border, scrollbars on the border
+with `ScrollbarOf` that can be dragged, a log scrolled sideways with `X`, text down a side, and each looping border
+effect.
+
+See also: [Text, boxes, and alignment](/layout/text-and-boxes#put-titles-and-more-on-a-border),
+[Scrolling](/layout/scrolling#show-a-scrollbar), [Effects reference](/reference/effects#borders).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/borders), or `go run ./borders`.
+
+## effects
+
+![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, Tint, and Recolor backdrops in turn](/demos/effects.webp)
+
+Every effect as a looping transition, two custom effects, a `Drawable`, and each backdrop.
+
+See also: [Effects reference](/reference/effects), [Custom effects](/motion/custom-effects).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/effects), or `go run ./effects`.
+
+## transitions
+
+![The transitions example: a gallery of transitions entering and leaving, then dialogs opening with an iris and unfolding from the button that was used](/demos/transitions.webp)
+
+`Unfold`, `Iris`, `Shade`, `Blinds`, `Wave`, the `Stagger`, `Delay`, `Reverse`, and `Ease` combinators, and dialogs opening from their button.
+
+See also: [Transitions](/motion/transitions).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/transitions), or `go run ./transitions`.
+
+## launch
+
+![The launch example: cards shimmer until their data arrives, numbers roll, a spotlight tour decodes each card, a wrong confirmation shakes, and the deploy bursts into confetti](/demos/launch.webp)
+
+A deploy console: shimmering placeholders, rolling numbers, a shake on wrong input, a spotlight tour with `Decode`,
+confetti, and a glitching badge.
+
+See also: [Feedback effects](/motion/feedback-effects).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/launch), or `go run ./launch`.
+
+## ticker
+
+![The ticker example: a scrolling news ticker above a list whose selected name scrolls when it doesn't fit, and a banner sliding in and out](/demos/ticker.webp)
+
+`Marquee` headlines and list items, and `anim.Sequence` for a banner and a pulse.
+
+See also: [Feedback effects](/motion/feedback-effects#scroll-text-that-doesnt-fit), [Animating
+values](/motion/animating-values). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/ticker), or `go
+run ./ticker`.
+
+## reflow
+
+![The reflow example: the sidebar closing and opening, the list re-sorting, the split changing ratio, and the details panel coming and going, each gliding into place](/demos/reflow.webp)
+
+Layout animation with `Animate`: a sidebar, a re-sorting list, a changing split, a panel coming and going, and a
+layer following the selection.
+
+See also: [Layout animation](/motion/layout-animation).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/reflow), or `go run ./reflow`.
+
+## dashboard
+
+![The dashboard example: selecting services, a restart dialog over a dimmed backdrop, toasts with each effect, the sidebar springing shut and open, and panels collapsing as the terminal narrows](/demos/dashboard.webp)
+
+Everything together at 120 frames a second, with the time each frame takes.
+
+See also: [Rendering and performance](/concepts/rendering).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/dashboard), or `go run ./dashboard`.
+
+## showcase
+
+![The showcase example: picking tints that wave in across every pane, a pane dragged by its title while the others fly out of its way, a pane zoomed with a double click, a spotlight tour, and panes collapsing as the terminal narrows](/demos/showcase.webp)
+
+A bit of everything, themed with bubbletint: tints that wave in with a decoding toast, panes that float under the
+pointer as they're dragged by their titles, and zoom with a double click, collapsing panes, and a spotlight tour.
+
+See also: [Related libraries](/resources/related-libraries#bubbletint), [Layout animation](/motion/layout-animation),
+[Mouse events](/input/mouse). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/showcase), or `go run
+./showcase`.
+
+## Run and record them
 
 Each example's comment at the top of `main.go` lists its keys. Most quit with <kbd>q</kbd> or <kbd>ctrl+c</kbd>.
 
