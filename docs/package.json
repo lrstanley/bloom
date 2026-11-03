@@ -7,7 +7,7 @@
     "dev": "fumapress dev",
     "build": "fumapress build && bun scripts/postbuild.ts && tsc --noEmit",
     "start": "fumapress start",
-    "preview": "bun scripts/preview.ts",
+    "preview": "bunx wrangler dev",
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
