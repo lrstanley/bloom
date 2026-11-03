@@ -17,17 +17,45 @@ import (
 	"github.com/lrstanley/x/term/steep"
 )
 
-// find returns the cell text starts at on screen.
-func find(t *testing.T, h *steep.Harness, text string) (x, y int) {
-	t.Helper()
-	view := h.View()
+// locate returns the cell text starts at in view.
+func locate(view, text string) (x, y int, ok bool) {
 	for y, line := range strings.Split(view, "\n") {
 		if before, _, ok := strings.Cut(line, text); ok {
-			return ansi.StringWidth(before), y
+			return ansi.StringWidth(before), y, true
 		}
 	}
-	t.Fatalf("%q is not on screen:\n%s", text, view)
-	return 0, 0
+	return 0, 0, false
+}
+
+// find returns the cell text starts at on screen, waiting for it first: a
+// tint's wave can still be scrambling the panes when a slow (such as -race)
+// run gets here.
+func find(t *testing.T, h *steep.Harness, text string) (x, y int) {
+	t.Helper()
+	view := h.Wait(text).View()
+	x, y, ok := locate(view, text)
+	if !ok {
+		t.Fatalf("%q is not on screen:\n%s", text, view)
+	}
+	return x, y
+}
+
+// movedPast reports whether the Activity pane's title is right of the
+// Services pane's in view.
+func movedPast(view string) bool {
+	a, _, aok := locate(view, "⠿ Activity")
+	s, _, sok := locate(view, "⠿ Services")
+	return aok && sok && a > s
+}
+
+// checkMovedPast waits for Activity to be dragged past Services, then checks
+// it is still there once the panes have glided into their places.
+func checkMovedPast(t *testing.T, h *steep.Harness) {
+	t.Helper()
+	h.WaitFor(reel.ScreenFunc(movedPast)).Sleep(1200 * time.Millisecond)
+	if view := h.View(); !movedPast(view) {
+		t.Fatalf("Activity did not move past Services:\n%s", view)
+	}
 }
 
 // pick clicks the tint named name in the sidebar, and waits for the panes
@@ -58,11 +86,7 @@ func TestShowcase(t *testing.T) {
 	x1, y1 := find(t, h, "⠿ Activity")
 	x2, y2 := find(t, h, "⠿ Services")
 	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+20, y2+4, reel.Delay(20*time.Millisecond))
-	h.Sleep(1200 * time.Millisecond)
-	a, _ := find(t, h, "⠿ Activity")
-	if s, _ := find(t, h, "⠿ Services"); a < s {
-		t.Fatalf("Activity did not move past Services:\n%s", h.View())
-	}
+	checkMovedPast(t, h)
 	pick(t, h, "Catppuccin Mocha")
 
 	// A double click zooms a pane, and another gives the rest their width
@@ -94,17 +118,12 @@ func TestShowcase(t *testing.T) {
 func TestDragPastCollapsed(t *testing.T) {
 	t.Parallel()
 
-	m := newModel()
-	h := steep.NewHarness(t, m, steep.WithWindowSize(96, 24))
+	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(96, 24))
 	h.Wait("billing").WaitNot("⠿ Palette").Sleep(800 * time.Millisecond)
 	x1, y1 := find(t, h, "⠿ Activity")
 	x2, y2 := find(t, h, "⠿ Services")
 	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+24, y2+4, reel.Delay(20*time.Millisecond))
-	h.Sleep(1200 * time.Millisecond)
-	a, _ := find(t, h, "⠿ Activity")
-	if s, _ := find(t, h, "⠿ Services"); a < s {
-		t.Fatalf("Activity did not move past Services, order %v:\n%s", m.order, h.View())
-	}
+	checkMovedPast(t, h)
 	h.Key("q")
 	h.WaitFinished()
 }
