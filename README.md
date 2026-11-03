@@ -75,31 +75,32 @@ over.
 > bloom is still pre-1.0. Its API may change drastically until the v1.0.0 release, so expect breaking changes
 > between versions, and pin the version you use.
 
-- :straight_ruler: **Layout without the math**: `Row`, `Column`, `Grid`, and `Wrap`, with `Fixed`, `Fill`, `Grow`,
+- :heavy_check_mark: **Layout without the math**: `Row`, `Column`, `Grid`, and `Wrap`, with `Fixed`, `Fill`, `Grow`,
   `Percent`, and natural-size slots, `Min`/`Max`, gaps, alignment, and justification. No more measuring rendered
   strings and subtracting borders on every resize.
-- :iphone: **Responsive by priority**: panels marked `Collapsible` drop out when the terminal is too small, lowest
-  priority first, and components can build a different layout for the space they're given.
-- :card_index_dividers: **Real layers**: `Overlay` draws dialogs, dropdowns, popovers, and toasts over the screen,
+- :heavy_check_mark: **Responsive by priority**: panels marked `Collapsible` drop out when the terminal is too
+  small, lowest priority first, and components can build a different layout for the space they're given.
+- :heavy_check_mark: **Real layers**: `Overlay` draws dialogs, dropdowns, popovers, and toasts over the screen,
   anchored to a corner or to another node, with backdrops, drop shadows, and modal input.
-- :computer_mouse: **Mouse handlers**: clicks, double clicks, the wheel, hover, and drags go to handlers on the
-  nodes they're about, `bloom.Text(name).On(on.Click(m.open))`, with hover styles and drag capture built in.
-- :keyboard: **Focus**: tab order from the layout, focused styles, the real terminal cursor, and focus scopes that
-  keep <kbd>tab</kbd> inside a dialog until it closes.
-- :sparkles: **Animation kept in your model**: eased and spring values, presences for showing and hiding (with
-  `ShowFor` for toasts that hide themselves), sequences of steps, and automatic layout animation with `Animate()`.
-- :art: **25+ cell effects**: `Fade`, `Slide`, `Iris`, `Unfold`, `Decode`, `Glitch`, and more as transitions; `Dim`,
-  `Desaturate`, `Tint`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst` for feedback;
-  `Chase`, `Pulse`, `Comet`, and `March` for looping borders; and combinators to stagger, delay, reverse, and ease
-  them. Or write your own.
-- :framed_picture: **More on a border**: titles, clickable tabs, icon buttons, and counters on a box's border with
-  `Edge`, and scrollbars there that can be dragged, which only show while there's more to scroll to.
-- :hourglass_flowing_sand: **Loading placeholders**: `Skeleton(8, 0, 5, 11)` draws shimmering bars in place of
-  content that's still loading, a line for each line of the content, so nothing jumps when it arrives.
-- :jigsaw: **Works with what you have**: anything with a `View() string` method, including
+- :heavy_check_mark: **Mouse handlers**: clicks, double clicks, the wheel, hover, and drags go to handlers on the
+  nodes they belong to, like `bloom.Text(name).On(on.Click(m.open))`. Hover styles and drag capture are built in.
+- :heavy_check_mark: **Focus**: tab order from the layout, focused styles, the real terminal cursor, and focus
+  scopes that keep <kbd>tab</kbd> inside a dialog until it closes.
+- :heavy_check_mark: **Animation kept in your model**: eased and spring values, presences for showing and hiding
+  (with `ShowFor` for toasts that hide themselves), sequences of steps, and automatic layout animation with
+  `Animate()`.
+- :heavy_check_mark: **25+ cell effects**: `Fade`, `Slide`, `Iris`, `Unfold`, `Decode`, `Glitch`, and more as
+  transitions; `Dim`, `Desaturate`, `Tint`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst`
+  for feedback; `Chase`, `Pulse`, `Comet`, and `March` for looping borders; and combinators to stagger, delay,
+  reverse, and ease them. Or write your own.
+- :heavy_check_mark: **Borders that do more**: put titles, clickable tabs, icon buttons, and counters on a box's
+  border with `Edge`, plus draggable scrollbars that only show up when there's more to scroll.
+- :heavy_check_mark: **Loading placeholders**: `Skeleton(8, 0, 5, 11)` draws shimmering bars in place of content
+  that's still loading, a line for each line of the content, so nothing jumps when it arrives.
+- :heavy_check_mark: **Works with existing components**: anything with a `View() string` method, including
   [Bubbles](https://github.com/charmbracelet/bubbles) components, is a leaf in the tree.
-- :zap: **Fast**: strings are parsed once, Lip Gloss renders are cached, and unchanged frames aren't composited
-  again. A 200×60 dashboard animating a dialog over a dimmed backdrop takes about 0.45ms a frame.
+- :heavy_check_mark: **Fast**: strings are parsed once, Lip Gloss renders are cached, and unchanged frames aren't
+  composited again. A 200×60 dashboard animating a dialog over a dimmed backdrop takes about 0.45ms a frame.
 
 ---
 
