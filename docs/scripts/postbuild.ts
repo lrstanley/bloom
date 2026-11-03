@@ -1,4 +1,4 @@
-// Post-build fixups and checks for the static site in dist/public, which is served from GitHub Pages
+// Post-build fixups and checks for the static site in dist/public, which is served from Cloudflare
 // (https://bloomfx.dev/).
 //
 //  1. The markdown outputs (llms.txt, llms-full.txt, /<page>.md) are generated with root-relative links

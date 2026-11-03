@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import press from "fumapress/vite";
 import { fumadocsMdx } from "fumadocs-mdx/vite";
 
-// Served from GitHub Pages at https://bloomfx.dev/.
+// Served from Cloudflare (see wrangler.jsonc) at https://bloomfx.dev/.
 export default defineConfig({
   plugins: [press({ basePath: "/" }), fumadocsMdx(), tailwindcss()],
 });

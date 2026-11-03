@@ -1,4 +1,4 @@
-// Serves the built site under BASE, as GitHub Pages does, so base-path links resolve locally.
+// Serves the built site under BASE, as Cloudflare does, so base-path links resolve locally.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";

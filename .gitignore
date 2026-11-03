@@ -11,3 +11,4 @@ dist
 **/bin/**
 *.out
 **/go.work*
+/docs/.wrangler
