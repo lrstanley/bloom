@@ -6,96 +6,14 @@ package bloom
 
 import (
 	"image"
-	"image/color"
 	"strings"
 	"testing"
-	"unsafe"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
 )
-
-var rounded = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
-
-func TestBoxEdges(t *testing.T) {
-	t.Parallel()
-
-	box := Box(rounded, Text("body").ID("body")).
-		Edge(Top, Start, Text("title").ID("title")).
-		Edge(Top, End, Text("1/9").ID("count")).
-		Edge(Top, End, Text("!").ID("flag")).
-		Edge(Bottom, Center, Text("help").ID("help")).
-		Edge(Right, Stretch, Text("x\nx\nx").ID("bar"))
-	f := Solve(box, 20, 5)
-	expectRect(t, f, "body", image.Rect(1, 1, 19, 4))
-	expectRect(t, f, "title", image.Rect(2, 0, 7, 1))
-	expectRect(t, f, "count", image.Rect(15, 0, 18, 1))
-	expectRect(t, f, "flag", image.Rect(13, 0, 14, 1))
-	expectRect(t, f, "help", image.Rect(8, 4, 12, 1+4))
-	expectRect(t, f, "bar", image.Rect(19, 1, 20, 4))
-
-	want := strings.Join([]string{
-		"╭─title──────!─1/9─╮",
-		"│body              x",
-		"│                  x",
-		"│                  x",
-		"╰───────help───────╯",
-	}, "\n")
-	if got := ansi.Strip(Render(box, 20, 5)); got != want {
-		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
-	}
-}
-
-func TestBoxEdgesShareWhatIsLeft(t *testing.T) {
-	t.Parallel()
-
-	// The ends are placed first and given what they want while there is
-	// room; the middle gets what is left, centered as far as the ends allow.
-	box := Box(rounded, nil).
-		Edge(Top, Center, Text("mid").ID("mid")).
-		Edge(Top, Start, Text("abcdef").ID("a")).
-		Edge(Top, End, Text("xyz").ID("z"))
-	f := Solve(box, 14, 3)
-	expectRect(t, f, "a", image.Rect(2, 0, 8, 1))
-	expectRect(t, f, "z", image.Rect(9, 0, 12, 1))
-	if _, ok := f.Rect("mid"); ok {
-		t.Fatal("a middle child with no room left was shown")
-	}
-
-	f = Solve(box, 20, 3)
-	expectRect(t, f, "mid", image.Rect(9, 0, 12, 1))
-
-	// Clipped to the room there is, rather than drawn over the corner.
-	if got := ansi.Strip(Render(Box(rounded, nil).Edge(Top, Start, Text("abcdefgh")), 8, 3)); !strings.HasPrefix(got, "╭─abcd─╮") {
-		t.Fatalf("got:\n%s", got)
-	}
-}
-
-func TestBoxEdgesNeedABorder(t *testing.T) {
-	t.Parallel()
-
-	noTop := lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), false, true, true, true)
-	f := Solve(Box(noTop, Text("x")).Edge(Top, Start, Text("t").ID("t")), 10, 3)
-	if _, ok := f.Rect("t"); ok {
-		t.Fatal("a child on a side with no border was shown")
-	}
-
-	// A box too small for its frame shows nothing on its edges either.
-	box := Box(rounded, Text("x")).Edge(Top, Start, Text("t").ID("t"))
-	if got := Render(Row(Fixed(1, box)), 4, 3); strings.Contains(got, "t") {
-		t.Fatalf("a cramped box showed its edge:\n%s", got)
-	}
-
-	// Margins are outside the border.
-	margins := rounded.Margin(1, 2)
-	f = Solve(Box(margins, Text("x")).Edge(Top, Start, Text("t").ID("t")).Edge(Left, Start, Text("l").ID("l")), 12, 6)
-	expectRect(t, f, "t", image.Rect(4, 1, 5, 2))
-	expectRect(t, f, "l", image.Rect(2, 2, 3, 3))
-}
 
 func TestScrollbarThumb(t *testing.T) {
 	t.Parallel()
@@ -173,49 +91,6 @@ func TestScrollbarOf(t *testing.T) {
 	}
 }
 
-func TestBorderFx(t *testing.T) {
-	t.Parallel()
-
-	red := color.RGBA{R: 0xff, A: 0xff}
-	var given image.Rectangle
-	spy := fx.Func(func(s *canvas.Surface, _ float64) { given = s.Rect() })
-	box := Box(rounded.Margin(1), Text("in")).
-		Edge(Top, Start, Text("t")).
-		BorderFx(1, spy, fx.Recolor{Fg: red})
-	out := Render(box, 8, 6)
-
-	// The effects are given the box less its margins, whose edge is the
-	// border.
-	if want := image.Rect(1, 1, 7, 5); given != want {
-		t.Fatalf("effects were given %v, want %v", given, want)
-	}
-	c := canvas.Parse(out, ansi.GraphemeWidth)
-	if got := c.CellAt(1, 1); got.Content != "╭" || got.Style.Fg != red {
-		t.Fatalf("the border was not recolored: %+v", got)
-	}
-	for _, p := range []image.Point{{2, 2}, {3, 1}} {
-		if got := c.CellAt(p.X, p.Y); got.Style.Fg != nil {
-			t.Fatalf("what is inside or on an edge was recolored at %v: %+v", p, got)
-		}
-	}
-}
-
-func TestBorderFxUnchangedFrame(t *testing.T) {
-	t.Parallel()
-
-	tree := func(t float64) Child {
-		return Box(rounded, Text("x")).BorderFx(t, fx.Chase{To: color.RGBA{R: 0xff, A: 0xff}})
-	}
-	r := New()
-	first := r.Render(10, 4, tree(0.25))
-	if again := r.Render(10, 4, tree(0.25)); unsafe.StringData(first) != unsafe.StringData(again) {
-		t.Fatal("an unchanged frame with border effects was drawn again")
-	}
-	if changed := r.Render(10, 4, tree(0.5)); changed == first {
-		t.Fatal("a frame whose border effects moved on was not drawn")
-	}
-}
-
 // scrollLayout is a Layouter that builds a scroll, which is built again for
 // each size it is given while measuring and arranging.
 type scrollLayout struct{ lines string }
@@ -234,16 +109,6 @@ func TestScrollbarOfLayouter(t *testing.T) {
 	box := Box(rounded, scrollLayout{lines}).Edge(Right, Stretch, ScrollbarOf("body").Thumb("#", lipgloss.NewStyle()))
 	if got := ansi.Strip(Render(Row(box, Text("x")), 12, 6)); !strings.Contains(got, "#") {
 		t.Fatalf("no scrollbar for a scroll a layouter built:\n%s", got)
-	}
-}
-
-func TestBorderFxNoBorder(t *testing.T) {
-	t.Parallel()
-
-	// A box that is all margin has no frame for its effects to change.
-	box := Box(lipgloss.NewStyle().Margin(1), nil).BorderFx(1, fx.Recolor{Bg: color.RGBA{R: 0xff, A: 0xff}})
-	if got := Render(box, 2, 2); strings.Contains(got, "\x1b[") {
-		t.Fatalf("effects changed the margins: %q", got)
 	}
 }
 
@@ -352,83 +217,5 @@ func TestScrollbarOnScroll(t *testing.T) {
 	r.ClickAt(7, 2)
 	if !clicked {
 		t.Fatal("a click on a border with no scrollbar did not reach the box")
-	}
-}
-
-func TestBoxEdgeTextRunsDownTheSides(t *testing.T) {
-	t.Parallel()
-
-	box := Box(rounded, Text("")).
-		Edge(Left, Start, Text("AB").Truncate()).
-		Edge(Right, End, Text("\x1b[31m✕\x1b[m"))
-	got := Render(box, 4, 4)
-	c := canvas.Parse(got, ansi.GraphemeWidth)
-	if a, b := c.CellAt(0, 1).Content, c.CellAt(0, 2).Content; a != "A" || b != "B" {
-		t.Fatalf("left edge shows %q, %q:\n%s", a, b, ansi.Strip(got))
-	}
-	if x := c.CellAt(3, 2); x.Content != "✕" || x.Style.Fg == nil {
-		t.Fatalf("right edge shows %+v:\n%s", x, ansi.Strip(got))
-	}
-	if stacked := stack("a\x1b[1mb\nc\x1b[m"); stacked != "a\x1b[1m\nb\nc\x1b[m" {
-		t.Fatalf("stack: %q", stacked)
-	}
-}
-
-func TestSameStyle(t *testing.T) {
-	t.Parallel()
-
-	a := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Padding(1)
-	b := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Padding(1)
-	c := a.Bold(true)
-	upper := a.Transform(strings.ToUpper)
-	switch {
-	case !sameStyle(&a, &a):
-		t.Fatal("a style differs from itself")
-	case !sameStyle(&a, &b):
-		t.Fatal("equal styles built apart differ")
-	case sameStyle(&a, &c):
-		t.Fatal("different styles match")
-	case sameStyle(&upper, &upper):
-		t.Fatal("a style with a transform matches")
-	}
-}
-
-func TestFrameFollowsStyleChanges(t *testing.T) {
-	t.Parallel()
-
-	// The frame of a box's style is kept from the last frame only while the
-	// style is the same.
-	r := New()
-	tree := func(pad int) Child {
-		return Row(Box(rounded.Padding(0, pad), Text("x").ID("x")), Space())
-	}
-	r.Render(20, 3, tree(0))
-	r.Render(20, 3, tree(3))
-	expectRect(t, r.Frame(), "x", image.Rect(4, 1, 5, 2))
-	// Frames no box used are dropped, along with their styles.
-	r.Render(20, 3, Text("plain"))
-	for i, m := range r.r.frameMemos {
-		if m.ok {
-			t.Fatalf("the frame of box %d is still kept", i)
-		}
-	}
-}
-
-// BenchmarkBorderFrame draws a 200×60 box with a title, a counter, and a
-// scrollbar that can be dragged on its border, whose border chases round a
-// little more each frame.
-func BenchmarkBorderFrame(b *testing.B) {
-	lines := strings.TrimSuffix(strings.Repeat("a line of the list\n", 400), "\n")
-	r := New()
-	tree := func(t float64) Child {
-		return Box(rounded, Scroll(Text(lines).ID("body"), 100)).
-			Edge(Top, Start, Text(" title ")).
-			Edge(Top, End, Text("101-158 of 400")).
-			Edge(Right, Stretch, ScrollbarOf("body").OnScroll(func(int) tea.Cmd { return nil })).
-			BorderFx(t, fx.Chase{To: color.RGBA{R: 0xff, A: 0xff}})
-	}
-	b.ReportAllocs()
-	for i := 0; b.Loop(); i++ {
-		r.Render(benchW, benchH, tree(float64(i%100)/100))
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lrstanley/bloom/internal/motion"
 	"github.com/lrstanley/bloom/on"
 )
 
@@ -29,6 +30,9 @@ type Root struct {
 	focus     focusTarget
 	mouse     mouse
 }
+
+// layoutFrameMsg is the tick of a layout animation frame for root.
+type layoutFrameMsg struct{ root *Root }
 
 // Option configures a [Root].
 type Option func(*config)
@@ -90,7 +94,7 @@ func New(opts ...Option) *Root {
 		now:       c.now,
 		focus:     c.focus,
 	}
-	r.r.motion = &layoutMotion{now: c.now}
+	r.r.motion = motion.New(c.now)
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
 	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)
 	return r
@@ -135,11 +139,11 @@ func (r *Root) tick(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		r.pending = false
-		if !r.r.motion.running {
+		if !r.r.motion.Running() {
 			return nil
 		}
 	}
-	if r.pending || len(r.r.motion.states) == 0 {
+	if r.pending || r.r.motion.Len() == 0 {
 		return nil
 	}
 	r.pending = true

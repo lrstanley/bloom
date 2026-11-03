@@ -14,6 +14,7 @@ import (
 	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
+	"github.com/lrstanley/bloom/internal/motion"
 )
 
 // box is a node of the tree being laid out, kept in the engine's arena and
@@ -69,7 +70,7 @@ type engine struct {
 	scratch    lipgloss.Style // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
-	motion     *layoutMotion
+	motion     *motion.Tracker // nil for pooled renderers, which keep no state between frames
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
@@ -95,8 +96,8 @@ func (e *engine) layout(c Child, w, h int) int {
 	defer e.retireFrames()
 	if c == nil || absent(c) {
 		if e.motion != nil {
-			e.motion.begin(w, h)
-			e.motion.end()
+			e.motion.Begin(w, h)
+			e.motion.End()
 		}
 		return -1
 	}
@@ -114,11 +115,11 @@ func (e *engine) layout(c Child, w, h int) int {
 	}
 	e.area = image.Rect(0, 0, w, h)
 	if e.motion != nil {
-		e.motion.begin(w, h)
+		e.motion.Begin(w, h)
 	}
 	e.arrange(root, e.area)
 	if e.motion != nil {
-		e.motion.end()
+		e.motion.End()
 	}
 	return root
 }
@@ -804,12 +805,12 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 // gliding there, or, moving with effects, at target, with its move noted on
 // the box for painting. A box still gliding finishes its glide first.
 func (e *engine) animate(i int, id any, cfg *layoutAnimation, moves []fx.Effect, target image.Rectangle) image.Rectangle {
-	if len(moves) > 0 && !e.motion.gliding(id) {
+	if len(moves) > 0 && !e.motion.Gliding(id) {
 		b := &e.boxes[i]
-		b.from, b.moveT, b.moving = e.motion.move(id, cfg, target, e.moved)
+		b.from, b.moveT, b.moving = e.motion.Move(id, cfg.opts, target, e.moved)
 		return target
 	}
-	return e.motion.rect(id, cfg, target, e.moved)
+	return e.motion.Rect(id, cfg.opts, target, e.moved)
 }
 
 // rectOf returns the rectangle of the box with ID id, if some of it is on

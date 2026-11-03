@@ -8,19 +8,24 @@ import (
 	"image"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
 )
 
 func down(x, y int) tea.MouseMsg { return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft} }
+
 func release(x, y int) tea.MouseMsg {
 	return tea.MouseReleaseMsg{X: x, Y: y, Button: tea.MouseLeft}
 }
+
 func move(x, y int) tea.MouseMsg { return tea.MouseMotionMsg{X: x, Y: y} }
+
 func dragTo(x, y int) tea.MouseMsg {
 	return tea.MouseMotionMsg{X: x, Y: y, Button: tea.MouseLeft}
 }
@@ -566,5 +571,91 @@ func TestThrottleMouse(t *testing.T) {
 		if got := filter(nil, tt.msg); (got != nil) != tt.kept {
 			t.Fatalf("%d: %T kept %v, want %v", i, tt.msg, got != nil, tt.kept)
 		}
+	}
+}
+
+type itemID int
+
+func mouseTree(modal bool) Child {
+	items := Column(
+		Text("zero").ID(itemID(0)),
+		Text("one").ID(itemID(1)),
+		Text("two").ID(itemID(2)),
+	)
+	base := Row(Fixed(10, items).ID("list"), Fill(Text("main")).ID("main"))
+	if !modal {
+		return base
+	}
+	return Overlay(base, Layer(Text("modal")).ID("modal").Modal().Anchor(End, End))
+}
+
+func TestHit(t *testing.T) {
+	t.Parallel()
+
+	f := Solve(mouseTree(false), 20, 4)
+	if got := f.Hit(2, 1); !slices.Equal(got, []any{"list", itemID(1)}) {
+		t.Fatalf("Hit on item 1 = %v", got)
+	}
+	if got := f.Hit(2, 3); !slices.Equal(got, []any{"list"}) {
+		t.Fatalf("Hit on the list below its items = %v", got)
+	}
+
+	f = Solve(mouseTree(true), 20, 4)
+	if got := f.Hit(2, 1); got != nil {
+		t.Fatalf("Hit outside a modal = %v, want nil", got)
+	}
+	if got := f.Hit(18, 3); !slices.Equal(got, []any{"modal"}) {
+		t.Fatalf("Hit on a modal = %v", got)
+	}
+}
+
+// topHit returns the ID of the topmost node at x, y, or nil.
+func topHit(f *Frame, x, y int) any {
+	if path := f.Hit(x, y); len(path) > 0 {
+		return path[len(path)-1]
+	}
+	return nil
+}
+
+func TestSlideMovesHits(t *testing.T) {
+	t.Parallel()
+
+	tree := Overlay(Text("base").ID("base"), Layer(Text("up").Cursor(tea.NewCursor(1, 0))).ID("up").Transition(0.5, fx.Slide{From: fx.Bottom}))
+	r := New()
+	v := r.View(10, 10, tree)
+	got, _ := r.Frame().Rect("up")
+	laidOut, _ := Solve(tree, 10, 10).Rect("up")
+	if got.Min.Y <= laidOut.Min.Y || got.Size() != laidOut.Size() {
+		t.Fatalf("slid layer at %v, laid out at %v", got, laidOut)
+	}
+	if v.Cursor == nil || v.Cursor.Y != got.Min.Y || v.Cursor.X != got.Min.X+1 {
+		t.Fatalf("cursor at %+v, want it in the slid layer at %v", v.Cursor, got)
+	}
+	if hit := topHit(r.Frame(), got.Min.X, got.Min.Y); hit != "up" {
+		t.Fatalf("a click on the slid layer went to %v", hit)
+	}
+
+	// Drawing the same frame again is skipped, but must not lose the slide.
+	v = r.View(10, 10, tree)
+	if again, _ := r.Frame().Rect("up"); again != got || v.Cursor == nil || v.Cursor.Y != got.Min.Y {
+		t.Fatalf("redrawn slid layer at %v with cursor %+v, want %v", again, v.Cursor, got)
+	}
+}
+
+func TestSlidingLayerHits(t *testing.T) {
+	t.Parallel()
+
+	// The layer starts partly off the overlay; sliding brings cells that
+	// were clipped into view, and they must be hit as the layer's.
+	tree := Overlay(Text("base").ID("base"),
+		Layer(Text("ABCD")).ID("layer").Anchor(Start, Start).Offset(-2, 0).Transition(0.5, fx.Slide{From: fx.Right}))
+	r := New()
+	r.Render(8, 1, tree)
+	col := strings.Index(r.r.canvas.String(), "A")
+	if col < 0 {
+		t.Fatalf("layer not drawn: %q", r.r.canvas.String())
+	}
+	if hit := topHit(r.Frame(), col, 0); hit != "layer" {
+		t.Fatalf("a click on the layer's A at %d went to %v", col, hit)
 	}
 }

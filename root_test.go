@@ -6,16 +6,89 @@ package bloom
 
 import (
 	"bytes"
+	"image"
 	"io"
 	"runtime"
 	"slices"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/lrstanley/bloom/on"
 )
+
+func TestSolveMatchesRoot(t *testing.T) {
+	t.Parallel()
+
+	for _, size := range []image.Point{{200, 60}, {120, 30}, {70, 20}} {
+		tree := benchTree(4, 1, 0.5)
+		r := New()
+		r.Render(size.X, size.Y, tree)
+		solved := Solve(tree, size.X, size.Y)
+		for _, id := range []any{"sidebar", "log", 4, "dialog"} {
+			want, wantOK := r.Frame().Rect(id)
+			got, gotOK := solved.Rect(id)
+			if id == "dialog" {
+				// Solve does not run effects, so a slid layer is where it
+				// was laid out.
+				continue
+			}
+			if got != want || gotOK != wantOK {
+				t.Errorf("%v at %v: Solve %v %v, Root %v %v", id, size, got, gotOK, want, wantOK)
+			}
+		}
+	}
+}
+
+func TestUnchangedFrame(t *testing.T) {
+	t.Parallel()
+
+	r := New()
+	first := r.Render(80, 24, benchTree(2, 0, -1))
+	frame := r.Frame()
+	again := r.Render(80, 24, benchTree(2, 0, -1))
+	if unsafe.StringData(first) != unsafe.StringData(again) || r.Frame() != frame {
+		t.Fatal("an unchanged frame was drawn again")
+	}
+	if changed := r.Render(80, 24, benchTree(3, 0, -1)); changed == first {
+		t.Fatal("a changed frame was not drawn")
+	}
+}
+
+func TestCursor(t *testing.T) {
+	t.Parallel()
+
+	input := Text("> abc").Cursor(tea.NewCursor(3, 0))
+	tree := Row(Fixed(10, Text("label")), input)
+
+	v := New().View(30, 3, tree)
+	if v.Cursor == nil || v.Cursor.X != 13 || v.Cursor.Y != 0 {
+		t.Fatalf("cursor = %+v, want 13,0", v.Cursor)
+	}
+
+	covered := Overlay(tree, Layer(Text("dialog over the input")).Anchor(End, Start))
+	if cur := New().View(30, 3, covered).Cursor; cur != nil {
+		t.Fatalf("cursor under a layer is shown at %+v", cur)
+	}
+}
+
+func TestEnvWithUncomparableColors(t *testing.T) {
+	t.Parallel()
+
+	r := New(WithColors(sliceColor{0xff}, sliceColor{0}))
+	r.Render(4, 1, Text("a"))
+	r.Render(4, 1, Text("a"))
+}
+
+// sliceColor is a valid [color.Color] that cannot be compared with ==.
+type sliceColor []uint8
+
+func (c sliceColor) RGBA() (r, g, b, a uint32) {
+	v := uint32(c[0]) * 0x101
+	return v, v, v, 0xffff
+}
 
 // goid returns the ID of the calling goroutine, from its stack trace.
 func goid() string {

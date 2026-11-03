@@ -5,6 +5,7 @@
 package bloom
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"strings"
@@ -13,6 +14,99 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
+
+func TestTextTruncate(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name, text string
+		width      int
+		style      lipgloss.Style
+		want       string
+	}{
+		{"plain", "abcdef", 4, lipgloss.NewStyle(), "abc…"},
+		{"wide", "世界你好", 4, lipgloss.NewStyle(), "世… "},
+		{"grapheme", "e\u0301e\u0301e\u0301", 2, lipgloss.NewStyle(), "e\u0301…"},
+		{"newlines", "a\r\nb\nc", 5, lipgloss.NewStyle(), "a b c"},
+		{"padding", "abcdef", 6, lipgloss.NewStyle().Padding(0, 1), " abc… "},
+		{"border", "abcdef", 6, lipgloss.NewStyle().BorderLeft(true).BorderRight(true).BorderStyle(lipgloss.NormalBorder()), "│abc…│"},
+		{"style width", "abcdef", 6, lipgloss.NewStyle().Width(3), "ab…   "},
+		{"one cell", "世界", 1, lipgloss.NewStyle(), "…"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			n := Text(tt.text).Style(tt.style).Truncate()
+			got := ansi.Strip(Render(n, tt.width, 1))
+			if got != tt.want {
+				t.Fatalf("got %q, want %q", got, tt.want)
+			}
+			if marquee := Render(Marquee(tt.text, 0).Style(tt.style), tt.width, 1); Render(n, tt.width, 1) != marquee {
+				t.Fatalf("differs from marquee: %q", marquee)
+			}
+		})
+	}
+	if got := Text("abc\ndef").Truncate().View(); got != "abc def" {
+		t.Fatalf("natural size: %q", got)
+	}
+	if got := ansi.Strip(Render(Column(Text("abcdef").Truncate(), Text("end")), 3, 0)); got != "ab…\nend" {
+		t.Fatalf("natural height: %q", got)
+	}
+}
+
+func TestTruncateKeepsStyleLimits(t *testing.T) {
+	t.Parallel()
+	tall := Text("x").Style(lipgloss.NewStyle().Height(3)).Truncate()
+	expectRect(t, Solve(Column(tall, Text("y").ID("y")), 0, 0), "y", image.Rect(0, 3, 1, 4))
+
+	// A transform that lengthens the text or adds lines is cut to one line too.
+	for _, tf := range []func(string) string{
+		func(s string) string { return strings.Repeat(s, 4) },
+		func(s string) string { return s + "\n" + s },
+	} {
+		grown := Text("abc").Style(lipgloss.NewStyle().Transform(tf)).Truncate()
+		if got := Render(Column(grown, Text("end")), 4, 0); got != "abc…\nend " {
+			t.Fatalf("transform: %q", got)
+		}
+	}
+
+	narrow := Text("abcdef").Style(lipgloss.NewStyle().MaxWidth(3)).Truncate()
+	if got := Render(narrow, 0, 0); got != "ab…" {
+		t.Fatalf("MaxWidth: %q", got)
+	}
+	if got := Render(Row(narrow, Text("|")), 0, 0); got != "ab…|" {
+		t.Fatalf("MaxWidth measured: %q", got)
+	}
+}
+
+// TestTruncateMeasuresAsDrawn checks that a truncated line's measured size,
+// worked out from its style, is the size it is drawn at.
+func TestTruncateMeasuresAsDrawn(t *testing.T) {
+	t.Parallel()
+	base := lipgloss.NewStyle()
+	styles := map[string]lipgloss.Style{
+		"plain":     base.Bold(true),
+		"padding":   base.Padding(1, 2),
+		"border":    base.Border(lipgloss.RoundedBorder()),
+		"margins":   base.Margin(1, 3),
+		"width":     base.Width(6).Padding(0, 1),
+		"height":    base.Height(3).Border(lipgloss.NormalBorder()),
+		"max width": base.MaxWidth(5).Padding(0, 1),
+		"max both":  base.MaxWidth(7).MaxHeight(2).Border(lipgloss.NormalBorder()),
+	}
+	for name, st := range styles {
+		for _, s := range []string{"ab", "a much longer line of text", "wide 字字字 glyphs"} {
+			// Widths too narrow for a style's own frame are clipped instead.
+			for _, avail := range []int{0, 9, 14, 80} {
+				n := Text(s).Style(st).Truncate()
+				f := Solve(Row(Auto(n).ID("n")), avail, 0)
+				r, _ := f.Rect("n")
+				got := textOf(n, r.Dx(), 0)
+				if w, h := lipgloss.Size(got); w != r.Dx() || h != r.Dy() {
+					t.Errorf("%s, %q in %d: measured %dx%d, drawn %dx%d:\n%s", name, s, avail, r.Dx(), r.Dy(), w, h, got)
+				}
+			}
+		}
+	}
+}
 
 func TestMarquee(t *testing.T) {
 	t.Parallel()
@@ -164,5 +258,59 @@ func BenchmarkMarqueeFrame(b *testing.B) {
 			items = append(items, Marquee("item with a very long name that has to be cut off or scrolled across the row", phase).Style(st))
 		}
 		r.View(benchW, benchH, Row(Fixed(40, Column(items...))))
+	}
+}
+
+func TestSkeleton(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		node SkeletonNode
+		w, h int
+		want string
+	}{
+		{"natural size", Skeleton(3, 0, 5), 0, 0, "███  \n     \n█████"},
+		{"cut to fit", Skeleton(8, 2), 4, 0, "████\n██  "},
+		{"negative is blank", Skeleton(-1, 1), 0, 0, " \n█"},
+		{"shimmering", Skeleton(2, 2).Shimmer(0.5), 0, 0, "██\n██"},
+		{"styled", Skeleton(4).Style(lipgloss.NewStyle().Padding(0, 1)), 4, 1, " ██ "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := ansi.Strip(Render(tt.node, tt.w, tt.h)); got != tt.want {
+				t.Fatalf("rendered %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestSkeletonColors checks that an unstyled skeleton is drawn in a color
+// faded from the terminal's, and a styled one in its style's.
+func TestSkeletonColors(t *testing.T) {
+	t.Parallel()
+
+	r := New(WithColors(lipgloss.Color("#ffffff"), lipgloss.Color("#000000")))
+	if got := r.Render(4, 1, Skeleton(4)); !strings.Contains(got, "38;2;51;51;51m") {
+		t.Fatalf("unstyled skeleton was not faded: %q", got)
+	}
+	styled := Skeleton(4).Style(lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")))
+	if got := r.Render(4, 1, styled); !strings.Contains(got, "38;2;255;0;0m") {
+		t.Fatalf("styled skeleton lost its color: %q", got)
+	}
+}
+
+func TestStack(t *testing.T) {
+	t.Parallel()
+
+	for in, want := range map[string]string{
+		"✕":                  "✕", // one glyph, returned as it is
+		"a\x1b[1mb\nc\x1b[m": "a\x1b[1m\nb\nc\x1b[m",
+	} {
+		if got := stack(in); got != want {
+			t.Fatalf("stack(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

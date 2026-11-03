@@ -7,99 +7,14 @@ package bloom
 import (
 	"image"
 	"slices"
-	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
 )
-
-// TextNode is a string, optionally styled. Build one with [Text].
-type TextNode struct {
-	meta
-
-	s        string
-	style    lipgloss.Style
-	styled   bool
-	truncate bool
-}
-
-// Text returns a node showing s, a string that may hold ANSI styles.
-func Text(s string) TextNode { return TextNode{s: s} }
-
-// Style renders the text with style at the size the node is given, so a
-// background fills the node and long lines wrap to its width. A width or
-// height set on style itself is kept.
-func (n TextNode) Style(style lipgloss.Style) TextNode {
-	n.style, n.styled = style, true
-	return n
-}
-
-// stack returns s with a line for each of its graphemes, keeping its escape
-// sequences, for text running down a side. Its own line breaks are dropped.
-func stack(s string) string {
-	if seq, _, n, _ := ansi.DecodeSequence(s, 0, nil); n == len(s) && seq != "\n" && seq != "\r" {
-		return s // one glyph, as a button usually is
-	}
-	var b strings.Builder
-	b.Grow(2 * len(s))
-	var state byte
-	for glyphs := 0; s != ""; {
-		seq, width, n, next := ansi.DecodeSequence(s, state, nil)
-		switch {
-		case width > 0:
-			if glyphs > 0 {
-				b.WriteByte('\n')
-			}
-			glyphs++
-			b.WriteString(seq)
-		case seq != "\n" && seq != "\r":
-			b.WriteString(seq)
-		}
-		s, state = s[n:], next
-	}
-	return b.String()
-}
-
-// Truncate shows one line, replacing newlines with spaces and cutting text
-// that does not fit with "…". Padding and borders count against its width.
-func (n TextNode) Truncate() TextNode {
-	n.s, n.truncate = lineBreaks.Replace(n.s), true
-	return n
-}
-
-// ID sets the ID that focus and [Frame.Rect] refer to the node by.
-func (n TextNode) ID[K comparable](id K) TextNode { n.id = id; return n }
-
-// On adds mouse handlers to the node, made by package [on].
-func (n TextNode) On(handlers ...on.Handler) TextNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// HoverStyle renders the text with style instead of its own while the
-// pointer is over it, which needs no state in the model. It should take the
-// same space as the node's style, changing only how it looks. See
-// [on.Hover] for when the pointer is followed.
-func (n TextNode) HoverStyle(style lipgloss.Style) TextNode {
-	n.hover = &style
-	return n
-}
-
-// Focusable makes the node one that [Focus] can move to.
-func (n TextNode) Focusable() TextNode { n.focusable = true; return n }
-
-// Cursor shows the terminal cursor at c, relative to the node's top-left
-// cell, while that cell is on screen and not covered by a later layer.
-func (n TextNode) Cursor(c *tea.Cursor) TextNode { n.cursor = c; return n }
-
-// View implements [Child], drawing the node at its natural size.
-func (n TextNode) View() string { return Render(n, 0, 0) }
 
 // sizing is how a slot takes part in sharing a row's or column's main axis.
 type sizing uint8
@@ -110,6 +25,11 @@ const (
 	sizeFill
 	sizePercent
 )
+
+// layoutAnimation is the animation of a slot or layer when layout changes,
+// with the options of its values. Nodes keep a pointer to one, nil unless
+// Animate was called, as Animate with no options has no options to tell.
+type layoutAnimation struct{ opts []anim.Option }
 
 // SlotNode places a child in a [Row] or [Column] with a sizing rule. Build
 // one with [Fixed], [Fill], [Grow], [Percent], or [Auto]. A child given to
