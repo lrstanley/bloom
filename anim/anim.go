@@ -14,7 +14,9 @@
 //
 // While the terminal is not focused, animations ask for fewer frames (see
 // [UnfocusedFPS]). Terminals report focus only to programs that enable it
-// with [tea.View] ReportFocus.
+// with [tea.View] ReportFocus. [SetMotion] turns animation off for the whole
+// program, for terminals that struggle with it or people who would rather not
+// see it.
 //
 // See the [documentation] for guides and examples. It is also available for
 // LLMs and agents as [llms.txt].
@@ -174,6 +176,10 @@ func (v *Value) To(target float64) tea.Cmd {
 	if v.now == nil || target == v.target {
 		return nil
 	}
+	if !Motion() {
+		v.Set(target)
+		return nil
+	}
 	now := v.now()
 	v.from, v.target, v.start, v.last = v.current, target, now, now
 	if v.running {
@@ -241,8 +247,11 @@ func (v *Value) frame() tea.Cmd {
 }
 
 // advance moves the value to where it is at now, reporting whether it is
-// done.
+// done. Callers put a value that is done on its target.
 func (v *Value) advance(now time.Time) bool {
+	if !Motion() {
+		return true
+	}
 	if !v.spring {
 		p := 1.0
 		if v.duration > 0 {

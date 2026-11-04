@@ -198,6 +198,9 @@ func (s *Sequence) enter() {
 		}
 		s.v.duration, s.v.ease = cfg.duration, cfg.ease
 		s.v.spring, s.v.frequency, s.v.damping = cfg.spring, cfg.frequency, cfg.damping
+		if !Motion() {
+			s.v.duration, s.v.spring = 0, false
+		}
 		s.v.from, s.v.target, s.v.start, s.v.last = s.v.current, st.target, s.at, s.at
 	case stepHold:
 	}
@@ -208,6 +211,10 @@ func (s *Sequence) enter() {
 func (s *Sequence) done(now time.Time) (end time.Time, done bool) {
 	switch st := s.steps[s.step]; st.kind {
 	case stepHold:
+		if s.loop && !Motion() {
+			// Steps that take no time end the loop, rather than blinking forever.
+			return s.at, true
+		}
 		end = s.at.Add(st.hold)
 		return end, !now.Before(end)
 	case stepTo:
@@ -219,7 +226,12 @@ func (s *Sequence) done(now time.Time) (end time.Time, done bool) {
 			// A spring ends when it settles, not at a time known in advance.
 			return now, true
 		}
-		return s.at.Add(s.v.duration), true
+		end = s.at.Add(s.v.duration)
+		if now.Before(end) {
+			// Motion was turned off partway through.
+			return now, true
+		}
+		return end, true
 	case stepJump:
 	}
 	return s.at, true

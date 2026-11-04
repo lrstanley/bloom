@@ -189,6 +189,21 @@ Use `anim.UnfocusedFPS(n)` to change the rate. Values learn of focus from the `t
 passed to their `Update`, so a value made while the terminal is blurred runs at its full rate until the next
 change. The full rate comes back from the frame after focus returns.
 
+## Turn motion off
+
+Some terminals can't keep up with animation, such as over a slow SSH connection, and some people would rather not
+see it. Terminals don't report a preference for this, so it's yours to offer, such as a setting or a flag.
+[`anim.SetMotion`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#SetMotion) turns animation off for the whole
+program, including layout animation, and applies from each running animation's next frame:
+
+```go
+anim.SetMotion(false)
+```
+
+Animations then jump to where they are going. A `Sequence` you play still waits out its `Hold` steps, so a toast is
+still on screen for as long as it should be. A looping one settles where its steps end and stops, so make sure that
+looks right at rest. It stays stopped if motion comes back, until you call `Loop` again.
+
 ## Related
 
 - [Transitions](/motion/transitions), for using these values with effects

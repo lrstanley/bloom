@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/internal/motion"
 	"github.com/lrstanley/bloom/on"
 )
@@ -143,7 +144,8 @@ func (r *Root) tick(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 	}
-	if r.pending || r.r.motion.Len() == 0 {
+	// With motion off, boxes reach their targets as they are laid out.
+	if r.pending || r.r.motion.Len() == 0 || !anim.Motion() {
 		return nil
 	}
 	r.pending = true

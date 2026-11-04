@@ -21,6 +21,43 @@ import (
 // predictably for tests to check where it is.
 var linear = []anim.Option{anim.Duration(time.Second), anim.Ease(anim.Linear)}
 
+// setMotion sets the motion until the test ends. Motion is global, so tests
+// using this do not call t.Parallel, and run while the ones that do wait.
+func setMotion(t *testing.T, on bool) {
+	t.Helper()
+	prev := anim.Motion()
+	anim.SetMotion(on)
+	t.Cleanup(func() { anim.SetMotion(prev) })
+}
+
+func TestLayoutAnimationMotionOff(t *testing.T) {
+	setMotion(t, false)
+
+	now := time.Unix(1, 0)
+	r := New(WithClock(func() time.Time { return now }))
+	glide := func(x int) Child { return Row(Fixed(x, nil), Fixed(5, Text("x")).ID("x").Animate(linear...)) }
+	r.View(100, 10, glide(0))
+	r.View(100, 10, glide(20))
+	expectRect(t, r.Frame(), "x", image.Rect(20, 0, 25, 10))
+	if r.r.motion.Running() {
+		t.Fatal("glide still running")
+	}
+	if r.Update("change") != nil {
+		t.Fatal("asked for a frame with motion off")
+	}
+
+	moves := func(x int) Child {
+		return Row(Fixed(x, nil), Fixed(5, Text("x")).ID("x").Animate(linear...).MoveWith(fx.Fade{}))
+	}
+	r = New(WithClock(func() time.Time { return now }))
+	r.View(100, 10, moves(0))
+	r.View(100, 10, moves(20))
+	expectRect(t, r.Frame(), "x", image.Rect(20, 0, 25, 10))
+	if r.r.motion.Running() {
+		t.Fatal("move still running")
+	}
+}
+
 func TestLayoutAnimationTween(t *testing.T) {
 	now := time.Unix(1, 0)
 	r := New(WithClock(func() time.Time { return now }))
