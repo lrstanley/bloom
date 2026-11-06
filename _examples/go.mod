@@ -9,10 +9,10 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
 	github.com/charmbracelet/x/ansi v0.11.9
-	github.com/lrstanley/bloom v0.0.0-20261102065440-460af85de9fd
+	github.com/lrstanley/bloom v0.0.0-20261104061907-56513da5a6e9
 	github.com/lrstanley/bubbletint/v2 v2.0.4
-	github.com/lrstanley/steep v0.0.0-alpha.0
-	github.com/lrstanley/steep/reel v0.0.0-alpha.0
+	github.com/lrstanley/steep v0.0.0-alpha.1
+	github.com/lrstanley/steep/reel v0.0.0-alpha.1
 )
 
 require (
@@ -31,7 +31,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/xo/terminfo v1.3.0 // indirect
+	github.com/xo/terminfo v1.3.1 // indirect
 	golang.org/x/image v0.47.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect

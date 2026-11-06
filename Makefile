@@ -21,9 +21,9 @@ fetch:
 	go mod tidy
 
 up:
-	go get -u ./... && go mod tidy
-	cd _examples/ && go get -u ./... && go mod tidy
-	cd _integration/ && go get -u ./... && go mod tidy
+	go get -u -t ./... && go mod tidy
+	cd _examples/ && go get -u -t ./... && go mod tidy
+	cd _integration/ && go get -u -t ./... && go mod tidy
 	cd docs && bunx npm-check-updates -u && bun install
 
 test:
