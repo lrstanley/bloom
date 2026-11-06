@@ -13,7 +13,7 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/x/term/steep/snapshot"
+	"github.com/lrstanley/steep/snapshot"
 )
 
 // view is a component drawn from a fixed string.

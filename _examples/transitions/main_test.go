@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/x/term/steep"
-	"github.com/lrstanley/x/term/steep/snapshot"
+	"github.com/lrstanley/steep"
+	"github.com/lrstanley/steep/snapshot"
 )
 
 func TestTransitions(t *testing.T) {

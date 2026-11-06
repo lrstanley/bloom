@@ -149,8 +149,9 @@ go get -u github.com/lrstanley/bloom@latest
 
 - [bubbletint](https://github.com/lrstanley/bubbletint): hundreds of terminal color themes for Bubble Tea and Lip
   Gloss, which work directly in bloom's styles and effects.
-- [steep](https://github.com/lrstanley/x/tree/master/term/steep): a test harness that runs Bubble Tea programs in an
-  emulated terminal, used for bloom's own end-to-end tests.
+- [steep](https://github.com/lrstanley/steep): a test harness that runs terminal programs, including Bubble Tea
+  programs, in an emulated terminal, used for bloom's own end-to-end tests. Docs are at
+  [getsteep.dev](https://getsteep.dev/).
 
 ---
 

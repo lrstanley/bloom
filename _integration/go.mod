@@ -4,16 +4,13 @@ go 1.27.3
 
 replace github.com/lrstanley/bloom => ../
 
-// steep requires reel at v0.0.0, which only resolves inside the x repository.
-exclude github.com/lrstanley/x/term/reel v0.0.0
-
 require (
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/lrstanley/bloom v0.0.0-00010101000000-000000000000
-	github.com/lrstanley/x/term/steep v0.0.0-20261101062257-fade429c2ecd
+	github.com/lrstanley/steep v0.0.0-alpha.0
 )
 
 require (
@@ -28,7 +25,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/lrstanley/x/term/reel v0.0.0-20261101062257-fade429c2ecd // indirect
+	github.com/lrstanley/steep/reel v0.0.0-alpha.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect

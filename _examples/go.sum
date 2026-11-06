@@ -34,10 +34,10 @@ github.com/google/jsonschema-go v0.4.3 h1:/DBOLZTfDow7pe2GmaJNhltueGTtDKICi8V8p+
 github.com/google/jsonschema-go v0.4.3/go.mod h1:r5quNTdLOYEz95Ru18zA0ydNbBuYoo9tgaYcxEYhJVE=
 github.com/lrstanley/bubbletint/v2 v2.0.4 h1:WZd1tEA3SgeYgSkaBlWLXOg1H56qpeiO7necuFapkK4=
 github.com/lrstanley/bubbletint/v2 v2.0.4/go.mod h1:HaBq3Yc6pcCrQDuW8huE+Bs1adVFUmg/O1B9Zu/kab4=
-github.com/lrstanley/x/term/reel v0.0.0-20261102020005-a6482435cbe1 h1:iOJc0pcxJD95oMqQpw3+Y1TN+Nmmo0CLAuVlh9AdBhM=
-github.com/lrstanley/x/term/reel v0.0.0-20261102020005-a6482435cbe1/go.mod h1:tH2Gg6sZfOtW03Ma/LNPDRh1wSZ/f3OC56SHdGusRT4=
-github.com/lrstanley/x/term/steep v0.0.0-20261102020005-a6482435cbe1 h1:A4hg/Pwv7zI1NDSaMToRpG/BiJOcIq2QnDLOYtbrDCI=
-github.com/lrstanley/x/term/steep v0.0.0-20261102020005-a6482435cbe1/go.mod h1:PFmXQPHZdXNHalX+SP1RHlL/+9wtIMxpjsTJo9Z3gAA=
+github.com/lrstanley/steep v0.0.0-alpha.0 h1:gTXVY23tV6RAIzwCJNpRUROFbenkA0FJ02S/bdkFUeY=
+github.com/lrstanley/steep v0.0.0-alpha.0/go.mod h1:UUB/dmlZQ7IiCnc/xlmdH299o3M06XInRKmJ7tuWN10=
+github.com/lrstanley/steep/reel v0.0.0-alpha.0 h1:kRDc+4xMHrKL6GC/vWxA3nVhlfJGag7bt7N8Q7tMhZg=
+github.com/lrstanley/steep/reel v0.0.0-alpha.0/go.mod h1:JtS+weg4vEGHHyeaoxpDVPLzpwfCDBnj+45sam8omRY=
 github.com/lucasb-eyer/go-colorful v1.4.1 h1:1EO+WB73+EH8EVbzlrG3KLAfEypQWVHIBqlTf+2hNss=
 github.com/lucasb-eyer/go-colorful v1.4.1/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
 github.com/mattn/go-runewidth v0.0.31 h1:1oCV4ReTlosDBc6rYRw5cL8S/4y8iv5oRl4SJ5IBgwo=

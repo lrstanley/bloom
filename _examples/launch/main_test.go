@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/x/term/reel"
-	"github.com/lrstanley/x/term/steep"
-	"github.com/lrstanley/x/term/steep/snapshot"
+	"github.com/lrstanley/steep"
+	"github.com/lrstanley/steep/reel"
+	"github.com/lrstanley/steep/snapshot"
 )
 
 // column returns the column text starts at in the screen's first line

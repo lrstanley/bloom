@@ -15,10 +15,10 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/x/term/reel"
-	"github.com/lrstanley/x/term/reel/effects"
-	"github.com/lrstanley/x/term/reel/render"
-	"github.com/lrstanley/x/term/steep"
+	"github.com/lrstanley/steep"
+	"github.com/lrstanley/steep/reel"
+	"github.com/lrstanley/steep/reel/effects"
+	"github.com/lrstanley/steep/reel/render"
 )
 
 // Options returns the steep options for a w×h true color tour, recorded to

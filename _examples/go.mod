@@ -4,9 +4,6 @@ go 1.27.3
 
 replace github.com/lrstanley/bloom => ../
 
-// steep requires reel at v0.0.0, which only resolves inside the x repository.
-exclude github.com/lrstanley/x/term/reel v0.0.0
-
 require (
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/lipgloss/v2 v2.0.6
@@ -14,8 +11,8 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/lrstanley/bloom v0.0.0-20261102065440-460af85de9fd
 	github.com/lrstanley/bubbletint/v2 v2.0.4
-	github.com/lrstanley/x/term/reel v0.0.0-20261102020005-a6482435cbe1
-	github.com/lrstanley/x/term/steep v0.0.0-20261102020005-a6482435cbe1
+	github.com/lrstanley/steep v0.0.0-alpha.0
+	github.com/lrstanley/steep/reel v0.0.0-alpha.0
 )
 
 require (

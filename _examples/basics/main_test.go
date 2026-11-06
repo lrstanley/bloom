@@ -7,7 +7,7 @@ package main
 import (
 	"testing"
 
-	"github.com/lrstanley/x/term/steep/snapshot"
+	"github.com/lrstanley/steep/snapshot"
 )
 
 func TestBasics(t *testing.T) {

@@ -16,7 +16,7 @@ import (
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/on"
-	"github.com/lrstanley/x/term/steep"
+	"github.com/lrstanley/steep"
 )
 
 type item int

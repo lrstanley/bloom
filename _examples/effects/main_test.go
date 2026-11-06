@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/x/term/steep"
+	"github.com/lrstanley/steep"
 )
 
 func TestEffects(t *testing.T) {
