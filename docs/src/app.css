@@ -498,8 +498,7 @@ pre {
 
 .bloom-lede a,
 .bloom-section-lede a,
-.bloom-split a,
-.bloom-footer a {
+.bloom-split a {
   color: var(--color-fd-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -540,7 +539,8 @@ pre {
 .bloom-button:focus-visible,
 .bloom-effect:focus-visible,
 .bloom-chore a:focus-visible,
-.bloom-path a:focus-visible {
+.bloom-path a:focus-visible,
+.bloom-footer a:focus-visible {
   outline: 2px solid var(--color-fd-ring);
   outline-offset: 3px;
 }
@@ -775,18 +775,31 @@ pre {
 }
 
 .bloom-footer {
-  display: grid;
-  gap: 0.75rem;
-  max-width: var(--home-width);
-  margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
   border-top: 1px solid var(--color-fd-border);
+  font-size: 0.8125rem;
   color: var(--color-fd-muted-foreground);
 }
 
-.bloom-footer p {
-  max-width: 44rem;
-  line-height: 1.6;
+.bloom-footer > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+  max-width: var(--home-width);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+.bloom-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.bloom-footer-links a:hover {
+  color: var(--color-fd-foreground);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

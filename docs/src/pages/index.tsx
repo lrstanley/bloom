@@ -353,13 +353,15 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                 </section>
 
                 <footer className="bloom-footer">
-                    <p>
-                        Theming your app? <Link href="/resources/related-libraries#bubbletint">bubbletint</Link> has
-                        hundreds of terminal color themes that work in bloom's styles and effects, and{" "}
-                        <Link href="/resources/related-libraries#steep">steep</Link> tests Bubble Tea programs end to
-                        end.
-                    </p>
-                    <LlmsLinks />
+                    <div>
+                        <span>© Liam Stanley.</span>
+                        <span className="bloom-footer-links">
+                            <SmartLink href="https://github.com/lrstanley/bloom">GitHub</SmartLink>
+                            <SmartLink href="https://pkg.go.dev/github.com/lrstanley/bloom">pkg.go.dev</SmartLink>
+                            <SmartLink href="/resources/related-libraries">Related libraries</SmartLink>
+                        </span>
+                        <LlmsLinks />
+                    </div>
                 </footer>
             </main>
         </>
