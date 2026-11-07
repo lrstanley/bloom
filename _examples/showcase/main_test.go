@@ -40,22 +40,24 @@ func find(t *testing.T, h *steep.Harness, text string) (x, y int) {
 	return x, y
 }
 
-// movedPast reports whether the Activity pane's title is right of the
-// Services pane's in view.
-func movedPast(view string) bool {
-	a, _, aok := locate(view, "⠿ Activity")
-	s, _, sok := locate(view, "⠿ Services")
-	return aok && sok && a > s
+// movedPast holds once the Activity pane's title is right of the Services
+// pane's.
+type movedPast struct{}
+
+func (movedPast) Check(screen reel.ScreenText) ([]reel.Match, bool) {
+	a, _, aok := locate(screen.Text, "⠿ Activity")
+	s, _, sok := locate(screen.Text, "⠿ Services")
+	return nil, aok && sok && a > s
 }
 
+func (movedPast) String() string { return "Activity right of Services" }
+
 // checkMovedPast waits for Activity to be dragged past Services, then checks
-// it is still there once the panes have glided into their places.
-func checkMovedPast(t *testing.T, h *steep.Harness) {
-	t.Helper()
-	h.WaitFor(reel.ScreenFunc(movedPast)).Sleep(1200 * time.Millisecond)
-	if view := h.View(); !movedPast(view) {
-		t.Fatalf("Activity did not move past Services:\n%s", view)
-	}
+// it is still there once the panes have glided into their places. A slow
+// (such as -race, or a busy CI) run can still be mid-glide after the sleep,
+// so the second check waits for Activity to land.
+func checkMovedPast(h *steep.Harness) {
+	h.WaitFor(movedPast{}).Sleep(1200 * time.Millisecond).WaitFor(movedPast{})
 }
 
 // pick clicks the tint named name in the sidebar, and waits for the panes
@@ -86,7 +88,7 @@ func TestShowcase(t *testing.T) {
 	x1, y1 := find(t, h, "⠿ Activity")
 	x2, y2 := find(t, h, "⠿ Services")
 	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+20, y2+4, reel.Delay(20*time.Millisecond))
-	checkMovedPast(t, h)
+	checkMovedPast(h)
 	pick(t, h, "Catppuccin Mocha")
 
 	// A double click zooms a pane, and another gives the rest their width
@@ -118,12 +120,12 @@ func TestShowcase(t *testing.T) {
 func TestDragPastCollapsed(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(96, 24))
+	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(96, 24), steep.WithTimeout(20*time.Second))
 	h.Wait("billing").WaitNot("⠿ Palette").Sleep(800 * time.Millisecond)
 	x1, y1 := find(t, h, "⠿ Activity")
 	x2, y2 := find(t, h, "⠿ Services")
 	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+24, y2+4, reel.Delay(20*time.Millisecond))
-	checkMovedPast(t, h)
+	checkMovedPast(h)
 	h.Key("q")
 	h.WaitFinished()
 }
