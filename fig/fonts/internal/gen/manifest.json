@@ -1,0 +1,873 @@
+[
+	{
+		"name": "ansi-compact",
+		"func": "ANSICompact",
+		"file": "ansi-compact.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/ANSI Compact.flf"
+		},
+		"sha256": "7725d789f12f20f854a2d0fb6f23df3080fefd0753e94055f2078b3853afe30f",
+		"usage": 0
+	},
+	{
+		"name": "banner",
+		"func": "Banner",
+		"file": "banner.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/banner.flf"
+		},
+		"sha256": "7312d534e44dbc1d5768ea34e588a8c58aad1842faa9bd721a472db561cb2522",
+		"usage": 0
+	},
+	{
+		"name": "banner3",
+		"func": "Banner3",
+		"file": "banner3.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/banner3.flf"
+		},
+		"sha256": "0f1fd23ae6abe5dbbd282a2b9d8337e0fa1eafce7c8d51416d4ca10d492d16cf",
+		"usage": 15
+	},
+	{
+		"name": "basic",
+		"func": "Basic",
+		"file": "basic.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/basic.flf"
+		},
+		"sha256": "2241950e17101a58e51a9c79bfc0b57ce73539630db1f4927e6187bf7166e971",
+		"usage": 8
+	},
+	{
+		"name": "bfraktur",
+		"func": "BFraktur",
+		"file": "bfraktur.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/bfraktur.tlf"
+		},
+		"sha256": "dd7e65f590888f8c2d3d790a23b755751eb6ce70fa1a931897dd7b01eb28ec5e",
+		"usage": 0
+	},
+	{
+		"name": "big",
+		"func": "Big",
+		"file": "big.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/big.flf"
+		},
+		"sha256": "0065328daf2a6eb49ff274f8d27a195e7b748cb51cad992b0aa96839ccb5169d",
+		"usage": 0
+	},
+	{
+		"name": "bigmono12",
+		"func": "BigMono12",
+		"file": "bigmono12.tlf.gz",
+		"license": "",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/bigmono12.tlf"
+		},
+		"sha256": "150ce07d35615ed7ef85cdd2eb643a51a7089f5a197cc28bd693ae81551ed605",
+		"usage": 13
+	},
+	{
+		"name": "bigmono9",
+		"func": "BigMono9",
+		"file": "bigmono9.tlf.gz",
+		"license": "",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/bigmono9.tlf"
+		},
+		"sha256": "0d7f03d30aa90dad836c8bdaaf368e23a767e3540e89c20c8cdfd4ebd6f4a46e",
+		"usage": 27
+	},
+	{
+		"name": "block",
+		"func": "Block",
+		"file": "block.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/block.flf"
+		},
+		"sha256": "4e9d3c11d20dd8ad25f7eef6e150670f4fdfe080a3946b4a87c32ee83a68241a",
+		"usage": 0
+	},
+	{
+		"name": "bloody",
+		"func": "Bloody",
+		"file": "bloody.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Bloody.flf"
+		},
+		"sha256": "3cd917d2e728effffe0e3f38af8d84c9b842b47b16a7a1293608c3acbdd0d1bb",
+		"usage": 28
+	},
+	{
+		"name": "bubble",
+		"func": "Bubble",
+		"file": "bubble.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/bubble.flf"
+		},
+		"sha256": "3e28f6fdc97e4e296de1b6fb08566c782f978c5912d6e53a957fa92ac8519c13",
+		"usage": 0
+	},
+	{
+		"name": "circle",
+		"func": "Circle",
+		"file": "circle.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/circle.tlf"
+		},
+		"sha256": "0caf7ff6452907fb7a6f85818e6894fc9d31a93618e9c25e9e66589a3361caaf",
+		"usage": 0
+	},
+	{
+		"name": "classy",
+		"func": "Classy",
+		"file": "classy.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Classy.flf"
+		},
+		"sha256": "c738ee428830b85bd7cdbe3edc7a296f1f1540b73910ee61756933ec43e06998",
+		"usage": 0
+	},
+	{
+		"name": "coder-mini",
+		"func": "CoderMini",
+		"file": "coder-mini.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Coder Mini.flf"
+		},
+		"sha256": "08857103cca94c8c3f515875af04389ec90f926876973c13ca11756c7d724592",
+		"usage": 0
+	},
+	{
+		"name": "colossal",
+		"func": "Colossal",
+		"file": "colossal.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/colossal.flf"
+		},
+		"sha256": "0010fa03c8f520a206caa4e0065e662bb6703215d9821a7f24b9cb3a1b6049de",
+		"usage": 11
+	},
+	{
+		"name": "cyberlarge",
+		"func": "CyberLarge",
+		"file": "cyberlarge.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/cyberlarge.flf"
+		},
+		"sha256": "ba9b64f63caa5a7e49d3aca1e61267adb81d9dd0469c3da0eafbb4cc1476ba9c",
+		"usage": 12
+	},
+	{
+		"name": "cybermedium",
+		"func": "CyberMedium",
+		"file": "cybermedium.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/cybermedium.flf"
+		},
+		"sha256": "fcbb6ba53c8eaa4fd64407c02df04240b5c4822dae7bb27357fdc7446d7a88f7",
+		"usage": 18
+	},
+	{
+		"name": "digital",
+		"func": "Digital",
+		"file": "digital.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/digital.flf"
+		},
+		"sha256": "dd3c2688add36c72f179778032a48a32b5c5b6fef65013bc1cb6fb6383d1bcbd",
+		"usage": 0
+	},
+	{
+		"name": "doh",
+		"func": "Doh",
+		"file": "doh.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/doh.flf"
+		},
+		"sha256": "1524624f5155f0480d9e8261b9192acf7e5cf514a6d165eeb91fe99733cecd9a",
+		"usage": 13
+	},
+	{
+		"name": "doom",
+		"func": "Doom",
+		"file": "doom.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/doom.flf"
+		},
+		"sha256": "3d8fe9963526329ff9d5414a97b0f47e3a852d2f288a693f2938730f5a230e75",
+		"usage": 26
+	},
+	{
+		"name": "emboss",
+		"func": "Emboss",
+		"file": "emboss.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/emboss.tlf"
+		},
+		"sha256": "e1e5179817e06a39ec37ee66be627e39c3184921d13cb54327aea36f805813b6",
+		"usage": 0
+	},
+	{
+		"name": "emboss2",
+		"func": "Emboss2",
+		"file": "emboss2.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/emboss2.tlf"
+		},
+		"sha256": "53136fac0b552200d4c371d7783cfec5c3cb9dd1157deb80f8a1b123dfc4327b",
+		"usage": 0
+	},
+	{
+		"name": "epic",
+		"func": "Epic",
+		"file": "epic.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/epic.flf"
+		},
+		"sha256": "7f38796cdcbc746b42ba68049a74b1359fbaee776bd90ff5b1a2a85b75bf9226",
+		"usage": 11
+	},
+	{
+		"name": "fauxcyrillic",
+		"func": "FauxCyrillic",
+		"file": "fauxcyrillic.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/fauxcyrillic.tlf"
+		},
+		"sha256": "82d21c75d8a384653a17eeae20ddc8aa34b832d49e71d504fa3348021bf26f55",
+		"usage": 0
+	},
+	{
+		"name": "font-font",
+		"func": "FontFont",
+		"file": "font-font.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Font Font.flf"
+		},
+		"sha256": "5c9ae5e9b9d79d6d6f9bb288b94f9fcfbbd1374a5b9ea727d13ef5dceaf8ea30",
+		"usage": 0
+	},
+	{
+		"name": "fullcyrillic",
+		"func": "FullCyrillic",
+		"file": "fullcyrillic.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/fullcyrillic.tlf"
+		},
+		"sha256": "9a609960f276ce71e62b32ab5f865cc368727aab06624d9e82e9470607a586dc",
+		"usage": 0
+	},
+	{
+		"name": "future",
+		"func": "Future",
+		"file": "future.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/future.tlf"
+		},
+		"sha256": "d3f82bef2625e99b750e81f230d5f4d2b122eb621250e94d2c5317da3e039682",
+		"usage": 0
+	},
+	{
+		"name": "graffiti",
+		"func": "Graffiti",
+		"file": "graffiti.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/graffiti.flf"
+		},
+		"sha256": "09f899a01c3d6765a326408115c0285778f809d5246102ed39528cb80baee266",
+		"usage": 17
+	},
+	{
+		"name": "isometric1",
+		"func": "Isometric1",
+		"file": "isometric1.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/isometric1.flf"
+		},
+		"sha256": "317bf1e39eb14046675ef8def4b44e617a4ad397dcfbe6a2488e3d260e3fa08c",
+		"usage": 11
+	},
+	{
+		"name": "isometric3",
+		"func": "Isometric3",
+		"file": "isometric3.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/isometric3.flf"
+		},
+		"sha256": "c302bbca9b326406198c68769cc94b17e9e522fa811dd464024a9a2234ce0fd6",
+		"usage": 8
+	},
+	{
+		"name": "ivrit",
+		"func": "Ivrit",
+		"file": "ivrit.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/ivrit.flf"
+		},
+		"sha256": "66a274a0c907b8c0c6b4edab8024b014187443da9accf18c4f9180e9c5e5a656",
+		"usage": 0
+	},
+	{
+		"name": "larry3d",
+		"func": "Larry3D",
+		"file": "larry3d.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/larry3d.flf"
+		},
+		"sha256": "43268db69544ddb1ac3f2e3647dbb5994ffb0624dd182976395ac9de958fc70b",
+		"usage": 32
+	},
+	{
+		"name": "lean",
+		"func": "Lean",
+		"file": "lean.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/lean.flf"
+		},
+		"sha256": "eb1e27c93b5824e913ee2b1f8f1dc2d611227b47af471b50430c4b6060995fb2",
+		"usage": 0
+	},
+	{
+		"name": "letter",
+		"func": "Letter",
+		"file": "letter.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/letter.tlf"
+		},
+		"sha256": "fb19317d1bc7c3c398b31ea26947aecc905f1dce8ce39bbfe7d9c7ece1d9c7f7",
+		"usage": 0
+	},
+	{
+		"name": "linguaholic-mini-block",
+		"func": "LinguaholicMiniBlock",
+		"file": "linguaholic-mini-block.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Linguaholic Mini Block.flf"
+		},
+		"sha256": "0021532634acc42e50b69b35dda71ab451b23e6cdef305cde5b1db986ba6689f",
+		"usage": 0
+	},
+	{
+		"name": "linguaholic-neon",
+		"func": "LinguaholicNeon",
+		"file": "linguaholic-neon.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Linguaholic Neon.flf"
+		},
+		"sha256": "9d2127f761bd8a319bddb336a6f866cc46b3b81ed873c4936e53569d5e353d89",
+		"usage": 0
+	},
+	{
+		"name": "linguaholic-rounded",
+		"func": "LinguaholicRounded",
+		"file": "linguaholic-rounded.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Linguaholic Rounded.flf"
+		},
+		"sha256": "062b5289e00343b3cef971f72fccd665e6743e9cdc6c87a42e542b6fce596c82",
+		"usage": 0
+	},
+	{
+		"name": "linguaholic-shadow-3d",
+		"func": "LinguaholicShadow3D",
+		"file": "linguaholic-shadow-3d.flf.gz",
+		"license": "MIT",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/Linguaholic Shadow 3D.flf"
+		},
+		"sha256": "22e08f610ecc93e160ecb6772327cc3d642a44479a4e9f91193173916bf4338c",
+		"usage": 0
+	},
+	{
+		"name": "mini",
+		"func": "Mini",
+		"file": "mini.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/mini.flf"
+		},
+		"sha256": "b5d0194157641407cb0d513f9fab2abf0c4b2c436f8c238a34d718b3911fa54b",
+		"usage": 0
+	},
+	{
+		"name": "miniwi",
+		"func": "Miniwi",
+		"file": "miniwi.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "patorjk/figlet.js",
+			"commit": "d29f4c185973b745100b7b23d6ba6e2cdf764fb2",
+			"path": "fonts/miniwi.flf"
+		},
+		"sha256": "331e0650acb0a94862a48580eb684cc8b94fc0ab836e0f9e2c5c5939a19e11c8",
+		"usage": 10
+	},
+	{
+		"name": "mnemonic",
+		"func": "Mnemonic",
+		"file": "mnemonic.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/mnemonic.flf"
+		},
+		"sha256": "4ed37ffa2cad45e806bc4218f191a0e7a26b9111b1e4ed619be3504e521f4acd",
+		"usage": 0
+	},
+	{
+		"name": "mono12",
+		"func": "Mono12",
+		"file": "mono12.tlf.gz",
+		"license": "",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/mono12.tlf"
+		},
+		"sha256": "a5385ff14c654d0a4f1ea09e6c64dbb2ac6951d81880913b1046a1784c3a0cfd",
+		"usage": 88
+	},
+	{
+		"name": "mono9",
+		"func": "Mono9",
+		"file": "mono9.tlf.gz",
+		"license": "",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/mono9.tlf"
+		},
+		"sha256": "9386c4515d68c89c3a95802a67b3accf04755217c5c1a13e6d8c4f2c672043f5",
+		"usage": 53
+	},
+	{
+		"name": "ogre",
+		"func": "Ogre",
+		"file": "ogre.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/ogre.flf"
+		},
+		"sha256": "6b39febca10523d657ca858dc96ed967d782411536da2abcea299701db43ccc1",
+		"usage": 14
+	},
+	{
+		"name": "pagga",
+		"func": "Pagga",
+		"file": "pagga.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/pagga.tlf"
+		},
+		"sha256": "ac5693a0d48e73bc0ef816755fcb0ff04631fcc0a40ed35f22e21dfdafbbede2",
+		"usage": 0
+	},
+	{
+		"name": "poison",
+		"func": "Poison",
+		"file": "poison.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/poison.flf"
+		},
+		"sha256": "68f879e43d8039ca626f044706e8d2da52bfddcd7e7161f75380f662f0726cd7",
+		"usage": 10
+	},
+	{
+		"name": "puffy",
+		"func": "Puffy",
+		"file": "puffy.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/puffy.flf"
+		},
+		"sha256": "459369f3d6acea147f7ec360f72d346d4cccab4dd05c9966b9b56ba30e71b800",
+		"usage": 11
+	},
+	{
+		"name": "rectangles",
+		"func": "Rectangles",
+		"file": "rectangles.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/rectangles.flf"
+		},
+		"sha256": "35896280614a60cdeb53328a8c80b22afdd7610e311d27525cb69081ed1a1afc",
+		"usage": 21
+	},
+	{
+		"name": "roman",
+		"func": "Roman",
+		"file": "roman.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/roman.flf"
+		},
+		"sha256": "616101ac8fb911d8f0f800b61c86536e1849abc4d7324760383e76c45c344817",
+		"usage": 36
+	},
+	{
+		"name": "rounded",
+		"func": "Rounded",
+		"file": "rounded.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/rounded.flf"
+		},
+		"sha256": "67faf919337b3c884ee5237b91613646be87eefd3e3c29916a649cfd2ca61d3f",
+		"usage": 11
+	},
+	{
+		"name": "script",
+		"func": "Script",
+		"file": "script.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/script.flf"
+		},
+		"sha256": "2cdabe1d9f8951d1e4678e9dc32a6f004f7e0098351cbe388fb149a2825bd586",
+		"usage": 0
+	},
+	{
+		"name": "shadow",
+		"func": "Shadow",
+		"file": "shadow.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/shadow.flf"
+		},
+		"sha256": "4e541014c689d8f4b2e380054bcedb2236a0c975af37b4989147e773301e342f",
+		"usage": 0
+	},
+	{
+		"name": "slant",
+		"func": "Slant",
+		"file": "slant.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/slant.flf"
+		},
+		"sha256": "776d70bf97e03e5753690bad342eb02f989b12571b018fa87dd3a67c8d16dc42",
+		"usage": 0
+	},
+	{
+		"name": "small",
+		"func": "Small",
+		"file": "small.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/small.flf"
+		},
+		"sha256": "c275f3cf053af2eec87804fe60ad5cc865dbb25ea65d5cbbe09a27f332c714f0",
+		"usage": 0
+	},
+	{
+		"name": "smblock",
+		"func": "SmBlock",
+		"file": "smblock.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/smblock.tlf"
+		},
+		"sha256": "53f60d05c830b49ec2b9efcf58ec83bc1e8df075ef9f9416ab4896136d93ef9c",
+		"usage": 0
+	},
+	{
+		"name": "smbraille",
+		"func": "SmBraille",
+		"file": "smbraille.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/smbraille.tlf"
+		},
+		"sha256": "b556845b33323a2100b79b2a8192f925c4a712a809a5ddc4be7669cef1f60d00",
+		"usage": 0
+	},
+	{
+		"name": "smmono12",
+		"func": "SmMono12",
+		"file": "smmono12.tlf.gz",
+		"license": "",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/smmono12.tlf"
+		},
+		"sha256": "00f785a2a082717e198b1bb55588ba6dea4d3834460d8dda4af031e795aa20d9",
+		"usage": 21
+	},
+	{
+		"name": "smmono9",
+		"func": "SmMono9",
+		"file": "smmono9.tlf.gz",
+		"license": "",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/smmono9.tlf"
+		},
+		"sha256": "8c38c715bc935338d14d078cf82c500b3a8b9935b31ac4a897dd9a636b9520e1",
+		"usage": 40
+	},
+	{
+		"name": "smscript",
+		"func": "SmScript",
+		"file": "smscript.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/smscript.flf"
+		},
+		"sha256": "72c57c300800e778185cd107f3f8447f78763057bf4b4063abea5494ee1d8ee0",
+		"usage": 0
+	},
+	{
+		"name": "smshadow",
+		"func": "SmShadow",
+		"file": "smshadow.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/smshadow.flf"
+		},
+		"sha256": "ed037c8cec54ba091db1de4cc5fca79f3ed093ac419f373fb1631d0ed60d0cbf",
+		"usage": 0
+	},
+	{
+		"name": "smslant",
+		"func": "SmSlant",
+		"file": "smslant.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/smslant.flf"
+		},
+		"sha256": "e12d429773ee1be01617ba0b11c368c5be90fb84770616827a6f9e385119dfc0",
+		"usage": 0
+	},
+	{
+		"name": "standard",
+		"func": "Standard",
+		"file": "standard.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/standard.flf"
+		},
+		"sha256": "42df7980ad15f73699b0272633882811e3b6b79699e67cd79f40893d2fe310c1",
+		"usage": 0
+	},
+	{
+		"name": "starwars",
+		"func": "StarWars",
+		"file": "starwars.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/starwars.flf"
+		},
+		"sha256": "a31359c883de277eeba13f4f66cb4d0556ee88e890bcacc280812b82048b2ea8",
+		"usage": 22
+	},
+	{
+		"name": "term",
+		"func": "Term",
+		"file": "term.flf.gz",
+		"license": "BSD-3-Clause",
+		"source": {
+			"repo": "cmatsuoka/figlet",
+			"commit": "202a0a8110650a943f1125f536b3bb455cf72ee1",
+			"path": "fonts/term.flf"
+		},
+		"sha256": "707266dec1d7cd48863a560c8c77c269a278bf9e97bdab77b920e8cc02770ac0",
+		"usage": 0
+	},
+	{
+		"name": "univers",
+		"func": "Univers",
+		"file": "univers.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/univers.flf"
+		},
+		"sha256": "d046e5169f54c3e51f8692b577176fae370802b1057910d52744d56cfab16bcc",
+		"usage": 21
+	},
+	{
+		"name": "whimsy",
+		"func": "Whimsy",
+		"file": "whimsy.flf.gz",
+		"license": "",
+		"source": {
+			"repo": "cmatsuoka/figlet-fonts",
+			"commit": "0ab03ceaa3ebcfa3c691d3d87e692215d8bddfb0",
+			"path": "contributed/whimsy.flf"
+		},
+		"sha256": "d6adb4a5a7d4db65d067f030afae3f0c054f9fe88dc7e893641e98fe4af9ac27",
+		"usage": 8
+	},
+	{
+		"name": "wideterm",
+		"func": "WideTerm",
+		"file": "wideterm.tlf.gz",
+		"license": "WTFPL",
+		"source": {
+			"repo": "cacalabs/toilet",
+			"commit": "3eb9d58037afb0a1baec6dca82caa045fb2217c0",
+			"path": "fonts/wideterm.tlf"
+		},
+		"sha256": "1ccf4011358b2d6685d5ef7a694c6e9a2aa00f101ae029cb5033f2f9dd55dcf3",
+		"usage": 0
+	}
+]
