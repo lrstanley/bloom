@@ -472,6 +472,7 @@ type LayerNode struct {
 	side      Direction
 	modal     bool
 	absent    bool
+	clear     bool
 	backdrop  []fx.Effect
 	shadowX   int
 	shadowY   int
@@ -516,6 +517,14 @@ func (n LayerNode) AnchorTo[K comparable](id K, side Direction) LayerNode {
 // dialog when its backdrop is clicked. It is also a focus scope, for
 // [Focus.Push].
 func (n LayerNode) Modal() LayerNode { n.modal, n.scope = true, true; return n }
+
+// Transparent lets what is beneath the layer show through the blank cells
+// its child draws, rather than the layer covering its whole rectangle: cells
+// holding a space with no background, underline, or reverse video. Use it
+// for text drawn over other content, such as a banner from package fig, or
+// ASCII art. A transparent layer is drawn into cells of its own each frame,
+// as a layer with effects is.
+func (n LayerNode) Transparent() LayerNode { n.clear = true; return n }
 
 // Backdrop applies effects to everything drawn beneath the layer, with the
 // layer's transition progress as their strength.

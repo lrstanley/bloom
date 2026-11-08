@@ -30,6 +30,32 @@ func TestCursorHiddenByEffects(t *testing.T) {
 	}
 }
 
+func TestTransparentLayer(t *testing.T) {
+	t.Parallel()
+
+	base := Text("abcdef\nghijkl")
+	bg := lipgloss.NewStyle().Background(lipgloss.Color("#202020"))
+	tests := []struct {
+		name  string
+		layer LayerNode
+		want  string
+	}{
+		{"opaque", Layer(Text("X  X\n Y")), "X  Xef\n Y  kl"},
+		{"transparent", Layer(Text("X  X\n Y")).Transparent(), "XbcXef\ngYijkl"},
+		{"with effects", Layer(Text("X  X\n Y")).Transparent().Transition(1, fx.Fade{}), "XbcXef\ngYijkl"},
+		{"background is opaque", Layer(Text(" X").Style(bg)).Transparent(), " Xcdef\nghijkl"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ansi.Strip(Render(Overlay(base, tt.layer.Anchor(Start, Start)), 6, 2))
+			if got != tt.want {
+				t.Fatalf("got\n%s\nwant\n%s", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPointerEffectsAreDrawnAgain(t *testing.T) {
 	t.Parallel()
 

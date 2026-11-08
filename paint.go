@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"image"
 	"reflect"
+	"slices"
 	"unsafe"
 
 	tea "charm.land/bubbletea/v2"
@@ -472,8 +473,12 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	if b.moving {
 		push, area = r.beginTravel(b, clip), clip.Union(b.rect)
 	}
-	if len(n.effects) > 0 {
-		r.paintEffects(r.firstKid(i), b.rect, area, n.t, n.effects, parent, from)
+	effects := n.effects
+	if n.clear {
+		effects = append(slices.Clip(effects), cutout{})
+	}
+	if len(effects) > 0 {
+		r.paintEffects(r.firstKid(i), b.rect, area, n.t, effects, parent, from)
 	} else {
 		r.ops = append(r.ops, op{kind: opClear, rect: b.rect.Intersect(area)})
 		mark := len(r.moves)
@@ -483,6 +488,29 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	if b.moving {
 		r.popEffects(b.rect, clip, b.from, b.moveT, n.moves, push, from)
 	}
+}
+
+// cutout hides the blank cells of a transparent layer, after its own effects,
+// so that what is beneath shows through them.
+type cutout struct{}
+
+// Apply implements [fx.Effect].
+func (cutout) Apply(s *canvas.Surface, _ float64) {
+	r := s.Reach()
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if c := s.Cell(x, y); c != nil && blankCell(c) {
+				s.Hide(x, y)
+			}
+		}
+	}
+}
+
+// blankCell reports whether c shows nothing: a space with no background,
+// underline, or reverse video.
+func blankCell(c *uv.Cell) bool {
+	return c.Width == 1 && (c.Content == " " || c.Content == "") && c.Style.Bg == nil &&
+		c.Style.Underline == 0 && c.Style.Attrs&uv.AttrReverse == 0
 }
 
 // deferredMove is a slot moving with effects, whose painting waits until
