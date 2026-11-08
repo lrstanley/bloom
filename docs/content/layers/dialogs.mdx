@@ -118,6 +118,18 @@ bloom.Layer(dialog).Shadow(2, 1, fx.Dim{Amount: 0.7})
 
 Terminal cells are about twice as tall as they are wide, so an offset of two columns and one row looks even.
 
+## Show what's beneath a layer's blank cells
+
+A layer covers everything beneath it, blank cells too. `Transparent()` shows what's beneath its blank cells
+instead: those with no background color, underline, or reversed colors. Use it for text drawn over the screen
+without a box around it, such as [FIGlet text](/layout/figlet-text#draw-it-over-other-things):
+
+```go
+bloom.Layer(fig.Text("Deployed!")).Transparent()
+```
+
+A cell an effect hides is shown through too, as on any layer.
+
 ## Size and place a dialog
 
 - `Size(w, h)` sets the layer's size. Zero for either uses the child's natural size on that axis. Text styled with

@@ -95,6 +95,9 @@ over.
   border with `Edge`, plus draggable scrollbars that only show up when there's more to scroll.
 - :heavy_check_mark: **Loading placeholders**: `Skeleton(8, 0, 5, 11)` draws shimmering bars in place of content
   that's still loading, a line for each line of the content, so nothing jumps when it arrives.
+- :heavy_check_mark: **FIGlet text**: package `fig` draws big text in 67 bundled FIGlet and TOIlet fonts, laid out
+  as C figlet does, with gradients and other paints, smaller fonts as space runs short, and letters animated one at
+  a time with bloom's effects and layout animation.
 - :heavy_check_mark: **Works with existing components**: anything with a `View() string` method, including
   [Bubbles](https://github.com/charmbracelet/bubbles) components, is a leaf in the tree.
 - :heavy_check_mark: **Fast**: strings are parsed once, Lip Gloss renders are cached, and unchanged frames aren't

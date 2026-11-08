@@ -1,0 +1,247 @@
+---
+title: FIGlet text
+description: Show large text drawn from ordinary characters in FIGlet and TOIlet fonts, color it, step down to smaller fonts as space runs short, and animate it letter by letter.
+---
+
+Package [`fig`](https://pkg.go.dev/github.com/lrstanley/bloom/fig) draws text in
+[FIGlet](http://www.figlet.org) and TOIlet fonts: big letters made of ordinary characters, for headers, splash
+screens, clocks, and banners. Its text is a bloom node like any other, so it fits in rows and columns, sits in
+layers, and works with bloom's effects and layout animation.
+
+![The fonts example: one line of text in each bundled font, colored with each of fig's paints](/demos/fig-fonts.webp)
+
+## Show text in a font
+
+[`fig.Text`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Text) returns a node. Give it fonts from package
+[`fonts`](https://pkg.go.dev/github.com/lrstanley/bloom/fig/fonts), and a paint:
+
+```go
+import (
+	"github.com/lrstanley/bloom/fig"
+	"github.com/lrstanley/bloom/fig/fonts"
+)
+
+header := fig.Text("Mission Control").
+	Font(fonts.Slant()).
+	Paint(fig.Gradient(lipgloss.Color("#ff6f91"), lipgloss.Color("#ffc29b")))
+
+bloom.Column(bloom.Centered(header), bloom.Fill(body))
+```
+
+Without `Font`, it uses figlet's standard font. The node measures as the size of its text, so `Centered`, `Auto`
+slots, and layers size it with no more work.
+
+Each font in package `fonts` is behind a function, such as `fonts.Slant()`, and is parsed the first time it's
+used. A program carries only the fonts it calls. `fonts.ByName("slant")` and `fonts.All()` find fonts by name,
+but they carry every font.
+
+### Load your own fonts
+
+[`fig.Parse`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Parse) reads a `.flf` or `.tlf` font, compressed
+with zip or gzip or not. [`fig.ParseFS`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#ParseFS) reads one from
+an `fs.FS`, such as an embedded directory:
+
+```go
+//go:embed fonts
+var fontFiles embed.FS
+
+doh, err := fig.ParseFS(fontFiles, "fonts/doh.flf")
+```
+
+[`fig.Lazy`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Lazy) waits until the font is first used to parse it.
+A FIGlet control file (`.flc`), read with
+[`fig.ParseControl`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#ParseControl), maps characters before they're
+laid out, as `figlet -C` does: `font.WithControl(c)`.
+
+## Step down to smaller fonts
+
+`Font` takes several fonts. The node uses the first whose text fits the space it's given, so a header shrinks as
+the terminal narrows. When none fits, it shows the text plainly, on one line, cut off with "…". Use `Fallback` to
+show something else:
+
+```go
+fig.Text("Mission Control").
+	Font(fonts.ANSICompact(), fonts.Doom(), fonts.Small(), fonts.Mini()).
+	Fallback(bloom.Text("MISSION CONTROL").Style(title))
+```
+
+![The mission example: a header stepping down through smaller fonts as the terminal narrows, and a FIGlet toast over the panels](/demos/fig-mission.webp)
+
+`Wrap()` wraps the text onto more lines at the node's width before it steps down to the next font.
+
+## Color it
+
+A [`Paint`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Paint) gives each character of the text its style:
+
+| Paint | Colors |
+| --- | --- |
+| `fig.Solid(c)` | everything one color |
+| `fig.Gradient(a, b, ...)` | a gradient across the text's columns. `.By(fig.ByRow)`, `ByDiagonal`, or `ByGlyph` (a color per letter) changes the direction |
+| `fig.Palette(a, b, ...)` | each letter the next color, in turn |
+| `fig.Rainbow()` | bright colors in diagonal bands, as TOIlet's rainbow filter |
+| `fig.Metal()` | shades of blue and gray in slanted bands, as TOIlet's metal filter |
+| `fig.Fill(inside, p)` | `p`, with the blanks inside letters, such as the middle of an "O", filled in |
+
+Where two letters were squeezed into the same cell, a gradient's `Blend()` mixes both letters' colors there.
+
+For anything else, write a [`PaintFunc`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#PaintFunc). It's given
+the whole figure and each cell: where it is, what kind of cell it is, and which letter of the text drew it. This one
+lights up the letter under the pointer:
+
+```go
+fig.PaintFunc(func(f *fig.Figure, c fig.Cell) uv.Style {
+	st := base.Shade(f, c)
+	if c.Glyph == m.hover {
+		st.Fg = white
+		st.Attrs |= uv.AttrBold
+	}
+	return st
+})
+```
+
+Text drawn with a built-in paint is cached, so text that doesn't change isn't drawn again. A `PaintFunc` is called
+every frame, since it may give different colors each time.
+
+## Lay it out
+
+[`Options`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Options) is how the text is laid out. Its zero value
+does what `figlet` with no options does, character for character:
+
+```go
+fig.Text(msg).Options(fig.Options{
+	Horizontal: fig.Fitted, // letters touch, but don't merge
+	Width:      60,         // wrap at 60 columns
+	Justify:    fig.Center,
+})
+```
+
+- `Horizontal` and `Vertical` are `fig.Full` (letters side by side, at full width), `Fitted` (pushed together until
+  they touch), `Smushed` (pushed one column further, merging the characters that meet by the font's rules), or
+  `Universal` (merged whatever the characters are). The zero value is the font's own layout. Lines can be smushed
+  vertically too, which figlet doesn't do.
+- `Rules` replaces the font's smushing rules, as `figlet -m` does.
+- `Direction` prints right to left, or left to right, whatever the font says.
+- `Width`, `Justify`, and `Paragraph` wrap and place lines of text, as figlet's `-w`, `-c`/`-r`, and `-p` do.
+- `Tracking` adds columns between letters. A negative `Tracking` pushes letters into each other, past what the
+  font's rules allow, so their strokes overlap. `Stacking` says which is drawn on top: the later letter, the
+  default, or the earlier.
+- `Strict` follows the FIGfont standard in the two places figlet doesn't.
+
+## Animate it letter by letter
+
+Text whose letters don't move is drawn as one string. Once they move, each letter is drawn as a
+[transparent layer](/layers/dialogs#show-whats-beneath-a-layers-blank-cells) of its own, so bloom's effects apply to
+single letters. Where two letters were merged into the same cells, each layer keeps its own strokes, and the merged
+characters are only shown while both letters are still. Letters moving apart don't leave holes.
+
+![The letters example: a title revealed from the middle out, a clock whose digits roll over, and an anagram whose letters fly to their places in the next word](/demos/fig-letters.webp)
+
+### Reveal letters one after another
+
+`Each(t, effects...)` applies effects to each letter for its own progress, as
+[`Transition`](/motion/transitions) does a node, the letters starting one after another as `t` goes from 0 to 1.
+`Spread` sets how much of `t` is spent starting them, and in what order: `fig.Forward`, `Backward`, `Outward`
+from the middle, `Inward`, or `fig.Random(seed)`:
+
+```go
+fig.Text("letters").
+	Font(fonts.Slant()).
+	Each(m.intro.Float(), fx.Slide{From: bloom.Top}, fx.Fade{}).
+	Spread(0.6, fig.Outward)
+```
+
+### Move letters to their new places
+
+`Animate()` glides each letter to where it is in the new text when the text changes, with bloom's
+[layout animation](/motion/layout-animation). It needs an ID and a retained [`bloom.Root`](/concepts/rendering).
+`MoveWith` moves them with effects instead, such as `fx.Fly`:
+
+```go
+fig.Text(anagrams[m.word]).
+	ID("anagram").
+	Animate(anim.Duration(900 * time.Millisecond)).
+	MoveWith(fx.Fly{Seed: 3})
+```
+
+Letters are matched by `Key`: `fig.ByOccurrence`, the default, matches the first "e" of the old text with the first
+"e" of the new, and so on. `fig.ByPosition` matches the letters in the same places, for text such as a clock, where
+a digit that changes should be replaced, not moved.
+
+### Morph from one text to another
+
+A [`fig.Morph`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Morph) keeps text in your model, and animates its
+changes: letters leaving the text go out with `Leave`'s effects, letters joining it come in with `Enter`'s, and the
+rest stay or move. Pass it every message, like any [animated value](/motion/animating-values):
+
+```go
+m.clock = fig.NewMorph("09:59:59", anim.Duration(450*time.Millisecond))
+
+// In Update:
+cmd := m.clock.Set(now.Format("15:04:05"))
+cmds = append(cmds, anim.Update(msg, &m.clock))
+
+// In View:
+m.clock.Text().
+	Font(fonts.Big()).
+	Key(fig.ByPosition).
+	Enter(fx.Slide{From: bloom.Top}, fx.Fade{}).
+	Leave(fx.Slide{From: bloom.Bottom}, fx.Fade{})
+```
+
+### Handle the mouse per letter
+
+`OnGlyph` adds mouse handlers to each letter. It's given the
+[`Glyph`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Glyph): the character, its place in the text, and the
+cells it covers. Where letters overlap, the one on top gets the event:
+
+```go
+fig.Text(word).OnGlyph(func(g fig.Glyph) []on.Handler {
+	return []on.Handler{on.Hover(func(over bool) tea.Cmd {
+		if over {
+			m.hover = g.Index
+		}
+		return nil
+	})}
+})
+```
+
+## Draw it over other things
+
+On a [transparent layer](/layers/dialogs#show-whats-beneath-a-layers-blank-cells), the blank cells around and inside
+the letters show what's beneath them, so big text can sit over a screen without a box around it:
+
+```go
+toast := fig.Text("Deployed!").Font(fonts.Doom()).Paint(green)
+bloom.Overlay(screen,
+	bloom.Layer(toast).Transparent().Presence(m.toast, fx.Slide{From: bloom.Top}),
+)
+```
+
+## Use it without bloom
+
+A font lays text out into a [`Figure`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Figure), which is also a
+plain string:
+
+```go
+f := fonts.Standard().Figure("Hello", fig.Options{})
+fmt.Println(f)                       // no colors
+fmt.Println(f.Render(fig.Rainbow())) // with ANSI colors
+```
+
+The figure also says, for every cell, which letter drew it (`At`), where each letter is (`Glyphs`), and, for every
+cell where two letters were merged, both of their characters and the rule that merged them (`Seams`).
+
+## Fonts and licenses
+
+Package `fonts` bundles 67 fonts: figlet's own, such as `standard`, `slant`, `big`, `small`, and `banner`, TOIlet's,
+such as `future`, `pagga`, and `smblock`, and popular fonts from other collections, such as `ansi-compact`, `doom`,
+`larry3d`, and `starwars`. Each font's documentation says where it's from and its license, where one is known. The
+licenses are in
+[`fig/fonts/LICENSES.md`](https://github.com/lrstanley/bloom/blob/master/fig/fonts/LICENSES.md).
+
+## Related
+
+- [`fig` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/fig)
+- [`fonts` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/fig/fonts)
+- [Transitions](/motion/transitions)
+- [Layout animation](/motion/layout-animation)

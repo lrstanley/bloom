@@ -30,6 +30,16 @@ bar, and clicks.
 See also: [Build your first layout](/getting-started/first-layout).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/standard), or `go run ./standard`.
 
+## fig-fonts
+
+![The fonts example: one line of text in each bundled font, colored with each of fig's paints](/demos/fig-fonts.webp)
+
+A gallery of the FIGlet fonts bundled with `fig`, and each of its paints: gradients by column, row, diagonal, and
+letter, a palette, a rainbow, metal, and letters filled in.
+
+See also: [FIGlet text](/layout/figlet-text).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/fig-fonts), or `go run ./fig-fonts`.
+
 ## responsive
 
 ![The responsive example: paging and scrolling the reader, then the toolbar dropping its labels, the details panel, and the navigation as the terminal narrows](/demos/responsive.webp)
@@ -120,6 +130,17 @@ See also: [Feedback effects](/motion/feedback-effects#scroll-text-that-doesnt-fi
 values](/motion/animating-values). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/ticker), or `go
 run ./ticker`.
 
+## fig-mission
+
+![The mission example: a header stepping down through smaller fonts as the terminal narrows, and a FIGlet toast over the panels](/demos/fig-mission.webp)
+
+A FIGlet header that steps down to smaller fonts as the terminal narrows, with a shine swept across it by a
+`PaintFunc`, and a FIGlet toast on a transparent layer, so the panels show through it.
+
+See also: [FIGlet text](/layout/figlet-text#step-down-to-smaller-fonts), [Dialogs and
+modals](/layers/dialogs#show-whats-beneath-a-layers-blank-cells).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/fig-mission), or `go run ./fig-mission`.
+
 ## reflow
 
 ![The reflow example: the sidebar closing and opening, the list re-sorting, the split changing ratio, and the details panel coming and going, each gliding into place](/demos/reflow.webp)
@@ -129,6 +150,16 @@ layer following the selection.
 
 See also: [Layout animation](/motion/layout-animation).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/reflow), or `go run ./reflow`.
+
+## fig-letters
+
+![The letters example: a title revealed from the middle out, a clock whose digits roll over, and an anagram whose letters fly to their places in the next word](/demos/fig-letters.webp)
+
+FIGlet text animated letter by letter: a title revealed with `Each`, a clock that's a `fig.Morph`, and an anagram
+whose letters fly to their places with `Animate` and `fx.Fly`, and light up under the pointer with `OnGlyph`.
+
+See also: [FIGlet text](/layout/figlet-text#animate-it-letter-by-letter).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/fig-letters), or `go run ./fig-letters`.
 
 ## dashboard
 
