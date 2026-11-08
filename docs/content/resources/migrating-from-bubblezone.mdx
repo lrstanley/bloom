@@ -1,0 +1,217 @@
+---
+title: Migrating from bubblezone
+description: Whether to move a Bubble Tea program from bubblezone to bloom, what you gain and give up, how each bubblezone call maps to bloom, and a worked example.
+---
+
+[bubblezone](https://github.com/lrstanley/bubblezone), by the same author, tracks where parts of a view were drawn
+so you can tell which one a mouse event landed on. bloom does that job too, as part of laying out the view, and is
+bubblezone's successor for programs on Bubble Tea v2.
+
+## Which one to use
+
+| Your program uses | Use |
+| --- | --- |
+| Bubble Tea v1 (`github.com/charmbracelet/bubbletea`) | bubblezone, `github.com/lrstanley/bubblezone`. bloom [needs Bubble Tea v2](/getting-started/installation#requirements). |
+| Bubble Tea v2 (`charm.land/bubbletea/v2`) | bloom. |
+
+bubblezone v2, `github.com/lrstanley/bubblezone/v2`, also runs on Bubble Tea v2, and a program that already uses
+it and builds its view as one string can stay on it. It may not work with Lip Gloss v2's canvas and compositor,
+though. For a new Bubble Tea v2 program, or one that's adding layers,
+dialogs, or more mouse handling, use bloom.
+
+## What changes
+
+The two libraries work differently. bubblezone wraps parts of your view string in invisible markers, then
+`zone.Scan` finds the markers in the final string, records where each one was, and strips them. bloom never sees
+your view as one string: you build a tree of nodes, bloom places them, and it already knows where each node is.
+
+What you gain:
+
+- **Handlers live on the nodes.** `bloom.Text("save").On(on.Click(m.save))` replaces a `zone.Mark` in `View`
+  plus an `InBounds` check in `Update`. Most nodes don't need an ID at all.
+- **One node gets each event.** bubblezone reports every zone whose rectangle contains the pointer, and you
+  decide which wins. In bloom, the innermost node with a handler for that kind of event takes it, and layers drawn
+  on top get events first. A [modal dialog](/layers/dialogs#make-it-modal) blocks clicks to what's underneath with
+  no extra checks.
+- **Nothing to break the markers.** There's no `zone.Scan` step, so `MaxWidth`, `MaxHeight`, and anything else
+  that trims a string can't cut a zone in half.
+- **More kinds of input.** Hover, drags, double clicks, and clicks outside a node are
+  [built in](/input/mouse#attach-handlers), along with keyboard [focus](/input/focus).
+- **No global state.** There's no manager to start and no background worker to close. Handlers don't need IDs,
+  so there are no prefixes to keep components apart. When you do need an ID, it can be any comparable value: a
+  type such as `type itemID int` keeps one kind of component's IDs apart from another's, though two instances of
+  the same component still need different values.
+- **Layout, layers, and motion come with it.** bloom also sizes panes, draws dialogs and toasts over the screen,
+  and animates them. See the [introduction](/getting-started/introduction#why-bloom-exists).
+
+What you give up:
+
+- **Your root view becomes a bloom tree.** `lipgloss.JoinHorizontal` and `lipgloss.JoinVertical` between parts
+  you want to click on become `bloom.Row` and `bloom.Column`. Components with a `View() string` method, and any
+  string, can still be leaves of the tree as they are.
+- **Newer requirements.** bloom needs Bubble Tea v2, Lip Gloss v2, and Go 1.27 or newer.
+- **A pre-1.0 API.** bloom's API may still change in breaking ways before v1.0.0.
+- **More to learn.** bubblezone is a handful of functions. bloom is a layout engine with its own model of slots
+  and sizes; [How layout works](/concepts/how-layout-works) covers it.
+
+## How bubblezone calls map to bloom
+
+| bubblezone | bloom |
+| --- | --- |
+| `zone.NewGlobal()`, `zone.New()` | `bloom.New()`, kept in your model as a `*bloom.Root`. |
+| `zone.Scan(view)` in the root `View` | `m.ui.View(width, height, layout)`, which returns the `tea.View`. |
+| `zone.Mark(id, s)` | `bloom.Text(s).On(...)` with a handler. Add `.ID(id)` only when something else needs to find the node. |
+| `zone.Get(id).InBounds(msg)` in `Update` | A handler on the node, such as `on.Click(fn)`. |
+| `zone.Get(id).Pos(msg)` | `on.ClickAt(func(e on.Event) tea.Cmd)`, with `e.X` and `e.Y` relative to the node. |
+| Checking `InBounds` on motion events for hover | `HoverStyle(style)`, or `on.Hover(fn)`. |
+| `zone.NewPrefix()` | Usually nothing, since handlers need no IDs. Where you need IDs, a type per component, such as `type itemID int`, with values that differ between instances. |
+| `zone.AnyInBounds`, `MsgZoneInBounds` | Handlers on the nodes. A handler made with `on.Msg(msg)` sends `msg` to `Update`. |
+| `ZoneInfo.StartX`, `StartY`, `EndX`, `EndY` | `m.ui.Frame().Rect(id)`, an `image.Rectangle`. Its `Max` is exclusive, while `EndX` and `EndY` are the last cell. |
+| `zone.Clear(id)`, `zone.Close()` | Nothing. bloom builds the frame fresh on every `View`. |
+
+## Migrate a program
+
+This bubblezone program lists three notes and selects one when it's clicked:
+
+```go title="main.go (bubblezone)"
+type model struct {
+	items    []string
+	selected int
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		if msg.String() == "q" {
+			return m, tea.Quit
+		}
+	case tea.MouseReleaseMsg:
+		if msg.Button != tea.MouseLeft {
+			return m, nil
+		}
+		for i := range m.items {
+			if zone.Get(fmt.Sprintf("item-%d", i)).InBounds(msg) {
+				m.selected = i
+			}
+		}
+	}
+	return m, nil
+}
+
+func (m model) View() tea.View {
+	rows := make([]string, len(m.items))
+	for i, name := range m.items {
+		style := item
+		if i == m.selected {
+			style = selected
+		}
+		rows[i] = zone.Mark(fmt.Sprintf("item-%d", i), style.Render(name))
+	}
+
+	v := tea.NewView(zone.Scan(lipgloss.JoinVertical(lipgloss.Left, rows...)))
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+func main() {
+	zone.NewGlobal()
+	m := model{items: []string{"Groceries", "Ideas", "Reading"}}
+	// ...
+}
+```
+
+<Steps>
+<Step>
+
+### Add a root to the model
+
+Replace `zone.NewGlobal()` with a `*bloom.Root` in the model. bloom needs the window's size, so keep that too, and
+pass every message to `m.ui.Update`:
+
+```go
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	items         []string
+	selected      int
+}
+
+func (m *model) Init() tea.Cmd { return m.ui.Init() }
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		if msg.String() == "q" {
+			return m, tea.Quit
+		}
+	}
+	return m, m.ui.Update(msg)
+}
+```
+
+```go
+m := &model{ui: bloom.New(), items: []string{"Groceries", "Ideas", "Reading"}}
+```
+
+The `tea.MouseReleaseMsg` case is gone. The methods now have pointer receivers, which the next step relies on.
+
+</Step>
+<Step>
+
+### Put the handlers on the nodes
+
+Each marked string becomes a text node with a click handler, and `lipgloss.JoinVertical` becomes `bloom.Column`.
+`m.ui.View` replaces `zone.Scan`:
+
+```go
+func (m *model) View() tea.View {
+	rows := make([]bloom.Child, len(m.items))
+	for i, name := range m.items {
+		style := item
+		if i == m.selected {
+			style = selected
+		}
+		rows[i] = bloom.Text(name).Style(style).On(on.Click(func() tea.Cmd {
+			m.selected = i
+			return nil
+		}))
+	}
+
+	v := m.ui.View(m.width, m.height, bloom.Column(rows...))
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+```
+
+The handler is a closure made in `View`, so it can only change the model through a pointer receiver. With a value
+receiver it changes a copy, and the click does nothing. When a handler can't reach the state, such as in a
+component kept by value, have it send a message with `on.Msg` instead. See
+[Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+
+</Step>
+<Step>
+
+### Remove bubblezone
+
+Drop the `zone` import and run `go mod tidy`. The string IDs and the `InBounds` loop have no
+replacement: the click goes to the row it's on.
+
+</Step>
+</Steps>
+
+## Don't mix the two
+
+Move a program over in one go rather than running bubblezone and bloom side by side. `zone.Scan` needs the whole
+screen as one string, and bloom draws cells and returns a `tea.View`. bloom also drops bubblezone's markers when it
+draws text, so a `zone.Mark` inside a bloom layout never registers a zone.
+
+## Related
+
+- [Mouse events](/input/mouse), for every handler and how bloom picks the node that gets an event
+- [Build your first layout](/getting-started/first-layout), a tutorial that starts from an empty screen
+- [Using Bubbles components](/layout/bubbles-components), for components you used to wrap in `zone.Mark`
+- [bubblezone on GitHub](https://github.com/lrstanley/bubblezone)
