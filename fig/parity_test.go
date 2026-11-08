@@ -60,14 +60,14 @@ var parityCases = []parityCase{
 	{name: "latin", args: []string{"-C", "utf8"}, text: "Ünïcödé ßtrasse ÄÖÜ äöü", utf8: true},
 }
 
-// update regenerates testdata/parity.txt from C figlet, whose path is in the
+// update regenerates testdata/parity.golden from C figlet, whose path is in the
 // FIGLET environment variable: figlet 2.2.5, built with TLF_FONTS, as its
 // Makefile builds it.
-var update = flag.Bool("update", false, "regenerate testdata/parity.txt from the figlet in $FIGLET")
+var update = flag.Bool("update", false, "regenerate testdata/parity.golden from the figlet in $FIGLET")
 
 // parityFile holds a hash of figlet's output for each font and case, rather
 // than the output itself, which would be far larger.
-const parityFile = "testdata/parity.txt"
+const parityFile = "testdata/parity.golden"
 
 // skipParity are the fonts and cases where fig differs from figlet on
 // purpose.
