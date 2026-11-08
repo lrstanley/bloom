@@ -99,7 +99,7 @@ func TestTruncateMeasuresAsDrawn(t *testing.T) {
 				n := Text(s).Style(st).Truncate()
 				f := Solve(Row(Auto(n).ID("n")), avail, 0)
 				r, _ := f.Rect("n")
-				got := textOf(n, r.Dx(), 0)
+				got := textOf(n, r.Dx(), 0, ansi.GraphemeWidth)
 				if w, h := lipgloss.Size(got); w != r.Dx() || h != r.Dy() {
 					t.Errorf("%s, %q in %d: measured %dx%d, drawn %dx%d:\n%s", name, s, avail, r.Dx(), r.Dy(), w, h, got)
 				}
@@ -143,7 +143,7 @@ func TestMarquee(t *testing.T) {
 			t.Parallel()
 
 			got := ansi.Strip(Render(tt.node, tt.width, 1))
-			if want := padTo(tt.want, tt.width); got != want {
+			if want := padTo(tt.want, tt.width, ansi.GraphemeWidth); got != want {
 				t.Fatalf("rendered %q, want %q", got, want)
 			}
 		})
@@ -208,6 +208,27 @@ func TestMarqueeWide(t *testing.T) {
 	}
 	if got := ansi.Strip(Render(Marquee(text, 4.5/13), 5, 1)); got != "你好 " {
 		t.Fatalf("scrolled whole glyphs: %q", got)
+	}
+}
+
+func TestTextWidthMethod(t *testing.T) {
+	t.Parallel()
+
+	// "❤️" is one cell to WcWidth and two to GraphemeWidth, so measuring
+	// with the wrong one cuts the text early and pads it with blanks.
+	const text = "❤️❤️❤️abc"
+	for _, tt := range []struct {
+		node Child
+		want string
+	}{
+		{Text(text).Truncate(), "❤️❤️❤️a…|"},
+		{Marquee(text, 0), "❤️❤️❤️a…|"},
+		{Marquee(text, 2.5/9), "❤️abc |"},
+	} {
+		got := ansi.Strip(newRenderer(ansi.WcWidth).render(Row(Fill(tt.node), Text("|")), 6, 1))
+		if got != tt.want {
+			t.Errorf("%T: %q, want %q", tt.node, got, tt.want)
+		}
 	}
 }
 

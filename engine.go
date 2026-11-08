@@ -224,7 +224,7 @@ func (e *engine) expand(i int, l Layouter, avail Size) int {
 		return b.expanded
 	}
 	root := -1
-	if child := l.Layout(Context{Width: avail.W, Height: avail.H}); child != nil {
+	if child := l.Layout(Context{Width: avail.W, Height: avail.H, wc: e.method == ansi.WcWidth}); child != nil {
 		root = e.build(child, i, -1)
 	}
 	e.boxes[i].expanded, e.boxes[i].expandedFor = root, avail
@@ -240,8 +240,9 @@ func (e *engine) viewOf(i int) string {
 }
 
 // textOf returns what a text node shows at w×h, or at its natural size for
-// a w or h of zero. A width or height the style sets itself is kept.
-func textOf(n TextNode, w, h int) string {
+// a w or h of zero, measuring with method. A width or height the style sets
+// itself is kept.
+func textOf(n TextNode, w, h int, method ansi.Method) string {
 	if n.truncate {
 		if tf := n.style.GetTransform(); tf != nil {
 			// The transform goes first, so what it makes is kept to one line.
@@ -251,8 +252,8 @@ func textOf(n TextNode, w, h int) string {
 		if room <= 0 {
 			room = unbounded
 		}
-		if inner := lineWidth(n.style, room); ansi.StringWidth(n.s) > inner {
-			n.s = truncateLine(n.s, inner)
+		if inner := lineWidth(n.style, room); method.StringWidth(n.s) > inner {
+			n.s = truncateLine(n.s, inner, method)
 		}
 	}
 	if !n.styled {
@@ -369,11 +370,11 @@ func (e *engine) measureText(i int, n TextNode, avail Size) Size {
 	}
 	if st.GetWidth() > 0 || st.GetTransform() != nil || st.GetMaxWidth() > 0 || st.GetMaxHeight() > 0 {
 		// The style wraps or changes the text in ways only rendering tells.
-		w, h = e.cache.Size(textOf(n, 0, 0))
+		w, h = e.cache.Size(textOf(n, 0, 0, e.method))
 	}
 	if w > avail.W {
 		// Too wide: rendered at the available width, where it wraps.
-		w, h = e.cache.Size(textOf(n, avail.W, 0))
+		w, h = e.cache.Size(textOf(n, avail.W, 0, e.method))
 	}
 	return Size{W: w, H: h}
 }

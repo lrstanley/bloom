@@ -90,6 +90,8 @@ type Context struct {
 	// Width and Height are the space available. Once layout is done they
 	// are the exact size the component was given.
 	Width, Height int
+
+	wc bool // text is measured with ansi.WcWidth rather than ansi.GraphemeWidth
 }
 
 // unbounded is the space given to content that may be larger than its

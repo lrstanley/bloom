@@ -297,7 +297,7 @@ func (r *renderer) textAt(i int, n TextNode, w, h int) string {
 		m.used = r.frames
 		return m.out
 	}
-	out := textOf(n, w, h)
+	out := textOf(n, w, h, r.method)
 	*m = styledMemo{ok: true, used: r.frames, style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out}
 	return out
 }

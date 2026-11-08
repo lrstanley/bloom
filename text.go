@@ -76,7 +76,6 @@ func (n TextNode) View() string { return Render(n, 0, 0) }
 // with [Marquee].
 type MarqueeNode struct {
 	s, gap string
-	w, gw  int // the cell widths of s and gap, measured once
 	phase  float64
 	style  lipgloss.Style
 	styled bool
@@ -100,7 +99,7 @@ func Marquee(s string, phase float64) MarqueeNode {
 	if strings.ContainsAny(s, "\r\n") {
 		s = lineBreaks.Replace(s)
 	}
-	return MarqueeNode{s: s, gap: "   ", w: ansi.StringWidth(s), gw: 3, phase: phase}
+	return MarqueeNode{s: s, gap: "   ", phase: phase}
 }
 
 // Style renders the text with style, at the size the node is given as
@@ -114,7 +113,7 @@ func (n MarqueeNode) Style(style lipgloss.Style) MarqueeNode {
 // Gap sets what is shown between the end of the text and its start again
 // while scrolling, three spaces by default.
 func (n MarqueeNode) Gap(s string) MarqueeNode {
-	n.gap, n.gw = s, ansi.StringWidth(s)
+	n.gap = s
 	return n
 }
 
@@ -127,14 +126,16 @@ func (n MarqueeNode) Layout(ctx Context) Child {
 	if inner <= 0 {
 		return nil
 	}
-	if n.w <= inner {
+	m := ctx.method()
+	w := m.StringWidth(n.s)
+	if w <= inner {
 		return n.text(n.s)
 	}
 	if n.phase == 0 {
-		return n.text(truncateLine(n.s, inner))
+		return n.text(truncateLine(n.s, inner, m))
 	}
 
-	period := n.w + n.gw
+	period := w + m.StringWidth(n.gap)
 	off := int((n.phase - math.Floor(n.phase)) * float64(period))
 	off = min(off, period-1)
 	loop := n.s + n.gap + n.s + n.gap // two loops, so a window starting anywhere in the first fits
@@ -143,10 +144,10 @@ func (n MarqueeNode) Layout(ctx Context) Child {
 	// push everything after it out of place, so a glyph cut in half at the
 	// left is replaced by a space.
 	lead := ""
-	if ansi.StringWidth(ansi.Cut(loop, 0, off)) < off {
+	if m.StringWidth(cut(m, loop, 0, off)) < off {
 		lead, off = " ", off+1
 	}
-	return n.text(padTo(lead+ansi.Cut(loop, off, off+inner-len(lead)), inner))
+	return n.text(padTo(lead+cut(m, loop, off, off+inner-len(lead)), inner, m))
 }
 
 func (n MarqueeNode) text(s string) TextNode {
@@ -277,22 +278,41 @@ func stack(s string) string {
 	return b.String()
 }
 
-// padTo pads s with spaces to w cells, as truncating may leave it short when
-// a wide glyph does not fit.
-func padTo(s string, w int) string {
-	if d := w - ansi.StringWidth(s); d > 0 {
+// padTo pads s with spaces to w cells measured with method, as truncating
+// may leave it short when a wide glyph does not fit.
+func padTo(s string, w int, method ansi.Method) string {
+	if d := w - method.StringWidth(s); d > 0 {
 		return s + strings.Repeat(" ", d)
 	}
 	return s
 }
 
-// truncateLine cuts s to width cells with "…", keeping whole graphemes, and
-// pads it back to width when a wide glyph that did not fit leaves it short.
-func truncateLine(s string, width int) string {
+// truncateLine cuts s to width cells measured with method, with "…",
+// keeping whole graphemes, and pads it back to width when a wide glyph that
+// did not fit leaves it short.
+func truncateLine(s string, width int, method ansi.Method) string {
 	if width <= 0 {
 		return ""
 	}
-	return padTo(ansi.Truncate(s, width, "…"), width)
+	return padTo(method.Truncate(s, width, "…"), width, method)
+}
+
+// cut returns the cells of s from left up to right, as [ansi.Method.Cut]
+// does, which in x/ansi v0.11.9 trims the left with TruncateWc rather than
+// TruncateLeftWc for [ansi.WcWidth].
+func cut(m ansi.Method, s string, left, right int) string {
+	if right <= left {
+		return ""
+	}
+	return m.TruncateLeft(m.Truncate(s, right, ""), left, "")
+}
+
+// method returns how the renderer laying out with ctx measures text.
+func (ctx Context) method() ansi.Method {
+	if ctx.wc {
+		return ansi.WcWidth
+	}
+	return ansi.GraphemeWidth
 }
 
 // lineWidth is the room for a line of text inside width, kept within the
