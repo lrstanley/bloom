@@ -7,9 +7,14 @@
 // from the repository root. Set STEEP_EXPORT_DIR to record somewhere else:
 //
 //	STEEP_EXPORT_DIR=/tmp/previews STEEP_EXPORT_MODE=on go test -count 1 ./...
+//
+// Set DEMO_FORMATS to a comma-separated list of extensions, such as
+// "gif,mp4", to record those as well as the .webp the docs pages load.
 package demo
 
 import (
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,7 +38,7 @@ func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
 		steep.WithTimeout(20 * time.Second),
 		steep.WithColor(steep.ColorTrueColor),
 		steep.WithRecording(reel.Profile{
-			Outputs: reel.MustFiles(name + ".webp"),
+			Outputs: reel.MustFiles(outputs(name)...),
 			Render: []render.Option{
 				render.WithWindowChrome(true),
 				render.WithPadding(10),
@@ -52,4 +57,16 @@ func ResizeInBand(t *testing.T, h *steep.Harness) {
 	if _, err := h.Session().Write([]byte(ansi.SetModeInBandResize)); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// outputs returns the files a tour named name is recorded to: name.webp, and
+// one for each extension in DEMO_FORMATS.
+func outputs(name string) []string {
+	out := []string{name + ".webp"}
+	for ext := range strings.SplitSeq(os.Getenv("DEMO_FORMATS"), ",") {
+		if ext = strings.TrimPrefix(strings.TrimSpace(ext), "."); ext != "" && ext != "webp" {
+			out = append(out, name+"."+ext)
+		}
+	}
+	return out
 }
