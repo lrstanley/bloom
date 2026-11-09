@@ -62,6 +62,7 @@
   --color-fd-accent-foreground: #2b1328;
   --color-fd-ring: #c2255c;
   --fd-layout-width: 90rem;
+  --bloom-warn: #a8480f;
 }
 
 .dark {
@@ -81,6 +82,7 @@
   --color-fd-accent: #2b1328;
   --color-fd-accent-foreground: #fff1ea;
   --color-fd-ring: #ff6f91;
+  --bloom-warn: #ffc29b;
 }
 
 code,
@@ -545,19 +547,69 @@ pre {
   outline-offset: 3px;
 }
 
-/* Like the banner's code box. */
+/* Like the banner's code box. Clicking anywhere on it copies the command. */
 .bloom-install {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: fit-content;
+  max-width: 100%;
   padding: 0.4rem 0.8rem;
   border: 1px solid rgb(255 111 145 / 0.28);
   border-radius: 6px;
   background: rgb(255 111 145 / 0.07);
+  font-family: var(--font-mono);
   font-size: 0.8125rem;
-  user-select: all;
+  color: var(--color-fd-muted-foreground);
+  cursor: pointer;
+  transition: border-color 150ms, color 150ms;
 }
 
-.bloom-note {
+.bloom-install:hover {
+  border-color: rgb(255 111 145 / 0.55);
+  color: var(--color-fd-foreground);
+}
+
+.bloom-install:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 3px;
+}
+
+.bloom-install code {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.bloom-install svg {
+  flex-shrink: 0;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.bloom-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: -0.5rem 0 0;
   font-size: 0.875rem;
-  color: var(--color-fd-muted-foreground);
+  font-weight: 600;
+  color: var(--bloom-warn);
+}
+
+.bloom-chip {
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--bloom-warn);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bloom-warn) 12%, transparent);
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .bloom-hero-demo {

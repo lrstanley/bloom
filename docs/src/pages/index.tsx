@@ -2,10 +2,13 @@ import type { ReactNode } from "react";
 import { Link } from "fumapress/client";
 import { asMarkdown, md } from "fumapress/markdown";
 import { BrandCode } from "../components/brand-code";
+import { CopyInstall } from "../components/copy-install";
 import { LlmsLinks } from "../components/llms-links";
 import { Logo } from "../components/logo";
 import { TerminalDemo } from "../components/terminal-demo";
 import { withBase } from "../lib/site";
+
+const install = "go get github.com/lrstanley/bloom@latest";
 
 const tagline = "Layout, motion, and effects for Bubble Tea.";
 
@@ -160,12 +163,12 @@ ${tagline}
 
 ${summary}
 
-> **Note**
+> **Warning**
 >
 > bloom is pre-1.0. Its API may change in breaking ways until v1.0.0.
 
 \`\`\`console
-go get github.com/lrstanley/bloom@latest
+${install}
 \`\`\`
 
 ## All of it in one program
@@ -233,9 +236,10 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                                 View on GitHub
                             </a>
                         </div>
-                        <code className="bloom-install">go get github.com/lrstanley/bloom@latest</code>
-                        <p className="bloom-note">
-                            Pre-1.0: expect breaking changes until v1.0.0.
+                        <CopyInstall text={install} />
+                        <p className="bloom-notice">
+                            <span className="bloom-chip">Pre-1.0</span>
+                            Expect breaking changes until v1.0.0.
                         </p>
                     </div>
                     <div className="bloom-hero-demo">
