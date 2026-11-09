@@ -41,8 +41,9 @@ func Scrollbar(total, visible, offset int) ScrollbarNode {
 }
 
 // ScrollbarOf returns a scrollbar for the [Scroll] that the node with ID id
-// is in, which follows the scroll from its layout, with no state of its own.
-// It is not drawn while there is no such node on screen.
+// is in, or for the [List] with ID id, in items, which follows it from its
+// layout, with no state of its own. It is not drawn while there is no such
+// node on screen.
 func ScrollbarOf[K comparable](id K) ScrollbarNode {
 	return ScrollbarNode{of: id}
 }
@@ -129,12 +130,17 @@ type scrollbarDrag struct {
 }
 
 // scrollbarOf fills in n's total, visible, and offset from the layout of the
-// [Scroll] around the node with n's ID, reporting false if there is none on
-// screen.
+// list with n's ID, or of the [Scroll] around the node with it, reporting
+// false if there is none on screen.
 func (e *engine) scrollbarOf(n ScrollbarNode) (ScrollbarNode, bool) {
 	i := e.shown(n.of)
 	if i < 0 {
 		return n, false
+	}
+	if _, ok := e.boxes[i].child.(ListNode); ok {
+		v := e.boxes[i].list
+		n.total, n.visible, n.offset = v.Count, v.Visible, v.First
+		return n, true
 	}
 	// The scroll's child, which is laid out whole.
 	for k, p := i, e.boxes[i].parent; p >= 0; k, p = p, e.boxes[p].parent {

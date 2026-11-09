@@ -216,11 +216,14 @@ type BoxNode struct {
 	borderFx []fx.Effect
 }
 
-// boxEdge is a child drawn over a side of a box's border.
+// boxEdge is a child drawn over a side of a box's border, at an end or in
+// the middle, or at a cell of its own along the side when exact.
 type boxEdge struct {
 	side  Direction
 	align Align
 	child Child
+	at    int
+	exact bool
 }
 
 // Box draws style's frame around child, which gets the space inside it. A box
@@ -260,14 +263,35 @@ func (n BoxNode) HoverStyle(style lipgloss.Style) BoxNode {
 // than is left, one cell apart, and one with no room is not shown. A side
 // without a border shows none.
 func (n BoxNode) Edge(side Direction, align Align, child Child) BoxNode {
-	if child == nil || absent(child) {
+	return n.edge(boxEdge{side: side, align: align, child: child})
+}
+
+// EdgeAt draws child over side of the box's border at cell at along it,
+// counted from the top or left end of the side, where 0 is the corner, or
+// back from the other end when negative, where -1 is the far corner. Use it
+// to join lines drawn inside the box to its border, such as a ┬ where a
+// column separator meets the top, or a ├ in place of a corner where boxes
+// stack. The child is given the room from at to the end of the side, one
+// row tall on the top and bottom, or one column wide on the left and right,
+// where a [Text] runs down the side as with [BoxNode.Edge]. Children placed
+// with EdgeAt take no room from those placed with Edge, and are drawn with
+// them in the order given, so a later child is drawn over an earlier one. A
+// cell outside the side, or a side without a border, shows nothing.
+func (n BoxNode) EdgeAt(side Direction, at int, child Child) BoxNode {
+	return n.edge(boxEdge{side: side, child: child, at: at, exact: true})
+}
+
+// edge adds e to the box's edges, with a Text on the left or right run down
+// the side.
+func (n BoxNode) edge(e boxEdge) BoxNode {
+	if e.child == nil || absent(e.child) {
 		return n
 	}
-	if t, ok := child.(TextNode); ok && (side == Left || side == Right) {
+	if t, ok := e.child.(TextNode); ok && (e.side == Left || e.side == Right) {
 		t.s, t.truncate = stack(t.s), false
-		child = t
+		e.child = t
 	}
-	n.edges = append(slices.Clip(n.edges), boxEdge{side: side, align: align, child: child})
+	n.edges = append(slices.Clip(n.edges), e)
 	return n
 }
 

@@ -346,7 +346,7 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		if n.cursor != nil {
 			r.placeCursor(n.cursor, b.rect.Min, vis)
 		}
-	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode:
+	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, ListNode:
 		for _, k := range r.kidsOf(i) {
 			r.paint(k, vis, parent)
 		}

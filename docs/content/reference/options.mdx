@@ -21,7 +21,8 @@ is on [pkg.go.dev](https://pkg.go.dev/github.com/lrstanley/bloom).
 | [`Centered(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Centered) | a child at its natural size in the middle of its space |
 | [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
 | [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
-| [`ScrollbarOf(id)`](https://pkg.go.dev/github.com/lrstanley/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in |
+| [`ScrollbarOf(id)`](https://pkg.go.dev/github.com/lrstanley/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` with ID `id` |
+| [`List(count, item)`](https://pkg.go.dev/github.com/lrstanley/bloom#List) | the items of a list that fit, built by `item(i)` only for those; `.Offset(i)`, `.Keep(i)`, `.Gap(n)` |
 | [`Overlay(base, layers...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Overlay) | layers drawn over a base |
 | [`Layer(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Layer) | a layer for an overlay, centered at its natural size |
 | [`Transition(t, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Transition) | a child drawn with effects at progress `t` |
@@ -44,6 +45,7 @@ Any value with a `View() string` method can also be a child.
 | Method | Does |
 | --- | --- |
 | `Edge(side, align, child)` | draws a child over a side of the border, such as a title, an icon button, or a scrollbar; a `Text` on the left or right runs down the side |
+| `EdgeAt(side, at, child)` | draws a child at cell `at` along a side, corners included, counting back from the far end when negative; for joining lines to the border |
 | `BorderFx(t, effects...)` | applies effects to the frame only, such as the looping [border effects](/reference/effects#borders) |
 
 ## Scrollbar options
@@ -162,7 +164,8 @@ From [`github.com/lrstanley/bloom/on`](https://pkg.go.dev/github.com/lrstanley/b
 | `on.Msg(msg)` | a handler function that sends `msg` to `Update` |
 
 Component interfaces: [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports a natural size,
-and [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a layout for the space given.
+and [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a layout for the space given. The
+handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen.
 
 ## Animation options
 

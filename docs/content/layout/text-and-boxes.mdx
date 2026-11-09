@@ -117,6 +117,35 @@ box = box.Edge(bloom.Right, bloom.Center, bloom.Text("LOGS").Style(label)) // L,
 A [scrollbar](/layout/scrolling#show-a-scrollbar) can go on a border too, where it shows only while there's
 more to scroll to, and can be dragged.
 
+### Join lines to the border
+
+`EdgeAt(side, at, child)` puts a child at an exact cell along a side, counted from the top or left end, where `0`
+is the corner. A negative `at` counts back from the other end, so `-1` is the far corner. It's for joining lines
+drawn inside a box to its border, such as where column separators meet it, or for swapping a corner for a `├`
+where two boxes stack:
+
+```go
+box := bloom.Box(panel, table)
+for _, x := range separators { // the column of each │ inside, from the box's left edge
+	box = box.
+		EdgeAt(bloom.Top, x, bloom.Text("┬").Style(border)).
+		EdgeAt(bloom.Bottom, x, bloom.Text("┴").Style(border))
+}
+box = box.Edge(bloom.Top, bloom.Start, bloom.Text("jobs").Style(title))
+```
+
+```
+╭─jobs─┬──────┬─────╮
+│   12 │ api  │ ok  │
+│   13 │ db   │ ok  │
+╰──────┴──────┴─────╯
+```
+
+Children placed with `EdgeAt` take no room from those placed with `Edge`, so a title or a counter stays where it
+was. Edge children are drawn in the order you add them, so add the junctions first to let a title cover any under
+it. A child gets the room from its cell to the end of the side, and a cell past the end, or a side with no
+border, shows nothing.
+
 ## Animate a border
 
 `BorderFx(t, effects...)` applies [effects](/reference/effects#borders) to a box's frame, its border, padding, and

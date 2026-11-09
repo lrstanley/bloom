@@ -8,6 +8,7 @@ import (
 	"image"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -657,5 +658,72 @@ func TestSlidingLayerHits(t *testing.T) {
 	}
 	if hit := topHit(r.Frame(), col, 0); hit != "layer" {
 		t.Fatalf("a click on the layer's A at %d went to %v", col, hit)
+	}
+}
+
+// frameReader lays out a list of 100 items kept scrolled to item keep. A
+// click on it notes the first item shown, as ctx.Frame tells it, and Layout
+// notes the frame ctx.Frame returns while laying out.
+type frameReader struct {
+	keep     int
+	first    *int
+	inLayout **Frame
+}
+
+func (l frameReader) View() string { return Render(l, 0, 0) }
+
+func (l frameReader) Layout(ctx Context) Child {
+	*l.inLayout = ctx.Frame()
+	return List(100, func(i int) Child { return Text(strconv.Itoa(i)) }).Keep(l.keep).ID("list").
+		On(on.Click(func() tea.Cmd {
+			v, _ := ctx.Frame().List("list")
+			*l.first = v.First
+			return nil
+		}))
+}
+
+func TestContextFrame(t *testing.T) {
+	t.Parallel()
+
+	var first int
+	var inLayout *Frame
+	r := New()
+
+	// The first frame has none before it.
+	r.Render(10, 5, frameReader{keep: 50, first: &first, inLayout: &inLayout})
+	if inLayout != nil {
+		t.Fatalf("Layout of the first frame got frame %p, want none", inLayout)
+	}
+	r.ClickAt(0, 0)
+	if first != 46 {
+		t.Fatalf("handler read first item %d, want 46, from the frame on screen", first)
+	}
+
+	// Laid out again, Layout gets the frame before; the handler, the new one.
+	before := r.Frame()
+	r.Render(10, 5, frameReader{keep: 80, first: &first, inLayout: &inLayout})
+	if inLayout != before {
+		t.Fatalf("Layout got frame %p, want the one before, %p", inLayout, before)
+	}
+	r.ClickAt(0, 0)
+	if first != 76 {
+		t.Fatalf("handler read first item %d, want 76, from the frame on screen", first)
+	}
+
+	// An older view's events read the frame they were found in, not the
+	// newer one laid out since.
+	shown := r.View(10, 5, frameReader{keep: 20, first: &first, inLayout: &inLayout})
+	r.View(10, 5, frameReader{keep: 90, first: &first, inLayout: &inLayout})
+	shown.OnMouse(down(0, 0))
+	shown.OnMouse(release(0, 0))
+	if first != 16 {
+		t.Fatalf("older view's handler read first item %d, want 16, from its own frame", first)
+	}
+
+	// Outside a Root there is no frame.
+	inLayout = before
+	Render(frameReader{keep: 50, first: &first, inLayout: &inLayout}, 10, 5)
+	if inLayout != nil {
+		t.Fatalf("Layout outside a Root got frame %p, want none", inLayout)
 	}
 }

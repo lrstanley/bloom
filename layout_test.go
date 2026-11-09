@@ -433,3 +433,46 @@ func TestBoxEdgeTextRunsDownTheSides(t *testing.T) {
 		t.Fatalf("right edge shows %+v:\n%s", x, ansi.Strip(got))
 	}
 }
+
+func TestBoxEdgeAt(t *testing.T) {
+	t.Parallel()
+
+	// Junctions at exact cells, corners included, counted from either end,
+	// beside a title placed with Edge, which keeps its own place.
+	box := Box(rounded, Text("")).
+		EdgeAt(Top, 4, Text("┬")).
+		EdgeAt(Top, -3, Text("┬").ID("back")).
+		EdgeAt(Left, 0, Text("├")).
+		Edge(Top, Start, Text("ab").ID("title")).
+		EdgeAt(Bottom, 20, Text("x").ID("outside")).
+		EdgeAt(Bottom, 8, Text("long")). // clipped to the side, corner and all
+		EdgeAt(Right, -1, Text("┤"))     // then drawn over the corner
+	want := strings.Join([]string{
+		"├─ab┬───┬─╮",
+		"│         │",
+		"╰───────lo┤",
+	}, "\n")
+	if got := ansi.Strip(Render(box, 11, 3)); got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+	f := Solve(box, 11, 3)
+	expectRect(t, f, "back", image.Rect(8, 0, 9, 1))
+	expectRect(t, f, "title", image.Rect(2, 0, 4, 1))
+	if _, ok := f.Rect("outside"); ok {
+		t.Fatal("a child past the end of the side was shown")
+	}
+
+	// Drawn in the order given: the title covers a junction under it.
+	box = Box(rounded, Text("")).EdgeAt(Top, 2, Text("┬")).Edge(Top, Start, Text("ab"))
+	if got := ansi.Strip(Render(box, 8, 3)); !strings.HasPrefix(got, "╭─ab───╮") {
+		t.Fatalf("got:\n%s", got)
+	}
+
+	// A side without a border shows nothing.
+	noTop := lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), false, true, true, true)
+	f = Solve(Box(noTop, Text("x")).EdgeAt(Top, 2, Text("t").ID("t")).EdgeAt(Left, 0, Text("l").ID("l")), 10, 3)
+	if _, ok := f.Rect("t"); ok {
+		t.Fatal("a child on a side with no border was shown")
+	}
+	expectRect(t, f, "l", image.Rect(0, 0, 1, 1))
+}

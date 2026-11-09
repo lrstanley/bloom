@@ -41,6 +41,12 @@ type box struct {
 	memoOK      bool
 	expandedFor Size
 
+	// list is what a [ListNode] shows, and listSize its natural size, for the
+	// space it was last expanded in, once listOK.
+	list     ListView
+	listSize Size
+	listOK   bool
+
 	// frame is the frame of the box's style, for a box or a styled text.
 	frame   frame
 	frameOK bool
@@ -70,7 +76,10 @@ type engine struct {
 	scratch    lipgloss.Style // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
+	listUp     []listRec // items of the lists being expanded; see listWindow
+	listDown   []listRec
 	motion     *motion.Tracker // nil for pooled renderers, which keep no state between frames
+	screen     func() *Frame   // the Root's frame on screen, for Context.Frame; nil outside a Root
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
@@ -165,6 +174,9 @@ func (e *engine) build(c Child, parent, slot int) int {
 		}
 	case LayerNode:
 		b.meta, b.modal, kids = n.meta, n.modal, []Child{n.child}
+	case ListNode:
+		// Its items are built once it knows how much space it has.
+		b.meta = n.meta
 	}
 
 	_, grid := c.(GridNode)
@@ -224,7 +236,7 @@ func (e *engine) expand(i int, l Layouter, avail Size) int {
 		return b.expanded
 	}
 	root := -1
-	if child := l.Layout(Context{Width: avail.W, Height: avail.H, wc: e.method == ansi.WcWidth}); child != nil {
+	if child := l.Layout(Context{Width: avail.W, Height: avail.H, wc: e.method == ansi.WcWidth, screen: e.screen}); child != nil {
 		root = e.build(child, i, -1)
 	}
 	e.boxes[i].expanded, e.boxes[i].expandedFor = root, avail
@@ -322,6 +334,9 @@ func (e *engine) measureChild(i int, avail Size) Size {
 		// A slot outside a row or column, an overlay, and a layer are as big
 		// as their first child: the slot's child, or the base.
 		return e.measure(e.firstKid(i), avail)
+	case ListNode:
+		e.expandList(i, n, avail)
+		return e.boxes[i].listSize
 	case drawableNode:
 		if m, ok := n.d.(Measurer); ok {
 			return m.Measure(avail)
@@ -536,6 +551,8 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 		for _, k := range kids[1:] {
 			e.arrangeLayer(k, r)
 		}
+	case ListNode:
+		e.arrangeList(i, n, r)
 	case Layouter:
 		e.arrange(e.expand(i, n, Size{W: r.Dx(), H: r.Dy()}), r)
 	}
@@ -617,18 +634,25 @@ func (e *engine) arrangeEdges(i int, n BoxNode, r image.Rectangle) {
 
 // edgeLine is the row or column of a side of a box's border.
 type edgeLine struct {
-	vertical bool
-	at       int // the row, or column, of the side
-	lo, hi   int // the span of it that children share
-	mid      int // the middle of the side
+	vertical   bool
+	at         int // the row, or column, of the side
+	lo, hi     int // the span of it that children share
+	mid        int // the middle of the side
+	start, end int // the whole side, corners and all, for [BoxNode.EdgeAt]
 }
 
 // edgeLine returns the line of side of the border of a box with frame f,
 // the outer cells of ring, reporting false if that side has no border.
 func (f frame) edgeLine(side Direction, ring image.Rectangle) (edgeLine, bool) {
 	// Children on the top and bottom are kept a cell from the corners.
-	horizontal := edgeLine{lo: ring.Min.X + f.bl + 1, hi: ring.Max.X - f.br - 1, mid: (ring.Min.X + ring.Max.X) / 2}
-	vertical := edgeLine{vertical: true, lo: ring.Min.Y + f.bt, hi: ring.Max.Y - f.bb, mid: (ring.Min.Y + ring.Max.Y) / 2}
+	horizontal := edgeLine{
+		lo: ring.Min.X + f.bl + 1, hi: ring.Max.X - f.br - 1, mid: (ring.Min.X + ring.Max.X) / 2,
+		start: ring.Min.X, end: ring.Max.X,
+	}
+	vertical := edgeLine{
+		vertical: true, lo: ring.Min.Y + f.bt, hi: ring.Max.Y - f.bb, mid: (ring.Min.Y + ring.Max.Y) / 2,
+		start: ring.Min.Y, end: ring.Max.Y,
+	}
 	switch side { //nolint:exhaustive // A corner, or the zero value, is not a side.
 	case Top:
 		horizontal.at = ring.Min.Y
@@ -649,9 +673,25 @@ func (f frame) edgeLine(side Direction, ring image.Rectangle) (edgeLine, bool) {
 // arrangeEdge places the children of box node n on side, whose line is l,
 // given their boxes, kids.
 func (e *engine) arrangeEdge(n BoxNode, kids []int, side Direction, l edgeLine) {
-	// The ends first, in order, from the corners inward.
+	// The ends first, in order, from the corners inward. Children at a cell
+	// of their own take no room from the rest.
 	for j, edge := range n.edges {
-		if edge.side != side || edge.align == Center {
+		if edge.side != side {
+			continue
+		}
+		if edge.exact {
+			at, length := edge.at, l.end-l.start
+			if at < 0 {
+				at += length
+			}
+			if at < 0 || at >= length {
+				e.boxes[kids[j]].hidden = true
+				continue
+			}
+			e.placeEdge(kids[j], l, l.start+at, e.edgeSize(kids[j], l, length-at))
+			continue
+		}
+		if edge.align == Center {
 			continue
 		}
 		s := l.hi - l.lo
@@ -677,7 +717,7 @@ func (e *engine) arrangeEdge(n BoxNode, kids []int, side Direction, l edgeLine) 
 	// free.
 	total := -1
 	for j, edge := range n.edges {
-		if edge.side == side && edge.align == Center {
+		if edge.side == side && !edge.exact && edge.align == Center {
 			if s := e.edgeSize(kids[j], l, l.hi-l.lo-total-1); s > 0 {
 				total += s + 1
 			}
@@ -685,7 +725,7 @@ func (e *engine) arrangeEdge(n BoxNode, kids []int, side Direction, l edgeLine) 
 	}
 	at, used := min(max(l.mid-total/2, l.lo), l.hi-total), -1
 	for j, edge := range n.edges {
-		if edge.side == side && edge.align == Center {
+		if edge.side == side && !edge.exact && edge.align == Center {
 			s := e.edgeSize(kids[j], l, l.hi-l.lo-used-1)
 			if e.placeEdge(kids[j], l, at, s) {
 				at, used = at+s+1, used+s+1

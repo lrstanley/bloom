@@ -23,6 +23,8 @@ type entry struct {
 	parent                  int             // nearest ancestor entry, or -1
 	focusable, scope, modal bool
 	hoverable               bool // the node has a hover style
+	list                    ListView
+	isList                  bool
 }
 
 // nodeKey is what a node is followed by from frame to frame: its ID, or
@@ -44,6 +46,9 @@ func (r *renderer) addEntry(b *box, vis, clip image.Rectangle, parent int) int {
 		id: b.meta.id, key: b.key(), rect: b.rect, vis: vis, parent: parent,
 		focusable: b.meta.focusable, scope: b.meta.scope, modal: b.modal,
 		hoverable: b.meta.hover != nil,
+	}
+	if _, ok := b.child.(ListNode); ok {
+		e.list, e.isList = b.list, true
 	}
 	if b.modal {
 		e.block = clip
@@ -78,6 +83,16 @@ func (f *Frame) Rect[K comparable](id K) (image.Rectangle, bool) {
 		return f.entries[i].rect, true
 	}
 	return image.Rectangle{}, false
+}
+
+// List returns which items the [List] with ID id showed, and whether it is
+// in the frame. Use it in Update to page by [ListView.Visible] items, and to
+// scroll from [ListView.First], where the list actually was.
+func (f *Frame) List[K comparable](id K) (ListView, bool) {
+	if i := f.index(id); i >= 0 && f.entries[i].isList {
+		return f.entries[i].list, true
+	}
+	return ListView{}, false
 }
 
 // Hit returns the IDs of the nodes at x, y on screen that mouse events

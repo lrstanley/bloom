@@ -22,8 +22,86 @@ func (m *model) layout() bloom.Child {
 ```
 
 `Scroll` measures and draws its whole child, which is fine for an article or a help screen. For a long log or
-a table with thousands of rows, have the component only render the rows in view instead, such as with the
-[Bubbles viewport](/layout/bubbles-components).
+a table with thousands of rows, use a [list](#show-a-long-list) instead, which only lays out the items in view.
+
+## Show a long list
+
+`bloom.List(count, item)` shows as many of `count` items as fit, top to bottom. It calls `item(i)` only for the
+items it may show, so a list of a million rows costs no more to draw than the rows on screen. Each item is as wide
+as the list and as tall as it wants, and the last one that doesn't fit is cut off:
+
+```go
+bloom.List(len(m.logs), func(i int) bloom.Child {
+	return bloom.Text(m.logs[i]).Style(line)
+}).Offset(m.offset).ID(paneLogs)
+```
+
+`Offset(i)` is the first item shown. The list clamps it, so an offset past the end shows the last page, full,
+rather than space below it. `Gap(n)` puts `n` cells between items.
+
+### Keep the cursor in view
+
+`Keep(i)` scrolls the list as little as it can from its offset so that item `i` is shown whole. Give it the item
+under a cursor, and moving the cursor is all the model does:
+
+```go
+func (m *model) layout() bloom.Child {
+	return bloom.List(len(m.items), m.row).Offset(m.offset).Keep(m.cursor).ID(paneItems)
+}
+```
+
+Items can have different heights, so the list, not the model, knows where it ended up. Read it back with
+`Frame().List(id)`, and keep `First` as the offset to scroll from next time. `Visible` is how many items were
+shown whole, which is how far to page:
+
+```go
+case tea.KeyPressMsg:
+	v, _ := m.ui.Frame().List(paneItems)
+	m.offset = v.First
+	switch msg.String() {
+	case "down":
+		m.cursor++
+	case "pgdown":
+		m.cursor += max(v.Visible-1, 1)
+	}
+	m.cursor = min(max(m.cursor, 0), len(m.items)-1)
+```
+
+While `Keep` is given, the list can't scroll away from that item, so to scroll with the wheel, move the cursor
+along with the offset:
+
+```go
+bloom.List(len(m.items), m.row).Offset(m.offset).Keep(m.cursor).ID(paneItems).
+	On(on.Scroll(func(_, dy int) tea.Cmd {
+		v, _ := m.ui.Frame().List(paneItems)
+		m.offset = max(v.First+dy*3, 0)
+		m.cursor = min(max(m.cursor, m.offset), m.offset+v.Visible-1, len(m.items)-1)
+		return nil
+	}))
+```
+
+Or let the wheel move only the cursor, `m.cursor += dy * 3`, and the list follows it as it does the arrow keys. Read
+the frame in the handler, as above, rather than keeping what it said when the last key was pressed: a resize, or
+the list keeping the cursor in view, moves it without a key.
+
+A component that implements [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given) has no root
+to ask, so its handlers read the frame from the `Context` its `Layout` was given. `ctx.Frame()` returns the frame on
+screen when it's called, which is the one the handler's event landed in:
+
+```go
+func (p *picker) Layout(ctx bloom.Context) bloom.Child {
+	return bloom.List(len(p.items), p.row).Offset(p.offset).Keep(p.cursor).ID(p.id).
+		On(on.Scroll(func(_, dy int) tea.Cmd {
+			v, _ := ctx.Frame().List(p.id)
+			p.offset = v.First
+			p.cursor = min(max(p.cursor+dy*3, 0), len(p.items)-1)
+			return nil
+		}))
+}
+```
+
+Items are followed from frame to frame by their index, so mouse handlers and hover styles stay with an item as
+the list scrolls.
 
 ## Find a node's size in Update
 
@@ -141,6 +219,9 @@ bloom.Box(panel, bloom.Scroll(bloom.Text(m.article).Style(prose).ID(paneArticle)
 │the border was│
 ╰──────────────╯
 ```
+
+`ScrollbarOf` a [list](#show-a-long-list)'s own ID follows it in items, and its `OnScroll` gets the first item to
+show, for `Offset`.
 
 For content that a component windows itself, such as the [Bubbles viewport](/layout/bubbles-components), give
 `bloom.Scrollbar(total, visible, offset)` the numbers yourself:

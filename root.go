@@ -96,6 +96,7 @@ func New(opts ...Option) *Root {
 		focus:     c.focus,
 	}
 	r.r.motion = motion.New(c.now)
+	r.r.screen = r.handlerFrame
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
 	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)
 	return r
@@ -186,6 +187,15 @@ func (r *Root) View(w, h int, c Child) tea.View {
 // Frame returns the geometry of the last frame rendered, for moving focus
 // with [Focus] and for finding where nodes are on screen.
 func (r *Root) Frame() *Frame {
+	return r.r.frame
+}
+
+// handlerFrame returns the frame whose handlers are running, or the last one
+// drawn, for [Context.Frame].
+func (r *Root) handlerFrame() *Frame {
+	if r.mouse.routing != nil {
+		return r.mouse.routing
+	}
 	return r.r.frame
 }
 

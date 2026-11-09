@@ -91,7 +91,22 @@ type Context struct {
 	// are the exact size the component was given.
 	Width, Height int
 
-	wc bool // text is measured with ansi.WcWidth rather than ansi.GraphemeWidth
+	wc     bool          // text is measured with ansi.WcWidth rather than ansi.GraphemeWidth
+	screen func() *Frame // the Root's frame on screen, or nil outside a Root
+}
+
+// Frame returns the frame on screen when it is called, rather than when the
+// component was laid out, for the mouse handlers it makes to read where its
+// parts ended up when they run, such as which items of a [List] were shown
+// or whether a node was laid out at all. In a handler, it is the frame the
+// event was found in. Called from Layout itself, it is the frame before the
+// one being laid out. Outside a [Root], such as with [Render], it is nil,
+// which finds nothing.
+func (c Context) Frame() *Frame {
+	if c.screen == nil {
+		return nil
+	}
+	return c.screen()
 }
 
 // unbounded is the space given to content that may be larger than its

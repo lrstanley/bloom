@@ -87,6 +87,7 @@ type mouse struct {
 	at      image.Point // where the pointer was last
 	atOK    bool
 	checked *Frame // the frame hover and drag were last brought up to date with
+	routing *Frame // the frame route is running handlers for, for Context.Frame
 	chain   []int  // scratch
 
 	next        []mouseTarget // scratch for the renderer's hovered
@@ -162,6 +163,11 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 	s := &r.mouse
+	// An older view's OnMouse routes its own frame, which may not be the
+	// last one drawn: handlers reading Context.Frame get the one they are in.
+	outer := s.routing
+	s.routing = f
+	defer func() { s.routing = outer }()
 	m := msg.Mouse()
 	p := image.Pt(m.X, m.Y)
 	s.at, s.atOK, s.checked = p, true, f
