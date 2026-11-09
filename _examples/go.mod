@@ -11,8 +11,8 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/lrstanley/bloom v0.0.0-20261104061907-56513da5a6e9
 	github.com/lrstanley/bubbletint/v2 v2.0.4
-	github.com/lrstanley/steep v0.0.0-alpha.1
-	github.com/lrstanley/steep/reel v0.0.0-alpha.1
+	github.com/lrstanley/steep v0.0.0-alpha.4
+	github.com/lrstanley/steep/reel v0.0.0-alpha.4
 )
 
 require (
