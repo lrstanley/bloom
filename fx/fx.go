@@ -198,30 +198,18 @@ func (s sweep) stride() int {
 	return 1
 }
 
-// each calls fn for every shown cell of s.
-func each(s *canvas.Surface, fn func(x, y int)) {
-	for y := range s.Height() {
-		for x := range s.Width() {
-			if s.Visible(x, y) {
-				fn(x, y)
-			}
-		}
-	}
-}
-
 // recolor sets the colors of every shown cell of s from its current colors,
 // resolved to the terminal's defaults when unset. A nil fg or bg leaves that
 // color alone, and keepUnsetBg leaves unset backgrounds unset.
 func recolor(s *canvas.Surface, fg, bg func(color.Color) color.Color, keepUnsetBg bool) {
-	each(s, func(x, y int) {
-		c := s.Cell(x, y)
+	for _, c := range s.Cells() {
 		if fg != nil {
 			c.Style.Fg = fg(s.Fg(c))
 		}
 		if bg != nil && (c.Style.Bg != nil || !keepUnsetBg) {
 			c.Style.Bg = bg(s.Bg(c))
 		}
-	})
+	}
 }
 
 // hash returns a well-mixed value in [0, 1) for a cell and seed.
@@ -234,5 +222,21 @@ func hash(x, y int, seed uint32) float64 {
 	h ^= h >> 33
 	return float64(h>>11) / (1 << 53)
 }
+
+// stepSeed returns seed mixed with step, for a pattern that changes in steps.
+func stepSeed(seed, step uint32) uint32 { return seed ^ step*0x9e3779b9 }
+
+// flicker returns one of glyphs, a string of one-byte glyphs, for the cell
+// at x, y in step, the same for the same seed.
+func flicker(glyphs string, x, y int, seed, step uint32) string {
+	i := int(hash(x, y, stepSeed(seed, step)) * float64(len(glyphs)))
+	return glyphs[i : i+1]
+}
+
+// smoothstep eases k, from 0 to 1, in and out.
+func smoothstep(k float64) float64 { return k * k * (3 - 2*k) }
+
+// shades are the glyphs of a cell partly filled in, from least to most.
+var shades = [...]string{"░", "▒", "▓"}
 
 func lerpInt(a, b int, t float64) int { return int(math.Round(float64(a) + float64(b-a)*t)) }

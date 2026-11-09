@@ -69,11 +69,10 @@ type engine struct {
 	cache      *canvas.Cache
 	memo       map[memoKey]Size // every measurement this frame
 	boxes      []box
-	kids       []int          // children of each box, in spans
-	stack      []int          // children of the boxes being built
-	frameMemos []frameMemo    // by box index, from the last frame
-	layouts    uint64         // layouts done, to retire unused frames
-	scratch    lipgloss.Style // for comparing styles without allocating
+	kids       []int            // children of each box, in spans
+	stack      []int            // children of the boxes being built
+	frameMemos memos[frameMemo] // by box index, from the last layout
+	scratch    lipgloss.Style   // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
 	listUp     []listRec // items of the lists being expanded; see listWindow
@@ -95,14 +94,13 @@ type memoKey struct {
 // layout builds the tree for c and lays it out in a w×h area, returning the
 // index of its root box, or -1 for a nil c. A w or h of zero or less is the
 // tree's natural size on that axis.
-func (e *engine) layout(c Child, w, h int) int {
+func (e *engine) layout(w, h int, c Child) int {
 	// Clearing drops last frame's components and strings, which the arena's
 	// storage would otherwise keep alive past a smaller frame.
 	clear(e.boxes)
 	clear(e.memo)
 	e.boxes, e.kids = e.boxes[:0], e.kids[:0]
-	e.layouts++
-	defer e.retireFrames()
+	defer e.frameMemos.retire()
 	if c == nil || absent(c) {
 		if e.motion != nil {
 			e.motion.Begin(w, h)
@@ -158,7 +156,9 @@ func (e *engine) build(c Child, parent, slot int) int {
 		b.meta, kids = n.meta, n.children
 	case BoxNode:
 		b.meta, kids = n.meta, []Child{n.child}
-	case wrapNode:
+	case transitionNode:
+		kids = []Child{n.child}
+	case centerNode:
 		kids = []Child{n.child}
 	case ScrollNode:
 		kids = []Child{n.child}
@@ -328,11 +328,10 @@ func (e *engine) measureChild(i int, avail Size) Size {
 		return Size{W: 1}
 	case ScrollNode:
 		return e.measure(e.firstKid(i), n.content(avail.W))
-	case wrapNode:
-		return e.measure(e.firstKid(i), avail)
-	case SlotNode, OverlayNode, LayerNode:
-		// A slot outside a row or column, an overlay, and a layer are as big
-		// as their first child: the slot's child, or the base.
+	case SlotNode, transitionNode, centerNode, OverlayNode, LayerNode:
+		// A slot outside a row or column, a transition, a centered node, an
+		// overlay, and a layer are as big as their first child: the slot's
+		// child, or the base.
 		return e.measure(e.firstKid(i), avail)
 	case ListNode:
 		e.expandList(i, n, avail)
@@ -513,7 +512,7 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 	}
 	e.boxes[i].rect = r
 	switch n := e.boxes[i].child.(type) {
-	case SlotNode:
+	case SlotNode, transitionNode:
 		e.arrange(e.firstKid(i), r)
 	case FlexNode:
 		e.arrangeFlex(i, n, r)
@@ -521,6 +520,11 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 		e.arrangeGrid(i, n, r)
 	case WrapNode:
 		e.flow(i, n, r.Dx(), r.Min, true)
+	case centerNode:
+		kid := e.firstKid(i)
+		s := e.measure(kid, Size{W: r.Dx(), H: r.Dy()})
+		at := r.Min.Add(image.Pt(Center.offset(s.W, r.Dx()), Center.offset(s.H, r.Dy())))
+		e.arrange(kid, image.Rectangle{Min: at, Max: at.Add(s.point())})
 	case BoxNode:
 		// Built directly, as image.Rect would swap the edges of a frame too
 		// big for r into a rectangle over the frame, rather than an empty one.
@@ -532,8 +536,6 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 			Max: image.Pt(max(r.Max.X-f.r, minX), max(r.Max.Y-f.b, minY)),
 		})
 		e.arrangeEdges(i, n, r)
-	case wrapNode:
-		e.arrangeWrap(i, n, r)
 	case ScrollNode:
 		// The child is laid out whole, moved by the offsets, and clipped to r
 		// when painted.
@@ -566,34 +568,54 @@ func (e *engine) frameOf(i int, style lipgloss.Style) frame {
 	if b.frameOK {
 		return b.frame
 	}
-	if i >= len(e.frameMemos) {
-		e.frameMemos = append(e.frameMemos, make([]frameMemo, i+1-len(e.frameMemos))...)
+	m := e.frameMemos.at(i)
+	if e.scratch = style; !m.ok || !sameStyle(&m.v.style, &e.scratch) {
+		m.ok, m.v = true, frameMemo{style: style, frame: frameOf(style)}
 	}
-	m := &e.frameMemos[i]
-	if e.scratch = style; !m.ok || !sameStyle(&m.style, &e.scratch) {
-		*m = frameMemo{ok: true, style: style, frame: frameOf(style)}
-	}
-	m.used = e.layouts
-	b.frame, b.frameOK = m.frame, true
-	return m.frame
-}
-
-// retireFrames drops the frames not used by the last layout, whose styles
-// would otherwise keep what they refer to alive.
-func (e *engine) retireFrames() {
-	for i := range e.frameMemos {
-		if e.frameMemos[i].used != e.layouts {
-			e.frameMemos[i] = frameMemo{}
-		}
-	}
+	b.frame, b.frameOK = m.v.frame, true
+	return m.v.frame
 }
 
 // frameMemo is the frame of the style a box had in the last frame.
 type frameMemo struct {
-	ok    bool
-	used  uint64 // the layout it was last used in
 	style lipgloss.Style
 	frame frame
+}
+
+// memos keeps a value for each box, by its index, from one frame to the
+// next, for boxes that tend to stay the same. Values a frame did not use are
+// dropped once it is done, as they would keep what they refer to alive.
+type memos[T any] struct {
+	slots []memo[T]
+	gen   uint64 // the frame being drawn
+}
+
+// memo is a value kept for a box, once ok.
+type memo[T any] struct {
+	ok   bool
+	used uint64 // the frame it was last used in
+	v    T
+}
+
+// at returns the memo at index i, marked used by this frame.
+func (m *memos[T]) at(i int) *memo[T] {
+	if i >= len(m.slots) {
+		m.slots = append(m.slots, make([]memo[T], i+1-len(m.slots))...)
+	}
+	s := &m.slots[i]
+	s.used = m.gen
+	return s
+}
+
+// retire drops the memos this frame did not use, and ends it.
+func (m *memos[T]) retire() {
+	slots, gen := m.slots, m.gen
+	for i := range slots {
+		if slots[i].used != gen && slots[i].ok {
+			slots[i] = memo[T]{}
+		}
+	}
+	m.gen++
 }
 
 // boxContent returns the box of what is inside box node n at index i, or -1
@@ -753,18 +775,6 @@ func (e *engine) placeEdge(k int, l edgeLine, at, size int) bool {
 		e.arrange(k, image.Rect(at, l.at, at+size, l.at+1))
 	}
 	return true
-}
-
-func (e *engine) arrangeWrap(i int, n wrapNode, r image.Rectangle) {
-	kid := e.firstKid(i)
-	switch n.kind {
-	case wrapCenter:
-		s := e.measure(kid, Size{W: r.Dx(), H: r.Dy()})
-		at := r.Min.Add(image.Pt(Center.offset(s.W, r.Dx()), Center.offset(s.H, r.Dy())))
-		e.arrange(kid, image.Rectangle{Min: at, Max: at.Add(s.point())})
-	case wrapTransition:
-		e.arrange(kid, r)
-	}
 }
 
 func (e *engine) arrangeFlex(i int, n FlexNode, r image.Rectangle) {

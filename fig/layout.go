@@ -143,7 +143,7 @@ func (f *Font) layout(text string, o Options) *Figure {
 		b.limit, b.inLimit = o.Width, (o.Width+1)*4+100
 	}
 	b.clearline()
-	b.run(f.input(text, o.Paragraph))
+	b.run(input(text, o.Paragraph, o.Control))
 	if b.outlen != 0 {
 		b.printline()
 	}
@@ -161,7 +161,7 @@ func (f *Font) layout(text string, o Options) *Figure {
 // input decodes text into the characters figlet's main loop sees: after
 // paragraph joining and the control file's mapping, with tabs as spaces,
 // other whitespace as line breaks, and other control characters dropped.
-func (f *Font) input(text string, paragraph bool) []inchar {
+func input(text string, paragraph bool, ctl *Control) []inchar {
 	out := make([]inchar, 0, len(text))
 	lastEOL := false
 	for i, r := range text {
@@ -178,7 +178,7 @@ func (f *Font) input(text string, paragraph bool) []inchar {
 			}
 		}
 		lastEOL = isSpace(c) && c != '\t' && c != ' '
-		c = f.ctl.Map(c)
+		c = ctl.Map(c)
 		if isSpace(c) {
 			if c == '\t' || c == ' ' {
 				c = ' '

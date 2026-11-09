@@ -48,7 +48,7 @@ func TestTransparentLayer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ansi.Strip(Render(Overlay(base, tt.layer.Anchor(Start, Start)), 6, 2))
+			got := ansi.Strip(Render(6, 2, Overlay(base, tt.layer.Anchor(Start, Start))))
 			if got != tt.want {
 				t.Fatalf("got\n%s\nwant\n%s", got, tt.want)
 			}
@@ -113,7 +113,7 @@ func TestBorderFx(t *testing.T) {
 	box := Box(rounded.Margin(1), Text("in")).
 		Edge(Top, Start, Text("t")).
 		BorderFx(1, spy, fx.Recolor{Fg: red})
-	out := Render(box, 8, 6)
+	out := Render(8, 6, box)
 
 	// The effects are given the box less its margins, whose edge is the
 	// border.
@@ -152,7 +152,7 @@ func TestBorderFxNoBorder(t *testing.T) {
 
 	// A box that is all margin has no frame for its effects to change.
 	box := Box(lipgloss.NewStyle().Margin(1), nil).BorderFx(1, fx.Recolor{Bg: color.RGBA{R: 0xff, A: 0xff}})
-	if got := Render(box, 2, 2); strings.Contains(got, "\x1b[") {
+	if got := Render(2, 2, box); strings.Contains(got, "\x1b[") {
 		t.Fatalf("effects changed the margins: %q", got)
 	}
 }
@@ -190,7 +190,7 @@ func TestFrameFollowsStyleChanges(t *testing.T) {
 	expectRect(t, r.Frame(), "x", image.Rect(4, 1, 5, 2))
 	// Frames no box used are dropped, along with their styles.
 	r.Render(20, 3, Text("plain"))
-	for i, m := range r.r.frameMemos {
+	for i, m := range r.r.frameMemos.slots {
 		if m.ok {
 			t.Fatalf("the frame of box %d is still kept", i)
 		}

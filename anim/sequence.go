@@ -50,8 +50,8 @@ func Jump(target float64) Step { return Step{kind: stepJump, target: target} }
 // [Sequence.Loop], and pass every message to Update. The zero Sequence has
 // no steps; make one with [NewSequence].
 type Sequence struct { //nolint:recvcheck // With configures a sequence before it is used, as a builder.
-	v    Value // the value being animated, and its id and generation
-	base Value // the options steps start from
+	v    Value  // the value being animated, and its id and generation
+	base config // the options steps start from
 	// steps is shared between copies of a sequence, and never changed.
 	steps []Step
 
@@ -66,17 +66,15 @@ type Sequence struct { //nolint:recvcheck // With configures a sequence before i
 // default to [NewValue]'s options; change them with [Sequence.With].
 func NewSequence(start float64, steps ...Step) Sequence {
 	v := NewValue(start)
-	return Sequence{v: v, base: v, steps: steps, step: -1}
+	return Sequence{v: v, base: v.config, steps: steps, step: -1}
 }
 
 // With sets the options steps start from, such as [Duration] and [Ease], and
 // [FPS], [UnfocusedFPS], and [Clock] for the whole sequence. It returns the changed sequence,
 // to be used before it is played.
 func (s Sequence) With(opts ...Option) Sequence {
-	for _, opt := range opts {
-		opt(&s.base)
-	}
-	s.v.interval, s.v.unfocused, s.v.now = s.base.interval, s.base.unfocused, s.base.now
+	s.base = s.base.with(opts)
+	s.v.config = s.base
 	return s
 }
 
@@ -192,12 +190,9 @@ func (s *Sequence) enter() {
 	case stepJump:
 		s.v.current, s.v.target, s.v.velocity = st.target, st.target, 0
 	case stepTo:
-		cfg := s.base
-		for _, opt := range st.opts {
-			opt(&cfg)
-		}
-		s.v.duration, s.v.ease = cfg.duration, cfg.ease
-		s.v.spring, s.v.frequency, s.v.damping = cfg.spring, cfg.frequency, cfg.damping
+		// A step changes how the value moves, but not how often it asks for
+		// frames, or its clock.
+		s.v.curve = s.base.with(st.opts).curve
 		if !Motion() {
 			s.v.duration, s.v.spring = 0, false
 		}

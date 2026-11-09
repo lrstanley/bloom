@@ -7,7 +7,6 @@ package fx
 import (
 	"cmp"
 	"image"
-	"image/color"
 	"math"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -28,7 +27,9 @@ func (Unfold) Apply(s *canvas.Surface, t float64) {
 	}
 	w, h := s.Width(), s.Height()
 	if t <= 0 || h == 0 {
-		each(s, func(x, y int) { s.Hide(x, y) })
+		for at := range s.Cells() {
+			s.Hide(at.X, at.Y)
+		}
 		return
 	}
 	band := min(1+int(float64(h-1)*t), h)
@@ -74,12 +75,13 @@ func (e Iris) Apply(s *canvas.Surface, t float64) {
 	// for the circle to look round.
 	farX, farY := max(cx, float64(w)-cx), 2*max(cy, float64(h)-cy)
 	r2 := (farX*farX + farY*farY) * max(t, 0) * max(t, 0)
-	each(s, func(x, y int) {
+	for at := range s.Cells() {
+		x, y := at.X, at.Y
 		dx, dy := float64(x)+0.5-cx, 2*(float64(y)+0.5-cy)
 		if dx*dx+dy*dy >= r2 {
 			s.Hide(x, y)
 		}
-	})
+	}
 }
 
 // Shade reveals a node's cells through shades of the frame beneath: each
@@ -96,39 +98,36 @@ type Shade struct {
 // its shades.
 const shadeWindow = 0.4
 
-// shadeGlyphs are the steps between a hidden cell and its own glyph.
-var shadeGlyphs = [...]string{"░", "▒", "▓"}
-
 // Apply implements [Effect].
 func (e Shade) Apply(s *canvas.Surface, t float64) {
 	if t >= 1 {
 		return
 	}
-	each(s, func(x, y int) {
-		c := s.Cell(x, y)
+	for at, c := range s.Cells() {
+		x, y := at.X, at.Y
 		if c.Width == 0 {
 			if x > 0 && !s.Visible(x-1, y) {
 				s.Hide(x, y)
 			}
-			return
+			continue
 		}
 		p := (t - hash(x, y, e.Seed)*(1-shadeWindow)) / shadeWindow
 		if p >= 1 {
-			return
+			continue
 		}
-		step := int(max(p, 0) * float64(len(shadeGlyphs)+1))
+		step := int(max(p, 0) * float64(len(shades)+1))
 		if step == 0 || c.Width > 1 || (c.Content == " " && c.Style.Bg == nil) {
 			s.Hide(x, y)
-			return
+			continue
 		}
 		ink := c.Style.Bg
 		if ink == nil {
 			ink = s.Fg(c)
 		}
-		c.Content, c.Link = shadeGlyphs[step-1], uv.Link{}
+		c.Content, c.Link = shades[step-1], uv.Link{}
 		c.Style.Attrs, c.Style.Underline = 0, 0
 		c.Style.Fg, c.Style.Bg = ink, s.Bg(s.Under(x, y))
-	})
+	}
 }
 
 // Blinds reveals a node through slats, like opening window blinds: it is cut
@@ -227,9 +226,6 @@ func (e Wave) Apply(s *canvas.Surface, t float64) {
 	}
 
 	glow := s.Env.Fg
-	if glow == nil {
-		glow = color.White
-	}
 	for y := range h {
 		along, dAlong, lane, dLane := sw.row(y)
 		for x := range w {

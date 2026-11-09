@@ -35,10 +35,10 @@ import (
 //	│  └─ Fill id="reader" 10,0 20x3 min=12
 //	│     └─ main.reader 10,0 20x3
 //	└─ Text "ready" 0,3 30x1 truncate
-func Debug(c Child, w, h int) string {
+func Debug(w, h int, c Child) string {
 	r, _ := renderers.Get().(*renderer)
 	defer renderers.Put(r)
-	root := r.layout(c, w, h)
+	root := r.layout(w, h, c)
 	fw, fh := r.size(root, w, h)
 	r.cache.EndFrame(fw * fh)
 	if root < 0 {
@@ -144,12 +144,9 @@ func debugNode(c Child) (kind string, attrs []string) {
 		return "Wrap", debugGap(n.gapX, n.gapY)
 	case BoxNode:
 		return "Box", nil
-	case wrapNode:
-		switch n.kind {
-		case wrapTransition:
-			return "Transition", []string{fmt.Sprintf("t=%.2f", n.t), debugEffects(n.effects)}
-		case wrapCenter:
-		}
+	case transitionNode:
+		return "Transition", []string{fmt.Sprintf("t=%.2f", n.t), debugEffects(n.effects)}
+	case centerNode:
 		return "Centered", nil
 	case ScrollNode:
 		attrs = []string{fmt.Sprintf("offset=%d", n.y)}
@@ -195,13 +192,7 @@ func debugSlot(n SlotNode) (kind string, attrs []string) {
 	if n.aligned {
 		attrs = append(attrs, "align="+debugName(alignNames, n.align))
 	}
-	if n.animation != nil {
-		attrs = append(attrs, "animate")
-	}
-	if len(n.moves) > 0 {
-		attrs = append(attrs, "moveWith="+strings.TrimPrefix(debugEffects(n.moves), "effects="))
-	}
-	return kind, attrs
+	return kind, debugMotion(attrs, n.animation, n.moves)
 }
 
 func debugLayer(n LayerNode) (attrs []string) {
@@ -223,11 +214,16 @@ func debugLayer(n LayerNode) (attrs []string) {
 	if n.t < 1 || len(n.effects) > 0 {
 		attrs = append(attrs, fmt.Sprintf("t=%.2f", n.t), debugEffects(n.effects))
 	}
-	if n.animation != nil {
+	return debugMotion(attrs, n.animation, n.moves)
+}
+
+// debugMotion appends how a slot or layer animates when layout changes.
+func debugMotion(attrs []string, animation *layoutAnimation, moves []fx.Effect) []string {
+	if animation != nil {
 		attrs = append(attrs, "animate")
 	}
-	if len(n.moves) > 0 {
-		attrs = append(attrs, "moveWith="+strings.TrimPrefix(debugEffects(n.moves), "effects="))
+	if len(moves) > 0 {
+		attrs = append(attrs, "moveWith="+strings.TrimPrefix(debugEffects(moves), "effects="))
 	}
 	return attrs
 }

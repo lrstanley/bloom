@@ -112,7 +112,7 @@ func TestLayout(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			snapshot.RequireEqual(t, bloom.Render(tt.tree, tt.w, tt.h), snapshot.WithANSI(false))
+			snapshot.RequireEqual(t, bloom.Render(tt.w, tt.h, tt.tree), snapshot.WithANSI(false))
 		})
 	}
 }

@@ -30,7 +30,7 @@ func TestListWindowsItems(t *testing.T) {
 
 	var calls int
 	list := List(1_000_000, lines(&calls)).Offset(500).ID("list")
-	got := ansi.Strip(Render(Box(rounded, list), 12, 5))
+	got := ansi.Strip(Render(12, 5, Box(rounded, list)))
 	want := strings.Join([]string{
 		"╭──────────╮",
 		"│item 500  │",
@@ -45,11 +45,11 @@ func TestListWindowsItems(t *testing.T) {
 		t.Fatalf("item was called %d times for 3 rows", calls)
 	}
 
-	f := Solve(Box(rounded, list), 12, 5)
+	f := Solve(12, 5, Box(rounded, list))
 	if v, ok := f.List("list"); !ok || v != (ListView{First: 500, Visible: 3, Count: 1_000_000}) {
 		t.Fatalf("view %+v, %v", v, ok)
 	}
-	if _, ok := Solve(Text("x").ID("t"), 4, 1).List("t"); ok {
+	if _, ok := Solve(4, 1, Text("x").ID("t")).List("t"); ok {
 		t.Fatal("a node that is not a list reported a view")
 	}
 }
@@ -59,7 +59,7 @@ func TestListClampsAndKeeps(t *testing.T) {
 
 	var calls int
 	view := func(n ListNode, h int) ListView {
-		v, _ := Solve(n.ID("list"), 10, h).List("list")
+		v, _ := Solve(10, h, n.ID("list")).List("list")
 		return v
 	}
 	item := lines(&calls)
@@ -95,22 +95,22 @@ func TestListItemHeights(t *testing.T) {
 	// counted as visible.
 	tall := func(i int) Child { return Text(strings.TrimSuffix(strings.Repeat(fmt.Sprintf("%d\n", i), i+1), "\n")) }
 	list := List(10, tall).ID("list")
-	got := ansi.Strip(Render(list, 1, 5))
+	got := ansi.Strip(Render(1, 5, list))
 	want := strings.Join([]string{"0", "1", "1", "2", "2"}, "\n")
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
-	if v, _ := Solve(list, 1, 5).List("list"); v.Visible != 2 {
+	if v, _ := Solve(1, 5, list).List("list"); v.Visible != 2 {
 		t.Fatalf("visible %d, want 2", v.Visible)
 	}
 
 	// Keeping an item taller than the list shows it from its top.
-	if v, _ := Solve(list.Keep(6), 3, 4).List("list"); v.First != 6 || v.Visible != 1 {
+	if v, _ := Solve(3, 4, list.Keep(6)).List("list"); v.First != 6 || v.Visible != 1 {
 		t.Fatalf("view %+v", v)
 	}
 
 	// Kept at the bottom, as far down as the items fit.
-	if v, _ := Solve(list.Keep(3), 3, 7).List("list"); v.First != 2 {
+	if v, _ := Solve(3, 7, list.Keep(3)).List("list"); v.First != 2 {
 		t.Fatalf("view %+v", v)
 	}
 
@@ -121,11 +121,11 @@ func TestListItemHeights(t *testing.T) {
 		}
 		return Text(strconv.Itoa(i))
 	}
-	if got = ansi.Strip(Render(List(6, holes), 1, 3)); got != "0\n2\n4" {
+	if got = ansi.Strip(Render(1, 3, List(6, holes))); got != "0\n2\n4" {
 		t.Fatalf("got:\n%s", got)
 	}
 	// Nor any gap.
-	if got = ansi.Strip(Render(List(6, holes).Gap(1), 1, 5)); got != "0\n \n2\n \n4" {
+	if got = ansi.Strip(Render(1, 5, List(6, holes).Gap(1))); got != "0\n \n2\n \n4" {
 		t.Fatalf("got:\n%q", got)
 	}
 
@@ -138,7 +138,7 @@ func TestListItemHeights(t *testing.T) {
 		}
 		return Text(strconv.Itoa(i))
 	}
-	if got = ansi.Strip(Render(List(3000, sparse), 4, 3)); got != "0   \n1000\n2000" || calls != 2001 {
+	if got = ansi.Strip(Render(4, 3, List(3000, sparse))); got != "0   \n1000\n2000" || calls != 2001 {
 		t.Fatalf("item called %d times for 2001 items:\n%s", calls, got)
 	}
 }
@@ -147,7 +147,7 @@ func TestListDebug(t *testing.T) {
 	t.Parallel()
 
 	inner := func(int) Child { return List(2, func(i int) Child { return Text(strconv.Itoa(i)) }) }
-	got := Debug(List(2, inner), 4, 4)
+	got := Debug(4, 4, List(2, inner))
 	if !strings.Contains(got, "Text") {
 		t.Fatalf("got:\n%s", got)
 	}
@@ -158,7 +158,7 @@ func TestListNaturalSize(t *testing.T) {
 
 	var calls int
 	list := Column(Auto(List(3, lines(&calls))), Text("end"))
-	if got := ansi.Strip(Render(list, 0, 0)); got != "item 0\nitem 1\nitem 2\nend   " {
+	if got := ansi.Strip(Render(0, 0, list)); got != "item 0\nitem 1\nitem 2\nend   " {
 		t.Fatalf("got:\n%q", got)
 	}
 }

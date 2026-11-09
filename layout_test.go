@@ -51,7 +51,7 @@ func TestNestedMeasureIsLinear(t *testing.T) {
 	t.Parallel()
 
 	var n int
-	Solve(nested(16, meteredLeaf{n: &n}), 200, 60)
+	Solve(200, 60, nested(16, meteredLeaf{n: &n}))
 	if n > 200 {
 		t.Fatalf("the leaf was measured %d times at depth 16", n)
 	}
@@ -61,22 +61,22 @@ func TestGrid(t *testing.T) {
 	t.Parallel()
 	children := []Child{Text("a").ID("a"), Text("bb").ID("b"), Text("c").ID("c")}
 	n := Grid(2, children...).Gap(1, 1)
-	f := Solve(n, 11, 7)
+	f := Solve(11, 7, n)
 	expectRect(t, f, "a", image.Rect(0, 0, 5, 3))
 	expectRect(t, f, "b", image.Rect(6, 0, 11, 3))
 	expectRect(t, f, "c", image.Rect(0, 4, 5, 7))
 	if got := n.View(); got != "a  bb\n     \nc    " {
 		t.Fatalf("natural: %q", got)
 	}
-	f = Solve(Grid(2, Fixed(2, Text("a")).ID("fixed"), Fill(Text("b")).ID("fill")), 10, 2)
+	f = Solve(10, 2, Grid(2, Fixed(2, Text("a")).ID("fixed"), Fill(Text("b")).ID("fill")))
 	expectRect(t, f, "fixed", image.Rect(0, 0, 2, 2))
 	expectRect(t, f, "fill", image.Rect(5, 0, 10, 2))
-	expectRect(t, Solve(Grid(0, Text("a").ID("a")), 4, 2), "a", image.Rect(0, 0, 4, 2))
+	expectRect(t, Solve(4, 2, Grid(0, Text("a").ID("a"))), "a", image.Rect(0, 0, 4, 2))
 	if got := Grid(2).View(); got != "" {
 		t.Fatalf("empty: %q", got)
 	}
 	n = Grid(2, Text("a\nb"), Text("c"), Text("d\ne\nf")).Gap(0, 1)
-	if got := Render(Column(n, Text("end").ID("end")), 10, 0); len(strings.Split(got, "\n")) != 7 {
+	if got := Render(10, 0, Column(n, Text("end").ID("end"))); len(strings.Split(got, "\n")) != 7 {
 		t.Fatalf("natural row heights: %q", got)
 	}
 }
@@ -96,13 +96,13 @@ func TestWrap(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := ansi.Strip(Render(tt.node, tt.width, 0)); got != tt.want {
+			if got := ansi.Strip(Render(tt.width, 0, tt.node)); got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
 		})
 	}
 	n := Wrap(Text("aaa").ID("a"), Text("bbb").ID("b")).Gap(1, 1)
-	expectRect(t, Solve(Column(Auto(n), Text("end").ID("end")), 5, 10), "end", image.Rect(0, 3, 5, 4))
+	expectRect(t, Solve(5, 10, Column(Auto(n), Text("end").ID("end"))), "end", image.Rect(0, 3, 5, 4))
 	if got := n.View(); got != "aaa bbb" {
 		t.Fatalf("natural width: %q", got)
 	}
@@ -118,7 +118,7 @@ func TestWrapMeasureCache(t *testing.T) {
 	for i := range children {
 		children[i] = meteredLeaf{n: &calls}
 	}
-	Solve(Column(Auto(Wrap(children...).Gap(1, 1)), Text("footer")), 40, 60)
+	Solve(40, 60, Column(Auto(Wrap(children...).Gap(1, 1)), Text("footer")))
 	if calls != len(children) {
 		t.Fatalf("measured %d times for %d children", calls, len(children))
 	}
@@ -127,7 +127,7 @@ func TestWrapMeasureCache(t *testing.T) {
 func TestGridNaturalRows(t *testing.T) {
 	t.Parallel()
 	n := Grid(2, Text("a"), Text("b"), Text("c\nd\ne").ID("tall")).Gap(1, 1)
-	expectRect(t, Solve(n, 9, 0), "tall", image.Rect(0, 2, 4, 5))
+	expectRect(t, Solve(9, 0, n), "tall", image.Rect(0, 2, 4, 5))
 }
 
 func TestPresent(t *testing.T) {
@@ -139,7 +139,7 @@ func TestPresent(t *testing.T) {
 		if vertical {
 			n = Column(children...).Gap(2)
 		}
-		f := Solve(n, 10, 10)
+		f := Solve(10, 10, n)
 		if _, ok := f.Rect("hidden"); ok {
 			t.Fatal("hidden presence has an entry")
 		}
@@ -152,11 +152,11 @@ func TestPresent(t *testing.T) {
 		}
 		expectRect(t, f, "b", want)
 	}
-	if got := Render(Present(p, Text("hidden")), 0, 0); got != "" {
+	if got := Render(0, 0, Present(p, Text("hidden"))); got != "" {
 		t.Fatalf("absent root: %q", got)
 	}
 	p.Show()
-	f := Solve(Row(Present(p, Text("shown").ID("shown")), Text("b").ID("b")).Gap(1), 10, 1)
+	f := Solve(10, 1, Row(Present(p, Text("shown").ID("shown")), Text("b").ID("b")).Gap(1))
 	expectRect(t, f, "b", image.Rect(6, 0, 7, 1))
 	expectRect(t, f, "shown", image.Rect(0, 0, 5, 1))
 }
@@ -227,10 +227,10 @@ func TestBoxTooSmallForItsFrame(t *testing.T) {
 	t.Parallel()
 
 	box := Box(lipgloss.NewStyle().Border(lipgloss.RoundedBorder()), Text("x"))
-	if got := Render(Row(Fixed(1, box), Text("y")), 4, 3); strings.ContainsAny(got, "╭│╰") {
+	if got := Render(4, 3, Row(Fixed(1, box), Text("y"))); strings.ContainsAny(got, "╭│╰") {
 		t.Fatalf("a box one cell wide drew part of its border:\n%s", got)
 	}
-	if got := Render(Row(Fixed(2, box)), 4, 3); !strings.Contains(got, "╭╮") {
+	if got := Render(4, 3, Row(Fixed(2, box))); !strings.Contains(got, "╭╮") {
 		t.Fatalf("a box just big enough for its border was not drawn:\n%s", got)
 	}
 }
@@ -238,16 +238,16 @@ func TestBoxTooSmallForItsFrame(t *testing.T) {
 func TestEmptySlotTakesNoGap(t *testing.T) {
 	t.Parallel()
 	for _, n := range []Child{Fixed(0, Text("x")), Auto(Text(""))} {
-		f := Solve(Row(n, Text("b").ID("b"), n, Text("c").ID("c"), n).Gap(2), 10, 1)
+		f := Solve(10, 1, Row(n, Text("b").ID("b"), n, Text("c").ID("c"), n).Gap(2))
 		expectRect(t, f, "b", image.Rect(0, 0, 1, 1))
 		expectRect(t, f, "c", image.Rect(3, 0, 4, 1))
-		if got := Render(Row(n, Text("b"), n, Text("c")).Gap(2), 0, 0); got != "b  c" {
+		if got := Render(0, 0, Row(n, Text("b"), n, Text("c")).Gap(2)); got != "b  c" {
 			t.Fatalf("natural size: %q", got)
 		}
 	}
 	// A growing slot with no content still takes its gap, so measuring
 	// leaves room for it rather than wrapping the text.
-	if got := Render(Row(Text("a b"), Space()).Gap(1), 0, 0); got != "a b " {
+	if got := Render(0, 0, Row(Text("a b"), Space()).Gap(1)); got != "a b " {
 		t.Fatalf("natural size with Space: %q", got)
 	}
 }
@@ -264,7 +264,7 @@ func TestFillNaturalSize(t *testing.T) {
 		Grow(2, Text("abcd").Style(wraps)).ID("c"),
 	).Gap(1)
 	// 22 cells, plus the gaps, is the least in which b gets its 6.
-	f := Solve(row, 0, 0)
+	f := Solve(0, 0, row)
 	expectRect(t, f, "a", image.Rect(0, 0, 5, 1))
 	expectRect(t, f, "b", image.Rect(6, 0, 12, 1))
 	expectRect(t, f, "c", image.Rect(13, 0, 24, 1))
@@ -275,7 +275,7 @@ func TestFillNaturalSize(t *testing.T) {
 		11: Row(Fill(Text("x").Style(wraps)).Max(1), Fill(Text("abcdefghij").Style(wraps))),
 		30: Row(Fill(Text("x").Style(wraps)).Min(20), Fill(Text("abcdefghij").Style(wraps))),
 	} {
-		r, _ := Solve(Column(row, Text("end").ID("end")), 0, 0).Rect("end")
+		r, _ := Solve(0, 0, Column(row, Text("end").ID("end"))).Rect("end")
 		if r.Dx() != want || r.Min.Y != 1 {
 			t.Fatalf("row of %d cells measured %v", want, r)
 		}
@@ -284,7 +284,7 @@ func TestFillNaturalSize(t *testing.T) {
 	// A column measures the row's height at that size, so the row is as tall
 	// stretched across the column as it is at its natural size.
 	for _, w := range []int{0, 40} {
-		if r, _ := Solve(Column(row, Text("end").ID("end")), w, 0).Rect("end"); r.Min.Y != 1 {
+		if r, _ := Solve(w, 0, Column(row, Text("end").ID("end"))).Rect("end"); r.Min.Y != 1 {
 			t.Fatalf("at width %d, the row is %d lines tall; want 1", w, r.Min.Y)
 		}
 	}
@@ -302,11 +302,11 @@ func TestGridRowHeights(t *testing.T) {
 		// Short of height, rows give it up in proportion to their own.
 		2: {image.Rect(0, 0, 1, 1), image.Rect(0, 1, 1, 2)},
 	} {
-		f := Solve(grid, 1, h)
+		f := Solve(1, h, grid)
 		expectRect(t, f, "a", want[0])
 		expectRect(t, f, "b", want[1])
 	}
-	if got := Render(grid, 1, 5); !strings.Contains(got, "d") {
+	if got := Render(1, 5, grid); !strings.Contains(got, "d") {
 		t.Fatalf("height 5 lost a line:\n%s", got)
 	}
 }
@@ -351,7 +351,7 @@ func TestBoxEdges(t *testing.T) {
 		Edge(Top, End, Text("!").ID("flag")).
 		Edge(Bottom, Center, Text("help").ID("help")).
 		Edge(Right, Stretch, Text("x\nx\nx").ID("bar"))
-	f := Solve(box, 20, 5)
+	f := Solve(20, 5, box)
 	expectRect(t, f, "body", image.Rect(1, 1, 19, 4))
 	expectRect(t, f, "title", image.Rect(2, 0, 7, 1))
 	expectRect(t, f, "count", image.Rect(15, 0, 18, 1))
@@ -366,7 +366,7 @@ func TestBoxEdges(t *testing.T) {
 		"│                  x",
 		"╰───────help───────╯",
 	}, "\n")
-	if got := ansi.Strip(Render(box, 20, 5)); got != want {
+	if got := ansi.Strip(Render(20, 5, box)); got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -380,18 +380,18 @@ func TestBoxEdgesShareWhatIsLeft(t *testing.T) {
 		Edge(Top, Center, Text("mid").ID("mid")).
 		Edge(Top, Start, Text("abcdef").ID("a")).
 		Edge(Top, End, Text("xyz").ID("z"))
-	f := Solve(box, 14, 3)
+	f := Solve(14, 3, box)
 	expectRect(t, f, "a", image.Rect(2, 0, 8, 1))
 	expectRect(t, f, "z", image.Rect(9, 0, 12, 1))
 	if _, ok := f.Rect("mid"); ok {
 		t.Fatal("a middle child with no room left was shown")
 	}
 
-	f = Solve(box, 20, 3)
+	f = Solve(20, 3, box)
 	expectRect(t, f, "mid", image.Rect(9, 0, 12, 1))
 
 	// Clipped to the room there is, rather than drawn over the corner.
-	if got := ansi.Strip(Render(Box(rounded, nil).Edge(Top, Start, Text("abcdefgh")), 8, 3)); !strings.HasPrefix(got, "╭─abcd─╮") {
+	if got := ansi.Strip(Render(8, 3, Box(rounded, nil).Edge(Top, Start, Text("abcdefgh")))); !strings.HasPrefix(got, "╭─abcd─╮") {
 		t.Fatalf("got:\n%s", got)
 	}
 }
@@ -400,20 +400,20 @@ func TestBoxEdgesNeedABorder(t *testing.T) {
 	t.Parallel()
 
 	noTop := lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), false, true, true, true)
-	f := Solve(Box(noTop, Text("x")).Edge(Top, Start, Text("t").ID("t")), 10, 3)
+	f := Solve(10, 3, Box(noTop, Text("x")).Edge(Top, Start, Text("t").ID("t")))
 	if _, ok := f.Rect("t"); ok {
 		t.Fatal("a child on a side with no border was shown")
 	}
 
 	// A box too small for its frame shows nothing on its edges either.
 	box := Box(rounded, Text("x")).Edge(Top, Start, Text("t").ID("t"))
-	if got := Render(Row(Fixed(1, box)), 4, 3); strings.Contains(got, "t") {
+	if got := Render(4, 3, Row(Fixed(1, box))); strings.Contains(got, "t") {
 		t.Fatalf("a cramped box showed its edge:\n%s", got)
 	}
 
 	// Margins are outside the border.
 	margins := rounded.Margin(1, 2)
-	f = Solve(Box(margins, Text("x")).Edge(Top, Start, Text("t").ID("t")).Edge(Left, Start, Text("l").ID("l")), 12, 6)
+	f = Solve(12, 6, Box(margins, Text("x")).Edge(Top, Start, Text("t").ID("t")).Edge(Left, Start, Text("l").ID("l")))
 	expectRect(t, f, "t", image.Rect(4, 1, 5, 2))
 	expectRect(t, f, "l", image.Rect(2, 2, 3, 3))
 }
@@ -424,7 +424,7 @@ func TestBoxEdgeTextRunsDownTheSides(t *testing.T) {
 	box := Box(rounded, Text("")).
 		Edge(Left, Start, Text("AB").Truncate()).
 		Edge(Right, End, Text("\x1b[31m✕\x1b[m"))
-	got := Render(box, 4, 4)
+	got := Render(4, 4, box)
 	c := canvas.Parse(got, ansi.GraphemeWidth)
 	if a, b := c.CellAt(0, 1).Content, c.CellAt(0, 2).Content; a != "A" || b != "B" {
 		t.Fatalf("left edge shows %q, %q:\n%s", a, b, ansi.Strip(got))
@@ -452,10 +452,10 @@ func TestBoxEdgeAt(t *testing.T) {
 		"│         │",
 		"╰───────lo┤",
 	}, "\n")
-	if got := ansi.Strip(Render(box, 11, 3)); got != want {
+	if got := ansi.Strip(Render(11, 3, box)); got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
-	f := Solve(box, 11, 3)
+	f := Solve(11, 3, box)
 	expectRect(t, f, "back", image.Rect(8, 0, 9, 1))
 	expectRect(t, f, "title", image.Rect(2, 0, 4, 1))
 	if _, ok := f.Rect("outside"); ok {
@@ -464,15 +464,29 @@ func TestBoxEdgeAt(t *testing.T) {
 
 	// Drawn in the order given: the title covers a junction under it.
 	box = Box(rounded, Text("")).EdgeAt(Top, 2, Text("┬")).Edge(Top, Start, Text("ab"))
-	if got := ansi.Strip(Render(box, 8, 3)); !strings.HasPrefix(got, "╭─ab───╮") {
+	if got := ansi.Strip(Render(8, 3, box)); !strings.HasPrefix(got, "╭─ab───╮") {
 		t.Fatalf("got:\n%s", got)
 	}
 
 	// A side without a border shows nothing.
 	noTop := lipgloss.NewStyle().Border(lipgloss.RoundedBorder(), false, true, true, true)
-	f = Solve(Box(noTop, Text("x")).EdgeAt(Top, 2, Text("t").ID("t")).EdgeAt(Left, 0, Text("l").ID("l")), 10, 3)
+	f = Solve(10, 3, Box(noTop, Text("x")).EdgeAt(Top, 2, Text("t").ID("t")).EdgeAt(Left, 0, Text("l").ID("l")))
 	if _, ok := f.Rect("t"); ok {
 		t.Fatal("a child on a side with no border was shown")
 	}
 	expectRect(t, f, "l", image.Rect(0, 0, 1, 1))
+}
+
+func TestCenteredIgnoresSlotSizing(t *testing.T) {
+	t.Parallel()
+
+	// A slot's sizing applies in a row or column, not in Centered, which
+	// places its child at its natural size.
+	for _, c := range []Child{
+		Centered(Fill(Text("x").ID("x"))),
+		Centered(Fixed(0, Text("x").ID("x"))),
+		Centered(Auto(Text("x").ID("x")).Align(Stretch)),
+	} {
+		expectRect(t, Solve(9, 5, c), "x", image.Rect(4, 2, 5, 3))
+	}
 }

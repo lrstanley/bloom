@@ -193,7 +193,7 @@ type geometry struct {
 func (m *model) geometry() geometry {
 	// The status bar reports the geometry, so it is solved with an empty one,
 	// which as a Measurer is the same size.
-	frame := bloom.Solve(m.layout(statusbar{}), m.w, m.h)
+	frame := bloom.Solve(m.w, m.h, m.layout(statusbar{}))
 	var g geometry
 	if r, ok := frame.Rect(paneReader); ok {
 		g.page = max(r.Dy()-panel.GetVerticalFrameSize(), 1)

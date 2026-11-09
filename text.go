@@ -70,7 +70,7 @@ func (n TextNode) Focusable() TextNode { n.focusable = true; return n }
 func (n TextNode) Cursor(c *tea.Cursor) TextNode { n.cursor = c; return n }
 
 // View implements [Child], drawing the node at its natural size.
-func (n TextNode) View() string { return Render(n, 0, 0) }
+func (n TextNode) View() string { return Render(0, 0, n) }
 
 // MarqueeNode is a line of text that scrolls when it does not fit. Build one
 // with [Marquee].
@@ -118,7 +118,7 @@ func (n MarqueeNode) Gap(s string) MarqueeNode {
 }
 
 // View implements [Child], drawing the marquee at its natural size.
-func (n MarqueeNode) View() string { return Render(n, 0, 0) }
+func (n MarqueeNode) View() string { return Render(0, 0, n) }
 
 // Layout implements [Layouter].
 func (n MarqueeNode) Layout(ctx Context) Child {
@@ -126,7 +126,7 @@ func (n MarqueeNode) Layout(ctx Context) Child {
 	if inner <= 0 {
 		return nil
 	}
-	m := ctx.method()
+	m := ctx.WidthMethod()
 	w := m.StringWidth(n.s)
 	if w <= inner {
 		return n.text(n.s)
@@ -203,7 +203,7 @@ func (n SkeletonNode) Shimmer(phase float64) SkeletonNode {
 }
 
 // View implements [Child], drawing the skeleton at its natural size.
-func (n SkeletonNode) View() string { return Render(n, 0, 0) }
+func (n SkeletonNode) View() string { return Render(0, 0, n) }
 
 // Layout implements [Layouter].
 func (n SkeletonNode) Layout(ctx Context) Child {
@@ -307,8 +307,10 @@ func cut(m ansi.Method, s string, left, right int) string {
 	return m.TruncateLeft(m.Truncate(s, right, ""), left, "")
 }
 
-// method returns how the renderer laying out with ctx measures text.
-func (ctx Context) method() ansi.Method {
+// WidthMethod returns how the renderer laying out with ctx measures text,
+// set with [WithWidthMethod], for a [Layouter] that measures or cuts strings
+// itself, as with [ansi.Method.StringWidth] and [ansi.Method.Truncate].
+func (ctx Context) WidthMethod() ansi.Method {
 	if ctx.wc {
 		return ansi.WcWidth
 	}

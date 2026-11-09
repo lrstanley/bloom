@@ -165,7 +165,7 @@ func (r *Root) Render(w, h int, c Child) string {
 	if w <= 0 {
 		c = nil
 	}
-	out := r.r.render(c, w, h)
+	out := r.r.render(w, h, c)
 	r.r.updateFrame()
 	return out
 }
@@ -237,10 +237,10 @@ var renderers = sync.Pool{New: func() any { return newRenderer(ansi.GraphemeWidt
 // c's natural size on that axis. A model's View should use [Root] instead,
 // which keeps more between frames. Render is stateless and draws animation
 // targets immediately.
-func Render(c Child, w, h int) string {
+func Render(w, h int, c Child) string {
 	r, _ := renderers.Get().(*renderer)
 	defer renderers.Put(r)
-	return r.render(c, w, h)
+	return r.render(w, h, c)
 }
 
 // Solve lays out c in a w×h frame without drawing it, and returns its
@@ -251,16 +251,16 @@ func Render(c Child, w, h int) string {
 //
 //	case tea.WindowSizeMsg:
 //		m.width, m.height = msg.Width, msg.Height
-//		if r, ok := bloom.Solve(m.layout(), m.width, m.height).Rect(paneReader); ok {
+//		if r, ok := bloom.Solve(m.width, m.height, m.layout()).Rect(paneReader); ok {
 //			m.reader.SetWidth(r.Dx())
 //			m.reader.SetHeight(r.Dy())
 //		}
-func Solve(c Child, w, h int) *Frame {
+func Solve(w, h int, c Child) *Frame {
 	r, _ := renderers.Get().(*renderer)
 	defer renderers.Put(r)
 	r.parse = false
 	defer func() { r.parse = true }()
-	r.paintTree(c, w, h)
+	r.paintTree(w, h, c)
 	r.placeEntries()
 	r.cache.EndFrame(w * h)
 	return &Frame{entries: slices.Clone(r.entries), handlers: slices.Clone(r.handlers), cursor: r.cursor}

@@ -51,7 +51,7 @@ func (e Spotlight) Apply(s *canvas.Surface, t float64) {
 				if soft > 0 {
 					d := math.Hypot(float64(dx)/2, float64(dy)) / soft
 					if d < 1 {
-						f *= d * d * (3 - 2*d)
+						f *= smoothstep(d)
 					}
 				}
 			}

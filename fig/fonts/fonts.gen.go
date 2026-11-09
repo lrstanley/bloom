@@ -777,15 +777,12 @@ var smSlantFont lazy
 // License: BSD-3-Clause, see LICENSES.md.
 func SmSlant() *fig.Font { return smSlantFont.get("smslant", smSlantData) }
 
-//go:embed data/standard.flf.gz
-var standardData string
-
-var standardFont lazy
-
 // Standard is the font "standard", 6 rows tall: Standard by Glenn Chappell & Ian Chai 3/93 -- based on Frank's .sig.
 // From https://github.com/cmatsuoka/figlet/blob/202a0a8110650a943f1125f536b3bb455cf72ee1/fonts/standard.flf.
 // License: BSD-3-Clause, see LICENSES.md.
-func Standard() *fig.Font { return standardFont.get("standard", standardData) }
+//
+// It is [fig.Standard], which package fig holds as its default font.
+func Standard() *fig.Font { return fig.Standard() }
 
 //go:embed data/starwars.flf.gz
 var starWarsData string

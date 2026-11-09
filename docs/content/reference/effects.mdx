@@ -22,7 +22,7 @@ random pattern that stays the same for the same seed.
 
 The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/effects) loops every effect as a transition, then shows each backdrop over them:
 
-![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, Tint, and Recolor backdrops in turn](/demos/effects.webp)
+![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, and two Recolor backdrops in turn](/demos/effects.webp)
 
 ## Entrances
 
@@ -48,11 +48,11 @@ The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/e
 | --- | --- | --- |
 | [`Dim`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Dim) | `Amount float64` | moving colors toward the terminal's background |
 | [`Desaturate`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Desaturate) | `Amount float64` | moving colors toward gray |
-| [`Tint`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Tint) | `Color color.Color`, `Amount float64` | moving colors toward `Color` |
-| [`Recolor`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Recolor) | `Fg, Bg color.Color` | drawing every cell in two colors, keeping the glyphs |
+| [`Recolor`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Recolor) | `Fg, Bg color.Color`, `Amount float64` (default 1) | moving colors toward `Fg` and `Bg`, keeping the glyphs: all the way draws every cell in the two colors, and the same color for both tints toward it |
 | [`Spotlight`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Spotlight) | `Rect image.Rectangle`, `Amount float64` (default 0.7), `Soft int` | dimming everything outside `Rect`, with a soft edge `Soft` cells wide |
 
-`Amount` runs from 0, no change, to 1, all the way. Backdrops also work as transitions; `Tint` on a node fades it in
+`Amount` runs from 0, no change, to 1, all the way, except where a default is listed: there, zero is the
+default. Backdrops also work as transitions; `Recolor` on a node fades it in
 from a color, for example.
 
 ## Feedback
@@ -92,7 +92,7 @@ loop: `t` is the phase, such as from `anim.NewLoop`, and they look the same at 0
 | [`March`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#March) | `Length int` (default 2) | marching ants: runs of line glyphs alternate with dashed ones and travel clockwise, a run each loop |
 
 A nil `From` is each cell's own color, and other nil colors are the terminal's foreground. Other effects work as
-border effects too, on the whole frame, such as `Tint` or `Shimmer`. Effects that move cells don't move the frame.
+border effects too, on the whole frame, such as `Recolor` or `Shimmer`. Effects that move cells don't move the frame.
 
 ## Combinators
 

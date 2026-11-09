@@ -139,8 +139,8 @@ var backdrops = []struct {
 }{
 	{"Dim", fx.Dim{Amount: 0.6}},
 	{"Desaturate", fx.Desaturate{Amount: 1}},
-	{"Tint", fx.Tint{Color: accent, Amount: 0.45}},
-	{"Recolor", fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.17), Bg: lipgloss.Darken(theme.Bg, 0.3)}},
+	{"Recolor: tint", fx.Recolor{Fg: accent, Bg: accent, Amount: 0.45}},
+	{"Recolor: two colors", fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.17), Bg: lipgloss.Darken(theme.Bg, 0.3)}},
 }
 
 type model struct {

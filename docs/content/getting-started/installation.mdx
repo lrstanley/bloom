@@ -54,10 +54,10 @@ import (
 func main() {
 	box := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 
-	fmt.Println(bloom.Render(bloom.Row(
+	fmt.Println(bloom.Render(50, 5, bloom.Row(
 		bloom.Fixed(16, bloom.Box(box, bloom.Text("sidebar"))),
 		bloom.Fill(bloom.Box(box, bloom.Text("content"))),
-	), 50, 5))
+	)))
 }
 ```
 

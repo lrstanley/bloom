@@ -95,9 +95,8 @@ func (e Fly) Apply(s *canvas.Surface, t float64) {
 		if resized {
 			start = start.Add(image.Pt(c.x*from.Dx()/s.Width()-c.x, c.y*from.Dy()/s.Height()-c.y))
 		}
-		k := c.p * c.p * (3 - 2*c.p)
-		glyph := int(hash(c.x, c.y, e.Seed^step*0x9e3779b9) * float64(len(decodeGlyphs)))
-		c.c.Content, c.c.Width = decodeGlyphs[glyph:glyph+1], 1
+		k := smoothstep(c.p)
+		c.c.Content, c.c.Width = flicker(decodeGlyphs, c.x, c.y, e.Seed, step), 1
 		c.c.Style.Attrs |= uv.AttrBold
 		if c.c.Style.Fg == nil {
 			c.c.Style.Fg = s.Env.Fg

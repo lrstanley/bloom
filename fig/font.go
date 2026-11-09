@@ -24,12 +24,8 @@ import (
 // Font is a FIGlet (.flf) or TOIlet (.tlf) font. It is safe for concurrent
 // use, and lays out each text and [Options] once, remembering the result.
 type Font struct {
-	name string
-	data string // for a lazy font, until it is parsed
-	once sync.Once
-	err  error
-	face *face
-	ctl  *Control
+	name  string
+	parse func() (*face, error) // the font's glyphs, parsed once
 
 	mu   sync.Mutex
 	memo map[memoKey]*Figure
@@ -105,9 +101,7 @@ func Parse(data []byte) (*Font, error) {
 	if err != nil {
 		return nil, err
 	}
-	f := &Font{face: fc}
-	f.once.Do(func() {})
-	return f, nil
+	return &Font{parse: func() (*face, error) { return fc, nil }}, nil
 }
 
 // ParseFS reads the font at name in fsys, as [Parse] does. The font is named
@@ -130,29 +124,29 @@ func ParseFS(fsys fs.FS, name string) (*Font, error) {
 // the first time it is used. It is how package fonts holds its fonts. If data
 // is not a font, the font has no glyphs and [Font.Err] reports why.
 func Lazy(name, data string) *Font {
-	return &Font{name: name, data: data}
+	return &Font{name: name, parse: sync.OnceValues(func() (*face, error) {
+		b, err := decompress([]byte(data))
+		if err != nil {
+			return newFace(1), err
+		}
+		fc, err := parseFace(string(b))
+		if err != nil {
+			return newFace(1), err
+		}
+		return fc, nil
+	})}
 }
 
-// load parses a lazy font, once.
+// load returns the font's glyphs, parsing a lazy font the first time.
 func (f *Font) load() *face {
-	f.once.Do(func() {
-		var data []byte
-		data, f.err = decompress([]byte(f.data))
-		if f.err == nil {
-			f.face, f.err = parseFace(string(data))
-		}
-		if f.err != nil {
-			f.face = &face{height: 1, glyphs: map[rune]*glyph{}, missing: &glyph{rows: make([][]sub, 1)}, subs: []string{"", " ", ""}, runes: []rune{-1, ' ', -1}}
-		}
-		f.data = ""
-	})
-	return f.face
+	fc, _ := f.parse()
+	return fc
 }
 
 // Err reports why a font made by [Lazy] could not be parsed, or nil.
 func (f *Font) Err() error {
-	f.load()
-	return f.err
+	_, err := f.parse()
+	return err
 }
 
 // Name returns the font's name: the one given to [Lazy], the file name for
@@ -165,10 +159,12 @@ type Info struct {
 	Height int
 	// Baseline is how many rows from the top capital letters rest on.
 	Baseline int
-	// Layout is the header's Full_Layout: the smushing rules and layout modes
-	// the font asks for, as the bits of [Rules] and the layout bits of the
-	// FIGfont standard.
-	Layout int
+	// Horizontal and Vertical are the layouts the font asks for: [Full],
+	// [Fitted], [Smushed] by its Rules, or [Universal] when it smushes with
+	// none.
+	Horizontal, Vertical Mode
+	// Rules are the smushing rules the font asks for.
+	Rules Rules
 	// RightToLeft reports whether the font prints right to left.
 	RightToLeft bool
 	// Comments are the header's comment lines, which hold the font's
@@ -182,9 +178,26 @@ type Info struct {
 func (f *Font) Info() Info {
 	fc := f.load()
 	return Info{
-		Height: fc.height, Baseline: fc.baseline, Layout: fc.layout, RightToLeft: fc.rtl,
-		Comments: append([]string(nil), fc.comments...), Glyphs: len(fc.glyphs),
+		Height: fc.height, Baseline: fc.baseline, RightToLeft: fc.rtl,
+		Horizontal: layoutMode(fc.layout, smKern, smSmush, hRules),
+		Vertical:   layoutMode(fc.layout, svFit, svSmush, vRules),
+		Rules:      Rules(fc.layout & (hRules | vRules)), //nolint:gosec // the rules' bits.
+		Comments:   append([]string(nil), fc.comments...), Glyphs: len(fc.glyphs),
 	}
+}
+
+// layoutMode returns the mode of the bits fit, smush, and rules of a
+// Full_Layout.
+func layoutMode(layout, fit, smush, rules int) Mode {
+	switch {
+	case layout&smush != 0 && layout&rules != 0:
+		return Smushed
+	case layout&smush != 0:
+		return Universal
+	case layout&fit != 0:
+		return Fitted
+	}
+	return Full
 }
 
 // Has reports whether the font has a glyph for r. Characters it lacks are
@@ -192,15 +205,6 @@ func (f *Font) Info() Info {
 func (f *Font) Has(r rune) bool {
 	_, ok := f.load().glyphs[r]
 	return ok
-}
-
-// WithControl returns a copy of the font that maps text through c before
-// laying it out, as figlet's -C option does. The copy shares the font's
-// glyphs.
-func (f *Font) WithControl(c *Control) *Font {
-	cf := &Font{name: f.name, face: f.load(), err: f.err, ctl: c}
-	cf.once.Do(func() {})
-	return cf
 }
 
 // decompress returns data unzipped or gunzipped, if it is compressed.
@@ -240,7 +244,7 @@ func readAll(r io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("fig: %w", err)
 	}
 	if len(b) > maxFontSize {
-		return nil, errors.New("fig: font is too large")
+		return nil, ErrTooLarge
 	}
 	return b, nil
 }
@@ -257,6 +261,23 @@ func (l *lines) next() (string, bool) {
 	line, rest, _ := strings.Cut(l.s, "\n")
 	l.s = rest
 	return strings.TrimSuffix(line, "\r"), true
+}
+
+// newFace returns a face h rows tall with no glyphs, for a font that could
+// not be parsed.
+func newFace(h int) *face {
+	fc := &face{height: h}
+	fc.init()
+	return fc
+}
+
+// init sets up the tables of a face whose height is known, before its
+// glyphs are read.
+func (fc *face) init() {
+	fc.subs = []string{"", " ", "", " "}
+	fc.runes = []rune{-1, ' ', -1, -1}
+	fc.glyphs = make(map[rune]*glyph, 128)
+	fc.missing = &glyph{rows: make([][]sub, fc.height)}
 }
 
 // parseFace parses a font's text as C figlet's readfont does.
@@ -277,10 +298,7 @@ func parseFace(s string) (*face, error) {
 	// The hardblank is interned first, so that it is never mistaken for
 	// another sub-character, and shows as a space.
 	p := parser{face: fc, hard: hard, index: map[string]sub{}}
-	fc.subs = []string{"", " ", "", " "}
-	fc.runes = []rune{-1, ' ', -1, -1}
-	fc.glyphs = make(map[rune]*glyph, 128)
-	fc.missing = &glyph{rows: make([][]sub, fc.height)}
+	fc.init()
 	for r := rune(' '); r <= '~'; r++ {
 		if err := p.glyph(in, r); err != nil {
 			return nil, err

@@ -8,7 +8,7 @@ import "strings"
 
 // Control is a FIGlet control file (.flc): a mapping applied to text before
 // it is laid out, such as from a keyboard layout to the letters of a Hebrew
-// font. Give one to a font with [Font.WithControl].
+// font. Give one to a layout with [Options.Control].
 //
 // Its "t" (translate) commands, number pairs, and "f" (freeze) commands are
 // followed as figlet follows them. The commands that choose how input bytes

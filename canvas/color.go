@@ -35,6 +35,18 @@ func sameColor(a, b color.Color) bool {
 	return toRGBA(a) == toRGBA(b)
 }
 
+// withDefaults returns e with the colors it lacks taken from [DefaultEnv],
+// so effects can blend with them.
+func (e Env) withDefaults() Env {
+	if e.Fg == nil {
+		e.Fg = DefaultEnv.Fg
+	}
+	if e.Bg == nil {
+		e.Bg = DefaultEnv.Bg
+	}
+	return e
+}
+
 // DefaultEnv is the [Env] used until the terminal reports its colors.
 var DefaultEnv = Env{
 	Fg:      color.RGBA{R: 0xdd, G: 0xdd, B: 0xdd, A: 0xff},

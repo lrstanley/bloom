@@ -87,7 +87,7 @@ Overlay 0,0 20x5
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got, want := Debug(tt.c, tt.w, tt.h), strings.TrimPrefix(tt.want, "\n"); got != want {
+			if got, want := Debug(tt.w, tt.h, tt.c), strings.TrimPrefix(tt.want, "\n"); got != want {
 				t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 			}
 		})

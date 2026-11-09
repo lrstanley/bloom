@@ -26,7 +26,7 @@ func TestSolveMatchesRoot(t *testing.T) {
 		tree := benchTree(4, 1, 0.5)
 		r := New()
 		r.Render(size.X, size.Y, tree)
-		solved := Solve(tree, size.X, size.Y)
+		solved := Solve(size.X, size.Y, tree)
 		for _, id := range []any{"sidebar", "log", 4, "dialog"} {
 			want, wantOK := r.Frame().Rect(id)
 			got, gotOK := solved.Rect(id)

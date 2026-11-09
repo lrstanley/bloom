@@ -218,11 +218,11 @@ func TestLayoutAnimationTicks(t *testing.T) {
 
 func TestLayoutAnimationStateless(t *testing.T) {
 	tree := Row(Fixed(20, nil), Fixed(10, Text("target")).ID("x").Animate())
-	got, ok := Solve(tree, 80, 10).Rect("x")
+	got, ok := Solve(80, 10, tree).Rect("x")
 	if !ok || got != image.Rect(20, 0, 30, 10) {
 		t.Fatalf("Solve = %v, %v", got, ok)
 	}
-	if Render(tree, 80, 10) != Render(Row(Fixed(20, nil), Fixed(10, Text("target"))), 80, 10) {
+	if Render(80, 10, tree) != Render(80, 10, Row(Fixed(20, nil), Fixed(10, Text("target")))) {
 		t.Fatal("stateless render animated")
 	}
 }
@@ -357,7 +357,7 @@ func TestMoveWith(t *testing.T) {
 
 	// At rest, a slot that moves with effects draws as any other.
 	before := r.Render(16, 2, tree(false, true))
-	if want := Render(tree(false, false), 16, 2); before != want {
+	if want := Render(16, 2, tree(false, false)); before != want {
 		t.Fatalf("at rest:\n%s\nwant:\n%s", before, want)
 	}
 
@@ -373,7 +373,7 @@ func TestMoveWith(t *testing.T) {
 	}
 
 	now = now.Add(500 * time.Millisecond)
-	after := Render(tree(true, false), 16, 2)
+	after := Render(16, 2, tree(true, false))
 	if mid := r.Render(16, 2, tree(true, true)); mid == before || mid == after {
 		t.Fatalf("half way, the panes are at one end:\n%s", mid)
 	}
@@ -448,7 +448,7 @@ func TestLayerMoveWith(t *testing.T) {
 	}
 
 	before := r.Render(10, 2, tree(0, true))
-	if want := Render(tree(0, false), 10, 2); before != want {
+	if want := Render(10, 2, tree(0, false)); before != want {
 		t.Fatalf("at rest:\n%s\nwant:\n%s", before, want)
 	}
 	if got := r.Render(10, 2, tree(8, true)); got != before {
@@ -463,7 +463,7 @@ func TestLayerMoveWith(t *testing.T) {
 		}
 	}
 	now = now.Add(200 * time.Millisecond)
-	if got, want := r.Render(10, 2, tree(8, true)), Render(tree(8, false), 10, 2); got != want {
+	if got, want := r.Render(10, 2, tree(8, true)), Render(10, 2, tree(8, false)); got != want {
 		t.Fatalf("after the move:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -491,7 +491,7 @@ func TestMoveWithOutOfSight(t *testing.T) {
 		t.Fatal("the slot moving out of sight can still be hit")
 	}
 	now = now.Add(2 * time.Second)
-	if got, want := r.Render(4, 1, tree(true)), Render(tree(true), 4, 1); got != want {
+	if got, want := r.Render(4, 1, tree(true)), Render(4, 1, tree(true)); got != want {
 		t.Fatalf("after the move: %q, want %q", got, want)
 	}
 }

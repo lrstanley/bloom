@@ -15,7 +15,7 @@ func TestSidebarCollapses(t *testing.T) {
 	m := newModel()
 	m.width, m.height = 50, 10
 
-	got := ansi.Strip(bloom.Render(m.layout(), m.width, m.height))
+	got := ansi.Strip(bloom.Render(m.width, m.height, m.layout()))
 	if strings.Contains(got, "Groceries") {
 		t.Errorf("sidebar should collapse at 50 columns:\n%s", got)
 	}
@@ -36,7 +36,7 @@ check sizes and positions, which is less brittle than comparing drawn output:
 
 ```go
 func TestReaderMinimum(t *testing.T) {
-	frame := bloom.Solve(newModel().layout(), 60, 20)
+	frame := bloom.Solve(60, 20, newModel().layout())
 
 	r, ok := frame.Rect(paneReader)
 	if !ok {

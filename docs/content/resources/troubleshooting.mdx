@@ -12,7 +12,7 @@ on screen are marked. Write it somewhere you can read while the program runs, su
 ```go
 func (m model) View() tea.View {
 	if m.debug {
-		log.Print(bloom.Debug(m.layout(), m.width, m.height))
+		log.Print(bloom.Debug(m.width, m.height, m.layout()))
 	}
 	return m.ui.View(m.width, m.height, m.layout())
 }

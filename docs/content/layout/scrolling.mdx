@@ -148,7 +148,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		frame := bloom.Solve(m.layout(), m.width, m.height)
+		frame := bloom.Solve(m.width, m.height, m.layout())
 		page := 1
 		if r, ok := frame.Rect(paneReader); ok {
 			page = max(r.Dy()-panel.GetVerticalFrameSize(), 1)
@@ -262,7 +262,7 @@ scrollbar takes clicks only while it's drawn, so with nothing to scroll, clicks 
 
 There are two ways to get geometry, and they answer different questions:
 
-- `bloom.Solve(layout, w, h)` lays out the tree you pass, for the state your model has now. Use it in `Update`
+- `bloom.Solve(w, h, layout)` lays out the tree you pass, for the state your model has now. Use it in `Update`
   after changing state, when the answer has to reflect that change.
 - `m.ui.Frame()` returns the geometry of the frame last drawn on screen. It costs nothing, and it's what
   [focus](/input/focus) moves through, but it doesn't know about changes your model made since. With

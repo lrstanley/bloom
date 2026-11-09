@@ -35,14 +35,8 @@ type Flash struct {
 
 // Apply implements fx.Effect.
 func (e Flash) Apply(s *canvas.Surface, t float64) {
-	for y := range s.Height() {
-		for x := range s.Width() {
-			c := s.Cell(x, y)
-			if c == nil {
-				continue
-			}
-			c.Style.Fg = s.Mix(e.Color, s.Fg(c), t)
-		}
+	for _, c := range s.Cells() {
+		c.Style.Fg = s.Mix(e.Color, s.Fg(c), t)
 	}
 }
 ```
@@ -83,6 +77,7 @@ changes. Coordinates are relative to its top-left cell.
 | Method or field | Use |
 | --- | --- |
 | `Width()`, `Height()` | the size of the surface |
+| `Cells()` | every cell that will be drawn, with where it is, to change them one by one: `for at, c := range s.Cells()` |
 | `Cell(x, y)` | the cell at a position, to change its glyph or style. Keep its width the same. |
 | `Set(x, y, c)` | replace a cell whole and show it, anywhere in `Reach()`, keeping wide glyphs whole |
 | `Fg(c)`, `Bg(c)` | the colors a cell shows, with unset colors resolved to the terminal's defaults |

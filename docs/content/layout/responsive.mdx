@@ -89,7 +89,7 @@ type editor struct {
 }
 
 func (e editor) View() string {
-	return bloom.Render(e.Layout(bloom.Context{}), 0, 0)
+	return bloom.Render(0, 0, e.Layout(bloom.Context{}))
 }
 
 func (e editor) Layout(ctx bloom.Context) bloom.Child {

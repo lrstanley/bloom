@@ -139,8 +139,8 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 
 | | Does |
 | --- | --- |
-| [`Solve(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) | lay out without drawing, and return the `*Frame` |
-| [`Render(tree, w, h)`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) | lay out and draw to a string, without a root |
+| [`Solve(w, h, tree)`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) | lay out without drawing, and return the `*Frame` |
+| [`Render(w, h, tree)`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) | lay out and draw to a string, without a root |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
 | [`ThrottleMouse(every)`](https://pkg.go.dev/github.com/lrstanley/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |

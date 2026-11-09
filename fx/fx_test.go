@@ -167,6 +167,16 @@ func TestBackdrops(t *testing.T) {
 		}
 	})
 
+	t.Run("recolor by an amount", func(t *testing.T) {
+		t.Parallel()
+		s := region()
+		// Red moves halfway toward white, at full strength.
+		Recolor{Fg: white, Bg: white, Amount: 0.5}.Apply(s, 1)
+		if c := rgba(s.Cell(0, 0).Style.Fg); c.R != 0xff || c.G < 0x70 || c.G > 0x90 {
+			t.Fatalf("foreground is %v, want halfway from red to white", c)
+		}
+	})
+
 	t.Run("dim keeps unset backgrounds", func(t *testing.T) {
 		t.Parallel()
 		s := region()
@@ -184,7 +194,7 @@ func TestBackdrops(t *testing.T) {
 		s := region()
 		Dim{Amount: 1}.Apply(s, 0)
 		Desaturate{Amount: 1}.Apply(s, 0)
-		Tint{Color: white, Amount: 1}.Apply(s, 0)
+		Recolor{Fg: white, Bg: white, Amount: 1}.Apply(s, 0)
 		Recolor{Fg: white}.Apply(s, 0)
 		if c := s.Cell(0, 0); rgba(c.Style.Fg) != red {
 			t.Fatalf("t=0 changed the color to %v", c.Style.Fg)

@@ -74,7 +74,7 @@ var (
 // paints are the paints shown, in order.
 var paints = []paint{
 	{"column", fig.Gradient(pink, peach)},
-	{"diagonal", fig.Gradient(sky, violet, pink).By(fig.ByDiagonal).Blend()},
+	{"diagonal", fig.Gradient(sky, violet, pink).By(fig.ByDiagonal)},
 	{"row", fig.Gradient(peach, pink, violet).By(fig.ByRow)},
 	{"glyph", fig.Gradient(sky, pink).By(fig.ByGlyph)},
 	{"palette", fig.Palette(theme.Red, theme.Yellow, theme.Green, theme.Cyan, theme.Blue)},
@@ -159,7 +159,7 @@ func (m *model) layout() bloom.Child {
 
 	shown := bloom.Box(stage, bloom.Centered(sample)).
 		Edge(bloom.Top, bloom.Start, bloom.Text(" "+font.Name()+" ").Style(title)).
-		Edge(bloom.Top, bloom.End, bloom.Text(fmt.Sprintf(" %d rows · %s · %s paint ", info.Height, layoutName(info.Layout), p.name)).Style(dim)).
+		Edge(bloom.Top, bloom.End, bloom.Text(fmt.Sprintf(" %d rows · %s · %s paint ", info.Height, layoutName(info.Horizontal), p.name)).Style(dim)).
 		Edge(bloom.Bottom, bloom.Center, bloom.Text(" "+credit(info.Comments)+" ").Style(dim).Truncate())
 
 	list := bloom.Box(panel, fontList{m: m}).
@@ -199,7 +199,7 @@ func (m *model) chips() bloom.Child {
 // middle, as tall as it is given.
 type fontList struct{ m *model }
 
-func (l fontList) View() string { return bloom.Render(l, 28, 10) }
+func (l fontList) View() string { return bloom.Render(28, 10, l) }
 
 func (l fontList) Layout(ctx bloom.Context) bloom.Child {
 	n := min(ctx.Height, len(gallery))
@@ -229,13 +229,12 @@ func keys(pairs ...string) bloom.Child {
 	return bloom.Wrap(parts...).Gap(2, 0)
 }
 
-// layoutName describes how a font's glyphs are put side by side, from its
-// Full_Layout.
-func layoutName(layout int) string {
-	switch {
-	case layout&128 != 0:
+// layoutName describes how a font's glyphs are put side by side.
+func layoutName(m fig.Mode) string {
+	switch m { //nolint:exhaustive // A font's own layout is never Default.
+	case fig.Smushed, fig.Universal:
 		return "smushed"
-	case layout&64 != 0:
+	case fig.Fitted:
 		return "fitted"
 	}
 	return "full width"

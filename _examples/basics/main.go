@@ -143,7 +143,7 @@ func render() string {
 	for _, ex := range examples() {
 		b.WriteString(heading.Render(ex.title))
 		b.WriteString("\n")
-		b.WriteString(bloom.Render(ex.tree, ex.w, ex.h))
+		b.WriteString(bloom.Render(ex.w, ex.h, ex.tree))
 		b.WriteString("\n\n")
 	}
 	return b.String()

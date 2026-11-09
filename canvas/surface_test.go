@@ -5,6 +5,7 @@
 package canvas
 
 import (
+	"fmt"
 	"image"
 	"strings"
 	"testing"
@@ -252,5 +253,25 @@ func TestSubFrom(t *testing.T) {
 	s.From = image.Rectangle{}
 	if got := s.Sub(image.Rect(0, 0, 2, 1)).From; !got.Empty() {
 		t.Fatalf("not moving, part was at %v", got)
+	}
+}
+
+func TestCells(t *testing.T) {
+	t.Parallel()
+
+	s := layerOf("ab\ncd")
+	s.Hide(1, 0)
+	var got []string
+	for at, c := range s.Cells() {
+		got = append(got, fmt.Sprintf("%d,%d=%s", at.X, at.Y, c.Content))
+		// A cell hidden before it comes is skipped.
+		s.Hide(0, 1)
+	}
+	if want := "0,0=a 1,1=d"; strings.Join(got, " ") != want {
+		t.Fatalf("Cells gave %q, want %q", strings.Join(got, " "), want)
+	}
+	// Breaking out early stops it.
+	for range s.Cells() {
+		break
 	}
 }

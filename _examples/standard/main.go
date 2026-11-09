@@ -44,7 +44,7 @@ var pages = []string{"Home", "Settings", "About"}
 // sidebar's width.
 type sidebar struct{ selected int }
 
-func (s sidebar) View() string { return bloom.Render(s.Layout(bloom.Context{}), 0, 0) }
+func (s sidebar) View() string { return bloom.Render(0, 0, s.Layout(bloom.Context{})) }
 
 func (s sidebar) Layout(bloom.Context) bloom.Child {
 	items := make([]bloom.Child, 0, len(pages)+2)

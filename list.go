@@ -63,7 +63,7 @@ func (n ListNode) On(handlers ...on.Handler) ListNode {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n ListNode) View() string { return Render(n, 0, 0) }
+func (n ListNode) View() string { return Render(0, 0, n) }
 
 // ListView is the part of a [List] that a frame showed, as [Frame.List]
 // reports it.

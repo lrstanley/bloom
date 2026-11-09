@@ -128,7 +128,7 @@ func (e Comet) Apply(s *canvas.Surface, t float64) {
 	perimeter(s, func(c *uv.Cell, i, n int) {
 		behind := math.Mod(at*float64(n)-float64(i)+float64(n), float64(n))
 		if k := 1 - behind/float64(min(length, n)); k > 0 {
-			c.Style.Fg = s.Mix(s.Fg(c), to, k*k*(3-2*k))
+			c.Style.Fg = s.Mix(s.Fg(c), to, smoothstep(k))
 		}
 	})
 }

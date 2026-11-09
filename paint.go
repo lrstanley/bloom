@@ -131,12 +131,11 @@ func fixed(v reflect.Value) bool {
 type renderer struct {
 	engine
 
-	styled   []styledMemo   // by box index, from the last frames
-	columns  []columnMemo   // by twice the box index, for scrollbars
-	drag     scrollbarDrag  // the scrollbar being dragged, if any
-	frames   uint64         // frames painted, to retire unused memos
-	style    lipgloss.Style // scratch for comparing styles without allocating
-	fxs      []fx.Effect    // effects of this frame's ops, copied from the tree
+	styled   memos[styledMemo] // by box index, from the last frame
+	columns  memos[columnMemo] // by twice the box index, for scrollbars
+	drag     scrollbarDrag     // the scrollbar being dragged, if any
+	style    lipgloss.Style    // scratch for comparing styles without allocating
+	fxs      []fx.Effect       // effects of this frame's ops, copied from the tree
 	prevFxs  []fx.Effect
 	env      canvas.Env
 	mixer    canvas.Mixer
@@ -169,8 +168,8 @@ func newRenderer(method ansi.Method) *renderer {
 
 // render lays out and draws c in a w×h frame, returning it as a string. For
 // a w or h of zero or less, the frame is c's natural size.
-func (r *renderer) render(c Child, w, h int) string {
-	root := r.paintTree(c, w, h)
+func (r *renderer) render(w, h int, c Child) string {
+	root := r.paintTree(w, h, c)
 	w, h = r.size(root, w, h)
 
 	if r.drawn != image.Pt(w, h) || !r.drawnEnv.Equal(r.env) || !r.sameOps() {
@@ -197,28 +196,17 @@ func (r *renderer) render(c Child, w, h int) string {
 
 // paintTree lays out c and builds the frame's ops and entries, returning the
 // root box.
-func (r *renderer) paintTree(c Child, w, h int) int {
+func (r *renderer) paintTree(w, h int, c Child) int {
 	clear(r.entries)
 	clear(r.handlers)
 	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
-	r.frames++
-	root := r.layout(c, w, h)
+	root := r.layout(w, h, c)
 	if root >= 0 {
 		r.paint(root, r.area, -1)
 		r.paintMoves(0)
 	}
-
-	// Memos for boxes not styled this frame would keep their strings alive.
-	for i := range r.styled {
-		if r.styled[i].used != r.frames {
-			r.styled[i] = styledMemo{}
-		}
-	}
-	for i := range r.columns {
-		if r.columns[i].used != r.frames {
-			r.columns[i] = columnMemo{}
-		}
-	}
+	r.styled.retire()
+	r.columns.retire()
 	return root
 }
 
@@ -273,8 +261,6 @@ func (r *renderer) sameOps() bool {
 // Lip Gloss is slow, as is truncating a long line, and a box tends to look
 // the same from one frame to the next.
 type styledMemo struct {
-	ok       bool
-	used     uint64 // the frame it was last used in
 	style    lipgloss.Style
 	s        string
 	truncate bool
@@ -287,19 +273,15 @@ func (r *renderer) textAt(i int, n TextNode, w, h int) string {
 	if !n.styled && !n.truncate {
 		return n.s
 	}
-	if i >= len(r.styled) {
-		r.styled = append(r.styled, make([]styledMemo, i+1-len(r.styled))...)
-	}
-	m := &r.styled[i]
+	m := r.styled.at(i)
 	// Comparing through pointers to storage that outlives the call keeps
 	// the styles from being copied to the heap.
 	r.style = n.style
-	if m.ok && m.w == w && m.h == h && m.truncate == n.truncate && m.s == n.s && sameStyle(&m.style, &r.style) {
-		m.used = r.frames
-		return m.out
+	if v := &m.v; m.ok && v.w == w && v.h == h && v.truncate == n.truncate && v.s == n.s && sameStyle(&v.style, &r.style) {
+		return v.out
 	}
 	out := textOf(n, w, h, r.method)
-	*m = styledMemo{ok: true, used: r.frames, style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out}
+	m.ok, m.v = true, styledMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out}
 	return out
 }
 
@@ -346,7 +328,7 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		if n.cursor != nil {
 			r.placeCursor(n.cursor, b.rect.Min, vis)
 		}
-	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, ListNode:
+	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, ListNode, centerNode:
 		for _, k := range r.kidsOf(i) {
 			r.paint(k, vis, parent)
 		}
@@ -380,8 +362,8 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		for _, k := range r.kidsOf(i) {
 			r.paint(k, vis, parent)
 		}
-	case wrapNode:
-		if n.kind == wrapTransition && len(n.effects) > 0 {
+	case transitionNode:
+		if len(n.effects) > 0 {
 			r.paintEffects(r.firstKid(i), b.rect, clip, n.t, n.effects, parent, len(r.entries))
 			return
 		}

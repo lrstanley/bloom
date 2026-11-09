@@ -7,6 +7,7 @@ package canvas
 import (
 	"image"
 	"image/color"
+	"iter"
 
 	uv "github.com/charmbracelet/ultraviolet"
 )
@@ -40,7 +41,8 @@ type Surface struct {
 	// is empty otherwise. Effects such as a flight draw the node's cells on
 	// their way from it, anywhere in [Surface.Reach].
 	From image.Rectangle
-	// Env describes the terminal, for resolving cells without a color.
+	// Env describes the terminal, for resolving cells without a color. Its
+	// colors are never nil: those an Env lacks are taken from [DefaultEnv].
 	Env Env
 
 	mixer *Mixer
@@ -51,7 +53,7 @@ type Surface struct {
 // keeps it from frame to frame: it is valid until the next call to Region on
 // c.
 func (c *Canvas) Region(rect image.Rectangle, env Env, mixer *Mixer) *Surface {
-	rect = rect.Intersect(c.Bounds())
+	rect, env = rect.Intersect(c.Bounds()), env.withDefaults()
 	c.region = Surface{
 		c: c, origin: rect.Min, w: rect.Dx(), h: rect.Dy(),
 		rect: rect, reach: image.Rect(0, 0, rect.Dx(), rect.Dy()), Viewport: c.Bounds(), Env: env, mixer: mixer,
@@ -77,7 +79,7 @@ func (c *Canvas) Layer(rect, viewport image.Rectangle, under *Canvas, env Env, m
 // returns, the surface belongs to c, and is valid until the next call to
 // Layer or TravelLayer on c.
 func (c *Canvas) TravelLayer(node, rect, viewport image.Rectangle, under *Canvas, env Env, mixer *Mixer) *Surface {
-	node = node.Intersect(c.Bounds())
+	node, env = node.Intersect(c.Bounds()), env.withDefaults()
 	if cap(c.mask) < c.w*c.h {
 		c.mask = make([]bool, c.w*c.h)
 	}
@@ -156,6 +158,32 @@ func (s *Surface) show(line uv.Line, x, y int, c *uv.Cell) {
 	line.Set(s.origin.X+x, c)
 	if s.mask != nil {
 		s.mask[s.maskAt+y*s.stride+x] = true
+	}
+}
+
+// Cells returns the surface's own cells that are shown, row by row, with
+// where each one is, for effects that change every cell:
+//
+//	for _, c := range s.Cells() {
+//		c.Style.Fg = s.Mix(s.Fg(c), tint, t)
+//	}
+//
+// Changing or hiding cells as they come is safe; a cell hidden before it
+// comes is skipped. The second cell of a wide glyph comes too, with a Width
+// of zero: change the glyph through its first cell.
+func (s *Surface) Cells() iter.Seq2[image.Point, *uv.Cell] {
+	return func(yield func(image.Point, *uv.Cell) bool) {
+		for y := range s.h {
+			row, shown := s.row(y)
+			for x := range row {
+				if len(shown) > x && !shown[x] {
+					continue
+				}
+				if !yield(image.Pt(x, y), &row[x]) {
+					return
+				}
+			}
+		}
 	}
 }
 

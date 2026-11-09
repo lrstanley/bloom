@@ -35,11 +35,11 @@ func TestTextTruncate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			n := Text(tt.text).Style(tt.style).Truncate()
-			got := ansi.Strip(Render(n, tt.width, 1))
+			got := ansi.Strip(Render(tt.width, 1, n))
 			if got != tt.want {
 				t.Fatalf("got %q, want %q", got, tt.want)
 			}
-			if marquee := Render(Marquee(tt.text, 0).Style(tt.style), tt.width, 1); Render(n, tt.width, 1) != marquee {
+			if marquee := Render(tt.width, 1, Marquee(tt.text, 0).Style(tt.style)); Render(tt.width, 1, n) != marquee {
 				t.Fatalf("differs from marquee: %q", marquee)
 			}
 		})
@@ -47,7 +47,7 @@ func TestTextTruncate(t *testing.T) {
 	if got := Text("abc\ndef").Truncate().View(); got != "abc def" {
 		t.Fatalf("natural size: %q", got)
 	}
-	if got := ansi.Strip(Render(Column(Text("abcdef").Truncate(), Text("end")), 3, 0)); got != "ab…\nend" {
+	if got := ansi.Strip(Render(3, 0, Column(Text("abcdef").Truncate(), Text("end")))); got != "ab…\nend" {
 		t.Fatalf("natural height: %q", got)
 	}
 }
@@ -55,7 +55,7 @@ func TestTextTruncate(t *testing.T) {
 func TestTruncateKeepsStyleLimits(t *testing.T) {
 	t.Parallel()
 	tall := Text("x").Style(lipgloss.NewStyle().Height(3)).Truncate()
-	expectRect(t, Solve(Column(tall, Text("y").ID("y")), 0, 0), "y", image.Rect(0, 3, 1, 4))
+	expectRect(t, Solve(0, 0, Column(tall, Text("y").ID("y"))), "y", image.Rect(0, 3, 1, 4))
 
 	// A transform that lengthens the text or adds lines is cut to one line too.
 	for _, tf := range []func(string) string{
@@ -63,16 +63,16 @@ func TestTruncateKeepsStyleLimits(t *testing.T) {
 		func(s string) string { return s + "\n" + s },
 	} {
 		grown := Text("abc").Style(lipgloss.NewStyle().Transform(tf)).Truncate()
-		if got := Render(Column(grown, Text("end")), 4, 0); got != "abc…\nend " {
+		if got := Render(4, 0, Column(grown, Text("end"))); got != "abc…\nend " {
 			t.Fatalf("transform: %q", got)
 		}
 	}
 
 	narrow := Text("abcdef").Style(lipgloss.NewStyle().MaxWidth(3)).Truncate()
-	if got := Render(narrow, 0, 0); got != "ab…" {
+	if got := Render(0, 0, narrow); got != "ab…" {
 		t.Fatalf("MaxWidth: %q", got)
 	}
-	if got := Render(Row(narrow, Text("|")), 0, 0); got != "ab…|" {
+	if got := Render(0, 0, Row(narrow, Text("|"))); got != "ab…|" {
 		t.Fatalf("MaxWidth measured: %q", got)
 	}
 }
@@ -97,7 +97,7 @@ func TestTruncateMeasuresAsDrawn(t *testing.T) {
 			// Widths too narrow for a style's own frame are clipped instead.
 			for _, avail := range []int{0, 9, 14, 80} {
 				n := Text(s).Style(st).Truncate()
-				f := Solve(Row(Auto(n).ID("n")), avail, 0)
+				f := Solve(avail, 0, Row(Auto(n).ID("n")))
 				r, _ := f.Rect("n")
 				got := textOf(n, r.Dx(), 0, ansi.GraphemeWidth)
 				if w, h := lipgloss.Size(got); w != r.Dx() || h != r.Dy() {
@@ -142,7 +142,7 @@ func TestMarquee(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := ansi.Strip(Render(tt.node, tt.width, 1))
+			got := ansi.Strip(Render(tt.width, 1, tt.node))
 			if want := padTo(tt.want, tt.width, ansi.GraphemeWidth); got != want {
 				t.Fatalf("rendered %q, want %q", got, want)
 			}
@@ -158,19 +158,19 @@ func TestMarqueeNaturalSize(t *testing.T) {
 	t.Parallel()
 
 	n := Marquee("hello world", 0.3)
-	if got := Render(n, 0, 0); ansi.Strip(got) != "hello world" {
+	if got := Render(0, 0, n); ansi.Strip(got) != "hello world" {
 		t.Fatalf("natural render = %q", got)
 	}
-	if v := n.View(); v != Render(n, 0, 0) {
+	if v := n.View(); v != Render(0, 0, n) {
 		t.Fatalf("View = %q", v)
 	}
 
 	// It shrinks in a slot, instead of pushing its neighbours out.
-	got := ansi.Strip(Render(Row(Fixed(5, Text("ab")), Fill(Marquee("hello world", 0)), Fixed(1, Text("|"))), 20, 1))
+	got := ansi.Strip(Render(20, 1, Row(Fixed(5, Text("ab")), Fill(Marquee("hello world", 0)), Fixed(1, Text("|")))))
 	if want := "ab   hello world   |"; got != want {
 		t.Fatalf("in a row: %q, want %q", got, want)
 	}
-	got = ansi.Strip(Render(Row(Fixed(5, Text("ab")), Fill(Marquee("hello world", 0)), Fixed(1, Text("|"))), 12, 1))
+	got = ansi.Strip(Render(12, 1, Row(Fixed(5, Text("ab")), Fill(Marquee("hello world", 0)), Fixed(1, Text("|")))))
 	if got != "ab   hello…|" {
 		t.Fatalf("shrunk in a row: %q", got)
 	}
@@ -187,7 +187,7 @@ func TestMarqueeWide(t *testing.T) {
 	for i := range n {
 		for _, width := range []int{4, 5, 6, 7} {
 			phase := (float64(i) + 0.5) / float64(n)
-			got := ansi.Strip(Render(Marquee(text, phase), width, 1))
+			got := ansi.Strip(Render(width, 1, Marquee(text, phase)))
 			if w := ansi.StringWidth(got); w != width {
 				t.Fatalf("phase %d/%d width %d: %q is %d cells", i, n, width, got, w)
 			}
@@ -199,14 +199,14 @@ func TestMarqueeWide(t *testing.T) {
 		}
 	}
 
-	if got := ansi.Strip(Render(Marquee(text, 0), 5, 1)); got != "世界…" {
+	if got := ansi.Strip(Render(5, 1, Marquee(text, 0))); got != "世界…" {
 		t.Fatalf("truncated at a wide glyph: %q", got)
 	}
 	// The cut lands in the middle of the second glyph, at cell 3.
-	if got := ansi.Strip(Render(Marquee(text, 3.5/13), 5, 1)); got != " 你好" {
+	if got := ansi.Strip(Render(5, 1, Marquee(text, 3.5/13))); got != " 你好" {
 		t.Fatalf("scrolled half a glyph: %q", got)
 	}
-	if got := ansi.Strip(Render(Marquee(text, 4.5/13), 5, 1)); got != "你好 " {
+	if got := ansi.Strip(Render(5, 1, Marquee(text, 4.5/13))); got != "你好 " {
 		t.Fatalf("scrolled whole glyphs: %q", got)
 	}
 }
@@ -225,7 +225,7 @@ func TestTextWidthMethod(t *testing.T) {
 		{Marquee(text, 0), "❤️❤️❤️a…|"},
 		{Marquee(text, 2.5/9), "❤️abc |"},
 	} {
-		got := ansi.Strip(newRenderer(ansi.WcWidth).render(Row(Fill(tt.node), Text("|")), 6, 1))
+		got := ansi.Strip(newRenderer(ansi.WcWidth).render(6, 1, Row(Fill(tt.node), Text("|"))))
 		if got != tt.want {
 			t.Errorf("%T: %q, want %q", tt.node, got, tt.want)
 		}
@@ -245,7 +245,7 @@ func TestMarqueeStyle(t *testing.T) {
 		{0.5, " 6789   "},
 	}
 	for _, tt := range tests {
-		got := Render(Marquee("0123456789", tt.phase).Style(st), 8, 1)
+		got := Render(8, 1, Marquee("0123456789", tt.phase).Style(st))
 		if ansi.Strip(got) != tt.want {
 			t.Errorf("phase %v: %q, want %q", tt.phase, ansi.Strip(got), tt.want)
 		}
@@ -255,10 +255,10 @@ func TestMarqueeStyle(t *testing.T) {
 	}
 
 	// Padding is part of the natural width, and counts against a fit.
-	if got := ansi.Strip(Render(Marquee("abc", 0).Style(st), 0, 0)); got != " abc " {
+	if got := ansi.Strip(Render(0, 0, Marquee("abc", 0).Style(st))); got != " abc " {
 		t.Fatalf("natural width with padding = %q", got)
 	}
-	if got := ansi.Strip(Render(Marquee("abcdef", 0).Style(st), 7, 1)); got != " abcd… " {
+	if got := ansi.Strip(Render(7, 1, Marquee("abcdef", 0).Style(st))); got != " abcd… " {
 		t.Fatalf("padding against the width = %q", got)
 	}
 }
@@ -301,7 +301,7 @@ func TestSkeleton(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if got := ansi.Strip(Render(tt.node, tt.w, tt.h)); got != tt.want {
+			if got := ansi.Strip(Render(tt.w, tt.h, tt.node)); got != tt.want {
 				t.Fatalf("rendered %q, want %q", got, tt.want)
 			}
 		})

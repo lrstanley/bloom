@@ -74,3 +74,11 @@ func TestLicensedFontsSayWhich(t *testing.T) {
 		}
 	}
 }
+
+func TestStandardIsFigsDefault(t *testing.T) {
+	t.Parallel()
+
+	if fonts.Standard() != fig.Standard() {
+		t.Fatal("fonts.Standard is not fig.Standard")
+	}
+}

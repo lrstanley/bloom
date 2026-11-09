@@ -291,11 +291,12 @@ func All() []*fig.Font {
 	return []*fig.Font{ {{- range .}}{{.Func}}(), {{end -}} }
 }
 {{range .}}
+{{- if ne .Name "standard"}}
 //go:embed data/{{.File}}
 var {{lower .Func}}Data string
 
 var {{lower .Func}}Font lazy
-
+{{end}}
 // {{.Func}} is the font "{{.Name}}", {{.Height}} rows tall{{if .Credit}}: {{.Credit}}{{end}}.
 // From {{.URL}}.
 {{- if .License}}
@@ -303,7 +304,13 @@ var {{lower .Func}}Font lazy
 {{- else}}
 // No license is stated.
 {{- end}}
+{{- if eq .Name "standard"}}
+//
+// It is [fig.Standard], which package fig holds as its default font.
+func {{.Func}}() *fig.Font { return fig.Standard() }
+{{- else}}
 func {{.Func}}() *fig.Font { return {{lower .Func}}Font.get({{quote .Name}}, {{lower .Func}}Data) }
+{{- end}}
 {{end}}`))
 
 //nolint:misspell // Christiaan Keet's name.

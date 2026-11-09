@@ -21,9 +21,11 @@ import (
 //go:embed fonts/data/standard.flf.gz
 var standardData string
 
-// standard is the font a TextNode uses when given none: figlet's standard
-// font, the same as fonts.Standard.
 var standard = sync.OnceValue(func() *Font { return Lazy("standard", standardData) })
+
+// Standard returns figlet's standard font, which a [TextNode] uses when given
+// none. It is the same font as fonts.Standard.
+func Standard() *Font { return standard() }
 
 // TextNode shows text in a FIGlet font, as a bloom node. Build one with
 // [Text]. It implements [bloom.Layouter] and [bloom.Measurer].
@@ -149,7 +151,7 @@ func (n TextNode) Enter(effects ...fx.Effect) TextNode { n.enter = effects; retu
 func (n TextNode) Leave(effects ...fx.Effect) TextNode { n.leave = effects; return n }
 
 // View implements [bloom.Child], drawing the node at its natural size.
-func (n TextNode) View() string { return bloom.Render(n, 0, 0) }
+func (n TextNode) View() string { return bloom.Render(0, 0, n) }
 
 // Measure implements [bloom.Measurer].
 func (n TextNode) Measure(avail bloom.Size) bloom.Size {
@@ -183,7 +185,7 @@ func (n TextNode) Layout(ctx bloom.Context) bloom.Child {
 
 // glyphwise reports whether the node is drawn a layer per glyph.
 func (n TextNode) glyphwise() bool {
-	return n.each && n.t < 1 || n.animate || len(n.moves) > 0 || n.onGlyph != nil
+	return n.each && n.t < 1 || n.animate || n.onGlyph != nil
 }
 
 // wrapped gives a tree of layers the node's ID and handlers.
@@ -295,18 +297,37 @@ func (n TextNode) restFor(f *Figure, still func(i int) bool) []bool {
 
 // progress returns each glyph's progress of [TextNode.Each].
 func (n TextNode) progress(f *Figure) []float64 {
-	ts := make([]float64, len(f.glyphs))
-	for i := range ts {
-		ts[i] = 1
-	}
 	if !n.each || n.t >= 1 {
+		ts := make([]float64, len(f.glyphs))
+		for i := range ts {
+			ts[i] = 1
+		}
 		return ts
 	}
-	ranks := n.order.ranks(f.shown)
+	return n.stagger(f, n.t, func(int) bool { return true })
+}
+
+// stagger returns the progress, for t, of each glyph of f that moves, as
+// moves reports, staggered in the order of the text as [TextNode.Spread]
+// says, and -1 for the rest. A glyph that shows nothing has no rank, and
+// nothing to animate, so it is done.
+func (n TextNode) stagger(f *Figure, t float64, moves func(i int) bool) []float64 {
+	ts := make([]float64, len(f.glyphs))
+	count := 0
 	for i := range ts {
-		// A glyph showing nothing has no rank, and nothing to animate.
-		if f.visible[i] < f.shown {
-			ts[i] = n.window(n.t, ranks[f.visible[i]], f.shown)
+		ts[i] = -1
+		if moves(i) {
+			ts[i] = 1
+			if !f.glyphs[i].Rect.Empty() {
+				count++
+			}
+		}
+	}
+	ranks, rank := n.order.ranks(count), 0
+	for i := range ts {
+		if ts[i] >= 0 && !f.glyphs[i].Rect.Empty() {
+			ts[i] = n.window(t, ranks[rank], count)
+			rank++
 		}
 	}
 	return ts

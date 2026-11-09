@@ -36,7 +36,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		if r, ok := bloom.Solve(m.layout(), m.width, m.height).Rect(paneLog); ok {
+		if r, ok := bloom.Solve(m.width, m.height, m.layout()).Rect(paneLog); ok {
 			m.log.SetWidth(r.Dx() - panel.GetHorizontalFrameSize())
 			m.log.SetHeight(r.Dy() - panel.GetVerticalFrameSize())
 		}
@@ -130,7 +130,7 @@ func (m *model) layout() bloom.Child {
 
 // resize gives the components the size their slots will have, inside the border.
 func (m *model) resize() {
-	frame := bloom.Solve(m.layout(), m.width, m.height)
+	frame := bloom.Solve(m.width, m.height, m.layout())
 	if r, ok := frame.Rect(paneLog); ok {
 		m.log.SetWidth(r.Dx() - panel.GetHorizontalFrameSize())
 		m.log.SetHeight(r.Dy() - panel.GetVerticalFrameSize())

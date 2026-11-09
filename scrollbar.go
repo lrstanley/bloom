@@ -77,7 +77,7 @@ func (n ScrollbarNode) Track(glyph string, style lipgloss.Style) ScrollbarNode {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n ScrollbarNode) View() string { return Render(n, 0, 0) }
+func (n ScrollbarNode) View() string { return Render(0, 0, n) }
 
 // thumbSpan returns the cells of a track length cells long that the thumb
 // covers, or an empty span when all of the content is in view.
@@ -241,7 +241,6 @@ type columnMemo struct {
 	n          int
 	horizontal bool
 	out        string
-	used       uint64
 }
 
 // column returns glyph, styled, repeated n times down, or across when
@@ -250,14 +249,10 @@ func (r *renderer) column(i int, glyph string, style lipgloss.Style, n int, hori
 	if !r.parse {
 		return ""
 	}
-	if i >= len(r.columns) {
-		r.columns = append(r.columns, make([]columnMemo, i+1-len(r.columns))...)
-	}
-	m := &r.columns[i]
+	m := r.columns.at(i)
 	r.style = style
-	if m.out != "" && m.glyph == glyph && m.n == n && m.horizontal == horizontal && sameStyle(&m.style, &r.style) {
-		m.used = r.frames
-		return m.out
+	if v := &m.v; m.ok && v.glyph == glyph && v.n == n && v.horizontal == horizontal && sameStyle(&v.style, &r.style) {
+		return v.out
 	}
 	var out string
 	if horizontal {
@@ -265,6 +260,6 @@ func (r *renderer) column(i int, glyph string, style lipgloss.Style, n int, hori
 	} else {
 		out = strings.TrimSuffix(strings.Repeat(style.Render(glyph)+"\n", n), "\n")
 	}
-	*m = columnMemo{glyph: glyph, style: style, n: n, horizontal: horizontal, out: out, used: r.frames}
+	m.ok, m.v = true, columnMemo{glyph: glyph, style: style, n: n, horizontal: horizontal, out: out}
 	return out
 }

@@ -53,7 +53,7 @@ func TestScrollbarOf(t *testing.T) {
 	}
 	// 4 of 20 rows in view, from row 10: a thumb of one row, 10/16 of the
 	// way down the rest of the track.
-	got := ansi.Strip(Render(tree(lines, 10), 8, 6))
+	got := ansi.Strip(Render(8, 6, tree(lines, 10)))
 	want := strings.Join([]string{
 		"╭──────╮",
 		"│line  │",
@@ -66,12 +66,12 @@ func TestScrollbarOf(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 	// Content that fits shows the border, with no scrollbar over it.
-	if fits := ansi.Strip(Render(tree("line", 0), 8, 6)); strings.Contains(fits, "#") {
+	if fits := ansi.Strip(Render(8, 6, tree("line", 0))); strings.Contains(fits, "#") {
 		t.Fatalf("a scrollbar was drawn for content that fits:\n%s", fits)
 	}
 	// No such node, no scrollbar.
 	missing := Box(rounded, Text("x")).Edge(Right, Stretch, ScrollbarOf("nope"))
-	if none := ansi.Strip(Render(missing, 8, 6)); strings.Contains(none, "┃") {
+	if none := ansi.Strip(Render(8, 6, missing)); strings.Contains(none, "┃") {
 		t.Fatalf("a scrollbar was drawn for a missing node:\n%s", none)
 	}
 
@@ -80,13 +80,13 @@ func TestScrollbarOf(t *testing.T) {
 		Fixed(3, Text("a\nb\nc")),
 		Fixed(2, Scroll(Text(lines).ID("in"), 0)),
 	), 0)).Edge(Right, Stretch, ScrollbarOf("in").Thumb("#", lipgloss.NewStyle()))
-	if out := ansi.Strip(Render(clipped, 8, 5)); strings.Contains(out, "#") {
+	if out := ansi.Strip(Render(8, 5, clipped)); strings.Contains(out, "#") {
 		t.Fatalf("a scrollbar was drawn for a scroll out of view:\n%s", out)
 	}
 
 	// In a row, it takes a column, and draws its track.
 	row := Row(Fill(Text("x")), Scrollbar(4, 2, 2).Track(".", lipgloss.NewStyle()))
-	if inRow := ansi.Strip(Render(row, 3, 4)); inRow != "x .\n  .\n  ┃\n  ┃" {
+	if inRow := ansi.Strip(Render(3, 4, row)); inRow != "x .\n  .\n  ┃\n  ┃" {
 		t.Fatalf("got:\n%q", inRow)
 	}
 }
@@ -107,7 +107,7 @@ func TestScrollbarOfLayouter(t *testing.T) {
 	// the one on screen.
 	lines := strings.TrimSuffix(strings.Repeat("line\n", 20), "\n")
 	box := Box(rounded, scrollLayout{lines}).Edge(Right, Stretch, ScrollbarOf("body").Thumb("#", lipgloss.NewStyle()))
-	if got := ansi.Strip(Render(Row(box, Text("x")), 12, 6)); !strings.Contains(got, "#") {
+	if got := ansi.Strip(Render(12, 6, Row(box, Text("x")))); !strings.Contains(got, "#") {
 		t.Fatalf("no scrollbar for a scroll a layouter built:\n%s", got)
 	}
 }
@@ -116,14 +116,14 @@ func TestScrollX(t *testing.T) {
 	t.Parallel()
 
 	long := Text("0123456789abcdef\nxy").ID("text")
-	f := Solve(Scroll(long, 1).X(3), 6, 1)
+	f := Solve(6, 1, Scroll(long, 1).X(3))
 	expectRect(t, f, "text", image.Rect(-3, -1, 13, 1))
-	if got := ansi.Strip(Render(Scroll(long, 0).X(3), 6, 2)); strings.TrimSpace(got) != "345678" {
+	if got := ansi.Strip(Render(6, 2, Scroll(long, 0).X(3))); strings.TrimSpace(got) != "345678" {
 		t.Fatalf("got %q", got)
 	}
 	// Without X, the child gets the scroll's width.
-	expectRect(t, Solve(Scroll(long, 0), 6, 1), "text", image.Rect(0, 0, 6, 2))
-	if got := Debug(Scroll(long, 1).X(3), 6, 1); !strings.Contains(got, "Scroll 0,0 6x1 offset=1 x=3") {
+	expectRect(t, Solve(6, 1, Scroll(long, 0)), "text", image.Rect(0, 0, 6, 2))
+	if got := Debug(6, 1, Scroll(long, 1).X(3)); !strings.Contains(got, "Scroll 0,0 6x1 offset=1 x=3") {
 		t.Fatalf("Debug:\n%s", got)
 	}
 }
@@ -136,13 +136,13 @@ func TestScrollbarHorizontal(t *testing.T) {
 	text := Text("0123456789abcdef").ID("text")
 	box := Box(rounded, Scroll(text, 0).X(5)).
 		Edge(Bottom, Stretch, ScrollbarOf("text").Horizontal().Thumb("#", lipgloss.NewStyle()))
-	got := ansi.Strip(Render(box, 8, 3))
+	got := ansi.Strip(Render(8, 3, box))
 	if want := "╭──────╮\n│56789a│\n╰──##──╯"; got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 	// In a column, it takes a row.
 	col := Column(Fill(Text("x")), Scrollbar(4, 2, 2).Horizontal())
-	if inCol := ansi.Strip(Render(col, 4, 2)); inCol != "x   \n  ━━" {
+	if inCol := ansi.Strip(Render(4, 2, col)); inCol != "x   \n  ━━" {
 		t.Fatalf("got %q", inCol)
 	}
 }

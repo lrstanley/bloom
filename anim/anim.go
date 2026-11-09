@@ -64,17 +64,53 @@ func inOut(t, p float64) float64 {
 	return 1 - math.Pow(-2*t+2, p)/2
 }
 
-// Option configures a [Value] or [Presence].
-type Option func(*Value)
+// Option configures a [Value], [Presence], or [Sequence].
+type Option func(*config)
+
+// config is how a value moves, and how often it asks for frames.
+type config struct {
+	curve
+
+	interval  time.Duration
+	unfocused time.Duration // the interval while the terminal is blurred
+	now       func() time.Time
+}
+
+// curve is how a value moves to its target, which a step of a [Sequence]
+// can change for itself.
+type curve struct {
+	duration  time.Duration
+	ease      Easing
+	spring    bool
+	frequency float64
+	damping   float64
+}
+
+// defaults are the options of [NewValue], with opts applied.
+func defaults(opts []Option) config {
+	c := config{
+		duration: 250 * time.Millisecond, ease: OutCubic,
+		interval: time.Second / 60, unfocused: time.Second / 20, now: time.Now,
+	}
+	return c.with(opts)
+}
+
+// with returns c with opts applied.
+func (c config) with(opts []Option) config {
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
+}
 
 // Duration makes the value ease to each target over d.
 func Duration(d time.Duration) Option {
-	return func(v *Value) { v.duration, v.spring = max(d, 0), false }
+	return func(c *config) { c.duration, c.spring = max(d, 0), false }
 }
 
 // Ease sets the easing of a duration-based value.
 func Ease(e Easing) Option {
-	return func(v *Value) { v.ease = e }
+	return func(c *config) { c.ease = e }
 }
 
 // Spring makes the value move like a damped spring of the given angular
@@ -82,13 +118,13 @@ func Ease(e Easing) Option {
 // without overshooting and less than 1 bounces. Unlike easing, a spring
 // keeps its speed when its target changes mid-flight.
 func Spring(frequency, damping float64) Option {
-	return func(v *Value) { v.spring, v.frequency, v.damping = true, frequency, damping }
+	return func(c *config) { c.spring, c.frequency, c.damping = true, frequency, damping }
 }
 
 // FPS sets how many frames per second the value asks for while animating.
 // It need not be more than Bubble Tea renders, 60 by default.
 func FPS(n int) Option {
-	return func(v *Value) { v.interval = time.Second / time.Duration(max(n, 1)) }
+	return func(c *config) { c.interval = time.Second / time.Duration(max(n, 1)) }
 }
 
 // UnfocusedFPS sets how many frames per second the value asks for while the
@@ -98,12 +134,12 @@ func FPS(n int) Option {
 // which Bubble Tea sends only while [tea.View] ReportFocus is set; until
 // then, a value counts the terminal as focused.
 func UnfocusedFPS(n int) Option {
-	return func(v *Value) { v.unfocused = time.Second / time.Duration(max(n, 1)) }
+	return func(c *config) { c.unfocused = time.Second / time.Duration(max(n, 1)) }
 }
 
 // Clock sets the value's source of time, for tests.
 func Clock(now func() time.Time) Option {
-	return func(v *Value) { v.now = now }
+	return func(c *config) { c.now = now }
 }
 
 var ids atomic.Uint64
@@ -111,36 +147,21 @@ var ids atomic.Uint64
 // Value is a number that animates toward a target. The zero Value does not
 // animate; make one with [NewValue].
 type Value struct {
+	config
+
 	id, gen uint64
 
 	current, target float64
 	from, velocity  float64
 	start, last     time.Time
 	running         bool
-
-	duration  time.Duration
-	ease      Easing
-	spring    bool
-	frequency float64
-	damping   float64
-	interval  time.Duration
-	unfocused time.Duration // the interval while the terminal is blurred
-	blurred   bool
-	now       func() time.Time
+	blurred         bool
 }
 
 // NewValue returns a value at v, which by default eases to each target over
 // 250ms.
 func NewValue(v float64, opts ...Option) Value {
-	val := Value{
-		id: ids.Add(1), current: v, target: v,
-		duration: 250 * time.Millisecond, ease: OutCubic,
-		interval: time.Second / 60, unfocused: time.Second / 20, now: time.Now,
-	}
-	for _, opt := range opts {
-		opt(&val)
-	}
-	return val
+	return Value{id: ids.Add(1), current: v, target: v, config: defaults(opts)}
 }
 
 // Float returns the current value.

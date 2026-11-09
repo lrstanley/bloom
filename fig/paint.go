@@ -45,11 +45,11 @@ func (p solid) Shade(_ *Figure, c Cell) uv.Style {
 type Axis uint8
 
 const (
+	// ByColumn runs from the left column to the right. It is the default.
+	ByColumn Axis = iota
 	// ByGlyph colors each glyph in one color, from the first glyph to the
 	// last.
-	ByGlyph Axis = iota
-	// ByColumn runs from the left column to the right.
-	ByColumn
+	ByGlyph
 	// ByRow runs from the top row to the bottom.
 	ByRow
 	// ByDiagonal runs from the top left corner to the bottom right, at 45
@@ -70,8 +70,9 @@ type GradientPaint struct {
 	blend bool
 }
 
-// Gradient returns a paint blending from the first of stops to the last, by
-// glyph unless changed with [GradientPaint.By]. Up to 16 stops are used.
+// Gradient returns a paint blending from the first of stops to the last,
+// across the columns unless changed with [GradientPaint.By]. Up to 16 stops
+// are used.
 func Gradient(stops ...color.Color) GradientPaint {
 	var g GradientPaint
 	g.n = copy(g.stops[:], stops)
@@ -81,9 +82,10 @@ func Gradient(stops ...color.Color) GradientPaint {
 // By sets what the gradient runs along.
 func (g GradientPaint) By(a Axis) GradientPaint { g.axis = a; return g }
 
-// Blend colors the cells where glyphs met, painted [ByGlyph], with the
-// glyphs' colors mixed, rather than in the color of the glyph whose
-// character the cell shows.
+// Blend colors the cells where glyphs met with the glyphs' colors mixed,
+// rather than in the color of the glyph whose character the cell shows. It
+// only applies [ByGlyph], as along the other axes, a cell's color follows
+// from where it is.
 func (g GradientPaint) Blend() GradientPaint { g.blend = true; return g }
 
 // Shade implements [Paint].

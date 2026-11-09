@@ -7,10 +7,12 @@ package fig_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/canvas"
 	"github.com/lrstanley/bloom/fig"
 	"github.com/lrstanley/bloom/fig/fonts"
@@ -20,7 +22,7 @@ import (
 // plain renders c at w×h without styles, each row's trailing spaces
 // removed.
 func plain(c bloom.Child, w, h int) string {
-	return trimRows(ansi.Strip(bloom.Render(c, w, h)))
+	return trimRows(ansi.Strip(bloom.Render(w, h, c)))
 }
 
 // trimRows removes each row's trailing spaces and the blank rows at the end.
@@ -180,5 +182,38 @@ func TestTransparentBanner(t *testing.T) {
 	// The banner's blank cells show the x's beneath.
 	if !strings.Contains(got, "x") || strings.Count(got, "x") == 30*6 {
 		t.Fatalf("got\n%s", got)
+	}
+}
+
+func TestMorphStaggersInTextOrder(t *testing.T) {
+	t.Parallel()
+
+	// Entering glyphs start in the order of the text, whichever is drawn on
+	// top, and a space, which shows nothing, takes no turn.
+	var b strings.Builder
+	b.WriteString("flf2a$ 1 1 3 0 0 0 136\n")
+	for r := ' '; r <= '~'; r++ {
+		switch r {
+		case 'A', 'B':
+			b.WriteString(string(r) + "@@\n")
+		default:
+			b.WriteString("@@\n")
+		}
+	}
+	font, err := fig.Parse([]byte(b.String()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(0, 0)
+	m := fig.NewMorph("", anim.Clock(func() time.Time { return now }), anim.Duration(time.Second), anim.Ease(anim.Linear))
+	cmd := m.Set("A B")
+	msg := cmd()
+	now = now.Add(time.Second / 2)
+	m.Update(msg)
+	// Halfway, the first of the two glyphs is done and the second has not
+	// started.
+	node := m.Text().Font(font).Options(fig.Options{Stacking: fig.EarlierOnTop}).Enter(hideUntilDone)
+	if got := plain(node, 10, 1); got != "A" {
+		t.Fatalf("halfway got %q, want %q", got, "A")
 	}
 }

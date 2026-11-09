@@ -40,7 +40,7 @@ type cards struct {
 }
 
 func (c cards) View() string {
-	return bloom.Render(c.Layout(bloom.Context{}), 0, 0)
+	return bloom.Render(0, 0, c.Layout(bloom.Context{}))
 }
 
 func (c cards) Layout(ctx bloom.Context) bloom.Child {

@@ -45,7 +45,7 @@ func (n GridNode) On(handlers ...on.Handler) GridNode {
 }
 
 // View implements [Child], drawing the grid at its natural size.
-func (n GridNode) View() string { return Render(n, 0, 0) }
+func (n GridNode) View() string { return Render(0, 0, n) }
 
 // WrapNode flows children at their natural sizes onto successive lines.
 // Build one with [Wrap].
@@ -78,7 +78,7 @@ func (n WrapNode) On(handlers ...on.Handler) WrapNode {
 }
 
 // View implements [Child], drawing the flow at its natural size.
-func (n WrapNode) View() string { return Render(n, 0, 0) }
+func (n WrapNode) View() string { return Render(0, 0, n) }
 
 // flow measures or arranges using the same cached natural sizes. Height is
 // unbounded so an Auto slot in a Column gets every wrapped line.

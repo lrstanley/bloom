@@ -72,8 +72,7 @@ func (e Decode) Apply(s *canvas.Surface, t float64) {
 			if c.Width != 1 {
 				continue
 			}
-			i := int(hash(x, y, e.Seed^step*0x9e3779b9) * float64(len(decodeGlyphs)))
-			c.Content = decodeGlyphs[i : i+1]
+			c.Content = flicker(decodeGlyphs, x, y, e.Seed, step)
 			c.Style.Fg = s.Env.Fg
 			c.Style.Attrs |= uv.AttrBold
 		}
@@ -82,9 +81,6 @@ func (e Decode) Apply(s *canvas.Surface, t float64) {
 
 // glitchSteps is how many times per transition the glitch pattern changes.
 const glitchSteps = 16
-
-// glitchGarble is what garbled cells show.
-var glitchGarble = [...]string{"░", "▒", "▓"}
 
 var (
 	glitchRed  color.Color = color.RGBA{R: 0xff, G: 0x30, B: 0x50, A: 0xff}
@@ -107,7 +103,7 @@ func (e Glitch) Apply(s *canvas.Surface, t float64) {
 	}
 	step := uint32(max(t, 0) * glitchSteps)
 	amount := 1 - float64(step)/glitchSteps
-	seed := e.Seed ^ step*0x9e3779b9
+	seed := stepSeed(e.Seed, step)
 	w := s.Width()
 
 	for y := range s.Height() {
@@ -137,7 +133,7 @@ func (e Glitch) Apply(s *canvas.Surface, t float64) {
 			case u < amount*0.03:
 				s.Hide(x, y)
 			case u < amount*0.08 && c.Width == 1 && c.Content != " ":
-				c.Content = glitchGarble[int(hash(y, x, seed)*float64(len(glitchGarble)))]
+				c.Content = shades[int(hash(y, x, seed)*float64(len(shades)))]
 			}
 		}
 	}
@@ -229,7 +225,7 @@ func (e Shimmer) Apply(s *canvas.Surface, t float64) {
 			if k <= 0 {
 				continue
 			}
-			f := shimmerStrength * k * k * (3 - 2*k)
+			f := shimmerStrength * smoothstep(k)
 			c := s.Cell(x, y)
 			c.Style.Fg = s.Mix(s.Fg(c), to, f)
 			c.Style.Bg = s.Mix(s.Bg(c), to, f)

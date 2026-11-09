@@ -88,7 +88,7 @@ over.
   (with `ShowFor` for toasts that hide themselves), sequences of steps, and automatic layout animation with
   `Animate()`.
 - :heavy_check_mark: **25+ cell effects**: `Fade`, `Slide`, `Iris`, `Unfold`, `Decode`, `Glitch`, and more as
-  transitions; `Dim`, `Desaturate`, `Tint`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst`
+  transitions; `Dim`, `Desaturate`, `Recolor`, and `Spotlight` as backdrops; `Shake`, `Shimmer`, `Roll`, and `Burst`
   for feedback; `Chase`, `Pulse`, `Comet`, and `March` for looping borders; and combinators to stagger, delay,
   reverse, and ease them. Or write your own.
 - :heavy_check_mark: **Borders that do more**: put titles, clickable tabs, icon buttons, and counters on a box's

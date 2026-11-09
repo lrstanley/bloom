@@ -54,7 +54,7 @@ var (
 )
 
 var (
-	titlePaint = fig.Gradient(theme.BrightPurple, theme.Purple, theme.Cyan).By(fig.ByDiagonal).Blend()
+	titlePaint = fig.Gradient(theme.BrightPurple, theme.Purple, theme.Cyan).By(fig.ByDiagonal)
 	clockPaint = fig.Gradient(theme.Cyan, theme.Green).By(fig.ByRow)
 	wordPaint  = fig.Palette(theme.BrightPurple, theme.Red, theme.Yellow, theme.Green, theme.Cyan, theme.Purple)
 )

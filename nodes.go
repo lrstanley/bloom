@@ -131,7 +131,7 @@ func (n SlotNode) Focusable() SlotNode { n.focusable = true; return n }
 func (n SlotNode) Scope() SlotNode { n.scope = true; return n }
 
 // View implements [Child], drawing the slot at its natural size.
-func (n SlotNode) View() string { return Render(n, 0, 0) }
+func (n SlotNode) View() string { return Render(0, 0, n) }
 
 // natural reports whether the slot starts at its child's natural size: an
 // Auto slot, or a Percent slot in a container of unbounded size, as when a
@@ -202,7 +202,7 @@ func (n FlexNode) On(handlers ...on.Handler) FlexNode {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n FlexNode) View() string { return Render(n, 0, 0) }
+func (n FlexNode) View() string { return Render(0, 0, n) }
 
 // BoxNode draws a Lip Gloss style's frame, its margins, border, padding, and
 // background, around a child. Build one with [Box].
@@ -305,7 +305,7 @@ func (n BoxNode) BorderFx(t float64, effects ...fx.Effect) BoxNode {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n BoxNode) View() string { return Render(n, 0, 0) }
+func (n BoxNode) View() string { return Render(0, 0, n) }
 
 // bordered returns the part of r, a rectangle the box was given, inside its
 // margins, whose outer cells are its border.
@@ -338,28 +338,15 @@ func frameOf(s lipgloss.Style) frame {
 	return f
 }
 
-// wrapKind is what a [wrapNode] does with its child.
-type wrapKind uint8
-
-const (
-	wrapCenter wrapKind = iota
-	wrapTransition
-)
-
-// wrapNode is a node with one child it places or draws differently.
-type wrapNode struct {
-	kind    wrapKind
-	child   Child
-	t       float64
-	effects []fx.Effect
-}
-
-// View implements [Child], drawing the node at its natural size.
-func (n wrapNode) View() string { return Render(n, 0, 0) }
-
 // Centered places child at its natural size in the middle of the space it is
 // given.
-func Centered(child Child) Child { return wrapNode{kind: wrapCenter, child: child} }
+func Centered(child Child) Child { return centerNode{child: child} }
+
+// centerNode places its child in its middle; see [Centered].
+type centerNode struct{ child Child }
+
+// View implements [Child], drawing the node at its natural size.
+func (n centerNode) View() string { return Render(0, 0, n) }
 
 // ScrollNode shows part of a child bigger than the space it is given. Build
 // one with [Scroll].
@@ -386,7 +373,7 @@ func (n ScrollNode) X(offset int) ScrollNode {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n ScrollNode) View() string { return Render(n, 0, 0) }
+func (n ScrollNode) View() string { return Render(0, 0, n) }
 
 // content returns the space the child of a scroll w cells wide is measured
 // in: unbounded down, and across too when it scrolls sideways.
@@ -401,8 +388,18 @@ func (n ScrollNode) content(w int) Size {
 // from 0, as it starts to enter, to 1, when it is fully shown. See
 // [fx.Effect].
 func Transition(t float64, child Child, effects ...fx.Effect) Child {
-	return wrapNode{kind: wrapTransition, child: child, t: t, effects: effects}
+	return transitionNode{child: child, t: t, effects: effects}
 }
+
+// transitionNode draws its child with effects; see [Transition].
+type transitionNode struct {
+	child   Child
+	t       float64
+	effects []fx.Effect
+}
+
+// View implements [Child], drawing the node at its natural size.
+func (n transitionNode) View() string { return Render(0, 0, n) }
 
 // Present draws child with p's progress while visible. When hidden, child
 // is absent, taking neither space nor a gap in its container.
@@ -425,7 +422,9 @@ func absent(c Child) bool {
 		return true
 	case SlotNode:
 		return absent(n.child)
-	case wrapNode:
+	case transitionNode:
+		return absent(n.child)
+	case centerNode:
 		return absent(n.child)
 	case ScrollNode:
 		return absent(n.child)
@@ -441,7 +440,7 @@ type drawableNode struct {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n drawableNode) View() string { return Render(n, 0, 0) }
+func (n drawableNode) View() string { return Render(0, 0, n) }
 
 // Drawable returns a node that draws d directly onto the cells it is given,
 // clipped to them. Its natural size is zero unless d implements [Measurer].
@@ -463,7 +462,7 @@ func Overlay(base Child, layers ...LayerNode) OverlayNode {
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n OverlayNode) View() string { return Render(n, 0, 0) }
+func (n OverlayNode) View() string { return Render(0, 0, n) }
 
 // Direction is a side or a corner of a node or of the screen, such as where
 // a layer is anchored to a node, or where an effect starts from.
@@ -604,4 +603,4 @@ func (n LayerNode) MoveWith(effects ...fx.Effect) LayerNode {
 }
 
 // View implements [Child], drawing the layer's child at its natural size.
-func (n LayerNode) View() string { return Render(n.child, 0, 0) }
+func (n LayerNode) View() string { return Render(0, 0, n.child) }

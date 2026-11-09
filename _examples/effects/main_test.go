@@ -22,7 +22,7 @@ func TestEffects(t *testing.T) {
 	h.Wait("t = 0.00").Sleep(400 * time.Millisecond)
 
 	// Each backdrop in turn over the gallery, then none.
-	for _, name := range []string{"Dim", "Desaturate", "Tint", "Recolor"} {
+	for _, name := range []string{"Dim", "Desaturate", "Recolor: tint", "Recolor: two colors"} {
 		h.Key("b").Wait("Backdrop: " + name).Sleep(900 * time.Millisecond)
 	}
 	h.Key("b").Wait("backdrop (none)").WaitNot("Backdrop:").Sleep(400 * time.Millisecond)

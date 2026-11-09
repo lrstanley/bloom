@@ -44,6 +44,9 @@ type Options struct {
 	// narrower than two columns may smush, and the zero value of Vertical
 	// is the font's own vertical layout.
 	Strict bool
+	// Control maps the text before it is laid out, as figlet's -C option
+	// does. Nil leaves it as it is.
+	Control *Control
 }
 
 // Mode is a layout mode, horizontal or vertical.

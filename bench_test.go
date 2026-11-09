@@ -103,7 +103,7 @@ func BenchmarkSolveNested(b *testing.B) {
 	tree := nested(16, Text("abcdefghij"))
 	b.ReportAllocs()
 	for b.Loop() {
-		Solve(tree, benchW, benchH)
+		Solve(benchW, benchH, tree)
 	}
 }
 
@@ -111,7 +111,7 @@ func BenchmarkSolve(b *testing.B) {
 	tree := benchTree(3, 0, -1)
 	b.ReportAllocs()
 	for b.Loop() {
-		Solve(tree, benchW, benchH)
+		Solve(benchW, benchH, tree)
 	}
 }
 

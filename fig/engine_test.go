@@ -152,8 +152,8 @@ func TestControl(t *testing.T) {
 			t.Errorf("Map(%q) = %q, want %q", in, got, want)
 		}
 	}
-	f := charFont(t, 0).WithControl(c)
-	if got := f.Figure("ab", fig.Options{}).String(); got != "AB" {
+	f := charFont(t, 0)
+	if got := f.Figure("ab", fig.Options{Control: c}).String(); got != "AB" {
 		t.Errorf("figure with control = %q, want AB", got)
 	}
 }
@@ -339,4 +339,29 @@ func charFontText() string {
 		fmt.Fprintf(&b, "%c##\n", r)
 	}
 	return b.String()
+}
+
+func TestInfoLayout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		layout     int
+		horizontal fig.Mode
+		vertical   fig.Mode
+		rules      fig.Rules
+	}{
+		{0, fig.Full, fig.Full, 0},
+		{64, fig.Fitted, fig.Full, 0},
+		{128, fig.Universal, fig.Full, 0},
+		{128 | 1 | 8, fig.Smushed, fig.Full, fig.RuleEqual | fig.RulePair},
+		{8192, fig.Full, fig.Fitted, 0},
+		{16384 | 256, fig.Full, fig.Smushed, fig.RuleVEqual},
+	}
+	for _, tt := range tests {
+		info := charFont(t, tt.layout).Info()
+		if info.Horizontal != tt.horizontal || info.Vertical != tt.vertical || info.Rules != tt.rules {
+			t.Errorf("layout %d: got %v, %v, %v, want %v, %v, %v", tt.layout,
+				info.Horizontal, info.Vertical, info.Rules, tt.horizontal, tt.vertical, tt.rules)
+		}
+	}
 }

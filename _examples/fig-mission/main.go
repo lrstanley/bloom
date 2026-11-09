@@ -59,7 +59,7 @@ const heading = "Mission Control"
 var headerFonts = []*fig.Font{fonts.ANSICompact(), fonts.Doom(), fonts.Small(), fonts.Mini()}
 
 var (
-	headerPaint = fig.Gradient(theme.Purple, theme.Blue, theme.Cyan).By(fig.ByDiagonal).Blend()
+	headerPaint = fig.Gradient(theme.Purple, theme.Blue, theme.Cyan).By(fig.ByDiagonal)
 	toastPaint  = fig.Gradient(theme.Green, theme.Yellow).By(fig.ByColumn)
 )
 
@@ -315,7 +315,7 @@ func (m *model) log() bloom.Child {
 // latest values at the right.
 type chart []int
 
-func (c chart) View() string { return bloom.Render(c, len(c), 6) }
+func (c chart) View() string { return bloom.Render(len(c), 6, c) }
 
 func (c chart) Layout(ctx bloom.Context) bloom.Child {
 	// A bar every other column, as many of the latest values as fit.

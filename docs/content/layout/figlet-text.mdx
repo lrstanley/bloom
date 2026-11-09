@@ -51,7 +51,7 @@ doh, err := fig.ParseFS(fontFiles, "fonts/doh.flf")
 [`fig.Lazy`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Lazy) waits until the font is first used to parse it.
 A FIGlet control file (`.flc`), read with
 [`fig.ParseControl`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#ParseControl), maps characters before they're
-laid out, as `figlet -C` does: `font.WithControl(c)`.
+laid out, as `figlet -C` does: `fig.Options{Control: c}`.
 
 ## Step down to smaller fonts
 
@@ -82,7 +82,7 @@ A [`Paint`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Paint) gives each 
 | `fig.Metal()` | shades of blue and gray in slanted bands, as TOIlet's metal filter |
 | `fig.Fill(inside, p)` | `p`, with the blanks inside letters, such as the middle of an "O", filled in |
 
-Where two letters were squeezed into the same cell, a gradient's `Blend()` mixes both letters' colors there.
+Where two letters were squeezed into the same cell, a `ByGlyph` gradient's `Blend()` mixes both letters' colors there.
 
 For anything else, write a [`PaintFunc`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#PaintFunc). It's given
 the whole figure and each cell: where it is, what kind of cell it is, and which letter of the text drew it. This one

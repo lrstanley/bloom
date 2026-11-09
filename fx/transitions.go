@@ -23,8 +23,8 @@ func (Fade) Apply(s *canvas.Surface, t float64) {
 	if t >= 1 {
 		return
 	}
-	each(s, func(x, y int) {
-		c, under := s.Cell(x, y), s.Under(x, y)
+	for at, c := range s.Cells() {
+		under := s.Under(at.X, at.Y)
 		bg := s.Mix(s.Bg(under), s.Bg(c), t)
 		if t < 0.5 && under != nil && under.Width == 1 && c.Width == 1 {
 			c.Content, c.Link = under.Content, under.Link
@@ -34,7 +34,7 @@ func (Fade) Apply(s *canvas.Surface, t float64) {
 			c.Style.Fg = s.Mix(bg, s.Fg(c), max(2*t-1, 0))
 		}
 		c.Style.Bg = bg
-	})
+	}
 }
 
 // Slide moves a node in from beyond a side or corner of its viewport, such
@@ -103,11 +103,12 @@ func (e Dissolve) Apply(s *canvas.Surface, t float64) {
 	if t >= 1 {
 		return
 	}
-	each(s, func(x, y int) {
+	for at := range s.Cells() {
+		x, y := at.X, at.Y
 		if hash(x, y, e.Seed) >= t {
 			s.Hide(x, y)
 		}
-	})
+	}
 }
 
 // Typewriter reveals a node's cells in reading order.
@@ -119,11 +120,12 @@ func (Typewriter) Apply(s *canvas.Surface, t float64) {
 		return
 	}
 	shown := int(float64(s.Width()*s.Height()) * t)
-	each(s, func(x, y int) {
+	for at := range s.Cells() {
+		x, y := at.X, at.Y
 		if y*s.Width()+x >= shown {
 			s.Hide(x, y)
 		}
-	})
+	}
 }
 
 // scrambleGlyphs are what [Scramble] shows in place of a cell's own glyph.
@@ -144,12 +146,11 @@ func (e Scramble) Apply(s *canvas.Surface, t float64) {
 		return
 	}
 	step := uint32(t * scrambleSteps)
-	each(s, func(x, y int) {
-		c := s.Cell(x, y)
+	for at, c := range s.Cells() {
+		x, y := at.X, at.Y
 		if c.Width != 1 || c.Content == " " || hash(x, y, e.Seed) < t {
-			return
+			continue
 		}
-		i := int(hash(x, y, e.Seed^step*0x9e3779b9) * float64(len(scrambleGlyphs)))
-		c.Content = scrambleGlyphs[i : i+1]
-	})
+		c.Content = flicker(scrambleGlyphs, x, y, e.Seed, step)
+	}
 }

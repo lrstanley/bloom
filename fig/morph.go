@@ -189,23 +189,12 @@ func (n TextNode) morphed(f, old *Figure) bloom.Child {
 	enter, leave := orFade(n.enter), orFade(n.leave)
 	t := n.morph.t
 
-	// Each glyph of the text is either one that was there before, or one
-	// entering, at its own progress.
-	entering := 0
-	for _, k := range nowKeys {
-		if _, ok := oldAt[k]; !ok {
-			entering++
-		}
-	}
-	progress := make([]float64, len(nowKeys))
-	ranks, rank := n.order.ranks(entering), 0
-	for _, i := range f.order() {
-		progress[i] = -1
-		if _, ok := oldAt[nowKeys[i]]; !ok {
-			progress[i] = n.window(t, ranks[rank], entering)
-			rank++
-		}
-	}
+	// Each glyph of the text is either one that was there before, at -1, or
+	// one entering, at its own progress.
+	progress := n.stagger(f, t, func(i int) bool {
+		_, was := oldAt[nowKeys[i]]
+		return !was
+	})
 	// A glyph is still once it has entered, or if it is the same glyph, in
 	// the same place, as before.
 	rest := n.restFor(f, func(i int) bool {
@@ -229,21 +218,14 @@ func (n TextNode) morphed(f, old *Figure) bloom.Child {
 	for _, k := range nowKeys {
 		inNow[k] = true
 	}
-	leaving := 0
-	for _, k := range oldKeys {
-		if !inNow[k] {
-			leaving++
-		}
-	}
-	ranks, rank = n.order.ranks(leaving), 0
+	leaving := n.stagger(old, t, func(i int) bool { return !inNow[oldKeys[i]] })
 	for _, i := range old.order() {
-		if inNow[oldKeys[i]] {
+		if leaving[i] < 0 {
 			continue
 		}
-		if l, ok := n.layer(old, i, false, oldKeys[i], 1-n.window(t, ranks[rank], leaving), leave); ok {
+		if l, ok := n.layer(old, i, false, oldKeys[i], 1-leaving[i], leave); ok {
 			layers = append(layers, l)
 		}
-		rank++
 	}
 	w, h := f.Size()
 	ow, oh := old.Size()

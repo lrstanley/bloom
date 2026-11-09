@@ -94,7 +94,7 @@ Effects that suit backdrops:
 | --- | --- |
 | `fx.Dim{Amount: 0.6}` | colors fade toward the terminal's background |
 | `fx.Desaturate{Amount: 1}` | colors fade to gray |
-| `fx.Tint{Color: c, Amount: 0.3}` | colors move toward `c` |
+| `fx.Recolor{Fg: c, Bg: c, Amount: 0.3}` | colors move toward `c` |
 | `fx.Recolor{Fg: fg, Bg: bg}` | everything redrawn in two colors, keeping the text |
 | `fx.Spotlight{Rect: r}` | everything dimmed except the rectangle `r` |
 

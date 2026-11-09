@@ -593,7 +593,7 @@ func mouseTree(modal bool) Child {
 func TestHit(t *testing.T) {
 	t.Parallel()
 
-	f := Solve(mouseTree(false), 20, 4)
+	f := Solve(20, 4, mouseTree(false))
 	if got := f.Hit(2, 1); !slices.Equal(got, []any{"list", itemID(1)}) {
 		t.Fatalf("Hit on item 1 = %v", got)
 	}
@@ -601,7 +601,7 @@ func TestHit(t *testing.T) {
 		t.Fatalf("Hit on the list below its items = %v", got)
 	}
 
-	f = Solve(mouseTree(true), 20, 4)
+	f = Solve(20, 4, mouseTree(true))
 	if got := f.Hit(2, 1); got != nil {
 		t.Fatalf("Hit outside a modal = %v, want nil", got)
 	}
@@ -625,7 +625,7 @@ func TestSlideMovesHits(t *testing.T) {
 	r := New()
 	v := r.View(10, 10, tree)
 	got, _ := r.Frame().Rect("up")
-	laidOut, _ := Solve(tree, 10, 10).Rect("up")
+	laidOut, _ := Solve(10, 10, tree).Rect("up")
 	if got.Min.Y <= laidOut.Min.Y || got.Size() != laidOut.Size() {
 		t.Fatalf("slid layer at %v, laid out at %v", got, laidOut)
 	}
@@ -670,7 +670,7 @@ type frameReader struct {
 	inLayout **Frame
 }
 
-func (l frameReader) View() string { return Render(l, 0, 0) }
+func (l frameReader) View() string { return Render(0, 0, l) }
 
 func (l frameReader) Layout(ctx Context) Child {
 	*l.inLayout = ctx.Frame()
@@ -722,7 +722,7 @@ func TestContextFrame(t *testing.T) {
 
 	// Outside a Root there is no frame.
 	inLayout = before
-	Render(frameReader{keep: 50, first: &first, inLayout: &inLayout}, 10, 5)
+	Render(10, 5, frameReader{keep: 50, first: &first, inLayout: &inLayout})
 	if inLayout != nil {
 		t.Fatalf("Layout outside a Root got frame %p, want none", inLayout)
 	}
