@@ -1,0 +1,30 @@
+ main › run › find › Text.Render › wrap                                            example.com/notes  Go Lens 
+                                                                                                              
+ render                                                                                                       
+                                                                                                              
+ func wrap(s string, width int)                                                                               
+ string                                                                                                       
+                                                                                                              
+ wrap breaks s into lines of at                                                                               
+ most width cells, between                                                                                    
+ words.                                                                                                       
+                                                                                                              
+                                                                                                              
+                                                                                                              
+                                                                                                              
+                                  ƒ Time.Format       time                                                    
+                                  ƒ Join           strings                                                    
+                                  ƒ Fprintf            fmt                                                    
+                                  ƒ indent             • 1                                                    
+                                 ▌ƒ wrap               • 4 ─┬─ ƒ Fields         strings                       
+                                                            ├─ ƒ Builder.Write… strings                       
+                                                            ├─ ƒ Builder.Write… strings                       
+                                                            ╰─ ƒ Builder.String strings                       
+                                                                                                              
+                                                                                                              
+                                                                                                              
+                                                                                                              
+ called by 1  calls 4                                                                                         
+ render/render.go:49                                                                                          
+                                                                                                              
+ ↑↓ move  ·  ←→ walk  ·  enter code  ·  / search  ·  q quit                                                   

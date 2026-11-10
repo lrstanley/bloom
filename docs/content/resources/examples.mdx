@@ -181,6 +181,19 @@ See also: [Related libraries](/resources/related-libraries#bubbletint), [Layout 
 [Mouse events](/input/mouse). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/showcase), or `go run
 ./showcase`.
 
+## golens
+
+![The golens example: walking a Go project's call graph as a tree that opens to the right, a click selecting a function, its code between its callers and callees with the selected call marked, and a search jumping to a function by the shortest path from main](/demos/golens.webp)
+
+A call graph explorer for any Go project, loaded with `golang.org/x/tools/go/packages`. The project's entry points
+open into a tree of what each function calls, where only functions and wires glide as branches open, inside a
+camera that scrolls with the selection. The code view opens from the selected function with an iris, highlights its
+code with chroma in the theme's colors from bubbletint's `chromatint`, and marks each call of the selected callee. Pass it a directory, and optionally package patterns, as with `go run ./golens ..`
+to explore bloom itself.
+
+See also: [Layout animation](/motion/layout-animation), [Scrolling](/layout/scrolling), [Dialogs](/layers/dialogs).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/golens), or `go run ./golens [dir]`.
+
 ## Run and record them
 
 Each example's comment at the top of `main.go` lists its keys. Most quit with <kbd>q</kbd> or <kbd>ctrl+c</kbd>.
