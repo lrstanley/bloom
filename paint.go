@@ -30,6 +30,7 @@ const (
 	opEffects               // apply effects to rect of the frame
 	opPush                  // draw what follows into its own cells, for effects
 	opPop                   // apply effects to those cells and composite them
+	opSelect                // draw the selection over the text leaves of the node it is in
 )
 
 // op is one step of drawing a frame. A frame is a list of them, built by
@@ -46,6 +47,7 @@ type op struct {
 	effects  []fx.Effect
 	t        float64
 	from     image.Rectangle // for opPop of a slot moving with effects: where it was
+	sel      selRange        // for opSelect, with t the copy flash's, or -1
 
 	// For opPop: the index of its opPush, the frame entries drawn since it,
 	// and how far its effects moved what was drawn, known once executed.
@@ -57,7 +59,7 @@ type op struct {
 
 func (o *op) equal(p *op) bool {
 	if o.kind != p.kind || o.kind == opDraw || o.src != p.src || o.rect != p.rect ||
-		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.t != p.t || o.from != p.from || len(o.effects) != len(p.effects) {
+		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.t != p.t || o.from != p.from || o.sel != p.sel || len(o.effects) != len(p.effects) {
 		return false
 	}
 	for i := range o.effects {
@@ -155,6 +157,22 @@ type renderer struct {
 	drawn    image.Point // size of the last composited frame
 	drawnEnv canvas.Env
 	frame    *Frame
+
+	// sel is the Root's selection, found in the text leaves of the node it
+	// is in as rng, and drawn over them with selStyle, or as the copy flash
+	// at flashT when that is not negative.
+	sel       selection
+	leaves    []selLeaf
+	rng       selRange
+	rngSeq    int // the seq of the selection rng is for, or -1
+	selStyle  selStyle
+	wordChars string
+	flashT    float64
+
+	// Scratch for finding words.
+	wordRow  []byte
+	wordOffs []int
+	wordSegs []wordSeg
 }
 
 func newRenderer(method ansi.Method) *renderer {
@@ -200,6 +218,8 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 	clear(r.entries)
 	clear(r.handlers)
 	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
+	clear(r.leaves)
+	r.leaves, r.rngSeq = r.leaves[:0], -1
 	root := r.layout(w, h, c)
 	if root >= 0 {
 		r.paint(root, r.area, -1)
@@ -294,11 +314,25 @@ func (r *renderer) blit(s string, rect, clip image.Rectangle) {
 }
 
 // paint adds the ops and entries for box i, clipped to clip, whose nearest
-// ancestor with an entry is entry parent.
+// ancestor with an entry is entry parent, and the selection over it if the
+// Root is selecting in it, once all of it is painted, so that what is drawn
+// on top later, such as a dialog, covers the selection.
 func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 	if i < 0 {
 		return
 	}
+	b := &r.boxes[i]
+	selected := r.selected(b)
+	r.paintBox(i, clip, parent)
+	// A slot moving with effects is drawn later, by paintMoves.
+	if selected && !b.moving {
+		r.paintSelection(i, clip)
+	}
+}
+
+// paintBox adds the ops and entries for box i, as [renderer.paint] does,
+// without the selection.
+func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 	b := &r.boxes[i]
 	vis := b.rect.Intersect(clip)
 	// A slot moving with effects is drawn on its way while where it was is
@@ -308,7 +342,7 @@ func (r *renderer) paint(i int, clip image.Rectangle, parent int) {
 		return
 	}
 	if hasEntry(b) && !vis.Empty() {
-		parent = r.addEntry(b, vis, clip, parent)
+		parent = r.addEntry(i, vis, clip, parent)
 	}
 	if b.moving {
 		r.moves = append(r.moves, deferredMove{box: i, clip: clip, parent: parent})
@@ -441,7 +475,7 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 		if len(n.effects) > 0 {
 			vis = b.rect
 		}
-		parent = r.addEntry(b, vis, clip, parent)
+		parent = r.addEntry(i, vis, clip, parent)
 	}
 
 	// A layer is opaque: whatever its child does not draw, such as a Space,
@@ -466,6 +500,9 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 		mark := len(r.moves)
 		r.paint(r.firstKid(i), b.rect.Intersect(area), parent)
 		r.paintMoves(mark)
+	}
+	if r.selected(b) {
+		r.paintSelection(i, area)
 	}
 	if b.moving {
 		r.popEffects(b.rect, clip, b.from, b.moveT, n.moves, push, from)
@@ -516,6 +553,10 @@ func (r *renderer) paintMoves(mark int) {
 		inner := len(r.moves)
 		r.paint(r.firstKid(mv.box), b.rect, mv.parent)
 		r.paintMoves(inner)
+		if r.selected(b) {
+			// Drawn into the slot's own cells, so it moves with them.
+			r.paintSelection(mv.box, b.rect)
+		}
 		r.popEffects(b.rect, mv.clip, b.from, b.moveT, n.moves, push, from)
 	}
 	r.moves = r.moves[:mark]
@@ -553,7 +594,7 @@ func (r *renderer) hideCoveredCursor() {
 		return
 	}
 	for _, o := range r.ops[r.cursorAt:] {
-		if o.kind != opPop && o.kind != opEffects && image.Pt(r.cursor.X, r.cursor.Y).In(o.rect.Intersect(o.clip)) {
+		if o.kind != opPop && o.kind != opEffects && o.kind != opSelect && image.Pt(r.cursor.X, r.cursor.Y).In(o.rect.Intersect(o.clip)) {
 			r.cursor = nil
 			return
 		}
@@ -577,6 +618,8 @@ func (r *renderer) execute() {
 			t.c.Blit(o.src, o.rect.Sub(t.origin), o.clip.Sub(t.origin))
 		case opClear:
 			t.c.ClearArea(o.rect.Sub(t.origin))
+		case opSelect:
+			r.executeSelect(o, t)
 		case opDraw:
 			scr := t.c.Screen(o.rect.Min.Sub(t.origin), o.rect.Size(), o.clip.Sub(t.origin))
 			o.draw.Draw(scr, scr.Bounds())

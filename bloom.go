@@ -145,12 +145,13 @@ func (a Align) offset(n, avail int) int {
 // whether it can be focused, the cursor it shows, its mouse handlers, and
 // the style it has while hovered.
 type meta struct {
-	id        any
-	focusable bool
-	scope     bool
-	cursor    *tea.Cursor
-	handlers  []on.Handler
-	hover     *lipgloss.Style
+	id         any
+	focusable  bool
+	scope      bool
+	selectable bool
+	cursor     *tea.Cursor
+	handlers   []on.Handler
+	hover      *lipgloss.Style
 }
 
 // with returns handlers with more added, without changing a slice that a

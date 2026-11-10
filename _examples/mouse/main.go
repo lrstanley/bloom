@@ -7,10 +7,13 @@
 // the pointer with a hover style, which keeps no state in the model; a
 // click selects one and a double click opens it; the wheel scrolls the
 // file; and the one-cell divider between the panes can be dragged, keeping
-// the drag after the pointer leaves it. Wheel and motion events are
+// the drag after the pointer leaves it. The file's text is selectable:
+// dragging over it selects text inside the reader alone, including lines
+// scrolled out of sight, and ctrl+c copies it. Wheel and motion events are
 // throttled with bloom.ThrottleMouse.
 //
-// Keys: q quits. Everything else is the mouse.
+// Keys: ctrl+c copies the selection, or quits when there is none; esc
+// clears the selection; q quits. Everything else is the mouse.
 package main
 
 import (
@@ -23,6 +26,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/lrstanley/bloom"
+	"github.com/lrstanley/bloom/_examples/internal/clip"
 	"github.com/lrstanley/bloom/on"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
@@ -68,7 +72,7 @@ type model struct {
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), split: 22, status: "hover, click, or double click a file; drag the divider"}
+	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithClipboard(clip.Write)), split: 22, status: "hover, click, or double click a file; drag the divider or over the text"}
 }
 
 func (m *model) Init() tea.Cmd { return nil }
@@ -78,8 +82,23 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
+	case bloom.SelectionMsg:
+		m.status = fmt.Sprintf("selected %d lines; ctrl+c copies", strings.Count(msg.Text, "\n")+1)
+	case bloom.CopyMsg:
+		m.status = fmt.Sprintf("copied %d characters", len(msg.Text))
+		if msg.Err != nil {
+			m.status = "copied with OSC 52 only: " + msg.Err.Error()
+		}
 	case tea.KeyPressMsg:
-		if msg.String() == "q" || msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "ctrl+c":
+			if copied := m.ui.CopySelection(); copied != nil {
+				return m, tea.Batch(cmd, copied)
+			}
+			return m, tea.Quit
+		case "esc":
+			m.ui.ClearSelection()
+		case "q":
 			return m, tea.Quit
 		}
 	}
@@ -121,7 +140,7 @@ func (m *model) View() tea.View {
 func (m *model) layout() bloom.Child {
 	reader := bloom.Column(
 		bloom.Text(cmp.Or(m.opened, "reader")).Style(heading.Padding(0, 1)),
-		bloom.Fill(bloom.Scroll(bloom.Text(m.contents()).Style(code).ID(readerText), m.offset)).ID(readerView),
+		bloom.Fill(bloom.Scroll(bloom.Text(m.contents()).Style(code).ID(readerText).Selectable(), m.offset)).ID(readerView),
 	)
 	return bloom.Column(
 		bloom.Fill(bloom.Row(

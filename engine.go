@@ -30,6 +30,7 @@ type box struct {
 	kidsLen  int
 	expanded int    // root of a Layouter's subtree, or -1
 	path     uint64 // where the box is in the tree, kept from frame to frame
+	slot     int    // where the box is in its parent's children
 
 	view   string // a component's View, called once per frame
 	viewOK bool
@@ -139,7 +140,7 @@ func (e *engine) build(c Child, parent, slot int) int {
 	if parent >= 0 {
 		path = e.boxes[parent].path
 	}
-	e.boxes = append(e.boxes, box{parent: parent, child: c, expanded: -1, path: childPath(path, slot)})
+	e.boxes = append(e.boxes, box{parent: parent, child: c, expanded: -1, path: childPath(path, slot), slot: slot})
 
 	var kids []Child
 	b := &e.boxes[i]
@@ -177,6 +178,10 @@ func (e *engine) build(c Child, parent, slot int) int {
 	case ListNode:
 		// Its items are built once it knows how much space it has.
 		b.meta = n.meta
+	default:
+		if _, ok := c.(TextSource); ok {
+			b.meta.selectable = true
+		}
 	}
 
 	_, grid := c.(GridNode)

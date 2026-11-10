@@ -23,6 +23,7 @@ type entry struct {
 	parent                  int             // nearest ancestor entry, or -1
 	focusable, scope, modal bool
 	hoverable               bool // the node has a hover style
+	selectable              bool
 	list                    ListView
 	isList                  bool
 }
@@ -41,11 +42,12 @@ func (b *box) key() nodeKey {
 	return nodeKey{path: b.path}
 }
 
-func (r *renderer) addEntry(b *box, vis, clip image.Rectangle, parent int) int {
+func (r *renderer) addEntry(i int, vis, clip image.Rectangle, parent int) int {
+	b := &r.boxes[i]
 	e := entry{
 		id: b.meta.id, key: b.key(), rect: b.rect, vis: vis, parent: parent,
 		focusable: b.meta.focusable, scope: b.meta.scope, modal: b.modal,
-		hoverable: b.meta.hover != nil,
+		hoverable: b.meta.hover != nil, selectable: b.meta.selectable,
 	}
 	if _, ok := b.child.(ListNode); ok {
 		e.list, e.isList = b.list, true
@@ -60,7 +62,7 @@ func (r *renderer) addEntry(b *box, vis, clip image.Rectangle, parent int) int {
 
 // hasEntry reports whether box b needs an entry in the frame.
 func hasEntry(b *box) bool {
-	return b.meta.id != nil || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil
+	return b.meta.id != nil || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable
 }
 
 // Frame is the geometry of a laid-out frame: where each node with an ID
@@ -170,6 +172,16 @@ func (f *Frame) inScope(i int, scope any) bool {
 		}
 	}
 	return false
+}
+
+// nearestID returns the ID of entry i, or of its nearest ancestor with one.
+func (f *Frame) nearestID(i int) any {
+	for ; i >= 0; i = f.entries[i].parent {
+		if id := f.entries[i].id; id != nil {
+			return id
+		}
+	}
+	return nil
 }
 
 // index returns the entry with ID id, or -1.

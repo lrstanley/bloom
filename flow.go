@@ -44,6 +44,13 @@ func (n GridNode) On(handlers ...on.Handler) GridNode {
 	return n
 }
 
+// Selectable lets the left button select text in the grid by dragging over
+// it, as a terminal selects text, but kept inside the grid. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+func (n GridNode) Selectable() GridNode { n.selectable = true; return n }
+
 // View implements [Child], drawing the grid at its natural size.
 func (n GridNode) View() string { return Render(0, 0, n) }
 

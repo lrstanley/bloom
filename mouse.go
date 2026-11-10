@@ -96,6 +96,30 @@ type mouse struct {
 	dragStart   image.Point
 	lastClick   nodeKey // the node clicked last, if it has a double click handler
 	lastClickAt time.Time
+
+	// What the presses in a row on a selectable node selected, the last at
+	// selAt on selKey at selTime, if selOK, for a double click to select a
+	// word and a triple click a line.
+	selUnit selUnit
+	selOK   bool
+	selKey  nodeKey
+	selAt   image.Point
+	selTime time.Time
+
+	held        heldClick // a click inside a selectable node, held back
+	heldSeq     int       // counts clicks held back, for the tick of one to know it
+	scrollChain []int     // scratch for scrolling the text being selected
+}
+
+// heldClick is a click of the left button inside a selectable node held
+// back until it can no longer become a double click, which selects a word
+// instead (see [WithClickDelay]): the handlers of the node with key it
+// runs, and the event it runs them with.
+type heldClick struct {
+	ok       bool
+	key      nodeKey
+	handlers []on.Handler
+	event    on.Event
 }
 
 // press is the button down, and the nodes it went down on that take its
@@ -104,6 +128,7 @@ type press struct {
 	button        tea.MouseButton
 	click, double nodeKey
 	ok, doubleOK  bool
+	hold          bool // the click is held back, as it may become a double click
 }
 
 // focusTarget is a [Focus] of any type that clicks can move, for
@@ -149,6 +174,7 @@ func (r *Root) input(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 	s.checked = f
+	r.checkSelect(f)
 	cmds := r.checkDrag(nil, f)
 	if s.atOK {
 		s.chain, _ = f.under(s.at, s.chain[:0])
@@ -189,20 +215,20 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 		if i := f.innermost(chain, clicks(m.Button)); i >= 0 {
 			s.press.click, s.press.ok = f.entries[i].key, true
 		}
-		if m.Button != tea.MouseLeft {
-			break
-		}
-		if i := f.innermost(chain, kindsOf(on.KindDoubleClick)); i >= 0 {
-			s.press.double, s.press.doubleOK = f.entries[i].key, true
-		}
-		if i := f.innermost(chain, kindsOf(on.KindDrag)); i >= 0 {
-			t := f.target(i)
-			s.drag, s.dragStart = &t, p
-			cmds = r.dragEvent(cmds, f, msg, p, chain, false)
+		if m.Button == tea.MouseLeft {
+			cmds = r.pressLeft(cmds, f, msg, p, chain)
 		}
 	case tea.MouseReleaseMsg:
 		if m.Button == tea.MouseLeft || m.Button == tea.MouseNone {
 			cmds = r.endDrag(cmds, f, msg, p, chain)
+			if r.sel.dragging {
+				r.moveSelect(f, p)
+				if r.sel.moved {
+					// Selecting text is not a click on what it was selected in.
+					s.press.ok, s.press.doubleOK = false, false
+				}
+				cmds = append(cmds, r.endSelect())
+			}
 		}
 		if pr := s.press; m.Button == pr.button || m.Button == tea.MouseNone {
 			s.press = press{}
@@ -218,8 +244,10 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 			// No button is down, so a press still pending lost its release.
 			s.press = press{}
 			cmds = r.endDrag(cmds, f, msg, p, chain)
+			cmds = append(cmds, r.endSelect())
 		} else {
 			cmds = r.dragEvent(cmds, f, msg, p, chain, false)
+			cmds = append(cmds, r.moveSelect(f, p))
 		}
 	}
 	if i := f.innermost(chain, kindsOf(on.KindMouse)); i >= 0 {
@@ -229,13 +257,54 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 	return tea.Batch(r.hover(cmds, f, msg, chain)...)
 }
 
+// pressLeft handles the left button going down at p, where the entries of
+// frame f under the pointer are chain: the drag or selection it starts.
+func (r *Root) pressLeft(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, p image.Point, chain []int) []tea.Cmd {
+	s := &r.mouse
+	// A click anywhere ends the selection, and the flash of the last copy,
+	// and may start another.
+	r.ClearSelection()
+	r.flash = selection{}
+	if i := f.innermost(chain, kindsOf(on.KindDoubleClick)); i >= 0 {
+		s.press.double, s.press.doubleOK = f.entries[i].key, true
+	}
+	// The innermost node that drags or selects takes the drag, and a drag
+	// handler beats selecting in the same node.
+	i := f.dragTarget(chain)
+	if i >= 0 && has(f.handlers[i], kindsOf(on.KindDrag)) {
+		cmds = r.settleHeld(cmds, nodeKey{}, p)
+		t := f.target(i)
+		s.drag, s.dragStart = &t, p
+		return r.dragEvent(cmds, f, msg, p, chain, false)
+	}
+	var k nodeKey
+	if i >= 0 {
+		k = f.entries[i].key
+	}
+	cmds = r.settleHeld(cmds, k, p)
+	if i >= 0 && r.startSelect(f, i, p, msg.Mouse().Mod) && r.clickDelay {
+		// A click here may be the first of a double click, which selects a
+		// word rather than clicks.
+		if r.sel.unit == unitCell {
+			s.press.hold = true
+		} else {
+			s.press.ok = false
+		}
+	}
+	return cmds
+}
+
 // release runs the click handlers of the node pr went down on, if the
 // button came up on it too.
 func (r *Root) release(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, p image.Point, pr press, chain []int) []tea.Cmd {
 	s := &r.mouse
 	if i := f.inChain(chain, pr.click); pr.ok && i >= 0 {
 		t := f.target(i)
-		cmds = run(cmds, t.handlers, clicks(pr.button), t.event(msg, p, true))
+		if pr.hold {
+			cmds = append(cmds, r.holdClick(t, t.event(msg, p, true)))
+		} else {
+			cmds = run(cmds, t.handlers, clicks(pr.button), t.event(msg, p, true))
+		}
 	}
 	i := f.inChain(chain, pr.double)
 	if !pr.doubleOK || i < 0 {
@@ -254,11 +323,75 @@ func (r *Root) release(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, p image.Point
 	return cmds
 }
 
+// holdClick holds back the click of the node of t, with event e, until it
+// can no longer become a double click, returning the command for when it
+// runs.
+func (r *Root) holdClick(t mouseTarget, e on.Event) tea.Cmd {
+	m := &r.mouse
+	m.heldSeq++
+	m.held = heldClick{ok: true, key: t.key, handlers: t.handlers, event: e}
+	seq := m.heldSeq
+	wait := max(doubleClick-r.now().Sub(m.selTime), 0)
+	return r.after(wait, func(time.Time) tea.Msg { return clickMsg{root: r, seq: seq} })
+}
+
+// settleHeld deals with the click held back, if any, for a press at p on
+// the selectable node with key k: it is dropped when the press makes it a
+// double click, and otherwise runs now, before the press.
+func (r *Root) settleHeld(cmds []tea.Cmd, k nodeKey, p image.Point) []tea.Cmd {
+	if !r.mouse.held.ok {
+		return cmds
+	}
+	if r.continuesClick(k, p) {
+		r.mouse.held = heldClick{}
+		return cmds
+	}
+	return r.runHeld(cmds)
+}
+
+// runHeldClick runs the click held back, for a tick of msg, if no press
+// came since.
+func (r *Root) runHeldClick(msg tea.Msg) tea.Cmd {
+	c, ok := msg.(clickMsg)
+	if !ok || c.root != r || !r.mouse.held.ok || c.seq != r.mouse.heldSeq {
+		return nil
+	}
+	return tea.Batch(r.runHeld(nil)...)
+}
+
+// runHeld runs the click held back, with the handlers its node has in the
+// frame on screen, should the view have made new ones since.
+func (r *Root) runHeld(cmds []tea.Cmd) []tea.Cmd {
+	h := r.mouse.held
+	r.mouse.held = heldClick{}
+	f := r.r.frame
+	if f != nil {
+		if i := f.find(h.key); i >= 0 {
+			h.handlers = f.handlers[i]
+		}
+	}
+	outer := r.mouse.routing
+	r.mouse.routing = f
+	defer func() { r.mouse.routing = outer }()
+	return run(cmds, h.handlers, leftClicks, h.event)
+}
+
 // innermost returns the first entry of chain with a handler of kinds k, or
 // -1.
 func (f *Frame) innermost(chain []int, k kinds) int {
 	for _, i := range chain {
 		if has(f.handlers[i], k) {
+			return i
+		}
+	}
+	return -1
+}
+
+// dragTarget returns the first entry of chain with a drag handler or that
+// is selectable, or -1.
+func (f *Frame) dragTarget(chain []int) int {
+	for _, i := range chain {
+		if f.entries[i].selectable || has(f.handlers[i], kindsOf(on.KindDrag)) {
 			return i
 		}
 	}

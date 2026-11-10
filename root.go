@@ -12,6 +12,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/lrstanley/bloom/anim"
 	"github.com/lrstanley/bloom/internal/motion"
@@ -30,6 +31,19 @@ type Root struct {
 	now       func() time.Time
 	focus     focusTarget
 	mouse     mouse
+
+	// What text is selected with the mouse, and what was copied last,
+	// while the band sweeping across it is drawn.
+	sel        selection
+	selSeq     int
+	flash      selection
+	flashAt    time.Time
+	copyFlash  bool
+	clickDelay bool
+	clipboard  func(text string) error
+	// after returns a command sending what fn returns after d, as tea.Tick
+	// does; tests have it send at once.
+	after func(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd
 }
 
 // layoutFrameMsg is the tick of a layout animation frame for root.
@@ -45,6 +59,12 @@ type config struct {
 	unfocusedFPS int
 	now          func() time.Time
 	focus        focusTarget
+	selStyle     lipgloss.Style
+	selStyled    bool
+	wordChars    *string
+	clipboard    func(text string) error
+	noFlash      bool
+	noClickDelay bool
 }
 
 // WithWidthMethod sets how the width of graphemes is measured. It must match
@@ -94,9 +114,19 @@ func New(opts ...Option) *Root {
 		unfocused: time.Second / time.Duration(min(c.unfocusedFPS, c.fps)),
 		now:       c.now,
 		focus:     c.focus,
+
+		copyFlash:  !c.noFlash,
+		clickDelay: !c.noClickDelay,
+		clipboard:  c.clipboard,
+		after:      tea.Tick,
 	}
 	r.r.motion = motion.New(c.now)
 	r.r.screen = r.handlerFrame
+	r.r.selStyle = newSelStyle(c.selStyle, c.selStyled)
+	r.r.wordChars = defaultWordChars
+	if c.wordChars != nil {
+		r.r.wordChars = *c.wordChars
+	}
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
 	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)
 	return r
@@ -130,7 +160,10 @@ func (r *Root) Update(msg tea.Msg) tea.Cmd {
 	case tea.BlurMsg:
 		r.blurred = true
 	}
-	return tea.Batch(r.input(msg), r.tick(msg))
+	return tea.Batch(
+		r.input(msg), r.tick(msg),
+		r.scrollSelection(msg), r.selectionDone(msg), r.runHeldClick(msg), r.flashFrame(msg),
+	)
 }
 
 // tick returns the command for the next layout animation frame, if one is
@@ -165,7 +198,22 @@ func (r *Root) Render(w, h int, c Child) string {
 	if w <= 0 {
 		c = nil
 	}
+	// The text copied last is drawn as selected, with the band sweeping
+	// across it, until the band has crossed it.
+	shown := &r.sel
+	r.r.flashT = -1
+	if !r.sel.ok && r.flash.ok {
+		if t := float64(r.now().Sub(r.flashAt)) / float64(flashFor); t < 1 {
+			shown, r.r.flashT = &r.flash, t
+		} else {
+			r.flash = selection{}
+		}
+	}
+	r.r.sel = *shown
 	out := r.r.render(w, h, c)
+	// Where the selection starts and ends is found in the frame, and
+	// followed from frame to frame by the text it is in.
+	shown.anchor, shown.head = r.r.sel.anchor, r.r.sel.head
 	r.r.updateFrame()
 	return out
 }

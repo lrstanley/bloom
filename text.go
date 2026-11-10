@@ -62,6 +62,14 @@ func (n TextNode) HoverStyle(style lipgloss.Style) TextNode {
 	return n
 }
 
+// Selectable lets the left button select text in the node by dragging over
+// it, as a terminal selects text, but kept inside the node. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+// Text scrolled out of sight is selected as well.
+func (n TextNode) Selectable() TextNode { n.selectable = true; return n }
+
 // Focusable makes the node one that [Focus] can move to.
 func (n TextNode) Focusable() TextNode { n.focusable = true; return n }
 

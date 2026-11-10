@@ -62,6 +62,13 @@ func (n ListNode) On(handlers ...on.Handler) ListNode {
 	return n
 }
 
+// Selectable lets the left button select text in the list by dragging over
+// it, as a terminal selects text, but kept inside the list. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+func (n ListNode) Selectable() ListNode { n.selectable = true; return n }
+
 // View implements [Child], drawing the node at its natural size.
 func (n ListNode) View() string { return Render(0, 0, n) }
 

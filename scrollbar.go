@@ -180,7 +180,7 @@ func (r *renderer) paintScrollbar(i int, b *box, n ScrollbarNode, clip image.Rec
 	}
 	if n.onScroll != nil {
 		b.meta.handlers = append(b.meta.handlers[:0:0], r.scrollbarDrag(n, length, start, end))
-		r.addEntry(b, rect.Intersect(clip), clip, parent)
+		r.addEntry(i, rect.Intersect(clip), clip, parent)
 	}
 
 	thumb, glyph := image.Rect(rect.Min.X, rect.Min.Y+start, rect.Max.X, rect.Min.Y+end), n.thumb

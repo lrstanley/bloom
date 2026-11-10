@@ -122,6 +122,13 @@ func (n SlotNode) MoveWith(effects ...fx.Effect) SlotNode {
 	return n
 }
 
+// Selectable lets the left button select text in the slot by dragging over
+// it, as a terminal selects text, but kept inside the slot. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+func (n SlotNode) Selectable() SlotNode { n.selectable = true; return n }
+
 // Focusable makes the slot one that [Focus] can move to.
 func (n SlotNode) Focusable() SlotNode { n.focusable = true; return n }
 
@@ -200,6 +207,13 @@ func (n FlexNode) On(handlers ...on.Handler) FlexNode {
 	n.handlers = with(n.handlers, handlers)
 	return n
 }
+
+// Selectable lets the left button select text in the row or column by dragging over
+// it, as a terminal selects text, but kept inside the row or column. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+func (n FlexNode) Selectable() FlexNode { n.selectable = true; return n }
 
 // View implements [Child], drawing the node at its natural size.
 func (n FlexNode) View() string { return Render(0, 0, n) }
@@ -303,6 +317,14 @@ func (n BoxNode) BorderFx(t float64, effects ...fx.Effect) BoxNode {
 	n.borderT, n.borderFx = t, effects
 	return n
 }
+
+// Selectable lets the left button select text in the box by dragging over
+// it, as a terminal selects text, but kept inside the box. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+// Only what is inside the box's frame is selected.
+func (n BoxNode) Selectable() BoxNode { n.selectable = true; return n }
 
 // View implements [Child], drawing the node at its natural size.
 func (n BoxNode) View() string { return Render(0, 0, n) }
@@ -601,6 +623,13 @@ func (n LayerNode) MoveWith(effects ...fx.Effect) LayerNode {
 	n.moves = effects
 	return n
 }
+
+// Selectable lets the left button select text in the layer by dragging over
+// it, as a terminal selects text, but kept inside the layer. Holding alt as
+// the drag starts selects a rectangle of cells instead. The innermost
+// selectable node under the pointer takes the drag, unless a node inside it
+// has an [on.Drag] handler. See [Root.Selection] for the text selected.
+func (n LayerNode) Selectable() LayerNode { n.selectable = true; return n }
 
 // View implements [Child], drawing the layer's child at its natural size.
 func (n LayerNode) View() string { return Render(0, 0, n.child) }
