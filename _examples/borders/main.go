@@ -42,6 +42,7 @@ var (
 
 	panel = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
 	item  = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
+	text  = lipgloss.NewStyle().Foreground(fg)
 	title = lipgloss.NewStyle().Foreground(fg).Bold(true).Padding(0, 1)
 	label = lipgloss.NewStyle().Foreground(muted).Padding(0, 1)
 	tab   = lipgloss.NewStyle().Foreground(muted)
@@ -52,11 +53,10 @@ var (
 	side  = lipgloss.NewStyle().Foreground(pink).Bold(true)
 )
 
+// The viewports of the list and the log, which their scrollbars follow.
 const (
-	paneList = "list" // the content of the scrolled list, which its scrollbar follows
-	paneBox  = "box"  // the list's box, for the size of a page
-	paneLog  = "log"  // the content of the log, scrolled sideways
-	paneLogs = "logs" // the log's box, for the width in view
+	paneList = "list"
+	paneLog  = "log"
 )
 
 // filters are the tabs over the list, each a prefix of the paths it shows.
@@ -68,11 +68,12 @@ type model struct {
 	phase  anim.Sequence
 	paused bool
 	filter int
-	offset int // rows the list is scrolled
-	logX   int // columns the log is scrolled
 	status string
 	paths  []string
-	log    string
+	listed *bloom.Buffer // the paths the filter shows
+	listAt bloom.ViewportPos
+	log    *bloom.Buffer
+	logAt  bloom.ViewportPos
 }
 
 func newModel() *model {
@@ -88,13 +89,16 @@ func newModel() *model {
 		log = append(log, fmt.Sprintf("12:0%d:41 read %s by token hvs.CAESIJ%04d (policy=default,%s-reader) in %dms, cache=miss, lease renewed",
 			i, p, 7919*i%10000, strings.Split(p, "/")[1], 3+i*7))
 	}
-	return &model{
+	m := &model{
 		ui:     bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
 		phase:  anim.NewLoop(4 * time.Second),
 		paths:  paths,
-		log:    strings.Join(log, "\n"),
+		listed: &bloom.Buffer{},
+		log:    bloom.NewBuffer(strings.Join(log, "\n")),
 		status: "drag a scrollbar, or click an icon on the list's left side",
 	}
+	m.setFilter(0)
+	return m
 }
 
 func main() {
@@ -114,17 +118,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 	case tea.KeyPressMsg:
+		list, _ := m.ui.Frame().Viewport(paneList)
+		log, _ := m.ui.Frame().Viewport(paneLog)
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up":
-			m.scrollTo(m.offset - 1)
+			m.listAt = list.Up(1)
 		case "down":
-			m.scrollTo(m.offset + 1)
+			m.listAt = list.Down(1)
 		case "left":
-			m.scrollLogTo(m.logX - 4)
+			m.logAt = log.Left(4)
 		case "right":
-			m.scrollLogTo(m.logX + 4)
+			m.logAt = log.Right(4)
 		case "tab":
 			m.setFilter((m.filter + 1) % len(filters))
 		case "space", " ":
@@ -154,27 +160,9 @@ func (m *model) shown() []string {
 	return out
 }
 
-// page returns how many rows of the list are in view, from the last frame.
-func (m *model) page() int {
-	r, _ := m.ui.Frame().Rect(paneBox)
-	return max(r.Dy()-2, 1)
-}
-
-// scrollTo scrolls the list to row offset, keeping its last page in view.
-func (m *model) scrollTo(offset int) {
-	m.offset = min(max(offset, 0), max(len(m.shown())-m.page(), 0))
-}
-
-// scrollLogTo scrolls the log to column x, keeping the ends of its longest
-// line in view, from the last frame.
-func (m *model) scrollLogTo(x int) {
-	content, _ := m.ui.Frame().Rect(paneLog)
-	view, _ := m.ui.Frame().Rect(paneLogs)
-	m.logX = min(max(x, 0), max(content.Dx()-(view.Dx()-2), 0))
-}
-
 func (m *model) setFilter(i int) {
-	m.filter, m.offset = i, 0
+	m.filter, m.listAt = i, bloom.ViewportPos{}
+	m.listed.SetLines(m.shown()...)
 }
 
 func (m *model) View() tea.View {
@@ -208,18 +196,20 @@ func (m *model) layout() bloom.Child {
 // position on its border, icons down its left side, and a scrollbar on its
 // right side that can be dragged.
 func (m *model) list(t float64) bloom.Child {
-	paths := m.shown()
-	box := bloom.Box(panel, bloom.Scroll(
-		bloom.Text(strings.Join(paths, "\n")).Style(item).ID(paneList),
-		m.offset,
-	)).ID(paneBox).
-		On(on.Scroll(func(_, dy int) tea.Cmd { m.scrollTo(m.offset + dy); return nil })).
+	// The position is where the list is now, a page as tall as it was in
+	// the last frame, which the frame itself is a step behind while nothing
+	// else draws a new one.
+	v, _ := m.ui.Frame().Viewport(paneList)
+	n, rows := m.listed.Len(), max(v.Rows, 1)
+	first := min(max(m.listAt.Line, 0), max(n-rows, 0))
+	// The scrollbar drags the list with the list's OnScroll.
+	box := bloom.Box(panel.Padding(0, 1), bloom.Viewport(m.listed).ID(paneList).At(m.listAt).Style(text).
+		OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.listAt = p; return nil })).
 		Edge(bloom.Top, bloom.Start, bloom.Text("◆ secrets").Style(title)).
 		Edge(bloom.Top, bloom.End, m.tabs()).
 		Edge(bloom.Bottom, bloom.End, bloom.Text(fmt.Sprintf("%d-%d of %d",
-			min(m.offset+1, len(paths)), min(m.offset+m.page(), len(paths)), len(paths))).Style(label)).
-		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneList).Thumb("┃", thumb).
-			OnScroll(func(offset int) tea.Cmd { m.scrollTo(offset); return nil }))
+			min(first+1, n), min(first+rows, n), n)).Style(label)).
+		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneList).Thumb("┃", thumb))
 	// Single glyphs down the side, each one a button.
 	for _, a := range []struct{ glyph, does string }{{"+", "new secret"}, {"✎", "edit"}, {"⧉", "copy path"}, {"✕", "delete"}} {
 		box = box.Edge(bloom.Left, bloom.Start, bloom.Text(a.glyph).Style(icon).HoverStyle(onTip).
@@ -245,10 +235,10 @@ func (m *model) tabs() bloom.Child {
 // logBox is a log of long lines, which scroll sideways rather than wrap,
 // with a horizontal scrollbar on its bottom edge and its name down its side.
 func (m *model) logBox() bloom.Child {
-	return bloom.Box(panel, bloom.Scroll(bloom.Text(m.log).Style(item).ID(paneLog), 0).X(m.logX)).ID(paneLogs).
+	return bloom.Box(panel.Padding(0, 1), bloom.Viewport(m.log).ID(paneLog).At(m.logAt).Style(text).
+		OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.logAt = p; return nil })).
 		Edge(bloom.Left, bloom.Center, bloom.Text("LOG").Style(side)).
-		Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().Thumb("━", thumb).
-			OnScroll(func(x int) tea.Cmd { m.scrollLogTo(x); return nil }))
+		Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().Thumb("━", thumb))
 }
 
 // effectBox is a box with one looping border effect, at phase t, described

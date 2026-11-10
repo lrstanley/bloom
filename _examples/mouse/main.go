@@ -48,15 +48,8 @@ var (
 	divider  = lipgloss.NewStyle().Foreground(muted)
 	grabbed  = divider.Foreground(accent)
 	heading  = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	code     = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
+	code     = lipgloss.NewStyle().Foreground(fg)
 	status   = lipgloss.NewStyle().Foreground(muted)
-)
-
-// The IDs of the reader's text and the space it scrolls in, to know how far
-// it can scroll.
-const (
-	readerText = "text"
-	readerView = "view"
 )
 
 var files = []string{"main.go", "model.go", "view.go", "update.go", "styles.go", "keys.go"}
@@ -67,12 +60,18 @@ type model struct {
 	split    int // the sidebar's width, which dragging the divider sets
 	selected int
 	opened   string
-	offset   int // the reader's scroll position
+	reader   *bloom.Buffer // the text of the opened file
+	at       bloom.ViewportPos
 	status   string
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithClipboard(clip.Write)), split: 22, status: "hover, click, or double click a file; drag the divider or over the text"}
+	return &model{
+		ui:     bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithClipboard(clip.Write)),
+		split:  22,
+		reader: bloom.NewBuffer("double click a file to open it"),
+		status: "hover, click, or double click a file; drag the divider or over the text",
+	}
 }
 
 func (m *model) Init() tea.Cmd { return nil }
@@ -105,25 +104,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// scroll scrolls the reader by dy rows, as far as the text on screen, which
-// wraps when the reader is narrow, goes past the space it is shown in.
-func (m *model) scroll(dy int) {
-	f := m.ui.Frame()
-	text, _ := f.Rect(readerText)
-	view, _ := f.Rect(readerView)
-	m.offset = min(max(m.offset+dy, 0), max(text.Dy()-view.Dy(), 0))
-}
-
-// contents is the text of the opened file.
-func (m *model) contents() string {
-	if m.opened == "" {
-		return "double click a file to open it"
+// open opens file f in the reader, from its top.
+func (m *model) open(f string) {
+	lines := make([]string, 40)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("%2d  // line %d of %s", i+1, i+1, f)
 	}
-	var b strings.Builder
-	for i := range 40 {
-		fmt.Fprintf(&b, "%2d  // line %d of %s\n", i+1, i+1, m.opened)
-	}
-	return strings.TrimSuffix(b.String(), "\n")
+	m.reader.SetLines(lines...)
+	m.opened, m.at, m.status = f, bloom.ViewportPos{}, "opened "+f
 }
 
 func (m *model) View() tea.View {
@@ -140,14 +128,16 @@ func (m *model) View() tea.View {
 func (m *model) layout() bloom.Child {
 	reader := bloom.Column(
 		bloom.Text(cmp.Or(m.opened, "reader")).Style(heading.Padding(0, 1)),
-		bloom.Fill(bloom.Scroll(bloom.Text(m.contents()).Style(code).ID(readerText).Selectable(), m.offset)).ID(readerView),
+		// The text wraps when the reader is narrow, and the wheel scrolls it.
+		bloom.Fill(bloom.Box(lipgloss.NewStyle().Padding(0, 1), bloom.Viewport(m.reader).At(m.at).
+			Wrap(bloom.WrapWords).Style(code).Selectable().
+			OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.at = p; return nil }))),
 	)
 	return bloom.Column(
 		bloom.Fill(bloom.Row(
 			bloom.Fixed(m.split, bloom.Box(panel, m.fileList())),
 			bloom.Fixed(1, m.divider()),
-			bloom.Fill(bloom.Box(panel, reader)).
-				On(on.Scroll(func(_, dy int) tea.Cmd { m.scroll(dy * 3); return nil })),
+			bloom.Fill(bloom.Box(panel, reader)),
 		)),
 		bloom.Text(" "+m.status).Style(status).Truncate(),
 	)
@@ -167,7 +157,7 @@ func (m *model) fileList() bloom.Child {
 				return nil
 			}),
 			on.DoubleClick(func() tea.Cmd {
-				m.opened, m.offset, m.status = f, 0, "opened "+f
+				m.open(f)
 				return nil
 			}),
 		))

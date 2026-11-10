@@ -5,7 +5,7 @@
 // Command selection shows selecting text with the mouse, and copying it,
 // in four kinds of node:
 //
-//   - The log is one selectable text, so a selection there takes lines
+//   - The log is a selectable viewport, so a selection there takes lines
 //     scrolled out of sight, and wheels with the text. Dragging past its
 //     top or bottom scrolls it.
 //   - The request is one selectable column of fields, so a selection runs
@@ -40,7 +40,6 @@ import (
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/_examples/internal/clip"
 	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -69,12 +68,8 @@ var (
 	}
 )
 
-// The IDs of the log's text and the space it scrolls in, to know how far it
-// can scroll.
-const (
-	logText = "log"
-	logView = "log view"
-)
+// logText is the ID of the log's viewport, to select all of it.
+const logText = "log"
 
 type field struct{ name, value string }
 
@@ -124,11 +119,11 @@ func (s secret) SelectedText(span bloom.Span) string {
 type model struct {
 	ui       *bloom.Root
 	w, h     int
-	offset   int
+	at       bloom.ViewportPos // where the log is scrolled to
 	dialog   bool
 	autoCopy bool
 	status   string
-	log      string
+	log      *bloom.Buffer
 }
 
 func newModel() *model {
@@ -141,7 +136,7 @@ func newModel() *model {
 			bloom.WithSelectionStyle(lipgloss.NewStyle().Background(theme.SelectionBg)),
 			bloom.WithClipboard(clip.Write),
 		),
-		log:    logLines(),
+		log:    bloom.NewBuffer(logLines()),
 		status: "drag over any text to select it",
 	}
 }
@@ -230,14 +225,6 @@ func preview(s string) string {
 	return s
 }
 
-// scroll scrolls the log by dy rows, as far as it goes past its view.
-func (m *model) scroll(dy int) {
-	f := m.ui.Frame()
-	text, _ := f.Rect(logText)
-	view, _ := f.Rect(logView)
-	m.offset = min(max(m.offset+dy, 0), max(text.Dy()-view.Dy(), 0))
-}
-
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
@@ -249,13 +236,11 @@ func (m *model) View() tea.View {
 }
 
 func (m *model) layout() bloom.Child {
-	logPane := bloom.Box(panel, bloom.Column(bloom.Fill(bloom.Scroll(
-		// The whole text is selectable, so a selection takes what is
-		// scrolled out of sight too.
-		bloom.Text(m.log).ID(logText).Selectable(), m.offset,
-	)).ID(logView))).
-		Edge(bloom.Top, bloom.Start, bloom.Text("server.log").Style(title)).
-		On(on.Scroll(func(_, dy int) tea.Cmd { m.scroll(dy * 2); return nil }))
+	// All of the log is selectable, so a selection takes what is scrolled
+	// out of sight too.
+	logPane := bloom.Box(panel, bloom.Viewport(m.log).ID(logText).At(m.at).Selectable().
+		OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.at = p; return nil })).
+		Edge(bloom.Top, bloom.Start, bloom.Text("server.log").Style(title))
 
 	rows := make([]bloom.Child, 0, len(request))
 	for _, f := range request {
