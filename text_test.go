@@ -335,3 +335,41 @@ func TestStack(t *testing.T) {
 		}
 	}
 }
+
+// TestStyledTextSizeKept checks that the size of a styled text, kept from
+// frame to frame rather than rendered again, follows its text, style, and
+// width as they change.
+func TestStyledTextSizeKept(t *testing.T) {
+	t.Parallel()
+
+	r := New()
+	after := func(w int, s string, style lipgloss.Style) int {
+		t.Helper()
+		r.Render(w, 20, Column(Text(s).Style(style), Text("after").ID("after")))
+		rect, ok := r.Frame().Rect("after")
+		if !ok {
+			t.Fatal("no text after")
+		}
+		return rect.Min.Y
+	}
+	plain := lipgloss.NewStyle()
+	words := "one two three four five six"
+	for _, tc := range []struct {
+		w     int
+		s     string
+		style lipgloss.Style
+		want  int
+	}{
+		{10, words, plain, 3},
+		{10, words, plain, 3},
+		{20, words, plain, 2},
+		{20, words + " seven eight nine", plain, 3},
+		{20, words + " seven eight nine", plain.PaddingTop(2), 5},
+		{20, words + " seven eight nine", plain.Width(10), 5},
+		{40, words, plain, 1},
+	} {
+		if got := after(tc.w, tc.s, tc.style); got != tc.want {
+			t.Errorf("%q at %d: after it at row %d, want %d", tc.s, tc.w, got, tc.want)
+		}
+	}
+}

@@ -26,6 +26,8 @@ type entry struct {
 	selectable              bool
 	list                    ListView
 	isList                  bool
+	vp                      ViewportView
+	isVP                    bool
 }
 
 // nodeKey is what a node is followed by from frame to frame: its ID, or
@@ -51,6 +53,9 @@ func (r *renderer) addEntry(i int, vis, clip image.Rectangle, parent int) int {
 	}
 	if _, ok := b.child.(ListNode); ok {
 		e.list, e.isList = b.list, true
+	}
+	if l := r.viewportOf(i); l != nil {
+		e.vp, e.isVP = l.view, true
 	}
 	if b.modal {
 		e.block = clip
@@ -95,6 +100,16 @@ func (f *Frame) List[K comparable](id K) (ListView, bool) {
 		return f.entries[i].list, true
 	}
 	return ListView{}, false
+}
+
+// Viewport returns where the [Viewport] with ID id was scrolled to, and
+// whether it is in the frame. Use it in Update to scroll from where it
+// actually was, with the methods of [ViewportView].
+func (f *Frame) Viewport[K comparable](id K) (ViewportView, bool) {
+	if i := f.index(id); i >= 0 && f.entries[i].isVP {
+		return f.entries[i].vp, true
+	}
+	return ViewportView{}, false
 }
 
 // Hit returns the IDs of the nodes at x, y on screen that mouse events

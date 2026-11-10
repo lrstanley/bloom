@@ -217,7 +217,8 @@ type selLeaf struct {
 	text       string         // the string of a styled text node, to find where it wrapped, or of one cut to fit
 	truncated  bool           // text was cut to fit, with "…"
 	source     TextSource
-	inner      bool // cells drawn by a TextSource's layout, which are not text of their own
+	inner      bool      // cells drawn by a TextSource's layout, which are not text of their own
+	vp         *vpLayout // the layout of a viewport, whose rows are drawn from its buffer when wanted
 }
 
 // selRange is a selection as laid out in a frame: from leaf a at pa to
@@ -245,18 +246,31 @@ func newSelStyle(st lipgloss.Style, set bool) selStyle {
 	if !set {
 		return s
 	}
-	s.fg, s.bg = colorOf(st.GetForeground()), colorOf(st.GetBackground())
+	c := cellStyle(st)
+	s.fg, s.bg, s.attrs = c.Fg, c.Bg, c.Attrs&^uv.AttrReverse
+	s.underline, s.reverse = c.Underline != 0, c.Attrs&uv.AttrReverse != 0
+	return s
+}
+
+// cellStyle returns the colors and attributes of a Lip Gloss style, as a
+// cell is drawn in them.
+func cellStyle(style lipgloss.Style) uv.Style {
+	var s uv.Style
+	s.Fg, s.Bg = colorOf(style.GetForeground()), colorOf(style.GetBackground())
 	attr := func(on bool, a uint8) {
 		if on {
-			s.attrs |= a
+			s.Attrs |= a
 		}
 	}
-	attr(st.GetBold(), uv.AttrBold)
-	attr(st.GetItalic(), uv.AttrItalic)
-	attr(st.GetFaint(), uv.AttrFaint)
-	attr(st.GetStrikethrough(), uv.AttrStrikethrough)
-	attr(st.GetBlink(), uv.AttrBlink)
-	s.underline, s.reverse = st.GetUnderline(), st.GetReverse()
+	attr(style.GetBold(), uv.AttrBold)
+	attr(style.GetItalic(), uv.AttrItalic)
+	attr(style.GetFaint(), uv.AttrFaint)
+	attr(style.GetStrikethrough(), uv.AttrStrikethrough)
+	attr(style.GetBlink(), uv.AttrBlink)
+	attr(style.GetReverse(), uv.AttrReverse)
+	if style.GetUnderline() {
+		s.Underline = uv.UnderlineSingle
+	}
 	return s
 }
 
@@ -327,6 +341,15 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, ListNode, OverlayNode, LayerNode, centerNode, transitionNode:
 		for _, k := range r.kidsOf(i) {
 			kid(k, inner)
+		}
+	case ViewportNode:
+		if l := r.viewportOf(i); l != nil && !inner {
+			key := nodeKey{path: path}
+			if b.meta.id != nil {
+				key = nodeKey{id: b.meta.id}
+			}
+			rect, shown := viewportLeaf(l, vis)
+			r.leaves = append(r.leaves, selLeaf{key: key, box: i, rect: rect, clip: shown, vp: l})
 		}
 	case drawableNode, ScrollbarNode:
 	case Layouter:
@@ -491,6 +514,9 @@ func (r *renderer) resolveSel() (selRange, bool) {
 
 // leafCell returns the cell at x, y of leaf i, or nil where it has none.
 func (r *renderer) leafCell(i, x, y int) *uv.Cell {
+	if l := &r.leaves[i]; l.vp != nil {
+		return r.cache.Get(r.vpRowCells(l.vp, y)).CellAt(x, 0)
+	}
 	if src := r.cells(&r.leaves[i]); src != nil {
 		return src.CellAt(x, y)
 	}
@@ -501,6 +527,9 @@ func (r *renderer) leafCell(i, x, y int) *uv.Cell {
 func (r *renderer) cellAt(p image.Point) *uv.Cell {
 	for i := len(r.leaves) - 1; i >= 0; i-- {
 		if l := &r.leaves[i]; p.In(l.rect) {
+			if l.vp != nil {
+				return r.leafCell(i, p.X-l.rect.Min.X, p.Y-l.rect.Min.Y)
+			}
 			if src := r.cells(l); src != nil {
 				return src.CellAt(p.X-l.rect.Min.X, p.Y-l.rect.Min.Y)
 			}
@@ -877,6 +906,9 @@ func (r *renderer) selectedText() string {
 
 // leafText returns the text of leaf l from from to to, in reading order.
 func (r *renderer) leafText(l *selLeaf, from, to image.Point) string {
+	if l.vp != nil {
+		return vpText(l.vp, from, to, false)
+	}
 	if l.source != nil {
 		return l.source.SelectedText(Span{Start: from, End: to, Size: Size{W: l.rect.Dx(), H: l.rect.Dy()}})
 	}
@@ -917,6 +949,9 @@ func (r *renderer) leafText(l *selLeaf, from, to image.Point) string {
 // blockText returns the text of block selection g, a line to a row.
 func (r *renderer) blockText(g *selRange) string {
 	area := r.blockRect(g)
+	if l := &r.leaves[g.a]; g.a == g.b && l.vp != nil {
+		return vpText(l.vp, area.Min.Sub(l.rect.Min), area.Max.Sub(l.rect.Min).Sub(image.Pt(1, 1)), true)
+	}
 	if l := &r.leaves[g.a]; g.a == g.b && l.source != nil {
 		return l.source.SelectedText(Span{
 			Start: area.Min.Sub(l.rect.Min), End: area.Max.Sub(l.rect.Min).Sub(image.Pt(1, 1)), Block: true,

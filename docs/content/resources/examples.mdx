@@ -60,6 +60,17 @@ Mouse handlers with no IDs: hover styles, click and double click, wheel scrollin
 See also: [Mouse events](/input/mouse). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), or
 `go run ./mouse`.
 
+## logs
+
+![The logs example: a quarter of a million log lines followed as they grow, scrolled, unwrapped and scrolled sideways, searched with matches marked, and a wrapped line selected and copied](/demos/logs.webp)
+
+A `Viewport` tailing a log of a quarter of a million lines that grows as it's shown: following the end, wrapping at
+words or scrolling sideways, line numbers, a search that marks its matches and moves between them, scrollbars on the
+border, and selecting text across the rows of a wrapped line.
+
+See also: [Scrolling](/layout/scrolling#show-a-lot-of-text).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/logs), or `go run ./logs`.
+
 ## contextmenu
 
 ![The contextmenu example: right click menus on a file list and its empty space, duplicating, adding, sorting, and deleting files, with menus that open to the left near the edge](/demos/contextmenu.webp)
@@ -85,8 +96,8 @@ See also: [Dialogs and modals](/layers/dialogs), [Focus](/input/focus), [Dropdow
 ![The borders example: a list with a title, clickable filter tabs, its position, and icon buttons on its border, its scrollbar being dragged and clicked, a log scrolled sideways with a horizontal scrollbar and its name down its side, next to boxes looping each border effect](/demos/borders.webp)
 
 A list with a title, clickable filter tabs, icon buttons, and its position on its border, scrollbars on the border
-with `ScrollbarOf` that can be dragged, a log scrolled sideways with `X`, text down a side, and each looping border
-effect.
+with `ScrollbarOf` that can be dragged, a log in a `Viewport` scrolled sideways, text down a side, and each looping
+border effect.
 
 See also: [Text, boxes, and alignment](/layout/text-and-boxes#put-titles-and-more-on-a-border),
 [Scrolling](/layout/scrolling#show-a-scrollbar), [Effects reference](/reference/effects#borders).

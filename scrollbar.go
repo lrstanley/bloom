@@ -142,6 +142,12 @@ func (e *engine) scrollbarOf(n ScrollbarNode) (ScrollbarNode, bool) {
 		n.total, n.visible, n.offset = v.Count, v.Visible, v.First
 		return n, true
 	}
+	if vp, ok := e.boxes[i].child.(ViewportNode); ok {
+		if l := e.viewportOf(i); l != nil {
+			return viewportScrollbar(n, vp, l.view), true
+		}
+		return n, false
+	}
 	// The scroll's child, which is laid out whole.
 	for k, p := i, e.boxes[i].parent; p >= 0; k, p = p, e.boxes[p].parent {
 		if _, ok := e.boxes[p].child.(ScrollNode); ok {
@@ -155,6 +161,31 @@ func (e *engine) scrollbarOf(n ScrollbarNode) (ScrollbarNode, bool) {
 		}
 	}
 	return n, false
+}
+
+// viewportScrollbar fills in scrollbar n for viewport vp, shown as v: in
+// rows, or in columns when horizontal. Without an OnScroll of its own, it
+// scrolls the viewport with the viewport's.
+func viewportScrollbar(n ScrollbarNode, vp ViewportNode, v ViewportView) ScrollbarNode {
+	if n.horizontal {
+		n.total, n.visible, n.offset = v.Widest, v.Width, v.Pos.X
+	} else {
+		n.total, n.visible, n.offset = v.TotalRows, v.Rows, v.Row
+	}
+	if n.onScroll == nil && vp.onScroll != nil {
+		fn, horizontal := vp.onScroll, n.horizontal
+		n.onScroll = func(offset int) tea.Cmd {
+			p := v.AtRow(offset)
+			if horizontal {
+				p = v.Right(offset - v.Pos.X)
+			}
+			if p == v.Pos {
+				return nil
+			}
+			return fn(p)
+		}
+	}
+	return n
 }
 
 // paintScrollbar adds the ops for scrollbar n, box b at index i, clipped to

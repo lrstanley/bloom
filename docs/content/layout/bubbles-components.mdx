@@ -18,6 +18,10 @@ Many components also need to know their size, because they decide what to render
 many lines as its height, a list pages by its height, and a table truncates columns by its width. bloom decides
 those sizes during layout, so you have to pass them to the component.
 
+For scrolling text, bloom has a [viewport of its own](/layout/scrolling#show-a-lot-of-text), `bloom.Viewport`, which
+is given its size by the layout, so it needs none of this. It also draws only the lines in sight, however long the
+text is, and keeps the same line at the top as lines wrap differently.
+
 ## Give a component its size
 
 Give the slot the component is in an ID, then use [`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve)

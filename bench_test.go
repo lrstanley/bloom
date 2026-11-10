@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -201,5 +202,124 @@ func BenchmarkRenderMoving(b *testing.B) {
 	for i := 0; b.Loop(); i++ {
 		now = now.Add(time.Second / 120)
 		r.View(benchW, benchH, tree(1+i/60))
+	}
+}
+
+// BenchmarkRenderWrappedText scrolls a styled text of ten thousand lines,
+// wrapped to fit, which is measured once rather than wrapped every frame.
+func BenchmarkRenderWrappedText(b *testing.B) {
+	lines := make([]string, 10_000)
+	for i := range lines {
+		lines[i] = benchLogLine(i)
+	}
+	text := Text(strings.Join(lines, "\n")).Style(benchItem)
+	r := New(WithColors(color.White, color.Black))
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		r.View(benchW, benchH, Box(benchBorder, Scroll(text, i*3%10_000)))
+	}
+}
+
+// The viewport benchmarks draw a buffer of log lines, styled, of mixed
+// lengths, in a bordered viewport filling a 200×60 terminal, with line
+// numbers. Their cost should not grow with the lines in the buffer.
+
+const benchLines = 1_000_000
+
+var (
+	benchLogLines []string
+	benchLogOnce  sync.Once
+)
+
+func benchLogLine(i int) string {
+	return fmt.Sprintf("\x1b[2m%07d\x1b[m GET /api/v1/items/%d served in %dms by worker-%02d %s",
+		i, i*7, i%97, i%32, strings.Repeat("lorem ipsum ", 3+i%24))
+}
+
+func benchBuffer(b *testing.B, n int) *Buffer {
+	b.Helper()
+	benchLogOnce.Do(func() {
+		benchLogLines = make([]string, benchLines)
+		for i := range benchLogLines {
+			benchLogLines[i] = benchLogLine(i)
+		}
+	})
+	var buf Buffer
+	buf.Append(benchLogLines[:n]...)
+	return &buf
+}
+
+func benchViewport(buf *Buffer, pos ViewportPos, wrap WrapMode) Child {
+	return Box(benchBorder, Viewport(buf).ID("log").At(pos).Wrap(wrap).LineNumbers(benchItem)).
+		Edge(Right, Stretch, ScrollbarOf("log"))
+}
+
+// BenchmarkViewportScroll scrolls through a million lines, three rows a
+// frame.
+func BenchmarkViewportScroll(b *testing.B) {
+	buf := benchBuffer(b, benchLines)
+	r := New(WithColors(color.White, color.Black))
+	r.View(benchW, benchH, benchViewport(buf, ViewportPos{}, WrapNone))
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		r.View(benchW, benchH, benchViewport(buf, ViewportPos{Line: i * 3 % benchLines}, WrapNone))
+	}
+}
+
+// BenchmarkViewportScrollWrapped scrolls through a million lines wrapped at
+// words, three rows a frame.
+func BenchmarkViewportScrollWrapped(b *testing.B) {
+	buf := benchBuffer(b, benchLines)
+	r := New(WithColors(color.White, color.Black))
+	r.View(benchW, benchH, benchViewport(buf, ViewportPos{}, WrapWords))
+	v, _ := r.Frame().Viewport("log")
+	b.ReportAllocs()
+	for b.Loop() {
+		r.View(benchW, benchH, benchViewport(buf, v.Pos, WrapWords))
+		v, _ = r.Frame().Viewport("log")
+		if v.AtBottom() {
+			v.Pos = ViewportPos{}
+		} else {
+			v.Pos = v.Down(3)
+		}
+	}
+}
+
+// BenchmarkViewportTail appends a line a frame to a million, wrapped at
+// words, and follows the end, as tailing a log does.
+func BenchmarkViewportTail(b *testing.B) {
+	buf := benchBuffer(b, benchLines)
+	r := New(WithColors(color.White, color.Black))
+	r.View(benchW, benchH, benchViewport(buf, ViewportEnd, WrapWords))
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		buf.Append(benchLogLine(benchLines + i))
+		r.View(benchW, benchH, benchViewport(buf, ViewportEnd, WrapWords))
+	}
+}
+
+// BenchmarkViewportResize draws a hundred thousand lines wrapped at words
+// at a width that changes every frame, as when the pane it is in animates
+// open, which wraps every line again.
+func BenchmarkViewportResize(b *testing.B) {
+	buf := benchBuffer(b, benchLines/10)
+	r := New(WithColors(color.White, color.Black))
+	b.ReportAllocs()
+	for i := 0; b.Loop(); i++ {
+		r.View(benchW-i%60, benchH, benchViewport(buf, ViewportPos{Line: 5000}, WrapWords))
+	}
+}
+
+// BenchmarkViewportSetContent replaces a million lines with SetContent and
+// draws the first frame of them.
+func BenchmarkViewportSetContent(b *testing.B) {
+	benchBuffer(b, 0)
+	s := strings.Join(benchLogLines, "\n")
+	var buf Buffer
+	r := New(WithColors(color.White, color.Black))
+	b.ReportAllocs()
+	for b.Loop() {
+		buf.SetContent(s)
+		r.View(benchW, benchH, benchViewport(&buf, ViewportPos{}, WrapWords))
 	}
 }

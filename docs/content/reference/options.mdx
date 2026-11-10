@@ -21,8 +21,9 @@ is on [pkg.go.dev](https://pkg.go.dev/github.com/lrstanley/bloom).
 | [`Centered(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Centered) | a child at its natural size in the middle of its space |
 | [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
 | [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
-| [`ScrollbarOf(id)`](https://pkg.go.dev/github.com/lrstanley/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` with ID `id` |
+| [`ScrollbarOf(id)`](https://pkg.go.dev/github.com/lrstanley/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` or `Viewport` with ID `id` |
 | [`List(count, item)`](https://pkg.go.dev/github.com/lrstanley/bloom#List) | the items of a list that fit, built by `item(i)` only for those; `.Offset(i)`, `.Keep(i)`, `.Gap(n)` |
+| [`Viewport(buf)`](https://pkg.go.dev/github.com/lrstanley/bloom#Viewport) | the lines of a [`Buffer`](https://pkg.go.dev/github.com/lrstanley/bloom#Buffer) in sight, from a position kept in the model, drawing only those |
 | [`Overlay(base, layers...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Overlay) | layers drawn over a base |
 | [`Layer(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Layer) | a layer for an overlay, centered at its natural size |
 | [`Transition(t, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Transition) | a child drawn with effects at progress `t` |
@@ -55,6 +56,27 @@ Any value with a `View() string` method can also be a child.
 | `Horizontal()` | one row tall, for content scrolled sideways |
 | `OnScroll(fn)` | drag the thumb, or click to jump, calling `fn` with the offset to scroll to |
 | `Thumb(glyph, style)`, `Track(glyph, style)` | how the part in view and the rest look; no track glyph leaves what's beneath |
+
+## Viewport options
+
+| Method | Does |
+| --- | --- |
+| `At(pos)` | where it's scrolled to: a `ViewportPos` of the line at the top, the rows of it above, and columns sideways; `ViewportEnd` is the end |
+| `Wrap(mode)` | `WrapNone` (default, scrolled sideways), `WrapWords`, or `WrapChars` |
+| `Follow()` | stay at the end as lines are appended, while it's there |
+| `OnScroll(fn)` | the wheel, a `ScrollbarOf` it, and selecting past its edge scroll it, calling `fn` with the position |
+| `LineNumbers(style)`, `Gutter(width, fn)` | columns beside the lines: their numbers, or what `fn` returns for each row |
+| `Marks(fn)`, `MarkMatches(re, style)` | parts of the lines in sight drawn in styles of their own, such as matches of a search |
+| `Style(style)` | colors and attributes for all of its rows, under the lines' own; put it in a `Box` for padding |
+| `LineStyle(fn)` | a style for each line in sight, across the whole row, under its own |
+| `Selectable()` | select its text with the mouse, all of it, with wrapped rows joined |
+
+| `Buffer` method | Does |
+| --- | --- |
+| `NewBuffer(s)`, `SetContent(s)`, `SetLines(lines...)` | replace the lines |
+| `Append(lines...)` | add lines, measuring only them |
+| `Len()`, `Line(i)`, `Text(i)`, `String()` | read lines back, with or without their styles |
+| `Find(re, line, at)`, `FindBefore(re, line, at)` | the next or previous match of a regular expression |
 
 ## Slots
 

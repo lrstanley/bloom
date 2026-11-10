@@ -21,8 +21,106 @@ func (m *model) layout() bloom.Child {
 }
 ```
 
-`Scroll` measures and draws its whole child, which is fine for an article or a help screen. For a long log or
-a table with thousands of rows, use a [list](#show-a-long-list) instead, which only lays out the items in view.
+`Scroll` measures and draws its whole child, which is fine for an article or a help screen. For a long log, a
+file, or anything else that's lines of text, use a [viewport](#show-a-lot-of-text) instead, and for thousands of
+rows of components, a [list](#show-a-long-list). Both only lay out what's in view.
+
+## Show a lot of text
+
+`bloom.Viewport(buf)` shows the lines of a `bloom.Buffer`, as many as fit. The buffer lives in your model and holds
+the text, and the viewport only lays out and draws the lines in sight, so a log of a million lines costs no more
+to draw, or to append a line to, than one of a hundred:
+
+```go
+type model struct {
+	ui  *bloom.Root
+	log *bloom.Buffer
+	pos bloom.ViewportPos
+}
+
+// In Update, as lines arrive:
+m.log.Append(line)
+
+// In the layout:
+bloom.Box(panel, bloom.Viewport(m.log).ID(paneLog).At(m.pos).
+	OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.pos = p; return nil })).
+	Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog))
+```
+
+Lines can hold ANSI styles and hyperlinks, such as the output of a syntax highlighter. A style left open at the end
+of a line carries on into the next, as it would in a terminal, so a comment highlighted over several lines stays
+highlighted wherever the viewport starts. Tabs are drawn as spaces to the next stop, every four columns.
+
+`OnScroll` scrolls it with the wheel, three rows a step, and the `ScrollbarOf` its ID drags it with the same
+function. Selecting text in it with the mouse scrolls it too, when the pointer is held past its edge.
+
+### Where it's scrolled to
+
+A `ViewportPos` is the line at the top, and while lines wrap, how many rows of that line are above the top. Because
+it's a line rather than a row, the same text stays at the top when the width changes and lines wrap differently.
+`X` scrolls lines that don't wrap sideways. Positions past the end show the last lines, and `bloom.ViewportEnd` is
+the end, however many lines there are.
+
+Read back where it was with `Frame().Viewport(id)`, whose methods give the position to scroll to from there:
+
+```go
+case tea.KeyPressMsg:
+	v, _ := m.ui.Frame().Viewport(paneLog)
+	switch msg.String() {
+	case "up":
+		m.pos = v.Up(1)
+	case "down":
+		m.pos = v.Down(1)
+	case "pgup":
+		m.pos = v.PageUp()
+	case "pgdown":
+		m.pos = v.PageDown()
+	case "home":
+		m.pos = v.Top()
+	case "end":
+		m.pos = bloom.ViewportEnd
+	case "left":
+		m.pos = v.Left(8)
+	case "right":
+		m.pos = v.Right(8)
+	}
+```
+
+`Reveal(line)` scrolls as little as it can to show a line, `AtRow(row)` goes to a row as a scrollbar counts them,
+and `Percent()`, `AtTop()`, and `AtBottom()` tell where it is, such as for a status line.
+
+### Follow the end
+
+`Follow()` keeps the viewport at the end while it's there, as `tail -f` does. A position that reaches the end, by the
+wheel, a scrollbar, or `v.Down(n)`, comes back as `ViewportEnd`, which stays at the end as lines are appended. Scrolled
+up, it stays where it is. Start the model at `bloom.ViewportEnd` to follow from the start.
+
+### Wrap lines
+
+`Wrap(bloom.WrapWords)` wraps lines at the spaces between words and after hyphens, as a styled `Text` wraps,
+and `Wrap(bloom.WrapChars)` at the width wherever it falls. The default, `WrapNone`, cuts lines off at the right edge and scrolls them sideways with `X`. The
+buffer works out how many rows each line takes at each width it's shown at, and keeps that, so scrolling and appending
+don't wrap anything again.
+
+### Line numbers, marks, and styles
+
+`LineNumbers(style)` draws the number of each line beside it, and `Gutter(width, fn)` draws what `fn` returns for each
+row, such as a marker beside changed lines. `Marks(fn)` draws parts of lines in styles of their own, and is given only
+the lines in sight, as text without styles, so it can run a search on each as it's drawn:
+
+```go
+bloom.Viewport(m.log).Marks(bloom.MarkMatches(m.query, highlight))
+```
+
+`m.log.Find(re, line, at)` and `FindBefore` find the next and previous match through the whole buffer, and
+`v.Reveal(match.Line)` scrolls to it. `Style(style)` draws all of the viewport in a style's colors, such as a color for
+lines without one of their own, and `LineStyle(fn)` styles whole lines, such as the one under a cursor. Both are drawn
+under the lines' own colors, and marks over them. For padding or a border, put the viewport in a `Box`.
+
+### Select text
+
+`Selectable()` lets the mouse select text in a viewport. The selection takes the lines scrolled out of sight as
+well, joins the rows of a wrapped line back into the line it is, and leaves out the line numbers and gutters.
 
 ## Show a long list
 
@@ -221,7 +319,8 @@ bloom.Box(panel, bloom.Scroll(bloom.Text(m.article).Style(prose).ID(paneArticle)
 ```
 
 `ScrollbarOf` a [list](#show-a-long-list)'s own ID follows it in items, and its `OnScroll` gets the first item to
-show, for `Offset`.
+show, for `Offset`. `ScrollbarOf` a [viewport](#show-a-lot-of-text)'s ID follows it in rows, and without an
+`OnScroll` of its own, scrolls it with the viewport's.
 
 For content that a component windows itself, such as the [Bubbles viewport](/layout/bubbles-components), give
 `bloom.Scrollbar(total, visible, offset)` the numbers yourself:

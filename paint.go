@@ -136,6 +136,9 @@ type renderer struct {
 	styled   memos[styledMemo] // by box index, from the last frame
 	columns  memos[columnMemo] // by twice the box index, for scrollbars
 	drag     scrollbarDrag     // the scrollbar being dragged, if any
+	vpMarks  []overlay         // scratch for the marks of a viewport's line
+	vpPens   penSGRs           // the styles of viewports' text, kept from frame to frame
+	vpCell   vpCellMemo        // the viewport row whose cells selection last asked for
 	style    lipgloss.Style    // scratch for comparing styles without allocating
 	fxs      []fx.Effect       // effects of this frame's ops, copied from the tree
 	prevFxs  []fx.Effect
@@ -412,6 +415,8 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		}
 	case drawableNode:
 		r.ops = append(r.ops, op{kind: opDraw, draw: n.d, rect: b.rect, clip: vis})
+	case ViewportNode:
+		r.paintViewport(i, n, vis)
 	case ScrollbarNode:
 		r.paintScrollbar(i, b, n, clip, parent)
 	case LayerNode:

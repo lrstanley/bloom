@@ -15,6 +15,7 @@ import (
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
 	"github.com/lrstanley/bloom/internal/motion"
+	"github.com/lrstanley/bloom/on"
 )
 
 // box is a node of the tree being laid out, kept in the engine's arena and
@@ -48,6 +49,10 @@ type box struct {
 	listSize Size
 	listOK   bool
 
+	// vp is the layout of a [ViewportNode], an index into the engine's vps
+	// plus one, or zero before it is laid out.
+	vp int
+
 	// frame is the frame of the box's style, for a box or a styled text.
 	frame   frame
 	frameOK bool
@@ -73,11 +78,14 @@ type engine struct {
 	kids       []int            // children of each box, in spans
 	stack      []int            // children of the boxes being built
 	frameMemos memos[frameMemo] // by box index, from the last layout
+	textMemos  memos[textMemo]  // by twice the box index, and once more for a width
 	scratch    lipgloss.Style   // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
 	listUp     []listRec // items of the lists being expanded; see listWindow
 	listDown   []listRec
+	vps        []vpLayout      // the viewports laid out this frame
+	vpRows     []vpRow         // the rows they show, in spans
 	motion     *motion.Tracker // nil for pooled renderers, which keep no state between frames
 	screen     func() *Frame   // the Root's frame on screen, for Context.Frame; nil outside a Root
 	// moved is where the nearest animated box being arranged is on screen,
@@ -101,7 +109,9 @@ func (e *engine) layout(w, h int, c Child) int {
 	clear(e.boxes)
 	clear(e.memo)
 	e.boxes, e.kids = e.boxes[:0], e.kids[:0]
+	e.vps, e.vpRows = e.vps[:0], e.vpRows[:0]
 	defer e.frameMemos.retire()
+	defer e.textMemos.retire()
 	if c == nil || absent(c) {
 		if e.motion != nil {
 			e.motion.Begin(w, h)
@@ -178,6 +188,11 @@ func (e *engine) build(c Child, parent, slot int) int {
 	case ListNode:
 		// Its items are built once it knows how much space it has.
 		b.meta = n.meta
+	case ViewportNode:
+		b.meta = n.meta
+		if n.onScroll != nil {
+			b.meta.handlers = with(n.handlers, []on.Handler{e.viewportScroll(n, b.key())})
+		}
 	default:
 		if _, ok := c.(TextSource); ok {
 			b.meta.selectable = true
@@ -341,6 +356,8 @@ func (e *engine) measureChild(i int, avail Size) Size {
 	case ListNode:
 		e.expandList(i, n, avail)
 		return e.boxes[i].listSize
+	case ViewportNode:
+		return e.measureViewport(n, avail)
 	case drawableNode:
 		if m, ok := n.d.(Measurer); ok {
 			return m.Measure(avail)
@@ -389,13 +406,44 @@ func (e *engine) measureText(i int, n TextNode, avail Size) Size {
 	}
 	if st.GetWidth() > 0 || st.GetTransform() != nil || st.GetMaxWidth() > 0 || st.GetMaxHeight() > 0 {
 		// The style wraps or changes the text in ways only rendering tells.
-		w, h = e.cache.Size(textOf(n, 0, 0, e.method))
+		natural := e.renderedSize(i, n, 0)
+		w, h = natural.W, natural.H
 	}
 	if w > avail.W {
 		// Too wide: rendered at the available width, where it wraps.
-		w, h = e.cache.Size(textOf(n, avail.W, 0, e.method))
+		return e.renderedSize(i, n, avail.W)
 	}
 	return Size{W: w, H: h}
+}
+
+// textMemo is the size of a text node, box i, as rendered w cells wide, or
+// at its natural size for 0, in the last frame.
+type textMemo struct {
+	style    lipgloss.Style
+	s        string
+	truncate bool
+	w        int
+	size     Size
+}
+
+// renderedSize returns the size of text node n, box i, rendered w cells
+// wide, or at its natural size for 0. Rendering with Lip Gloss is slow, and
+// a long text wrapped to fit takes long enough to render that doing it every
+// frame would be most of the frame, so the size is kept from frame to frame
+// while the box shows the same text in the same style at the same width.
+func (e *engine) renderedSize(i int, n TextNode, w int) Size {
+	slot := 2 * i
+	if w > 0 {
+		slot++
+	}
+	m := e.textMemos.at(slot)
+	e.scratch = n.style
+	if v := &m.v; m.ok && v.w == w && v.truncate == n.truncate && v.s == n.s && sameStyle(&v.style, &e.scratch) {
+		return v.size
+	}
+	sw, sh := e.cache.Size(textOf(n, w, 0, e.method))
+	m.ok, m.v = true, textMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, size: Size{W: sw, H: sh}}
+	return m.v.size
 }
 
 // axes returns a size's main and cross lengths for a row, or a column when
@@ -560,6 +608,8 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 		}
 	case ListNode:
 		e.arrangeList(i, n, r)
+	case ViewportNode:
+		e.layoutViewport(i, n, r)
 	case Layouter:
 		e.arrange(e.expand(i, n, Size{W: r.Dx(), H: r.Dy()}), r)
 	}

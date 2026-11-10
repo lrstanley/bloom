@@ -93,6 +93,8 @@ over.
   reverse, and ease them. Or write your own.
 - :heavy_check_mark: **Borders that do more**: put titles, clickable tabs, icon buttons, and counters on a box's
   border with `Edge`, plus draggable scrollbars that only show up when there's more to scroll.
+- :heavy_check_mark: **Viewports for a lot of text**: `Viewport` shows a `Buffer` of lines, such as a log of a
+  million, drawing only those in sight, with wrapping, following the end, line numbers, search marks, and selection.
 - :heavy_check_mark: **Loading placeholders**: `Skeleton(8, 0, 5, 11)` draws shimmering bars in place of content
   that's still loading, a line for each line of the content, so nothing jumps when it arrives.
 - :heavy_check_mark: **FIGlet text**: package `fig` draws big text in 67 bundled FIGlet and TOIlet fonts, laid out

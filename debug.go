@@ -162,6 +162,25 @@ func debugNode(c Child) (kind string, attrs []string) {
 		return fmt.Sprintf("Drawable(%T)", n.d), nil
 	case ScrollbarNode:
 		return "Scrollbar", nil
+	case ViewportNode:
+		lines := 0
+		if n.buf != nil {
+			lines = n.buf.Len()
+		}
+		attrs = []string{fmt.Sprintf("lines=%d", lines)}
+		switch {
+		case n.pos.AtEnd():
+			attrs = append(attrs, "at=end")
+		case n.pos != ViewportPos{}:
+			attrs = append(attrs, fmt.Sprintf("at=%d:%d:%d", n.pos.Line, n.pos.Row, n.pos.X))
+		}
+		if n.wrap != WrapNone {
+			attrs = append(attrs, debugName(wrapNames, n.wrap))
+		}
+		if n.follow {
+			attrs = append(attrs, "follow")
+		}
+		return "Viewport", attrs
 	default:
 		return fmt.Sprintf("%T", c), nil
 	}
@@ -231,6 +250,7 @@ func debugMotion(attrs []string, animation *layoutAnimation, moves []fx.Effect) 
 var (
 	alignNames   = []string{"stretch", "start", "center", "end"}
 	justifyNames = []string{"start", "center", "end", "space-between", "space-around", "space-evenly"}
+	wrapNames    = []string{"nowrap", "wrap=words", "wrap=chars"}
 	// The zero value of a layer's side is the default, Bottom.
 	directionNames = []string{"bottom", "bottom", "top", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"}
 )
