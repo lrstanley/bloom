@@ -3,7 +3,7 @@
 // the LICENSE file.
 
 // Package demo holds what the examples' tests share: the steep options for
-// a tour that is recorded when exporting is turned on, as with "make demos"
+// a tour that is recorded when exporting is turned on, as with "task demos"
 // from the repository root. Set STEEP_EXPORT_DIR to record somewhere else:
 //
 //	STEEP_EXPORT_DIR=/tmp/previews STEEP_EXPORT_MODE=on go test -count 1 ./...

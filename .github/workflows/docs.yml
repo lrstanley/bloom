@@ -5,11 +5,11 @@ name: docs
 on:
   pull_request:
     branches: [master]
-    paths: ["docs/**", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "Taskfile.yaml", ".github/workflows/docs.yml"]
     types: [opened, edited, reopened, synchronize, unlocked]
   push:
     branches: [master]
-    paths: ["docs/**", ".github/workflows/docs.yml"]
+    paths: ["docs/**", "Taskfile.yaml", ".github/workflows/docs.yml"]
   workflow_dispatch: {}
 
 concurrency:
@@ -24,4 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: lrstanley/.github/composite/install-node@master
-      - run: make docs-build
+      - uses: lrstanley/.github/composite/invoke-task@master
+        with:
+          task: docs:build
