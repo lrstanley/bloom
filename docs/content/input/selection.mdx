@@ -1,0 +1,248 @@
+---
+title: Selecting and copying text
+description: Let the mouse select text in the nodes you choose, as a terminal does but kept inside them, read what's selected, and copy it with OSC 52 or the system clipboard.
+---
+
+Once a program turns on mouse reporting, the terminal stops selecting text itself: the mouse events go to the
+program instead. bloom brings selection back, for the nodes you make selectable. A selection stays inside the node
+it started in, so dragging down a log in one pane doesn't run into the sidebar beside it, and it reads the text the
+node holds, not the cells on screen, so it can take lines scrolled out of sight and leave out a box's border.
+
+The [selection example](https://github.com/lrstanley/bloom/tree/master/_examples/selection) has a selectable log,
+a pane of fields, wrapped text, and a dialog with a masked token:
+
+![The selection example: lines of a log dragged over and copied, a rectangle of timestamps selected with alt held, a selection across a request's fields, words selected with a double click, all of the log selected and copied, and a token selected inside a dialog over the log](/demos/selection.webp)
+
+## Make text selectable
+
+`Selectable()` lets the left button select text in a node. Text, boxes, rows, columns, grids, slots, layers,
+[viewports](/layout/viewports), and [lists](/layout/lists) all have it:
+
+```go
+bloom.Box(panel, bloom.Column(fields...).Selectable())
+```
+
+A selection can run across every node inside the selectable one, such as from a label into the value beside it,
+but not out of it. On a box, only what's inside its frame is selected. When selectable nodes are inside each other,
+the innermost one under the pointer takes the drag.
+
+Selecting needs the mouse turned on, and drags need only the motion reported while a button is down:
+
+```go
+v.MouseMode = tea.MouseModeCellMotion
+```
+
+The root keeps the selection, and sends itself ticks while selecting, so pass every message to `m.ui.Update`, as
+you do for the rest of bloom.
+
+## How the mouse selects
+
+| Gesture | Selects |
+| --- | --- |
+| drag | a run of text, in reading order, as a terminal does |
+| <kbd>alt</kbd> held as the drag starts | a rectangle of cells, such as a column of timestamps |
+| double click | a word |
+| triple click | a line |
+| click | nothing, and clears what was selected |
+
+A double click finds words as Unicode does, and joins them across `@-./_~?&=%+#`, so a path, a URL, or an email
+address is one word. `bloom.WithWordChars(chars)` changes those characters, and `""` leaves words as Unicode finds
+them:
+
+```go
+ui := bloom.New(bloom.WithWordChars("-_"))
+```
+
+## Read what's selected
+
+When a drag that selected some text ends, the root sends a `bloom.SelectionMsg` with the text, and the ID of the node
+it was selected in, or of its nearest ancestor with one:
+
+```go
+case bloom.SelectionMsg:
+	m.status = fmt.Sprintf("selected %d characters in %v", len(msg.Text), msg.ID)
+```
+
+After a double click, the message waits until a third click could no longer widen the selection to the line.
+
+`m.ui.Selection()` returns the text selected at any time, and whether any is. The selection stays until the next
+click, `m.ui.ClearSelection()`, or a copy.
+
+### What text is read
+
+A selection reads the text of the nodes it covers, rather than the cells drawn:
+
+- All of a `Text`, including the lines scrolled out of sight in a [`Scroll`](/layout/scrolling).
+- Text that a style wrapped to fit, joined back into the lines it was.
+- Text [cut short with `Truncate`](/layout/text-and-boxes#keep-text-on-one-line), copied whole.
+- A viewport's lines, including those scrolled away, without its line numbers and gutters.
+- What a component draws, read from its cells, or what it says it shows, if it implements
+  [`TextSource`](#components-that-know-their-text).
+
+What's drawn around the text, such as a box's border, padding, and the edges on it, isn't selected.
+
+A list builds only the items in view, so its selection takes only those, and ends when they scroll away. To select
+text beyond the screen, show it in a viewport or a `Scroll`.
+
+## Copy it
+
+`m.ui.CopySelection()` copies the selection to the clipboard, clears it, and sweeps a band across the text it
+copied, to show what went. It returns `nil` when nothing is selected, so <kbd>ctrl+c</kbd> can copy, or quit with
+nothing to copy:
+
+```go
+case tea.KeyPressMsg:
+	switch msg.String() {
+	case "ctrl+c":
+		if cmd := m.ui.CopySelection(); cmd != nil {
+			return m, cmd
+		}
+		return m, tea.Quit
+	}
+```
+
+To copy as soon as text is selected, as many terminals do, copy when the message arrives:
+
+```go
+case bloom.SelectionMsg:
+	return m, m.ui.CopySelection()
+```
+
+### Where the text goes
+
+The text is sent to the terminal's clipboard with OSC 52, which reaches the clipboard of the machine the terminal
+runs on, even over SSH. Not every terminal allows it, and those that do don't answer, so there's no telling whether
+it arrived.
+
+`bloom.WithClipboard(write)` writes to the system clipboard as well, first, with a function you give it, such as one
+that runs `wl-copy`, `xclip`, or `pbcopy`. A function that can't reach a system clipboard, such as over SSH, should
+return `nil` and leave the copy to OSC 52:
+
+```go
+ui := bloom.New(bloom.WithClipboard(func(text string) error {
+	cmd := exec.Command("wl-copy")
+	cmd.Stdin = strings.NewReader(text)
+	return cmd.Run()
+}))
+```
+
+A `bloom.CopyMsg` arrives once the text is copied, with what the function returned in `Err`:
+
+```go
+case bloom.CopyMsg:
+	m.status = fmt.Sprintf("copied %d characters", len(msg.Text))
+	if msg.Err != nil {
+		m.status += " with OSC 52 only: " + msg.Err.Error()
+	}
+```
+
+`bloom.WithCopyFlash(false)` turns the band off.
+
+## Select all, and clear
+
+`m.ui.SelectAll(id)` selects all the text of the node with an ID, or of the selectable node it's in, including what's
+scrolled out of sight. It reports whether there was such a node with text in the last frame, and can be copied at
+once. No `SelectionMsg` is sent for it:
+
+```go
+case "ctrl+a":
+	m.ui.SelectAll(paneLog)
+case "esc":
+	m.ui.ClearSelection()
+```
+
+## Select past the edge
+
+Dragging past the edge of what's shown of a selectable node scrolls it while the pointer is held there,
+the way the wheel would:
+
+- A [viewport](/layout/viewports#select-text) scrolls through its `OnScroll`.
+- Text in a [`Scroll`](/layout/scrolling) scrolls through the `on.Scroll` handler on the node around it, the one the
+  wheel uses.
+
+```go
+bloom.Fixed(10, bloom.Scroll(bloom.Text(m.help).Selectable(), m.offset)).
+	On(on.Scroll(func(_, dy int) tea.Cmd { m.offset = min(max(m.offset+dy, 0), m.maxOffset); return nil }))
+```
+
+The selection is kept on the text it covers, so it moves with the text as it scrolls, and stays when it's scrolled
+out of sight.
+
+## Clicks and drags in selectable nodes
+
+Selecting and clicking share the left button, so bloom sorts them out:
+
+- A press that moves before it comes up selects; one that doesn't is a click, and runs the click handlers of what's
+  under it, such as a row's `on.Click`.
+- A node inside with an [`on.Drag`](/input/mouse#drag) handler, such as a splitter or a slider, takes its drags, and
+  doesn't select.
+- A double or triple click in a selectable node selects the word or line, and doesn't click.
+
+So that double clicking a word doesn't also click the row it's in, a click inside a selectable node waits until it
+can no longer become a double click, 400ms, before its handlers run. `bloom.WithClickDelay(false)` runs clicks at
+once, and a double click is then two clicks. Make only the nodes people read selectable,
+rather than the whole screen, and buttons elsewhere answer at once.
+
+## Selections and layers
+
+A selection in a [layer](/layers/dialogs) stays inside it, so a dialog's text can be selected over the log it covers.
+Make the layer selectable to select across all of what's in it:
+
+```go
+bloom.Layer(bloom.Box(dialog, body)).ID("dialog").Selectable().Modal()
+```
+
+A layer opening over a selection leaves it as it was, under the layer. A selection ends when its node leaves the
+frame, such as a dialog closing.
+
+## Change how it looks
+
+By default, selected cells get a background between the terminal's own background and foreground, and keep their
+foregrounds where they can be read on it. `bloom.WithSelectionStyle(style)` draws them in a style of your own. A
+color the style leaves unset is kept from each cell, so a background alone keeps the colors of highlighted code:
+
+```go
+ui := bloom.New(bloom.WithSelectionStyle(lipgloss.NewStyle().Background(selectionBg)))
+```
+
+A foreground kept that would be hard to read on the background, such as a dim one, takes the terminal's foreground
+or background instead, whichever reads better.
+
+## Components that know their text
+
+A component's text is read from the cells it draws. When that isn't the text to copy, such as a token it shows
+masked, or a decoration it draws around its text, implement `bloom.TextSource`. `SelectedText` gets the `Span`
+selected, in cells from the component's top-left, and returns the text for it:
+
+```go
+type secret struct{ value string }
+
+func (s secret) View() string {
+	return s.value[:4] + strings.Repeat("•", len(s.value)-4)
+}
+
+// SelectedText implements bloom.TextSource: the token is one row, a
+// character to a cell.
+func (s secret) SelectedText(span bloom.Span) string {
+	from, to := span.Start.X, span.End.X+1
+	if span.Start.Y > 0 {
+		from = len(s.value)
+	}
+	if span.End.Y > 0 {
+		to = len(s.value)
+	}
+	from, to = min(from, len(s.value)), min(to, len(s.value))
+	return s.value[from:max(to, from)]
+}
+```
+
+`Start` and `End` are the first and last cells selected, inclusive. `Block` is set for a rectangle, and `Size` is
+the size the component was laid out at, to wrap its text the same way again. A component that implements
+`TextSource` is selectable without being made so.
+
+## Related
+
+- [Mouse events](/input/mouse)
+- [Viewports](/layout/viewports)
+- The [`selection` example](https://github.com/lrstanley/bloom/tree/master/_examples/selection)
+- [`Root.Selection` API reference](https://pkg.go.dev/bloomfx.dev/bloom#Root.Selection)

@@ -1,0 +1,131 @@
+---
+title: Sizes and positions in Update
+description: Find where a node goes, and how big it is, from Update, with Solve for the state you have now or Frame for what's on screen, for paging, clamping, and components that need their size up front.
+---
+
+Layout runs in `View`, but `Update` often needs what it decided: how tall a pane is to page by it, how long the
+content is to clamp an offset, or where a button was drawn to start an effect from it. bloom gives you two ways to
+ask.
+
+## Solve or Frame?
+
+- `bloom.Solve(w, h, layout)` lays out the tree you pass, for the state your model has now, without drawing it. Use
+  it in `Update` after changing state, when the answer has to reflect that change.
+- `m.ui.Frame()` returns the geometry of the frame last drawn on screen. It costs nothing, and it's what
+  [focus](/input/focus) and [mouse handlers](/input/mouse) work from, but it doesn't know about changes your model
+  made since. With [layout animation](/motion/layout-animation), it has the rectangles currently on screen,
+  mid-animation, while `Solve` returns where things are headed.
+
+Both return a `*bloom.Frame`, so everything below works with either.
+
+| `Frame` method | Gives |
+| --- | --- |
+| `Rect(id)` | where the node with an ID went, in screen cells, and whether it's in the frame |
+| `Hit(x, y)` | the IDs of the nodes at a point, outermost first |
+| `Viewport(id)` | where a [viewport](/layout/viewports#scroll-with-keys) was scrolled to, and the positions to scroll to from there |
+| `List(id)` | the items a [list](/layout/lists#read-where-it-ended-up) showed |
+
+## Find a node's size in Update
+
+[`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) lays out a tree without drawing it, and returns where
+each node with an ID would go. Layout is a pure function of the tree and the size, so `Solve` in `Update` gives the
+same rectangles that `View` will draw for the same state.
+
+Give the nodes you need IDs. Here, the box gives the size of one page, and the text inside the scroll gives the
+full height of the article:
+
+```go
+type pane string
+
+const (
+	paneReader  pane = "reader"
+	paneArticle pane = "article"
+)
+
+func (m *model) layout() bloom.Child {
+	return bloom.Column(
+		header,
+		bloom.Fill(bloom.Box(panel, bloom.Scroll(
+			bloom.Text(m.article).Style(prose).ID(paneArticle),
+			m.offset,
+		))).ID(paneReader),
+	)
+}
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.width, m.height, m.layout())
+	v.AltScreen = true
+	return v
+}
+```
+
+Then solve the same layout in `Update`:
+
+```go
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+	case tea.KeyPressMsg:
+		frame := bloom.Solve(m.width, m.height, m.layout())
+		page := 1
+		if r, ok := frame.Rect(paneReader); ok {
+			page = max(r.Dy()-panel.GetVerticalFrameSize(), 1)
+		}
+		switch msg.String() {
+		case "down":
+			m.offset++
+		case "up":
+			m.offset--
+		case "pgdown":
+			m.offset += page
+		case "pgup":
+			m.offset -= page
+		}
+		if r, ok := frame.Rect(paneArticle); ok {
+			m.offset = min(max(m.offset, 0), max(r.Dy()-page, 0))
+		}
+	}
+	return m, m.ui.Update(msg)
+}
+```
+
+`Rect` returns an `image.Rectangle` in screen cells, and whether the node is in the frame at all. A node in a
+[collapsed slot](/layout/responsive), or a layer that's hidden, isn't.
+
+This works best when the model has a method that returns the layout, separate from `View`, so `Update` and `View`
+lay out the same tree. It's also how [tests](/resources/testing#test-where-things-go) check where things go.
+
+## Size a component before it draws
+
+Components that pick what to render from their size, such as a Bubbles viewport or table, need that size in
+`Update`. Solve the layout, read the rectangle of the slot the component is in, and give the component its size
+before it draws. [Using Bubbles components](/layout/bubbles-components) walks through it.
+
+A component that builds its own layout can skip this by implementing
+[`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given), which is given its size as it's laid out.
+
+## Use what's on screen
+
+When the answer is about what the user saw, read `m.ui.Frame()` instead. To draw an effect from a button's
+position:
+
+```go
+if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
+	center := image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
+	// ...
+}
+```
+
+To find what's under a raw mouse event, `Hit` returns the IDs of the nodes there, outermost first. See
+[handle raw events yourself](/input/mouse#handle-raw-events-yourself).
+
+A [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given) has no root to ask, so its handlers
+read the frame from the `Context` its `Layout` was given, with `ctx.Frame()`.
+
+## Related
+
+- [How layout works](/concepts/how-layout-works), for why `Solve` matches `View`
+- [Scrolling](/layout/scrolling)
+- [Using Bubbles components](/layout/bubbles-components)
+- [Testing](/resources/testing)

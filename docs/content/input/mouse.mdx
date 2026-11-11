@@ -110,6 +110,9 @@ row or column, so a click anywhere along a list row's line can select it.
 
 Hover is the exception: every node under the pointer is hovered, as in CSS.
 
+Nodes made [selectable](/input/selection) take left-button drags to select their text, unless a node inside them
+has an `on.Drag` handler.
+
 ## Use the position inside a node
 
 `on.ClickAt` gets an [`on.Event`](https://pkg.go.dev/bloomfx.dev/bloom/on#Event), with `X` and `Y`
@@ -206,7 +209,8 @@ the IDs of the nodes there, outermost first:
 ```
 
 For things other than events, such as drawing an effect from a button's position, `m.ui.Frame().Rect(id)` returns
-where a node was drawn in the last frame, in screen coordinates:
+where a node was drawn in the last frame, in screen coordinates (see
+[Sizes and positions in Update](/layout/sizes-in-update)):
 
 ```go
 if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
@@ -254,7 +258,8 @@ if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
 ## Related
 
 - [Focus and keyboard navigation](/input/focus), which can focus the node you click
-- [Scrolling and sizing in Update](/layout/scrolling)
+- [Selecting and copying text](/input/selection), with the mouse
+- [Scrolling](/layout/scrolling)
 - [`on` API reference](https://pkg.go.dev/bloomfx.dev/bloom/on)
 - The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double
   clicks, the wheel, and a draggable divider

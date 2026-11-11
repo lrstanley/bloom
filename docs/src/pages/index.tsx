@@ -77,8 +77,20 @@ const chores = [
     {
         title: "Knowing what was clicked",
         without: "Turn an X and Y back into whichever list item or button you drew there.",
-        code: "id, ok := msg.Target[noteID]()",
+        code: "bloom.Text(note.Title).On(on.Click(m.open))",
         href: "/input/mouse",
+    },
+    {
+        title: "Scrolling a huge log",
+        without: "Slice out the lines in sight, wrap them again on every resize, and keep the same line at the top.",
+        code: "bloom.Viewport(m.log).At(m.pos).Follow()",
+        href: "/layout/viewports",
+    },
+    {
+        title: "Selecting and copying text",
+        without: "Turning on the mouse turns off the terminal's own selection, so text can't be copied out.",
+        code: "bloom.Viewport(m.log).Selectable()",
+        href: "/input/selection",
     },
     {
         title: "Keeping focus inside a dialog",

@@ -1,7 +1,17 @@
 ---
-title: Scrolling and sizing in Update
-description: Scroll content that is taller than its space, and use Solve to find a node's size in Update for paging and for components that need their size up front.
+title: Scrolling
+description: Scroll content that is taller or wider than its space with Scroll, move it with keys and the mouse wheel, and show scrollbars that can be dragged and clicked.
 ---
+
+bloom has three ways to show more than fits:
+
+- [`Scroll`](#scroll-content) shows any child from an offset. It lays out all of the child, which is fine for an
+  article, a help screen, or a form.
+- A [viewport](/layout/viewports) shows the lines of a text buffer, laying out only those in sight, for logs, files,
+  and other long text.
+- A [list](/layout/lists) shows rows of components, building only those in view, for thousands of items.
+
+All three work with the same [scrollbars](#show-a-scrollbar).
 
 ## Scroll content
 
@@ -21,261 +31,14 @@ func (m *model) layout() bloom.Child {
 }
 ```
 
-`Scroll` measures and draws its whole child, which is fine for an article or a help screen. For a long log, a
-file, or anything else that's lines of text, use a [viewport](#show-a-lot-of-text) instead, and for thousands of
-rows of components, a [list](#show-a-long-list). Both only lay out what's in view.
-
-## Show a lot of text
-
-`bloom.Viewport(buf)` shows the lines of a `bloom.Buffer`, as many as fit. The buffer lives in your model and holds
-the text, and the viewport only lays out and draws the lines in sight, so a log of a million lines costs no more
-to draw, or to append a line to, than one of a hundred:
-
-```go
-type model struct {
-	ui  *bloom.Root
-	log *bloom.Buffer
-	pos bloom.ViewportPos
-}
-
-// In Update, as lines arrive:
-m.log.Append(line)
-
-// In the layout:
-bloom.Box(panel, bloom.Viewport(m.log).ID(paneLog).At(m.pos).
-	OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.pos = p; return nil })).
-	Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog))
-```
-
-Lines can hold ANSI styles and hyperlinks, such as the output of a syntax highlighter. A style left open at the end
-of a line carries on into the next, as it would in a terminal, so a comment highlighted over several lines stays
-highlighted wherever the viewport starts. Tabs are drawn as spaces to the next stop, every four columns.
-
-`OnScroll` scrolls it with the wheel, three rows a step, and the `ScrollbarOf` its ID drags it with the same
-function. Selecting text in it with the mouse scrolls it too, when the pointer is held past its edge.
-
-### Where it's scrolled to
-
-A `ViewportPos` is the line at the top, and while lines wrap, how many rows of that line are above the top. Because
-it's a line rather than a row, the same text stays at the top when the width changes and lines wrap differently.
-`X` scrolls lines that don't wrap sideways. Positions past the end show the last lines, and `bloom.ViewportEnd` is
-the end, however many lines there are.
-
-Read back where it was with `Frame().Viewport(id)`, whose methods give the position to scroll to from there:
-
-```go
-case tea.KeyPressMsg:
-	v, _ := m.ui.Frame().Viewport(paneLog)
-	switch msg.String() {
-	case "up":
-		m.pos = v.Up(1)
-	case "down":
-		m.pos = v.Down(1)
-	case "pgup":
-		m.pos = v.PageUp()
-	case "pgdown":
-		m.pos = v.PageDown()
-	case "home":
-		m.pos = v.Top()
-	case "end":
-		m.pos = bloom.ViewportEnd
-	case "left":
-		m.pos = v.Left(8)
-	case "right":
-		m.pos = v.Right(8)
-	}
-```
-
-`Reveal(line)` scrolls as little as it can to show a line, `AtRow(row)` goes to a row as a scrollbar counts them,
-and `Percent()`, `AtTop()`, and `AtBottom()` tell where it is, such as for a status line.
-
-### Follow the end
-
-`Follow()` keeps the viewport at the end while it's there, as `tail -f` does. A position that reaches the end, by the
-wheel, a scrollbar, or `v.Down(n)`, comes back as `ViewportEnd`, which stays at the end as lines are appended. Scrolled
-up, it stays where it is. Start the model at `bloom.ViewportEnd` to follow from the start.
-
-### Wrap lines
-
-`Wrap(bloom.WrapWords)` wraps lines at the spaces between words and after hyphens, as a styled `Text` wraps,
-and `Wrap(bloom.WrapChars)` at the width wherever it falls. The default, `WrapNone`, cuts lines off at the right edge and scrolls them sideways with `X`. The
-buffer works out how many rows each line takes at each width it's shown at, and keeps that, so scrolling and appending
-don't wrap anything again.
-
-### Line numbers, marks, and styles
-
-`LineNumbers(style)` draws the number of each line beside it, and `Gutter(width, fn)` draws what `fn` returns for each
-row, such as a marker beside changed lines. `Marks(fn)` draws parts of lines in styles of their own, and is given only
-the lines in sight, as text without styles, so it can run a search on each as it's drawn:
-
-```go
-bloom.Viewport(m.log).Marks(bloom.MarkMatches(m.query, highlight))
-```
-
-`m.log.Find(re, line, at)` and `FindBefore` find the next and previous match through the whole buffer, and
-`v.Reveal(match.Line)` scrolls to it. `Style(style)` draws all of the viewport in a style's colors, such as a color for
-lines without one of their own, and `LineStyle(fn)` styles whole lines, such as the one under a cursor. Both are drawn
-under the lines' own colors, and marks over them. For padding or a border, put the viewport in a `Box`.
-
-### Select text
-
-`Selectable()` lets the mouse select text in a viewport. The selection takes the lines scrolled out of sight as
-well, joins the rows of a wrapped line back into the line it is, and leaves out the line numbers and gutters.
-
-## Show a long list
-
-`bloom.List(count, item)` shows as many of `count` items as fit, top to bottom. It calls `item(i)` only for the
-items it may show, so a list of a million rows costs no more to draw than the rows on screen. Each item is as wide
-as the list and as tall as it wants, and the last one that doesn't fit is cut off:
-
-```go
-bloom.List(len(m.logs), func(i int) bloom.Child {
-	return bloom.Text(m.logs[i]).Style(line)
-}).Offset(m.offset).ID(paneLogs)
-```
-
-`Offset(i)` is the first item shown. The list clamps it, so an offset past the end shows the last page, full,
-rather than space below it. `Gap(n)` puts `n` cells between items.
-
-### Keep the cursor in view
-
-`Keep(i)` scrolls the list as little as it can from its offset so that item `i` is shown whole. Give it the item
-under a cursor, and moving the cursor is all the model does:
-
-```go
-func (m *model) layout() bloom.Child {
-	return bloom.List(len(m.items), m.row).Offset(m.offset).Keep(m.cursor).ID(paneItems)
-}
-```
-
-Items can have different heights, so the list, not the model, knows where it ended up. Read it back with
-`Frame().List(id)`, and keep `First` as the offset to scroll from next time. `Visible` is how many items were
-shown whole, which is how far to page:
-
-```go
-case tea.KeyPressMsg:
-	v, _ := m.ui.Frame().List(paneItems)
-	m.offset = v.First
-	switch msg.String() {
-	case "down":
-		m.cursor++
-	case "pgdown":
-		m.cursor += max(v.Visible-1, 1)
-	}
-	m.cursor = min(max(m.cursor, 0), len(m.items)-1)
-```
-
-While `Keep` is given, the list can't scroll away from that item, so to scroll with the wheel, move the cursor
-along with the offset:
-
-```go
-bloom.List(len(m.items), m.row).Offset(m.offset).Keep(m.cursor).ID(paneItems).
-	On(on.Scroll(func(_, dy int) tea.Cmd {
-		v, _ := m.ui.Frame().List(paneItems)
-		m.offset = max(v.First+dy*3, 0)
-		m.cursor = min(max(m.cursor, m.offset), m.offset+v.Visible-1, len(m.items)-1)
-		return nil
-	}))
-```
-
-Or let the wheel move only the cursor, `m.cursor += dy * 3`, and the list follows it as it does the arrow keys. Read
-the frame in the handler, as above, rather than keeping what it said when the last key was pressed: a resize, or
-the list keeping the cursor in view, moves it without a key.
-
-A component that implements [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given) has no root
-to ask, so its handlers read the frame from the `Context` its `Layout` was given. `ctx.Frame()` returns the frame on
-screen when it's called, which is the one the handler's event landed in:
-
-```go
-func (p *picker) Layout(ctx bloom.Context) bloom.Child {
-	return bloom.List(len(p.items), p.row).Offset(p.offset).Keep(p.cursor).ID(p.id).
-		On(on.Scroll(func(_, dy int) tea.Cmd {
-			v, _ := ctx.Frame().List(p.id)
-			p.offset = v.First
-			p.cursor = min(max(p.cursor+dy*3, 0), len(p.items)-1)
-			return nil
-		}))
-}
-```
-
-Items are followed from frame to frame by their index, so mouse handlers and hover styles stay with an item as
-the list scrolls.
-
-## Find a node's size in Update
-
-To clamp the offset, or to page by a screen at a time, `Update` needs to know how tall the scrolled area is. That's
-decided by the layout, which runs in `View`.
-
-[`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) lays out a tree without drawing it, and
-returns where each node with an ID would go. Layout is a pure function of the tree and the size, so `Solve` in
-`Update` gives the same rectangles that `View` will draw for the same state.
-
-Give the nodes you need IDs. Here, the box gives the size of one page, and the text inside the scroll gives the
-full height of the article:
-
-```go
-type pane string
-
-const (
-	paneReader  pane = "reader"
-	paneArticle pane = "article"
-)
-
-func (m *model) layout() bloom.Child {
-	return bloom.Column(
-		header,
-		bloom.Fill(bloom.Box(panel, bloom.Scroll(
-			bloom.Text(m.article).Style(prose).ID(paneArticle),
-			m.offset,
-		))).ID(paneReader),
-	)
-}
-
-func (m *model) View() tea.View {
-	v := m.ui.View(m.width, m.height, m.layout())
-	v.AltScreen = true
-	return v
-}
-```
-
-Then solve the same layout in `Update`:
-
-```go
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-	case tea.KeyPressMsg:
-		frame := bloom.Solve(m.width, m.height, m.layout())
-		page := 1
-		if r, ok := frame.Rect(paneReader); ok {
-			page = max(r.Dy()-panel.GetVerticalFrameSize(), 1)
-		}
-		switch msg.String() {
-		case "down":
-			m.offset++
-		case "up":
-			m.offset--
-		case "pgdown":
-			m.offset += page
-		case "pgup":
-			m.offset -= page
-		}
-		if r, ok := frame.Rect(paneArticle); ok {
-			m.offset = min(max(m.offset, 0), max(r.Dy()-page, 0))
-		}
-	}
-	return m, m.ui.Update(msg)
-}
-```
-
-`Rect` returns an `image.Rectangle` in screen cells, and whether the node is in the frame at all. A node
-in a [collapsed slot](/layout/responsive), or a layer that's hidden, isn't.
+To move the offset with keys, and to clamp it so it doesn't scroll past the end, `Update` needs to know how tall
+the scroll and its content are. [Sizes and positions in Update](/layout/sizes-in-update) shows how, with paging by
+a screen at a time.
 
 ## Scroll with the mouse wheel
 
-Put an [`on.Scroll`](https://pkg.go.dev/bloomfx.dev/bloom/on#Scroll) handler on the reader, so the wheel
-only scrolls what it's over. `dy` is `1` for each step down and `-1` for each step up:
+Put an [`on.Scroll`](https://pkg.go.dev/bloomfx.dev/bloom/on#Scroll) handler on the node the scroll is in,
+so the wheel only scrolls what it's over. `dy` is `1` for each step down and `-1` for each step up:
 
 ```go
 reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
@@ -283,14 +46,15 @@ reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
 	On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; return nil }))
 ```
 
-The handler runs just before `Update` gets the wheel event, so clamp the offset in `Update` as you do for keys.
+The handler runs just before `Update` gets the wheel event, so clamp the offset in `Update` as you do for
+[keys](/layout/sizes-in-update#find-a-nodes-size-in-update).
 
 Remember to turn on mouse reporting in `View` with `v.MouseMode = tea.MouseModeCellMotion`.
 
 ## Scroll sideways
 
 `X(offset)` scrolls a `Scroll` sideways too: its child gets as much width as it wants, so long lines don't wrap,
-and is shown from column `offset`. It's what you want for logs and wide tables:
+and is shown from column `offset`. It's what you want for wide tables and code:
 
 ```go
 bloom.Scroll(bloom.Text(m.log).ID(paneLog), m.offset).X(m.logX)
@@ -318,9 +82,9 @@ bloom.Box(panel, bloom.Scroll(bloom.Text(m.article).Style(prose).ID(paneArticle)
 ╰──────────────╯
 ```
 
-`ScrollbarOf` a [list](#show-a-long-list)'s own ID follows it in items, and its `OnScroll` gets the first item to
-show, for `Offset`. `ScrollbarOf` a [viewport](#show-a-lot-of-text)'s ID follows it in rows, and without an
-`OnScroll` of its own, scrolls it with the viewport's.
+`ScrollbarOf` a [list](/layout/lists#show-a-scrollbar)'s own ID follows it in items, and its `OnScroll` gets the
+first item to show, for `Offset`. `ScrollbarOf` a [viewport](/layout/viewports)'s ID follows it in rows, and
+without an `OnScroll` of its own, scrolls it with the viewport's.
 
 For content that a component windows itself, such as the [Bubbles viewport](/layout/bubbles-components), give
 `bloom.Scrollbar(total, visible, offset)` the numbers yourself:
@@ -357,18 +121,15 @@ Pressing on the thumb and moving drags it, keeping the point you grabbed under t
 else on the scrollbar jumps so the thumb is centered there, and holding the button down keeps dragging. The
 scrollbar takes clicks only while it's drawn, so with nothing to scroll, clicks reach whatever is beneath it.
 
-## Solve or Frame?
+## Select text in a scroll
 
-There are two ways to get geometry, and they answer different questions:
-
-- `bloom.Solve(w, h, layout)` lays out the tree you pass, for the state your model has now. Use it in `Update`
-  after changing state, when the answer has to reflect that change.
-- `m.ui.Frame()` returns the geometry of the frame last drawn on screen. It costs nothing, and it's what
-  [focus](/input/focus) moves through, but it doesn't know about changes your model made since. With
-  [layout animation](/motion/layout-animation), it has the rectangles currently on screen, mid-animation, while
-  `Solve` returns where things are headed.
+A selectable node inside a `Scroll` takes the text scrolled out of sight too, and the selection stays on its text as
+it scrolls. Dragging past the scroll's edge scrolls it, through the `on.Scroll` handler on it. See
+[Selecting and copying text](/input/selection#select-past-the-edge).
 
 ## Related
 
-- [Using Bubbles components](/layout/bubbles-components), for sizing a viewport the same way
+- [Viewports](/layout/viewports), for long text
+- [Long lists](/layout/lists), for rows of components
+- [Sizes and positions in Update](/layout/sizes-in-update), for paging and clamping
 - [Mouse events](/input/mouse)

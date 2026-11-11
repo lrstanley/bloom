@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-description: Fixes for common problems - a blank screen, clicks that don't arrive or arrive twice, animations that don't move, text that doesn't wrap, and more.
+description: Fixes for common problems - a blank screen, clicks that don't arrive or arrive twice, text that can't be selected, animations that don't move, text that doesn't wrap, and more.
 ---
 
 ## See what the layout did
@@ -74,6 +74,21 @@ See [change state, or send a message](/input/mouse#change-state-or-send-a-messag
 
 Your handlers run, and the original `tea.MouseClickMsg` reaches `Update` too. If you also handle the raw mouse
 messages, don't act on an event a handler already handled.
+
+## Clicks are slow inside selectable text
+
+A click inside a node made [selectable](/input/selection) waits until it can no longer become a double click, so
+that double clicking a word doesn't also click what it's in. Make only the text people read selectable, rather than
+the whole screen, or turn the wait off with `bloom.WithClickDelay(false)`.
+
+## Text can't be selected or copied
+
+Once a program turns on mouse reporting, the terminal stops selecting text itself. Most terminals still select with
+<kbd>shift</kbd> held while dragging, or <kbd>option</kbd> in some on macOS. To select inside the program, mark the nodes `Selectable()`, and copy with
+`m.ui.CopySelection()`; see [Selecting and copying text](/input/selection).
+
+If a copy doesn't reach the clipboard, the terminal may not allow OSC 52, or may need it turned on in its settings.
+Give the root a system clipboard to write to with `bloom.WithClipboard`.
 
 ## The screen freezes after a click
 

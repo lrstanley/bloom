@@ -59,6 +59,8 @@ Any value with a `View() string` method can also be a child.
 
 ## Viewport options
 
+See [Viewports](/layout/viewports).
+
 | Method | Does |
 | --- | --- |
 | `At(pos)` | where it's scrolled to: a `ViewportPos` of the line at the top, the rows of it above, and columns sideways; `ViewportEnd` is the end |
@@ -69,12 +71,12 @@ Any value with a `View() string` method can also be a child.
 | `Marks(fn)`, `MarkMatches(re, style)` | parts of the lines in sight drawn in styles of their own, such as matches of a search |
 | `Style(style)` | colors and attributes for all of its rows, under the lines' own; put it in a `Box` for padding |
 | `LineStyle(fn)` | a style for each line in sight, across the whole row, under its own |
-| `Selectable()` | select its text with the mouse, all of it, with wrapped rows joined |
+| `Selectable()` | [select its text with the mouse](/input/selection), all of it, with wrapped rows joined |
 | `Trusted()` | keep the commands in its lines meant for the terminal, such as images, which are dropped otherwise |
 
 | `Buffer` method | Does |
 | --- | --- |
-| `NewBuffer(s)`, `SetContent(s)`, `SetLines(lines...)` | replace the lines |
+| `NewBuffer(s)`, `SetContent(s)`, `SetLines(lines...)`, `Clear()` | replace or remove the lines |
 | `Append(lines...)` | add lines, measuring only them |
 | `Len()`, `Line(i)`, `Text(i)`, `String()` | read lines back, with or without their styles |
 | `Find(re, line, at)`, `FindBefore(re, line, at)` | the next or previous match of a regular expression |
@@ -115,6 +117,9 @@ Any value with a `View() string` method can also be a child.
 Boxes, rows, columns, grids, and wraps have `ID(id)` and `On(handlers...)` too, and boxes have `HoverStyle(style)`
 for their frame.
 
+Text, boxes, rows, columns, grids, slots, layers, lists, and viewports have `Selectable()`, which lets the mouse
+[select their text](/input/selection).
+
 `Marquee` has `Style(style)` and `Gap(s)`, the text shown between loops. `Skeleton` has `Style(style)`, which
 colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 
@@ -147,6 +152,8 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | `ui.Render(w, h, tree)` | lay out and draw to a string; a height of zero uses the natural height |
 | `ui.Frame()` | the geometry of the last frame drawn |
 | `ui.Click(id)`, `ui.ClickAt(x, y)` | run the handlers for a click, for tests |
+| `ui.Selection()`, `ui.SelectAll(id)`, `ui.ClearSelection()` | read, select all of a node, or clear the [text selected with the mouse](/input/selection) |
+| `ui.CopySelection()` | copy the selection with OSC 52 and `WithClipboard`; `nil` when nothing is selected |
 
 ### Root options
 
@@ -158,6 +165,11 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`WithWidthMethod(m)`](https://pkg.go.dev/bloomfx.dev/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
 | [`WithClock(now)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock) | `time.Now` | the clock for layout animation and double clicks, for tests |
 | [`WithFocus(&m.focus)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus) | none | the focus that clicks move, before handlers run |
+| [`WithSelectionStyle(style)`](https://pkg.go.dev/bloomfx.dev/bloom#WithSelectionStyle) | a tinted background | how text selected with the mouse is drawn |
+| [`WithWordChars(chars)`](https://pkg.go.dev/bloomfx.dev/bloom#WithWordChars) | `@-./_~?&=%+#` | the characters a double click takes into a word, besides letters and digits |
+| [`WithClipboard(write)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClipboard) | none | a system clipboard `CopySelection` writes to, besides OSC 52 |
+| [`WithCopyFlash(on)`](https://pkg.go.dev/bloomfx.dev/bloom#WithCopyFlash) | on | whether a copy sweeps a band across the text copied |
+| [`WithClickDelay(on)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClickDelay) | on | whether clicks in selectable nodes wait to tell them from a double click |
 
 ## Geometry and input
 
@@ -167,6 +179,7 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`Render(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Render) | lay out and draw to a string, without a root |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
+| `frame.Viewport(id)`, `frame.List(id)` | where a [viewport](/layout/viewports) or [list](/layout/lists) was scrolled to, and how much it showed |
 | [`ThrottleMouse(every)`](https://pkg.go.dev/bloomfx.dev/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
 | `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
 
