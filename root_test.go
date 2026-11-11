@@ -15,8 +15,8 @@ import (
 	"time"
 	"unsafe"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom/on"
 )
 
 func TestSolveMatchesRoot(t *testing.T) {

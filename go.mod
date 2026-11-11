@@ -1,4 +1,4 @@
-module github.com/lrstanley/bloom
+module bloomfx.dev/bloom
 
 go 1.27.3
 

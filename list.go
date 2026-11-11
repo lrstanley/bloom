@@ -7,7 +7,7 @@ package bloom
 import (
 	"image"
 
-	"github.com/lrstanley/bloom/on"
+	"bloomfx.dev/bloom/on"
 )
 
 // ListNode shows as many items of a list as fit in the space it is given,

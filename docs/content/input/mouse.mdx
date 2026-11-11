@@ -26,10 +26,10 @@ Use `tea.MouseModeAllMotion` to also get motion while no button is pressed, for 
 ## Attach handlers
 
 Every node has an `On` method, which takes handlers made by the
-[`on`](https://pkg.go.dev/github.com/lrstanley/bloom/on) package:
+[`on`](https://pkg.go.dev/bloomfx.dev/bloom/on) package:
 
 ```go
-import "github.com/lrstanley/bloom/on"
+import "bloomfx.dev/bloom/on"
 ```
 
 ```go
@@ -112,7 +112,7 @@ Hover is the exception: every node under the pointer is hovered, as in CSS.
 
 ## Use the position inside a node
 
-`on.ClickAt` gets an [`on.Event`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Event), with `X` and `Y`
+`on.ClickAt` gets an [`on.Event`](https://pkg.go.dev/bloomfx.dev/bloom/on#Event), with `X` and `Y`
 relative to the node the handler is on, and `W` and `H`, its size. A seek bar needs nothing else:
 
 ```go
@@ -255,7 +255,7 @@ if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
 
 - [Focus and keyboard navigation](/input/focus), which can focus the node you click
 - [Scrolling and sizing in Update](/layout/scrolling)
-- [`on` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/on)
+- [`on` API reference](https://pkg.go.dev/bloomfx.dev/bloom/on)
 - The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double
   clicks, the wheel, and a draggable divider
 - The [`contextmenu` example](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu), with right

@@ -267,7 +267,7 @@ package fonts
 import (
 	_ "embed"
 
-	"github.com/lrstanley/bloom/fig"
+	"bloomfx.dev/bloom/fig"
 )
 
 // Names are the names of the fonts, as [ByName] knows them.

@@ -74,9 +74,9 @@ bloom.Layer(marker).
 
 The options are captured when the ID first appears, so changing them later has no effect on a node already on
 screen. The frame rate and clock come from the root, set with
-[`bloom.WithFPS`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFPS),
-[`bloom.WithUnfocusedFPS`](https://pkg.go.dev/github.com/lrstanley/bloom#WithUnfocusedFPS), and
-[`bloom.WithClock`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock). Layout animation also stops when
+[`bloom.WithFPS`](https://pkg.go.dev/bloomfx.dev/bloom#WithFPS),
+[`bloom.WithUnfocusedFPS`](https://pkg.go.dev/bloomfx.dev/bloom#WithUnfocusedFPS), and
+[`bloom.WithClock`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock). Layout animation also stops when
 [motion is turned off](/motion/animating-values#turn-motion-off).
 
 ## Move with effects
@@ -91,7 +91,7 @@ bloom.Fill(pane).
 	MoveWith(fx.Fly{})
 ```
 
-[`fx.Fly`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fly) starts the slot out whole where it was, then flies
+[`fx.Fly`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Fly) starts the slot out whole where it was, then flies
 its cells over, a column at a time, as bright glyphs that arc over and land where it goes. A slot that changed size
 starts out squeezed or stretched to the size it was.
 
@@ -120,9 +120,9 @@ rectangle.
 
 ## Related
 
-- [`SlotNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.Animate),
-  [`LayerNode.Animate`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.Animate),
-  [`SlotNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.MoveWith), and
-  [`LayerNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.MoveWith) API reference
+- [`SlotNode.Animate`](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.Animate),
+  [`LayerNode.Animate`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode.Animate),
+  [`SlotNode.MoveWith`](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.MoveWith), and
+  [`LayerNode.MoveWith`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode.MoveWith) API reference
 - The [`reflow` example](https://github.com/lrstanley/bloom/tree/master/_examples/reflow): a sidebar, a re-sorting
   list, a changing split, a panel coming and going, and a marker following the selection

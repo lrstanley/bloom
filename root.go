@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/internal/motion"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/internal/motion"
-	"github.com/lrstanley/bloom/on"
 )
 
 // Root renders a layout as a model's [tea.View], keeping what it can between

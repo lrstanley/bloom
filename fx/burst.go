@@ -9,7 +9,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // burstGlyphs are what a particle twinkles through, and burstFaded what it

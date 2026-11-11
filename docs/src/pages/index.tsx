@@ -8,7 +8,7 @@ import { Logo } from "../components/logo";
 import { TerminalDemo } from "../components/terminal-demo";
 import { withBase } from "../lib/site";
 
-const install = "go get github.com/lrstanley/bloom@latest";
+const install = "go get bloomfx.dev/bloom@latest";
 
 const tagline = "Layout, motion, and effects for Bubble Tea.";
 
@@ -134,7 +134,7 @@ const paths = [
         links: [
             { text: "Effects", href: "/reference/effects" },
             { text: "Nodes and options", href: "/reference/options" },
-            { text: "API reference", href: "https://pkg.go.dev/github.com/lrstanley/bloom" },
+            { text: "API reference", href: "https://pkg.go.dev/bloomfx.dev/bloom" },
         ],
     },
 ];
@@ -200,7 +200,7 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
 ## Links
 
 - [Source](https://github.com/lrstanley/bloom)
-- [API reference](https://pkg.go.dev/github.com/lrstanley/bloom)
+- [API reference](https://pkg.go.dev/bloomfx.dev/bloom)
 - [Related libraries](/resources/related-libraries), such as bubbletint for color themes
 `;
     }
@@ -361,7 +361,7 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                         <span>© Liam Stanley.</span>
                         <span className="bloom-footer-links">
                             <SmartLink href="https://github.com/lrstanley/bloom">GitHub</SmartLink>
-                            <SmartLink href="https://pkg.go.dev/github.com/lrstanley/bloom">pkg.go.dev</SmartLink>
+                            <SmartLink href="https://pkg.go.dev/bloomfx.dev/bloom">pkg.go.dev</SmartLink>
                             <SmartLink href="/resources/related-libraries">Related libraries</SmartLink>
                         </span>
                         <LlmsLinks />

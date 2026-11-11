@@ -8,8 +8,8 @@ import (
 	"image"
 	"slices"
 
-	"github.com/lrstanley/bloom/flex"
-	"github.com/lrstanley/bloom/on"
+	"bloomfx.dev/bloom/flex"
+	"bloomfx.dev/bloom/on"
 )
 
 // GridNode lays children out in equal-width columns. Build one with [Grid].

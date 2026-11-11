@@ -8,8 +8,8 @@ import (
 	"image"
 	"slices"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom/on"
 )
 
 // entry is a node of a frame that input refers to: one with an ID, mouse

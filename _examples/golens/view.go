@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 )
 
 const (

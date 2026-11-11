@@ -7,8 +7,8 @@ package bloom
 import (
 	"testing"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom/on"
 )
 
 func focusTree(dialog bool) Child {

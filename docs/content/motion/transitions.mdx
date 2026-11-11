@@ -20,7 +20,7 @@ their buttons:
 | A node in a layout that comes and goes | `bloom.Present(p, c, effects...)` |
 | Any node, with any progress | `bloom.Transition(t, c, effects...)` or `bloom.Layer(c).Transition(t, effects...)` |
 
-The `Presence` forms take an [`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) and
+The `Presence` forms take an [`anim.Presence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence) and
 leave the node out completely while it's hidden. A hidden `Present` node takes no space in its row or column and
 leaves no gap behind. A hidden layer has no backdrop, no shadow, and doesn't take mouse events.
 
@@ -77,7 +77,7 @@ bloom.Layer(dialog).Presence(m.dialog, effects...)
 Effects given together are applied in order, all with the same progress. `fx.Fade{}, fx.Slide{From: bloom.Bottom}`
 fades in while sliding up. `fx.Scramble{}, fx.Fade{}` settles random glyphs into the text while it fades in.
 
-The [`fx`](https://pkg.go.dev/github.com/lrstanley/bloom/fx) package has four combinators for finer control:
+The [`fx`](https://pkg.go.dev/bloomfx.dev/bloom/fx) package has four combinators for finer control:
 
 ### Cascade with Stagger
 

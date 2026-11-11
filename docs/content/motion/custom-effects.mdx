@@ -24,7 +24,7 @@ that just changed:
 import (
 	"image/color"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // Flash shows a node in Color at first, and fades it back to its own colors as t
@@ -71,7 +71,7 @@ effects you keep.
 
 ## What a surface offers
 
-[`canvas.Surface`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas#Surface) is the grid of cells an effect
+[`canvas.Surface`](https://pkg.go.dev/bloomfx.dev/bloom/canvas#Surface) is the grid of cells an effect
 changes. Coordinates are relative to its top-left cell.
 
 | Method or field | Use |
@@ -146,7 +146,7 @@ To move a whole node in a straight line, set `Offset` instead, as `fx.Slide` doe
 
 An effect transforms cells that something else drew. To paint cells yourself, such as a chart, a meter, or a
 game board, implement [Ultraviolet](https://github.com/charmbracelet/ultraviolet)'s `Drawable` interface and place it
-with [`bloom.Drawable`](https://pkg.go.dev/github.com/lrstanley/bloom#Drawable):
+with [`bloom.Drawable`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable):
 
 ```go
 import (
@@ -187,7 +187,7 @@ cpu ████████░░░░░░░░░░░░
 ```
 
 The drawable is clipped to the area it's given. Its natural size is zero unless it also implements
-[`bloom.Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer), so give it a sized slot such as `Fill` or
+[`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer), so give it a sized slot such as `Fill` or
 `Fixed`.
 
 ## Related

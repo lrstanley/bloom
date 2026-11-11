@@ -24,7 +24,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // Effect transforms the cells of a surface for progress t, from 0 to 1.

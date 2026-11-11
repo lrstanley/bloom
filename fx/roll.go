@@ -7,7 +7,7 @@ package fx
 import (
 	"unicode/utf8"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 const (

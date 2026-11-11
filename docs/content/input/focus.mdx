@@ -3,7 +3,7 @@ title: Focus and keyboard navigation
 description: Track keyboard focus with bloom.Focus, move it with tab and clicks, press buttons with enter, confine it to dialogs and panels with scopes, and show the terminal cursor.
 ---
 
-[`bloom.Focus`](https://pkg.go.dev/github.com/lrstanley/bloom#Focus) keeps track of which node has keyboard focus,
+[`bloom.Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) keeps track of which node has keyboard focus,
 by ID. It lives in your model. The layout marks which nodes can take focus, and the order they appear in the
 layout is the tab order.
 
@@ -81,7 +81,7 @@ focus's type, so `m.focus.Set("cancel")` sets the `control` `"cancel"`.
 
 ## Press buttons with the keyboard
 
-A button made with [`on.Press`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Press) runs its handler when
+A button made with [`on.Press`](https://pkg.go.dev/bloomfx.dev/bloom/on#Press) runs its handler when
 clicked, and when <kbd>enter</kbd> or <kbd>space</kbd> is pressed while it has focus. `m.focus.Update` runs it for
 the keys, and returns its command with `ok` set:
 
@@ -209,7 +209,7 @@ if m.focus.Within(m.ui.Frame(), scopeForm) {
 
 ## Related
 
-- [`Focus` API reference](https://pkg.go.dev/github.com/lrstanley/bloom#Focus)
+- [`Focus` API reference](https://pkg.go.dev/bloomfx.dev/bloom#Focus)
 - [Dialogs and modals](/layers/dialogs)
 - The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with focusable inputs,
   buttons, and stacked dialog scopes

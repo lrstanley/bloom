@@ -110,8 +110,8 @@ An `anim.Presence` is a number from 0 (hidden) to 1 (shown) that animates betwee
 `fx` imports:
 
 ```go
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fx"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fx"
 ```
 
 Add a presence to the model, and create it in `newModel`:
@@ -174,7 +174,7 @@ between buttons:
 ```
 
 A button is text with an ID that's marked `Focusable`, styled by whether it has focus. `on.Press` (from
-`github.com/lrstanley/bloom/on`) makes it press when it's clicked, or when <kbd>enter</kbd> or <kbd>space</kbd> is
+`bloomfx.dev/bloom/on`) makes it press when it's clicked, or when <kbd>enter</kbd> or <kbd>space</kbd> is
 pressed while it has focus:
 
 ```go
@@ -295,12 +295,12 @@ import (
 	"slices"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 )
 
 type note struct {

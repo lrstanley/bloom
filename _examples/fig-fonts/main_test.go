@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/demo"
+	"bloomfx.dev/bloom/fig/fonts"
 	"getsteep.dev/steep"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/bloom/fig/fonts"
 )
 
 func TestFonts(t *testing.T) {

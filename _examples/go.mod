@@ -1,10 +1,11 @@
-module github.com/lrstanley/bloom/_examples
+module bloomfx.dev/bloom/_examples
 
 go 1.27.3
 
-replace github.com/lrstanley/bloom => ../
+replace bloomfx.dev/bloom => ../
 
 require (
+	bloomfx.dev/bloom v0.0.0-20261104061907-56513da5a6e9
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/lipgloss/v2 v2.0.6
 	getsteep.dev/steep v0.0.0-alpha.8
@@ -13,7 +14,6 @@ require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
 	github.com/charmbracelet/x/ansi v0.11.9
-	github.com/lrstanley/bloom v0.0.0-20261104061907-56513da5a6e9
 	github.com/lrstanley/bubbletint/chromatint/v2 v2.0.4
 	github.com/lrstanley/bubbletint/v2 v2.0.4
 	golang.org/x/tools v0.52.0

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 )
 
 func down(x, y int) tea.MouseMsg { return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft} }

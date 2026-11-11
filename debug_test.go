@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/fx"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom/fx"
 )
 
 type (

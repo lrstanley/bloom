@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/fx"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/fx"
 )
 
 var rounded = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())

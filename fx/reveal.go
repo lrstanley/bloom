@@ -9,8 +9,8 @@ import (
 	"image"
 	"math"
 
+	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // Unfold opens a node from its middle row outward, like a CRT turning on. A

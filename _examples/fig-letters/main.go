@@ -23,15 +23,15 @@ import (
 	"os"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fig"
+	"bloomfx.dev/bloom/fig/fonts"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fig"
-	"github.com/lrstanley/bloom/fig/fonts"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

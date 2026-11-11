@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/canvas"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // litFrame returns a 20×7 region of white-on-blue text, whose top-left cell

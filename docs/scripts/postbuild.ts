@@ -64,15 +64,15 @@ if (!llms.startsWith("# Docs")) {
 
 > bloom is a Go library for Bubble Tea (charm.land/bubbletea/v2) programs. A view is described each frame as a tree of nodes (rows, columns, grids, boxes, and overlays with layers such as dialogs, dropdowns, and toasts), which bloom lays out, composites, animates, and routes mouse and focus input for. Its packages are bloom (layout, layers, input), anim (springs, eased values, presences, and sequences kept in the model), and fx (cell effects used as transitions and backdrops).
 
-Import path: github.com/lrstanley/bloom. Every page below links to its markdown version; the whole site is also available as a single file at ${SITE}/llms-full.txt.`,
+Import path: bloomfx.dev/bloom. Every page below links to its markdown version; the whole site is also available as a single file at ${SITE}/llms-full.txt.`,
         ).trimEnd() +
             `
 
 ## Optional
 
-- [bloom API reference](https://pkg.go.dev/github.com/lrstanley/bloom): Go package documentation for bloom
-- [anim API reference](https://pkg.go.dev/github.com/lrstanley/bloom/anim): Go package documentation for bloom/anim
-- [fx API reference](https://pkg.go.dev/github.com/lrstanley/bloom/fx): Go package documentation for bloom/fx
+- [bloom API reference](https://pkg.go.dev/bloomfx.dev/bloom): Go package documentation for bloom
+- [anim API reference](https://pkg.go.dev/bloomfx.dev/bloom/anim): Go package documentation for bloom/anim
+- [fx API reference](https://pkg.go.dev/bloomfx.dev/bloom/fx): Go package documentation for bloom/fx
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea): the TUI framework bloom builds on
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss): the styling library bloom's boxes and text use
 - [Source and examples](https://github.com/lrstanley/bloom): the repository, including runnable programs in _examples

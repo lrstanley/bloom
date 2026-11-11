@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
 )
 
 func TestBorders(t *testing.T) {

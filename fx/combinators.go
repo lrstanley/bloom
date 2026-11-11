@@ -8,7 +8,7 @@ import (
 	"cmp"
 	"image"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // The effects in this file wrap another effect, changing the t it sees or

@@ -7,8 +7,8 @@ package bloom
 import (
 	"slices"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom/on"
 )
 
 // Focus is which node has the keyboard focus, by its ID, of type K. Keep it

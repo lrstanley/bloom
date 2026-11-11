@@ -11,10 +11,10 @@ import (
 	"testing/synctest"
 	"time"
 
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fx"
 )
 
 // linear is a one second linear layout animation, which moves a box

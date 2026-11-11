@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/canvas"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // particles counts the cells of s that show a burst glyph, in a surface that

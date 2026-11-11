@@ -32,10 +32,10 @@ import (
 	"strings"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/_examples/internal/clip"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/_examples/internal/clip"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

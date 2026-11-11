@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lrstanley/bloom/fig"
-	"github.com/lrstanley/bloom/fig/fonts"
+	"bloomfx.dev/bloom/fig"
+	"bloomfx.dev/bloom/fig/fonts"
 )
 
 func TestFonts(t *testing.T) {

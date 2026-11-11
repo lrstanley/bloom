@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"bloomfx.dev/bloom/fx"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/fx"
 )
 
 // Debug lays out c in a w×h frame, as [Solve] does, and returns its tree of

@@ -22,7 +22,7 @@ package fonts
 import (
 	"sync"
 
-	"github.com/lrstanley/bloom/fig"
+	"bloomfx.dev/bloom/fig"
 )
 
 // lazy is a font made on first use, so that only the fonts a program uses are

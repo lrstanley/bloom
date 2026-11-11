@@ -47,11 +47,11 @@ That only costs anything while they're on screen. Wrapping a node in a transitio
 Some effects blend toward the terminal's own colors: `Dim` toward its background, and `Shimmer` and `Wave` toward
 its foreground. `m.ui.Init()` asks the terminal for those colors, and `m.ui.Update` hears the reply, along with the
 terminal's color profile. Until the reply arrives, or if the terminal never answers, bloom uses defaults that you can
-set with [`bloom.WithColors`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors).
+set with [`bloom.WithColors`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors).
 
 Text widths are measured with grapheme clustering by default, as Lip Gloss and modern terminals do. If your
 program targets terminals that measure differently, set the method with
-[`bloom.WithWidthMethod`](https://pkg.go.dev/github.com/lrstanley/bloom#WithWidthMethod) so bloom agrees with the
+[`bloom.WithWidthMethod`](https://pkg.go.dev/bloomfx.dev/bloom#WithWidthMethod) so bloom agrees with the
 terminal about where each cell is.
 
 ## Frame rate
@@ -71,7 +71,7 @@ it with `anim.UnfocusedFPS(n)` and `bloom.WithUnfocusedFPS(n)`; see
 
 ## Render without a program
 
-[`bloom.Render`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) lays out and draws a tree once, and returns
+[`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) lays out and draws a tree once, and returns
 a string. It doesn't keep anything between calls and shows animations at their targets, so it suits places where a
 string is wanted: printing to stdout, inside a Lip Gloss layout, a component's `View` method, or tests. A width or
 height of zero uses the tree's natural size on that axis.

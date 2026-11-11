@@ -53,7 +53,7 @@ bloom.Viewport(buf).Trusted()
 
 A component's view is drawn as it is, commands included, since that's how a component shows an image. If a
 component shows text from outside your program, clean the text first with
-[`canvas.Sanitize`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas#Sanitize), or show it in a `Text` or
+[`canvas.Sanitize`](https://pkg.go.dev/bloomfx.dev/bloom/canvas#Sanitize), or show it in a `Text` or
 `Viewport` instead.
 
 ## Draw a box around a node
@@ -224,10 +224,10 @@ The values are `bloom.Stretch` (the default), `bloom.Start`, `bloom.Center`, and
 ## Justify children along a row or column
 
 When no child grows, there may be space left over along the row or column. `Justify` decides where it goes,
-using the values from the [`flex`](https://pkg.go.dev/github.com/lrstanley/bloom/flex#Justify) package:
+using the values from the [`flex`](https://pkg.go.dev/bloomfx.dev/bloom/flex#Justify) package:
 
 ```go
-import "github.com/lrstanley/bloom/flex"
+import "bloomfx.dev/bloom/flex"
 
 bloom.Row(a, b).Justify(flex.SpaceBetween)
 ```
@@ -261,8 +261,8 @@ hiding a child doesn't leave a double gap behind.
 
 ## Related
 
-- [`TextNode`](https://pkg.go.dev/github.com/lrstanley/bloom#TextNode),
-  [`BoxNode`](https://pkg.go.dev/github.com/lrstanley/bloom#BoxNode), and
-  [`FlexNode`](https://pkg.go.dev/github.com/lrstanley/bloom#FlexNode) API reference
+- [`TextNode`](https://pkg.go.dev/bloomfx.dev/bloom#TextNode),
+  [`BoxNode`](https://pkg.go.dev/bloomfx.dev/bloom#BoxNode), and
+  [`FlexNode`](https://pkg.go.dev/bloomfx.dev/bloom#FlexNode) API reference
 - [Border effects](/reference/effects#borders)
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss), for the styles themselves

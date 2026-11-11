@@ -10,11 +10,11 @@ import (
 	"os"
 	"testing"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/fig"
+	"bloomfx.dev/bloom/fig/fonts"
+	"bloomfx.dev/bloom/fx"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/fig"
-	"github.com/lrstanley/bloom/fig/fonts"
-	"github.com/lrstanley/bloom/fx"
 )
 
 func BenchmarkParse(b *testing.B) {

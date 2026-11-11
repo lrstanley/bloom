@@ -30,9 +30,9 @@ import (
 	"strings"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
 )
 
 // pane is which list of the code view has the cursor.

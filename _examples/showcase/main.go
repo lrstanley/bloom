@@ -21,10 +21,10 @@ import (
 	"slices"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/on"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

@@ -42,7 +42,7 @@ default).
 
 ## Skeleton loading placeholders
 
-[`bloom.Skeleton`](https://pkg.go.dev/github.com/lrstanley/bloom#Skeleton) draws placeholder bars while data
+[`bloom.Skeleton`](https://pkg.go.dev/bloomfx.dev/bloom#Skeleton) draws placeholder bars while data
 loads. Each number is a line: a bar that many cells wide, or `0` for a blank line. Give it the same number of lines
 as the content it stands in for, so nothing moves when the content arrives.
 
@@ -78,7 +78,7 @@ Bars are drawn in the terminal's foreground faded most of the way into its backg
 `Style` colors them yourself, and bars wider than the space they're given are cut to fit.
 
 The band starts just off one side and ends just off the other, so the loop restarts without a visible jump. It's
-[`fx.Shimmer`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shimmer), which works on any node. For a band of
+[`fx.Shimmer`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Shimmer), which works on any node. For a band of
 another color or width, or to shimmer a whole card, draw it in a transition instead:
 
 ```go

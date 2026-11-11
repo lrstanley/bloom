@@ -18,10 +18,10 @@ import (
 	"os"
 	"strings"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/on"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

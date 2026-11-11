@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"bloomfx.dev/bloom/internal/escape"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/internal/escape"
 )
 
 // Sanitize returns s with only its text, tabs, line breaks, styles, and

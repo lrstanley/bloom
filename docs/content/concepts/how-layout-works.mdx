@@ -73,9 +73,9 @@ On the other axis, children stretch to the row's height unless an `Align` says o
 bloom can measure any component by rendering its `View()` and counting lines and columns. Two optional interfaces
 let a component do better:
 
-- [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) answers "how big do you want to be, given
+- [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) answers "how big do you want to be, given
   this much space?" without rendering, which is cheaper and lets a component ask for less than its view.
-- [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) answers "what layout do you want, given this
+- [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) answers "what layout do you want, given this
   much space?" by returning nodes. This is how a component changes its shape with its size, rather than only
   stretching.
 
@@ -86,7 +86,7 @@ which is why it must not change the component.
 
 Given the same tree and the same size, layout always gives the same rectangles. bloom relies on this in two ways:
 
-- [`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) can run the layout in `Update`, without
+- [`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) can run the layout in `Update`, without
   drawing, and get exactly the rectangles `View` will draw. That's how components like viewports learn their size
   before they render.
 - Mouse events are matched against the frame that's on screen, so a click always lands on what the user saw, even

@@ -14,9 +14,9 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/fig"
+	"bloomfx.dev/bloom/fig/fonts"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/fig"
-	"github.com/lrstanley/bloom/fig/fonts"
 )
 
 // charFont returns a font one row tall whose glyphs are their own

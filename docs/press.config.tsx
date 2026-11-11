@@ -49,7 +49,7 @@ const config = defineConfig({
         links: [
             {
                 text: "pkg.go.dev",
-                url: "https://pkg.go.dev/github.com/lrstanley/bloom",
+                url: "https://pkg.go.dev/bloomfx.dev/bloom",
                 external: true,
             },
             {

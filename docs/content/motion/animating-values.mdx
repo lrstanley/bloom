@@ -4,14 +4,14 @@ description: Keep animations in your model with anim.Value, anim.Presence, and a
 ---
 
 Everything that moves in bloom is driven by a number. The
-[`anim`](https://pkg.go.dev/github.com/lrstanley/bloom/anim) package animates those numbers, as ordinary fields in
+[`anim`](https://pkg.go.dev/bloomfx.dev/bloom/anim) package animates those numbers, as ordinary fields in
 your model:
 
 | Type | Use it for |
 | --- | --- |
-| [`anim.Value`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Value) | a number moving toward a target, such as a panel's width, or a one-shot effect's progress |
-| [`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) | something being shown and hidden, from 0 to 1, such as a dialog or toast |
-| [`anim.Sequence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Sequence) | a series of steps on one number: animate, hold, jump, or loop forever |
+| [`anim.Value`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Value) | a number moving toward a target, such as a panel's width, or a one-shot effect's progress |
+| [`anim.Presence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence) | something being shown and hidden, from 0 to 1, such as a dialog or toast |
+| [`anim.Sequence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Sequence) | a series of steps on one number: animate, hold, jump, or loop forever |
 
 ## How animations run
 
@@ -19,7 +19,7 @@ Animations follow the Bubble Tea pattern: starting one returns a `tea.Cmd`, whic
 passing that message back to the animation moves it forward and schedules the next. Two rules keep it working:
 
 1. **Return the command** from `Show`, `To`, `Play`, or `Loop`.
-2. **Pass every message** to every animation. [`anim.Update`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Update)
+2. **Pass every message** to every animation. [`anim.Update`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Update)
    does that for any number of them and batches their commands:
 
 ```go
@@ -193,7 +193,7 @@ change. The full rate comes back from the frame after focus returns.
 
 Some terminals can't keep up with animation, such as over a slow SSH connection, and some people would rather not
 see it. Terminals don't report a preference for this, so it's yours to offer, such as a setting or a flag.
-[`anim.SetMotion`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#SetMotion) turns animation off for the whole
+[`anim.SetMotion`](https://pkg.go.dev/bloomfx.dev/bloom/anim#SetMotion) turns animation off for the whole
 program, including layout animation, and applies from each running animation's next frame:
 
 ```go
@@ -207,5 +207,5 @@ looks right at rest. It stays stopped if motion comes back, until you call `Loop
 ## Related
 
 - [Transitions](/motion/transitions), for using these values with effects
-- [`anim` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/anim)
+- [`anim` API reference](https://pkg.go.dev/bloomfx.dev/bloom/anim)
 - [Animation options reference](/reference/options#animation-options)

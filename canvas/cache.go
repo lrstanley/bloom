@@ -7,9 +7,9 @@ package canvas
 import (
 	"strings"
 
+	"bloomfx.dev/bloom/internal/escape"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/internal/escape"
 )
 
 // Measure returns the size of s, a string with ANSI styles: the width of its

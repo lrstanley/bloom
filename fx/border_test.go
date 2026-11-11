@@ -8,9 +8,9 @@ import (
 	"image"
 	"testing"
 
+	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // boxSurface returns a surface over a 6×4 rounded box with a dot inside.

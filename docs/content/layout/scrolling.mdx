@@ -206,7 +206,7 @@ the list scrolls.
 To clamp the offset, or to page by a screen at a time, `Update` needs to know how tall the scrolled area is. That's
 decided by the layout, which runs in `View`.
 
-[`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) lays out a tree without drawing it, and
+[`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) lays out a tree without drawing it, and
 returns where each node with an ID would go. Layout is a pure function of the tree and the size, so `Solve` in
 `Update` gives the same rectangles that `View` will draw for the same state.
 
@@ -274,7 +274,7 @@ in a [collapsed slot](/layout/responsive), or a layer that's hidden, isn't.
 
 ## Scroll with the mouse wheel
 
-Put an [`on.Scroll`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Scroll) handler on the reader, so the wheel
+Put an [`on.Scroll`](https://pkg.go.dev/bloomfx.dev/bloom/on#Scroll) handler on the reader, so the wheel
 only scrolls what it's over. `dy` is `1` for each step down and `-1` for each step up:
 
 ```go

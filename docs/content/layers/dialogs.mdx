@@ -23,7 +23,7 @@ dialog, stacks a second one on top, and closes them with <kbd>esc</kbd> and a cl
 
 ## Show and hide a dialog
 
-Keep an [`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) for the dialog in your
+Keep an [`anim.Presence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence) for the dialog in your
 model, and give it to the layer. The layer is only drawn while the presence is visible, including while it
 animates out, and its effects run with the presence's progress:
 
@@ -46,7 +46,7 @@ bloom.Layer(dialog).Presence(m.confirm, fx.Fade{}, fx.Slide{From: bloom.Bottom})
 ```
 
 `m.confirm.Show()`, `Hide()`, and `Toggle()` start the animation and return a command for it. Pass every message to
-the presence so it can move, with [`anim.Update`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Update):
+the presence so it can move, with [`anim.Update`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Update):
 
 ```go
 return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
@@ -59,7 +59,7 @@ return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
 
 `Modal()` makes a layer take every mouse event from what's beneath it. Clicks inside it go to its nodes as usual.
 Clicks outside don't reach the screen behind; they run the layer's
-[`on.ClickOutside`](https://pkg.go.dev/github.com/lrstanley/bloom/on#ClickOutside) handler, so you can close the
+[`on.ClickOutside`](https://pkg.go.dev/bloomfx.dev/bloom/on#ClickOutside) handler, so you can close the
 dialog:
 
 ```go
@@ -104,7 +104,7 @@ Several effects can be combined: `Backdrop(fx.Desaturate{Amount: 1}, fx.Dim{Amou
   `Dim` moves colors toward the terminal's background color, and `Shimmer` and `Wave` use its foreground. The root
   asks the terminal for both. Return `m.ui.Init()` from your model's `Init` and pass every message to
   `m.ui.Update` so it hears the answer, or set defaults with
-  [`bloom.WithColors`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors).
+  [`bloom.WithColors`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors).
 </Callout>
 
 ## Add a shadow
@@ -183,7 +183,7 @@ bloom.Layer(panel).Transition(m.panelAnim.Float(), fx.Wipe{From: bloom.Left})
 
 ## Related
 
-- [`LayerNode` API reference](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode)
+- [`LayerNode` API reference](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode)
 - [Dropdowns and popovers](/layers/dropdowns)
 - [Toast notifications](/layers/toasts)
 - [Transitions](/motion/transitions), for every effect a dialog can open with

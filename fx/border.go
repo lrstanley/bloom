@@ -8,8 +8,8 @@ import (
 	"image/color"
 	"math"
 
+	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // The effects in this file change only the cells around the edge of their

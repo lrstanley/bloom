@@ -3,7 +3,7 @@ title: FIGlet text
 description: Show large text drawn from ordinary characters in FIGlet and TOIlet fonts, color it, step down to smaller fonts as space runs short, and animate it letter by letter.
 ---
 
-Package [`fig`](https://pkg.go.dev/github.com/lrstanley/bloom/fig) draws text in
+Package [`fig`](https://pkg.go.dev/bloomfx.dev/bloom/fig) draws text in
 [FIGlet](http://www.figlet.org) and TOIlet fonts: big letters made of ordinary characters, for headers, splash
 screens, clocks, and banners. Its text is a bloom node like any other, so it fits in rows and columns, sits in
 layers, and works with bloom's effects and layout animation.
@@ -12,13 +12,13 @@ layers, and works with bloom's effects and layout animation.
 
 ## Show text in a font
 
-[`fig.Text`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Text) returns a node. Give it fonts from package
-[`fonts`](https://pkg.go.dev/github.com/lrstanley/bloom/fig/fonts), and a paint:
+[`fig.Text`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Text) returns a node. Give it fonts from package
+[`fonts`](https://pkg.go.dev/bloomfx.dev/bloom/fig/fonts), and a paint:
 
 ```go
 import (
-	"github.com/lrstanley/bloom/fig"
-	"github.com/lrstanley/bloom/fig/fonts"
+	"bloomfx.dev/bloom/fig"
+	"bloomfx.dev/bloom/fig/fonts"
 )
 
 header := fig.Text("Mission Control").
@@ -37,8 +37,8 @@ but they carry every font.
 
 ### Load your own fonts
 
-[`fig.Parse`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Parse) reads a `.flf` or `.tlf` font, compressed
-with zip or gzip or not. [`fig.ParseFS`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#ParseFS) reads one from
+[`fig.Parse`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Parse) reads a `.flf` or `.tlf` font, compressed
+with zip or gzip or not. [`fig.ParseFS`](https://pkg.go.dev/bloomfx.dev/bloom/fig#ParseFS) reads one from
 an `fs.FS`, such as an embedded directory:
 
 ```go
@@ -48,9 +48,9 @@ var fontFiles embed.FS
 doh, err := fig.ParseFS(fontFiles, "fonts/doh.flf")
 ```
 
-[`fig.Lazy`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Lazy) waits until the font is first used to parse it.
+[`fig.Lazy`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Lazy) waits until the font is first used to parse it.
 A FIGlet control file (`.flc`), read with
-[`fig.ParseControl`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#ParseControl), maps characters before they're
+[`fig.ParseControl`](https://pkg.go.dev/bloomfx.dev/bloom/fig#ParseControl), maps characters before they're
 laid out, as `figlet -C` does: `fig.Options{Control: c}`.
 
 ## Step down to smaller fonts
@@ -71,7 +71,7 @@ fig.Text("Mission Control").
 
 ## Color it
 
-A [`Paint`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Paint) gives each character of the text its style:
+A [`Paint`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Paint) gives each character of the text its style:
 
 | Paint | Colors |
 | --- | --- |
@@ -84,7 +84,7 @@ A [`Paint`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Paint) gives each 
 
 Where two letters were squeezed into the same cell, a `ByGlyph` gradient's `Blend()` mixes both letters' colors there.
 
-For anything else, write a [`PaintFunc`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#PaintFunc). It's given
+For anything else, write a [`PaintFunc`](https://pkg.go.dev/bloomfx.dev/bloom/fig#PaintFunc). It's given
 the whole figure and each cell: where it is, what kind of cell it is, and which letter of the text drew it. This one
 lights up the letter under the pointer:
 
@@ -104,7 +104,7 @@ every frame, since it may give different colors each time.
 
 ## Lay it out
 
-[`Options`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Options) is how the text is laid out. Its zero value
+[`Options`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Options) is how the text is laid out. Its zero value
 does what `figlet` with no options does, character for character:
 
 ```go
@@ -169,7 +169,7 @@ a digit that changes should be replaced, not moved.
 
 ### Morph from one text to another
 
-A [`fig.Morph`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Morph) keeps text in your model, and animates its
+A [`fig.Morph`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Morph) keeps text in your model, and animates its
 changes: letters leaving the text go out with `Leave`'s effects, letters joining it come in with `Enter`'s, and the
 rest stay or move. Pass it every message, like any [animated value](/motion/animating-values):
 
@@ -191,7 +191,7 @@ m.clock.Text().
 ### Handle the mouse per letter
 
 `OnGlyph` adds mouse handlers to each letter. It's given the
-[`Glyph`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Glyph): the character, its place in the text, and the
+[`Glyph`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Glyph): the character, its place in the text, and the
 cells it covers. Where letters overlap, the one on top gets the event:
 
 ```go
@@ -219,7 +219,7 @@ bloom.Overlay(screen,
 
 ## Use it without bloom
 
-A font lays text out into a [`Figure`](https://pkg.go.dev/github.com/lrstanley/bloom/fig#Figure), which is also a
+A font lays text out into a [`Figure`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Figure), which is also a
 plain string:
 
 ```go
@@ -241,7 +241,7 @@ licenses are in
 
 ## Related
 
-- [`fig` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/fig)
-- [`fonts` API reference](https://pkg.go.dev/github.com/lrstanley/bloom/fig/fonts)
+- [`fig` API reference](https://pkg.go.dev/bloomfx.dev/bloom/fig)
+- [`fonts` API reference](https://pkg.go.dev/bloomfx.dev/bloom/fig/fonts)
 - [Transitions](/motion/transitions)
 - [Layout animation](/motion/layout-animation)

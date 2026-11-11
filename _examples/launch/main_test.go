@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
 	"getsteep.dev/steep/snapshot"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
 )
 
 // column returns the column text starts at in the screen's first line

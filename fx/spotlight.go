@@ -8,7 +8,7 @@ import (
 	"image"
 	"math"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // Spotlight dims everything but a rectangle, for drawing attention to part

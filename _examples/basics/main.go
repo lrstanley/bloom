@@ -14,9 +14,9 @@ import (
 	"fmt"
 	"strings"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/flex"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/flex"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

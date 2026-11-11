@@ -8,12 +8,12 @@ import (
 	"image"
 	"slices"
 
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/flex"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/flex"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 )
 
 // sizing is how a slot takes part in sharing a row's or column's main axis.

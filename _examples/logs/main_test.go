@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/clip"
+	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
 	"getsteep.dev/steep/reel/effects"
 	"getsteep.dev/steep/reel/vt"
-	"github.com/lrstanley/bloom/_examples/internal/clip"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
 )
 
 func init() { clip.Native = false }

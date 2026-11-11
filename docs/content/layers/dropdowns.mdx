@@ -4,7 +4,7 @@ description: Attach a layer to another node with AnchorTo, for autocomplete sugg
 ---
 
 A dropdown is a layer placed against another node, rather than against the screen.
-[`AnchorTo(id, side)`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.AnchorTo) puts a layer against a side
+[`AnchorTo(id, side)`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode.AnchorTo) puts a layer against a side
 of the node with that ID, aligned with its start.
 
 The [contextmenu example](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu) opens a menu
@@ -54,7 +54,7 @@ like a click on anything else.
 ## Close it on a click elsewhere
 
 A menu that stays open until dismissed can close itself with
-[`on.ClickOutside`](https://pkg.go.dev/github.com/lrstanley/bloom/on#ClickOutside), which runs when a button goes
+[`on.ClickOutside`](https://pkg.go.dev/bloomfx.dev/bloom/on#ClickOutside), which runs when a button goes
 down anywhere but on the layer. The click still reaches what it's on:
 
 ```go
@@ -91,7 +91,7 @@ hidden too.
 A tooltip is the same thing, shown while the pointer is over a node. Following the pointer needs
 `v.MouseMode = tea.MouseModeAllMotion`.
 
-[`on.Hover`](https://pkg.go.dev/github.com/lrstanley/bloom/on#Hover) runs when the pointer moves onto a node and
+[`on.Hover`](https://pkg.go.dev/bloomfx.dev/bloom/on#Hover) runs when the pointer moves onto a node and
 off it. Note which button it's over:
 
 ```go

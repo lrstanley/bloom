@@ -7,7 +7,7 @@ Because a bloom view is a function of your model, most of it can be tested witho
 
 ## Test what a layout draws
 
-[`bloom.Render`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) draws a tree at a size and returns a string.
+[`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) draws a tree at a size and returns a string.
 Compare it with a golden file, or check for the text you expect:
 
 ```go
@@ -31,7 +31,7 @@ This works best when your model has a method that returns the layout, separate f
 
 ## Test where things go
 
-[`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) returns the geometry without drawing. Use it to
+[`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) returns the geometry without drawing. Use it to
 check sizes and positions, which is less brittle than comparing drawn output:
 
 ```go
@@ -72,6 +72,6 @@ Clicks go through the same path as a real terminal's, so this tests your IDs and
 ## Make animations deterministic
 
 Animations run on the wall clock, which makes timing-sensitive tests flaky. Give values a clock you control with
-[`anim.Clock`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Clock), and the root one with
-[`bloom.WithClock`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) for layout animation. Or wait for the
+[`anim.Clock`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Clock), and the root one with
+[`bloom.WithClock`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock) for layout animation. Or wait for the
 end state instead: tests usually care that a dialog opened, not how it looked halfway.

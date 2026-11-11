@@ -8,7 +8,7 @@ import (
 	"cmp"
 	"image"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // Fade crossfades a node in over the frame beneath it. Backgrounds blend

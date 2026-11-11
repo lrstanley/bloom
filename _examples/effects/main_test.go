@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
 )
 
 func TestEffects(t *testing.T) {

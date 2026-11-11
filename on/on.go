@@ -123,7 +123,7 @@ func DoubleClick(fn func() tea.Cmd) Handler { return simple(KindDoubleClick, fn)
 // does, or when enter or space is pressed while it has the focus, which
 // [bloom.Focus.Update] handles.
 //
-// [bloom.Focus.Update]: https://pkg.go.dev/github.com/lrstanley/bloom#Focus.Update
+// [bloom.Focus.Update]: https://pkg.go.dev/bloomfx.dev/bloom#Focus.Update
 func Press(fn func() tea.Cmd) Handler { return simple(KindPress, fn) }
 
 // Scroll runs fn when the wheel turns over the node: dy is 1 for each step

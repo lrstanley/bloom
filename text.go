@@ -8,12 +8,12 @@ import (
 	"math"
 	"strings"
 
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 )
 
 // TextNode is a string, optionally styled. Build one with [Text].

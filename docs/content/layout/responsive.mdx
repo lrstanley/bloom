@@ -48,7 +48,7 @@ Unlike `Fixed`, a percentage slot can shrink below its share when space runs sho
 Some components should change shape, not just size: a toolbar that shows icon labels when wide and only icons
 when narrow, or a form that's two columns on a wide screen and one on a narrow one.
 
-A component that implements [`bloom.Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds its
+A component that implements [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds its
 own layout. bloom calls its `Layout` method with a `bloom.Context` holding the width and height it has, and draws
 whatever it returns:
 

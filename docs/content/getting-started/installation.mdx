@@ -16,18 +16,18 @@ handler that v2 views have.
 ## Install
 
 ```console
-go get github.com/lrstanley/bloom@latest
+go get bloomfx.dev/bloom@latest
 ```
 
 That gets all of bloom's packages. Import the ones you use:
 
 ```go
 import (
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim" // animated values, for transitions
+	"bloomfx.dev/bloom/fx"   // effects, for transitions and backdrops
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim" // animated values, for transitions
-	"github.com/lrstanley/bloom/fx"   // effects, for transitions and backdrops
 )
 ```
 
@@ -47,8 +47,8 @@ package main
 import (
 	"fmt"
 
+	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
 )
 
 func main() {

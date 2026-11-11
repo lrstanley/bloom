@@ -10,8 +10,8 @@ import (
 	"image/color"
 	"math"
 
+	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // decodeGlyphs are what the leading cell of a [Decode] column shows.

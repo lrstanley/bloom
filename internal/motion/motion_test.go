@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lrstanley/bloom/anim"
+	"bloomfx.dev/bloom/anim"
 )
 
 var linear = []anim.Option{anim.Duration(time.Second), anim.Ease(anim.Linear)}

@@ -7,7 +7,7 @@ package fx
 import (
 	"image/color"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // The effects in this file suit backdrops, where t is the strength, though

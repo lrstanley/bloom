@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/fig"
+	"bloomfx.dev/bloom/fig/fonts"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/fig"
-	"github.com/lrstanley/bloom/fig/fonts"
 )
 
 // layerOptions are layouts whose glyph layers are checked against the

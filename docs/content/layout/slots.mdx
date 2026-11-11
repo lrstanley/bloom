@@ -27,11 +27,11 @@ bloom.Row(
 
 | Slot | Size | Grows | Shrinks when space is short |
 | --- | --- | --- | --- |
-| [`Fixed(n, c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Fixed) | exactly `n` cells | no | no |
-| [`Auto(c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Auto), or `c` with no slot | the child's natural size | no | yes, down to its `Min` |
-| [`Fill(c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Fill) | an equal share of the space left over | yes | yes, down to its `Min` |
-| [`Grow(w, c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Grow) | `w` shares of the space left over | yes, by weight | yes, down to its `Min` |
-| [`Percent(p, c)`](https://pkg.go.dev/github.com/lrstanley/bloom#Percent) | `p`% of the row or column | no | yes, down to its `Min` |
+| [`Fixed(n, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fixed) | exactly `n` cells | no | no |
+| [`Auto(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Auto), or `c` with no slot | the child's natural size | no | yes, down to its `Min` |
+| [`Fill(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fill) | an equal share of the space left over | yes | yes, down to its `Min` |
+| [`Grow(w, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Grow) | `w` shares of the space left over | yes, by weight | yes, down to its `Min` |
+| [`Percent(p, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Percent) | `p`% of the row or column | no | yes, down to its `Min` |
 
 "Space left over" is what remains after the `Fixed`, `Auto`, and `Percent` slots, and the gaps, are placed. `Fill`
 is the same as `Grow(1, c)`.
@@ -100,6 +100,6 @@ bloom.Fixed(24, sidebar).ID(paneSidebar).Collapsible(1)
 
 ## Related
 
-- [`SlotNode` API reference](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode)
+- [`SlotNode` API reference](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode)
 - [Responsive layouts](/layout/responsive)
 - [How layout works](/concepts/how-layout-works)

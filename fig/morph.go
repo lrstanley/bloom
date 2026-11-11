@@ -8,10 +8,10 @@ import (
 	"cmp"
 	"slices"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fx"
 )
 
 // Order is the order glyphs start in, for [TextNode.Spread].

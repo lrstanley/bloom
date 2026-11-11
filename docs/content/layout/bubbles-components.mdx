@@ -24,7 +24,7 @@ text is, and keeps the same line at the top as lines wrap differently.
 
 A component's view reaches the terminal as it is, including any commands in it that aren't drawn, such as images.
 If a component shows text from outside your program, such as a file in a Bubbles viewport, clean it first with
-[`canvas.Sanitize`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas#Sanitize), which keeps its styles and
+[`canvas.Sanitize`](https://pkg.go.dev/bloomfx.dev/bloom/canvas#Sanitize), which keeps its styles and
 hyperlinks:
 
 ```go
@@ -33,7 +33,7 @@ m.viewport.SetContent(canvas.Sanitize(contents))
 
 ## Give a component its size
 
-Give the slot the component is in an ID, then use [`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve)
+Give the slot the component is in an ID, then use [`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve)
 when the window size changes. `Solve` lays out the same tree `View` draws, without drawing it, and reports
 where each node with an ID goes:
 
@@ -66,7 +66,7 @@ after those changes too. Putting it in one method that you call from each place 
 ## Show the terminal cursor
 
 Text inputs in Bubbles can draw a fake cursor in their view, or report where the real terminal cursor should go.
-bloom can place the real one: [`Text(s).Cursor(c)`](https://pkg.go.dev/github.com/lrstanley/bloom#TextNode.Cursor)
+bloom can place the real one: [`Text(s).Cursor(c)`](https://pkg.go.dev/bloomfx.dev/bloom#TextNode.Cursor)
 shows the cursor at `c`, relative to the node's top-left corner, wherever the node ends up on screen.
 
 ```go
@@ -95,11 +95,11 @@ import (
 	"os"
 	"strings"
 
+	"bloomfx.dev/bloom"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
 )
 
 type pane string
@@ -201,9 +201,9 @@ func main() {
 The components you write don't need anything bloom-specific either: a `View() string` method is enough. When a
 component would benefit from knowing more, it can opt in:
 
-- [`bloom.Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports its natural size, so bloom
+- [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports its natural size, so bloom
   doesn't have to render its view to measure it. A one-line status bar can say it's one row tall at any width.
-- [`bloom.Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a bloom layout for the space it's
+- [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a bloom layout for the space it's
   given, which lets it [change shape with its size](/layout/responsive#build-a-layout-for-the-space-youre-given).
 
 ```go

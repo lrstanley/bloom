@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/on"
 )
 
 // lines returns a list item function of one-line items, counting the items

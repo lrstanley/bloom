@@ -12,13 +12,13 @@ import (
 	"time"
 	"unicode"
 
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/clipperhouse/uax29/v2/words"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/on"
 )
 
 // SelectionMsg is sent when text is selected with the mouse in a node made

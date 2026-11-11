@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/on"
 )
 
 func TestScrollbarThumb(t *testing.T) {

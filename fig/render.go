@@ -7,9 +7,9 @@ package fig
 import (
 	"image"
 
+	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // renderLimit is how many renderings a figure keeps, besides room for every

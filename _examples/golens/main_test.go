@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
 	"getsteep.dev/steep/reel/effects"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
 )
 
 // at returns the cell where text first appears on screen, or -1, -1.

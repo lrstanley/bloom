@@ -4,31 +4,31 @@ description: A compact reference of bloom's nodes, slot and layer options, Root 
 ---
 
 This page lists what's available, grouped by what it's for. The full documentation, with every method's details,
-is on [pkg.go.dev](https://pkg.go.dev/github.com/lrstanley/bloom).
+is on [pkg.go.dev](https://pkg.go.dev/bloomfx.dev/bloom).
 
 ## Nodes
 
 | Function | Makes |
 | --- | --- |
-| [`Row(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Row) | children left to right |
-| [`Column(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Column) | children top to bottom |
-| [`Grid(cols, children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Grid) | equal-width columns, filled row by row |
-| [`Wrap(children...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Wrap) | children flowing onto new lines at their natural sizes |
-| [`Text(s)`](https://pkg.go.dev/github.com/lrstanley/bloom#Text) | a string, optionally styled |
-| [`Marquee(s, phase)`](https://pkg.go.dev/github.com/lrstanley/bloom#Marquee) | one line that scrolls, or is cut short, when it doesn't fit |
-| [`Skeleton(lines...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Skeleton) | placeholder bars for content still loading, a line for each width, 0 for a blank line |
-| [`Box(style, child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Box) | a Lip Gloss frame around a child |
-| [`Centered(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Centered) | a child at its natural size in the middle of its space |
-| [`Scroll(child, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
-| [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/github.com/lrstanley/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
-| [`ScrollbarOf(id)`](https://pkg.go.dev/github.com/lrstanley/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` or `Viewport` with ID `id` |
-| [`List(count, item)`](https://pkg.go.dev/github.com/lrstanley/bloom#List) | the items of a list that fit, built by `item(i)` only for those; `.Offset(i)`, `.Keep(i)`, `.Gap(n)` |
-| [`Viewport(buf)`](https://pkg.go.dev/github.com/lrstanley/bloom#Viewport) | the lines of a [`Buffer`](https://pkg.go.dev/github.com/lrstanley/bloom#Buffer) in sight, from a position kept in the model, drawing only those |
-| [`Overlay(base, layers...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Overlay) | layers drawn over a base |
-| [`Layer(child)`](https://pkg.go.dev/github.com/lrstanley/bloom#Layer) | a layer for an overlay, centered at its natural size |
-| [`Transition(t, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Transition) | a child drawn with effects at progress `t` |
-| [`Present(p, child, effects...)`](https://pkg.go.dev/github.com/lrstanley/bloom#Present) | a child shown only while a presence is visible |
-| [`Drawable(d)`](https://pkg.go.dev/github.com/lrstanley/bloom#Drawable) | an Ultraviolet `Drawable`, painting cells directly |
+| [`Row(children...)`](https://pkg.go.dev/bloomfx.dev/bloom#Row) | children left to right |
+| [`Column(children...)`](https://pkg.go.dev/bloomfx.dev/bloom#Column) | children top to bottom |
+| [`Grid(cols, children...)`](https://pkg.go.dev/bloomfx.dev/bloom#Grid) | equal-width columns, filled row by row |
+| [`Wrap(children...)`](https://pkg.go.dev/bloomfx.dev/bloom#Wrap) | children flowing onto new lines at their natural sizes |
+| [`Text(s)`](https://pkg.go.dev/bloomfx.dev/bloom#Text) | a string, optionally styled |
+| [`Marquee(s, phase)`](https://pkg.go.dev/bloomfx.dev/bloom#Marquee) | one line that scrolls, or is cut short, when it doesn't fit |
+| [`Skeleton(lines...)`](https://pkg.go.dev/bloomfx.dev/bloom#Skeleton) | placeholder bars for content still loading, a line for each width, 0 for a blank line |
+| [`Box(style, child)`](https://pkg.go.dev/bloomfx.dev/bloom#Box) | a Lip Gloss frame around a child |
+| [`Centered(child)`](https://pkg.go.dev/bloomfx.dev/bloom#Centered) | a child at its natural size in the middle of its space |
+| [`Scroll(child, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
+| [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
+| [`ScrollbarOf(id)`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` or `Viewport` with ID `id` |
+| [`List(count, item)`](https://pkg.go.dev/bloomfx.dev/bloom#List) | the items of a list that fit, built by `item(i)` only for those; `.Offset(i)`, `.Keep(i)`, `.Gap(n)` |
+| [`Viewport(buf)`](https://pkg.go.dev/bloomfx.dev/bloom#Viewport) | the lines of a [`Buffer`](https://pkg.go.dev/bloomfx.dev/bloom#Buffer) in sight, from a position kept in the model, drawing only those |
+| [`Overlay(base, layers...)`](https://pkg.go.dev/bloomfx.dev/bloom#Overlay) | layers drawn over a base |
+| [`Layer(child)`](https://pkg.go.dev/bloomfx.dev/bloom#Layer) | a layer for an overlay, centered at its natural size |
+| [`Transition(t, child, effects...)`](https://pkg.go.dev/bloomfx.dev/bloom#Transition) | a child drawn with effects at progress `t` |
+| [`Present(p, child, effects...)`](https://pkg.go.dev/bloomfx.dev/bloom#Present) | a child shown only while a presence is visible |
+| [`Drawable(d)`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable) | an Ultraviolet `Drawable`, painting cells directly |
 
 Any value with a `View() string` method can also be a child.
 
@@ -152,27 +152,27 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 
 | Option | Default | Sets |
 | --- | --- | --- |
-| [`WithColors(fg, bg)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithColors) | white on black | the terminal colors effects blend with, until the terminal reports its own |
-| [`WithFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFPS) | 60 | the frame rate of layout animation |
-| [`WithUnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithUnfocusedFPS) | 20 | the frame rate of layout animation while the terminal isn't focused |
-| [`WithWidthMethod(m)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
-| [`WithClock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithClock) | `time.Now` | the clock for layout animation and double clicks, for tests |
-| [`WithFocus(&m.focus)`](https://pkg.go.dev/github.com/lrstanley/bloom#WithFocus) | none | the focus that clicks move, before handlers run |
+| [`WithColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) | white on black | the terminal colors effects blend with, until the terminal reports its own |
+| [`WithFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFPS) | 60 | the frame rate of layout animation |
+| [`WithUnfocusedFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithUnfocusedFPS) | 20 | the frame rate of layout animation while the terminal isn't focused |
+| [`WithWidthMethod(m)`](https://pkg.go.dev/bloomfx.dev/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
+| [`WithClock(now)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock) | `time.Now` | the clock for layout animation and double clicks, for tests |
+| [`WithFocus(&m.focus)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus) | none | the focus that clicks move, before handlers run |
 
 ## Geometry and input
 
 | | Does |
 | --- | --- |
-| [`Solve(w, h, tree)`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve) | lay out without drawing, and return the `*Frame` |
-| [`Render(w, h, tree)`](https://pkg.go.dev/github.com/lrstanley/bloom#Render) | lay out and draw to a string, without a root |
+| [`Solve(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) | lay out without drawing, and return the `*Frame` |
+| [`Render(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Render) | lay out and draw to a string, without a root |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
-| [`ThrottleMouse(every)`](https://pkg.go.dev/github.com/lrstanley/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
+| [`ThrottleMouse(every)`](https://pkg.go.dev/bloomfx.dev/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
 | `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
 
 ## Mouse handlers
 
-From [`github.com/lrstanley/bloom/on`](https://pkg.go.dev/github.com/lrstanley/bloom/on), for `On(...)`:
+From [`bloomfx.dev/bloom/on`](https://pkg.go.dev/bloomfx.dev/bloom/on), for `On(...)`:
 
 | Handler | Runs on |
 | --- | --- |
@@ -187,8 +187,8 @@ From [`github.com/lrstanley/bloom/on`](https://pkg.go.dev/github.com/lrstanley/b
 | `on.Mouse(fn)` | every mouse event over the node |
 | `on.Msg(msg)` | a handler function that sends `msg` to `Update` |
 
-Component interfaces: [`Measurer`](https://pkg.go.dev/github.com/lrstanley/bloom#Measurer) reports a natural size,
-and [`Layouter`](https://pkg.go.dev/github.com/lrstanley/bloom#Layouter) builds a layout for the space given. The
+Component interfaces: [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports a natural size,
+and [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a layout for the space given. The
 handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen.
 
 ## Animation options
@@ -197,12 +197,12 @@ For `anim.NewValue`, `anim.NewPresence`, `anim.NewLoop`, `Sequence.With`, `anim.
 
 | Option | Default | Sets |
 | --- | --- | --- |
-| [`Duration(d)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Duration) | 250ms | how long easing to a target takes |
-| [`Ease(e)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Ease) | `OutCubic` | the easing curve |
-| [`Spring(frequency, damping)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Spring) | | move like a spring instead of easing |
-| [`FPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#FPS) | 60 | frames requested while animating |
-| [`UnfocusedFPS(n)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#UnfocusedFPS) | 20 | frames requested while the terminal isn't focused |
-| [`Clock(now)`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Clock) | `time.Now` | the source of time, for tests |
+| [`Duration(d)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Duration) | 250ms | how long easing to a target takes |
+| [`Ease(e)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Ease) | `OutCubic` | the easing curve |
+| [`Spring(frequency, damping)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Spring) | | move like a spring instead of easing |
+| [`FPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#FPS) | 60 | frames requested while animating |
+| [`UnfocusedFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#UnfocusedFPS) | 20 | frames requested while the terminal isn't focused |
+| [`Clock(now)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Clock) | `time.Now` | the source of time, for tests |
 
 Easings: `Linear`, `InQuad`, `OutQuad`, `InOutQuad`, `OutCubic`, `InOutCubic`, `OutBack`, or any
 `func(float64) float64`.

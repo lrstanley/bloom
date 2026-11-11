@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel/vt"
 	"getsteep.dev/steep/snapshot"
-	"github.com/lrstanley/bloom/_examples/internal/demo"
 )
 
 func TestResponsive(t *testing.T) {

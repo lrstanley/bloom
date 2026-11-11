@@ -11,7 +11,7 @@ import (
 	"image"
 	"time"
 
-	"github.com/lrstanley/bloom/anim"
+	"bloomfx.dev/bloom/anim"
 )
 
 // state is the animation of a box with an ID: its place gliding, as four

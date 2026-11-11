@@ -10,8 +10,8 @@ import (
 	"slices"
 	"sync"
 
+	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // Fly flies a moving node's cells over from where it was, [canvas.Surface.From],
@@ -25,7 +25,7 @@ import (
 // ends. Flights are the same for the same Seed. On a node that is not
 // moving, it does nothing.
 //
-// [bloom.SlotNode.MoveWith]: https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.MoveWith
+// [bloom.SlotNode.MoveWith]: https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.MoveWith
 type Fly struct {
 	Seed uint32
 }

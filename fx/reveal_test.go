@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/canvas"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 // boxText returns the text of a w×h box with a border, white on blue, with a

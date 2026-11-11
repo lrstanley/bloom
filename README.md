@@ -26,11 +26,8 @@
     <img title="Code Coverage" src="https://img.shields.io/codecov/c/github/lrstanley/bloom/master?style=flat-square">
   </a>
 
-  <a href="https://pkg.go.dev/github.com/lrstanley/bloom">
-    <img title="Go Documentation" src="https://pkg.go.dev/badge/github.com/lrstanley/bloom?style=flat-square">
-  </a>
-  <a href="https://goreportcard.com/report/github.com/lrstanley/bloom">
-    <img title="Go Report Card" src="https://goreportcard.com/badge/github.com/lrstanley/bloom?style=flat-square">
+  <a href="https://pkg.go.dev/bloomfx.dev/bloom">
+    <img title="Go Documentation" src="https://pkg.go.dev/badge/bloomfx.dev/bloom?style=flat-square">
   </a>
 </p>
 <p align="center">
@@ -144,7 +141,7 @@ Runnable programs, from a basic layout to a 120 FPS dashboard, are in [`_example
 <!-- template:begin:goget -->
 <!-- do not edit anything in this "template" block, its auto-generated -->
 ```console
-go get -u github.com/lrstanley/bloom@latest
+go get -u bloomfx.dev/bloom@latest
 ```
 <!-- template:end:goget -->
 

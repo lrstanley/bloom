@@ -16,10 +16,10 @@ import (
 	"os"
 	"slices"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

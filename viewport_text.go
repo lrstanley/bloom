@@ -10,10 +10,10 @@ import (
 	"slices"
 	"strings"
 
+	"bloomfx.dev/bloom/internal/escape"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/internal/escape"
 )
 
 // tabStop is how many columns apart the stops a tab in a [Buffer] moves to

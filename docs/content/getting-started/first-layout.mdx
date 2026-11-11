@@ -28,7 +28,7 @@ Create a new module and add bloom, Bubble Tea, and Lip Gloss:
 ```console
 mkdir notes && cd notes
 go mod init example.com/notes
-go get github.com/lrstanley/bloom@latest charm.land/bubbletea/v2 charm.land/lipgloss/v2
+go get bloomfx.dev/bloom@latest charm.land/bubbletea/v2 charm.land/lipgloss/v2
 ```
 
 Everything below goes in `main.go`.
@@ -49,8 +49,8 @@ import (
 	"fmt"
 	"os"
 
+	"bloomfx.dev/bloom"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom"
 )
 
 type model struct {
@@ -232,7 +232,7 @@ Then handle the arrow keys in `Update`, next to the quit keys:
 Mouse handlers go on the nodes they're about, with `On`. The handlers come from the `on` package, so import it:
 
 ```go
-import "github.com/lrstanley/bloom/on"
+import "bloomfx.dev/bloom/on"
 ```
 
 Give each sidebar item a click handler in `View`:
@@ -287,10 +287,10 @@ import (
 	"fmt"
 	"os"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/on"
 )
 
 type note struct {

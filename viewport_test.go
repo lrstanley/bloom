@@ -16,11 +16,11 @@ import (
 	"strings"
 	"testing"
 
+	"bloomfx.dev/bloom/canvas"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
 )
 
 func wantRender(t *testing.T, w, h int, c Child, want ...string) {

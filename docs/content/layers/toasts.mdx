@@ -4,7 +4,7 @@ description: Show a notification in a corner of the screen that animates in and 
 ---
 
 A toast is a [layer](/layers/dialogs) anchored to a corner of the screen, shown with an
-[`anim.Presence`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence) that hides itself.
+[`anim.Presence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence) that hides itself.
 
 ## Show one toast
 
@@ -19,7 +19,7 @@ type model struct {
 ```
 
 Create the presence with `anim.NewPresence()`, and show it with
-[`ShowFor`](https://pkg.go.dev/github.com/lrstanley/bloom/anim#Presence.ShowFor). It animates in, waits, then
+[`ShowFor`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence.ShowFor). It animates in, waits, then
 animates out, with no timer messages for you to handle:
 
 ```go
@@ -63,7 +63,7 @@ Effects combine, so `fx.Typewriter{}, fx.Fade{}` types the message in while it f
 ## Stack several toasts
 
 To show more than one at a time, keep a list of toasts, each with its own presence. Put them in a column inside a
-single layer, and wrap each in [`bloom.Present`](https://pkg.go.dev/github.com/lrstanley/bloom#Present).
+single layer, and wrap each in [`bloom.Present`](https://pkg.go.dev/bloomfx.dev/bloom#Present).
 `Present` is the `Presence` of an ordinary node: a hidden toast takes no space and leaves no gap, so the others
 close up behind it.
 
@@ -114,11 +114,11 @@ import (
 	"slices"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/fx"
 )
 
 var toastBox = lipgloss.NewStyle().

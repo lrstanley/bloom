@@ -3,7 +3,7 @@ title: Effects
 description: Every effect in the fx package, its fields, and whether it suits a transition, a backdrop, or feedback.
 ---
 
-All effects are in [`github.com/lrstanley/bloom/fx`](https://pkg.go.dev/github.com/lrstanley/bloom/fx). Each takes a
+All effects are in [`bloomfx.dev/bloom/fx`](https://pkg.go.dev/bloomfx.dev/bloom/fx). Each takes a
 progress `t` from 0 to 1:
 
 - As a **transition** (`bloom.Transition`, `bloom.Present`, `Layer.Presence`, `Layer.Transition`), it changes the
@@ -28,28 +28,28 @@ The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/e
 
 | Effect | Fields | Brings a node in by |
 | --- | --- | --- |
-| [`Fade`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fade) | | crossfading from what's beneath it |
-| [`Slide`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Slide) | `From Direction` | moving in from beyond a side or corner of its viewport |
-| [`Wipe`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Wipe) | `From Direction` | revealing it from one side or corner to the opposite one |
-| [`Dissolve`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Dissolve) | `Seed` | revealing its cells in a random order |
-| [`Typewriter`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Typewriter) | | revealing its cells in reading order |
-| [`Scramble`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Scramble) | `Seed` | random glyphs settling into its own |
-| [`Decode`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Decode) | `From Direction` (default `Top`), `Seed` | columns falling into place like digital rain, or rows or diagonals from another side or corner |
-| [`Unfold`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Unfold) | | opening from its middle row outward, like a CRT turning on |
-| [`Iris`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Iris) | `At image.Point` | a circle growing from `At` (screen coordinates; zero is the node's center) |
-| [`Shade`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shade) | `Seed` | each cell stepping through ░ ▒ ▓ to its glyph |
-| [`Blinds`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Blinds) | `From Direction`, `Size int` (default 3) | opening slats, like window blinds; diagonal from a corner |
-| [`Wave`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Wave) | `From Direction` | a wobbling front sweeping across, with a bright crest |
-| [`Glitch`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Glitch) | `Seed` | a breaking-up signal that settles, with jitter and split colors |
+| [`Fade`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Fade) | | crossfading from what's beneath it |
+| [`Slide`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Slide) | `From Direction` | moving in from beyond a side or corner of its viewport |
+| [`Wipe`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Wipe) | `From Direction` | revealing it from one side or corner to the opposite one |
+| [`Dissolve`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Dissolve) | `Seed` | revealing its cells in a random order |
+| [`Typewriter`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Typewriter) | | revealing its cells in reading order |
+| [`Scramble`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Scramble) | `Seed` | random glyphs settling into its own |
+| [`Decode`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Decode) | `From Direction` (default `Top`), `Seed` | columns falling into place like digital rain, or rows or diagonals from another side or corner |
+| [`Unfold`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Unfold) | | opening from its middle row outward, like a CRT turning on |
+| [`Iris`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Iris) | `At image.Point` | a circle growing from `At` (screen coordinates; zero is the node's center) |
+| [`Shade`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Shade) | `Seed` | each cell stepping through ░ ▒ ▓ to its glyph |
+| [`Blinds`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Blinds) | `From Direction`, `Size int` (default 3) | opening slats, like window blinds; diagonal from a corner |
+| [`Wave`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Wave) | `From Direction` | a wobbling front sweeping across, with a bright crest |
+| [`Glitch`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Glitch) | `Seed` | a breaking-up signal that settles, with jitter and split colors |
 
 ## Backdrops
 
 | Effect | Fields | Changes what's beneath a layer by |
 | --- | --- | --- |
-| [`Dim`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Dim) | `Amount float64` | moving colors toward the terminal's background |
-| [`Desaturate`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Desaturate) | `Amount float64` | moving colors toward gray |
-| [`Recolor`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Recolor) | `Fg, Bg color.Color`, `Amount float64` (default 1) | moving colors toward `Fg` and `Bg`, keeping the glyphs: all the way draws every cell in the two colors, and the same color for both tints toward it |
-| [`Spotlight`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Spotlight) | `Rect image.Rectangle`, `Amount float64` (default 0.7), `Soft int` | dimming everything outside `Rect`, with a soft edge `Soft` cells wide |
+| [`Dim`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Dim) | `Amount float64` | moving colors toward the terminal's background |
+| [`Desaturate`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Desaturate) | `Amount float64` | moving colors toward gray |
+| [`Recolor`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Recolor) | `Fg, Bg color.Color`, `Amount float64` (default 1) | moving colors toward `Fg` and `Bg`, keeping the glyphs: all the way draws every cell in the two colors, and the same color for both tints toward it |
+| [`Spotlight`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Spotlight) | `Rect image.Rectangle`, `Amount float64` (default 0.7), `Soft int` | dimming everything outside `Rect`, with a soft edge `Soft` cells wide |
 
 `Amount` runs from 0, no change, to 1, all the way, except where a default is listed: there, zero is the
 default. Backdrops also work as transitions; `Recolor` on a node fades it in
@@ -62,21 +62,21 @@ drive them.
 
 | Effect | Fields | Does |
 | --- | --- | --- |
-| [`Shake`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shake) | `Amount int` (default 2), `Times int` (default 4) | moves the node side to side with a decaying wobble; still at 0 and 1 |
-| [`Shimmer`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Shimmer) | `Color color.Color`, `Width int` (default 6), `From Direction` (default `TopLeft`) | sweeps a highlight band across the node, parallel to a side or diagonal from a corner; `t` is the band's position |
-| [`Roll`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Roll) | `From string` | turns digits over like an odometer, from the number in `From` |
-| [`Burst`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Burst) | `At image.Point`, `Count int` (default 40), `Seed` | throws confetti from `At`; `t` is its age, gone at 1 |
+| [`Shake`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Shake) | `Amount int` (default 2), `Times int` (default 4) | moves the node side to side with a decaying wobble; still at 0 and 1 |
+| [`Shimmer`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Shimmer) | `Color color.Color`, `Width int` (default 6), `From Direction` (default `TopLeft`) | sweeps a highlight band across the node, parallel to a side or diagonal from a corner; `t` is the band's position |
+| [`Roll`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Roll) | `From string` | turns digits over like an odometer, from the number in `From` |
+| [`Burst`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Burst) | `At image.Point`, `Count int` (default 40), `Seed` | throws confetti from `At`; `t` is its age, gone at 1 |
 
 ## Moves
 
 These draw a slot or layer on its way to a new place, given to
-[`SlotNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#SlotNode.MoveWith) or
-[`LayerNode.MoveWith`](https://pkg.go.dev/github.com/lrstanley/bloom#LayerNode.MoveWith). See
+[`SlotNode.MoveWith`](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.MoveWith) or
+[`LayerNode.MoveWith`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode.MoveWith). See
 [Layout animation](/motion/layout-animation#move-with-effects).
 
 | Effect | Fields | Does |
 | --- | --- | --- |
-| [`Fly`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Fly) | `Seed` | flies the node's cells over from where it was, a column at a time, as bright glyphs arcing to where they land |
+| [`Fly`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Fly) | `Seed` | flies the node's cells over from where it was, a column at a time, as bright glyphs arcing to where they land |
 
 ## Borders
 
@@ -86,10 +86,10 @@ loop: `t` is the phase, such as from `anim.NewLoop`, and they look the same at 0
 
 | Effect | Fields | Does |
 | --- | --- | --- |
-| [`Chase`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Chase) | `From, To color.Color`, `Cycles int` (default 1) | a gradient from `From` to `To` and back, travelling clockwise; more `Cycles` make a ripple of narrower bands |
-| [`Pulse`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Pulse) | `Color color.Color` | moves the whole border toward `Color` and back, reaching it at 0.5 |
-| [`Comet`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Comet) | `Color color.Color`, `Length int` (default 8) | sends a bright head with a fading tail once around |
-| [`March`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#March) | `Length int` (default 2) | marching ants: runs of line glyphs alternate with dashed ones and travel clockwise, a run each loop |
+| [`Chase`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Chase) | `From, To color.Color`, `Cycles int` (default 1) | a gradient from `From` to `To` and back, travelling clockwise; more `Cycles` make a ripple of narrower bands |
+| [`Pulse`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Pulse) | `Color color.Color` | moves the whole border toward `Color` and back, reaching it at 0.5 |
+| [`Comet`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Comet) | `Color color.Color`, `Length int` (default 8) | sends a bright head with a fading tail once around |
+| [`March`](https://pkg.go.dev/bloomfx.dev/bloom/fx#March) | `Length int` (default 2) | marching ants: runs of line glyphs alternate with dashed ones and travel clockwise, a run each loop |
 
 A nil `From` is each cell's own color, and other nil colors are the terminal's foreground. Other effects work as
 border effects too, on the whole frame, such as `Recolor` or `Shimmer`. Effects that move cells don't move the frame.
@@ -100,16 +100,16 @@ These wrap other effects.
 
 | Effect | Fields | Does |
 | --- | --- | --- |
-| [`Stagger`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Stagger) | `Effect`, `From Direction`, `Spread float64` (default 0.5) | runs `Effect` on each row (`From` top or bottom) or column (left or right), one after another; a corner is taken as its top or bottom |
-| [`Delay`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Delay) | `Effect`, `From, To float64` (`To` defaults to 1) | runs `Effect` only between `From` and `To` of the progress |
-| [`Reverse`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Reverse) | `Effect` | runs `Effect` with `1-t` |
-| [`Ease`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Ease) | `Effect`, `Easing func(float64) float64` | runs `Effect` with eased progress, such as `anim.OutBack` |
+| [`Stagger`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Stagger) | `Effect`, `From Direction`, `Spread float64` (default 0.5) | runs `Effect` on each row (`From` top or bottom) or column (left or right), one after another; a corner is taken as its top or bottom |
+| [`Delay`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Delay) | `Effect`, `From, To float64` (`To` defaults to 1) | runs `Effect` only between `From` and `To` of the progress |
+| [`Reverse`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Reverse) | `Effect` | runs `Effect` with `1-t` |
+| [`Ease`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Ease) | `Effect`, `Easing func(float64) float64` | runs `Effect` with eased progress, such as `anim.OutBack` |
 
 ## Your own
 
 | Type | Does |
 | --- | --- |
-| [`Func`](https://pkg.go.dev/github.com/lrstanley/bloom/fx#Func) | turns a `func(*canvas.Surface, float64)` into an effect |
+| [`Func`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Func) | turns a `func(*canvas.Surface, float64)` into an effect |
 
 Any type with an `Apply(*canvas.Surface, float64)` method is an effect. See [Custom effects](/motion/custom-effects).
 

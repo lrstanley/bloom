@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lrstanley/bloom/anim"
+	"bloomfx.dev/bloom/anim"
 
+	"bloomfx.dev/bloom/fx"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom/fx"
 )
 
 // The benchmarks lay out and draw a dashboard on a 200×60 terminal: a

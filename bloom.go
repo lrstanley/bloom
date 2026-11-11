@@ -52,9 +52,9 @@ package bloom
 import (
 	"slices"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/lrstanley/bloom/on"
 )
 
 // Child is anything that can be placed in a layout: every node of this
@@ -65,7 +65,7 @@ import (
 // written to the terminal rather than drawn, such as images, which [Text]
 // and [Viewport] drop unless they are trusted. A component that shows text
 // from outside the program, such as a file, should clean it with
-// [github.com/lrstanley/bloom/canvas.Sanitize] first.
+// [bloomfx.dev/bloom/canvas.Sanitize] first.
 type Child interface {
 	View() string
 }

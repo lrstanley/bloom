@@ -9,13 +9,13 @@ import (
 	"image"
 	"slices"
 
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/flex"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/internal/motion"
+	"bloomfx.dev/bloom/on"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/flex"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/internal/motion"
-	"github.com/lrstanley/bloom/on"
 )
 
 // box is a node of the tree being laid out, kept in the engine's arena and

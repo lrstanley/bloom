@@ -18,13 +18,13 @@ import (
 	"os"
 	"time"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/fx"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 

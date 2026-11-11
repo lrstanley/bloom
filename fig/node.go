@@ -10,12 +10,12 @@ import (
 	"strings"
 	"sync"
 
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/lrstanley/bloom"
-	"github.com/lrstanley/bloom/anim"
-	"github.com/lrstanley/bloom/canvas"
-	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/bloom/on"
 )
 
 //go:embed fonts/data/standard.flf.gz

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lrstanley/bloom/canvas"
+	"bloomfx.dev/bloom/canvas"
 )
 
 // gridText returns w×h cells where row y is made of the letter 'a'+y.

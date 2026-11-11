@@ -9,8 +9,8 @@ import (
 	"slices"
 	"time"
 
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"github.com/lrstanley/bloom/on"
 )
 
 // doubleClick is the longest time between the clicks of a double click.
