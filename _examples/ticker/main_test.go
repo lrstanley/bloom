@@ -19,16 +19,16 @@ func TestTicker(t *testing.T) {
 
 	// Long names are cut off. The selected one waits a moment, then scrolls.
 	h.Wait("markets").Wait("Globex International Holdings G…").Wait("Stark Industries Advanced Resea…")
-	h.Wait("ACME Corp").Sleep(500 * time.Millisecond)
+	h.Wait("ACME Corp").Sleep(demo.Hold(500 * time.Millisecond))
 
 	// Moving the selection starts the next name over: cut off, then scrolling
 	// until the end of it is in view.
-	h.Key("down").Sleep(300 * time.Millisecond)
+	h.Key("down").Sleep(demo.Hold(300 * time.Millisecond))
 	h.Wait("Holdings Group")
 	h.Key("down").Key("down").Wait("Umbrella Pharmaceuticals and Bi…").Wait("Biotechnology")
 
 	// The banner slides in, holds, and slides out again.
-	h.Key("b").Wait("Alert 1").Sleep(400 * time.Millisecond)
+	h.Key("b").Wait("Alert 1").Sleep(demo.Hold(400 * time.Millisecond))
 	h.WaitNot("Alert 1")
 
 	// Paused, nothing moves, so the screen is the same every time.
@@ -36,8 +36,8 @@ func TestTicker(t *testing.T) {
 	h.AssertSnapshot()
 
 	// A click on a row selects it, while paused too.
-	h.LeftClick(10, 5).Sleep(200 * time.Millisecond)
-	h.Key("space").Sleep(400 * time.Millisecond)
+	h.LeftClick(10, 5).Sleep(demo.Hold(200 * time.Millisecond))
+	h.Key("space").Sleep(demo.Hold(400 * time.Millisecond))
 
 	h.Key("q")
 	h.WaitFinished()

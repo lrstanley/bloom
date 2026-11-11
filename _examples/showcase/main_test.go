@@ -80,7 +80,7 @@ func TestShowcase(t *testing.T) {
 
 	// A click selects a service.
 	x, y := find(t, h, "billing")
-	h.LeftClick(x, y).Wait("billing is slow").Sleep(500 * time.Millisecond)
+	h.LeftClick(x, y).Wait("billing is slow").Sleep(demo.Hold(500 * time.Millisecond))
 	pick(t, h, "Rose Pine")
 
 	// A pane dragged by its title floats under the pointer, and the others
@@ -96,21 +96,21 @@ func TestShowcase(t *testing.T) {
 	x, y = find(t, h, "⠿ Palette")
 	h.LeftClick(x+3, y, reel.Repeat(2)).WaitNot("⠿ Services").Sleep(1200 * time.Millisecond)
 	x, y = find(t, h, "⠿ Palette")
-	h.LeftClick(x+3, y, reel.Repeat(2)).Wait("⠿ Services").Sleep(1000 * time.Millisecond)
+	h.LeftClick(x+3, y, reel.Repeat(2)).Wait("⠿ Services").Sleep(demo.Hold(1000 * time.Millisecond))
 
 	// The tour spotlights each part in turn.
-	h.Key("?").Wait("Click one to switch").Sleep(1600 * time.Millisecond)
-	h.Key("?").Wait("Double click to zoom").Sleep(1600 * time.Millisecond)
-	h.Key("?").Wait("lowest priority first").Sleep(1600 * time.Millisecond)
-	h.Key("esc").WaitNot("lowest priority first").Sleep(300 * time.Millisecond)
+	h.Key("?").Wait("Click one to switch").Sleep(demo.Hold(1600 * time.Millisecond))
+	h.Key("?").Wait("Double click to zoom").Sleep(demo.Hold(1600 * time.Millisecond))
+	h.Key("?").Wait("lowest priority first").Sleep(demo.Hold(1600 * time.Millisecond))
+	h.Key("esc").WaitNot("lowest priority first").Sleep(demo.Hold(300 * time.Millisecond))
 	pick(t, h, "Kanagawa Wave")
 
 	// Narrowing the terminal collapses the palette, then the sidebar.
-	h.Resize(96, 24).WaitNot("⠿ Palette").Sleep(900 * time.Millisecond)
-	h.Resize(64, 24).WaitNot("Tints").Sleep(900 * time.Millisecond)
-	h.Resize(130, 24).Wait("⠿ Palette").Wait("Tints").Sleep(900 * time.Millisecond)
+	h.Resize(96, 24).WaitNot("⠿ Palette").Sleep(demo.Hold(900 * time.Millisecond))
+	h.Resize(64, 24).WaitNot("Tints").Sleep(demo.Hold(900 * time.Millisecond))
+	h.Resize(130, 24).Wait("⠿ Palette").Wait("Tints").Sleep(demo.Hold(900 * time.Millisecond))
 
-	h.Key("t").Wait("▸ Dracula").Sleep(1800 * time.Millisecond)
+	h.Key("t").Wait("▸ Dracula").Sleep(demo.Hold(1800 * time.Millisecond))
 	h.Key("q")
 	h.WaitFinished()
 }

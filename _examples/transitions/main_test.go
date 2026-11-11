@@ -19,8 +19,8 @@ func TestTransitions(t *testing.T) {
 	h := steep.NewHarness(t, newModel(), demo.Options("transitions", 124, 34)...)
 
 	// One loop: in, held, and out again.
-	h.Wait("Ease: Slide with OutBack").Wait("t = 1.00").Sleep(300 * time.Millisecond)
-	h.Wait("t = 0.00").Sleep(300 * time.Millisecond)
+	h.Wait("Ease: Slide with OutBack").Wait("t = 1.00").Sleep(demo.Hold(300 * time.Millisecond))
+	h.Wait("t = 0.00").Sleep(demo.Hold(300 * time.Millisecond))
 	h.Wait("t = 1.00")
 
 	// Paused, the gallery settles fully shown, the same every time.
@@ -34,7 +34,7 @@ func TestTransitions(t *testing.T) {
 
 	h.Key("u").Wait("Opened by unfolding").Sleep(900 * time.Millisecond)
 	h.AssertSnapshot(snapshot.WithSuffix("unfold"))
-	h.Key("esc").WaitNot("Opened by unfolding").Sleep(700 * time.Millisecond)
+	h.Key("esc").WaitNot("Opened by unfolding").Sleep(demo.Hold(700 * time.Millisecond))
 
 	h.Key("q")
 	h.WaitFinished()

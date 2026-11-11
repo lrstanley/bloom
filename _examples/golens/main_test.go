@@ -107,8 +107,8 @@ func TestGoLens(t *testing.T) {
 	t.Parallel()
 
 	h := steep.NewHarness(t, newModel("testdata/notes"), demo.Options("golens", 110, 30, effects.Mouse())...)
-	h.Wait("example.com/notes").Wait("run").Sleep(900 * time.Millisecond)
-	step := func(key string) { h.Key(key).Sleep(280 * time.Millisecond) }
+	h.Wait("example.com/notes").Wait("run").Sleep(demo.Hold(900 * time.Millisecond))
+	step := func(key string) { h.Key(key).Sleep(demo.Hold(280 * time.Millisecond)) }
 
 	// Into run, whose callees open beside it, and down to add.
 	step("right")
@@ -128,25 +128,25 @@ func TestGoLens(t *testing.T) {
 
 	// A click selects a function anywhere in the tree.
 	x, y := at(h.View(), "normalize")
-	h.LeftClick(x+2, y).Wait("normalize sorts tags").Sleep(600 * time.Millisecond)
+	h.LeftClick(x+2, y).Wait("normalize sorts tags").Sleep(demo.Hold(600 * time.Millisecond))
 	step("left")
 	step("left")
 	h.Wait("add saves a note")
 
 	// The code view, with each call of the selected callee marked, and a
 	// walk into one of them and back out.
-	h.Key("enter").Wait("Called by").Sleep(700 * time.Millisecond)
+	h.Key("enter").Wait("Called by").Sleep(demo.Hold(700 * time.Millisecond))
 	for range 3 {
 		step("down")
 	}
-	h.Key("enter").Wait("CutPrefix").Sleep(800 * time.Millisecond)
-	h.Key("left").Wait("strings.Join(args").Sleep(700 * time.Millisecond)
+	h.Key("enter").Wait("CutPrefix").Sleep(demo.Hold(800 * time.Millisecond))
+	h.Key("left").Wait("strings.Join(args").Sleep(demo.Hold(700 * time.Millisecond))
 	step("tab")
-	h.Key("esc").WaitNot("Called by").Sleep(600 * time.Millisecond)
+	h.Key("esc").WaitNot("Called by").Sleep(demo.Hold(600 * time.Millisecond))
 
 	// Search jumps anywhere, by the shortest path from main.
-	h.Key("/").Sleep(300 * time.Millisecond)
-	h.Type("wrap", reel.Delay(120*time.Millisecond)).Wait("example.com/notes/render").Sleep(500 * time.Millisecond)
+	h.Key("/").Sleep(demo.Hold(300 * time.Millisecond))
+	h.Type("wrap", reel.Delay(120*time.Millisecond)).Wait("example.com/notes/render").Sleep(demo.Hold(500 * time.Millisecond))
 	h.Key("enter").Wait("wrap breaks s").Sleep(1200 * time.Millisecond)
 	h.AssertSnapshot()
 

@@ -18,16 +18,16 @@ func TestEffects(t *testing.T) {
 	h := steep.NewHarness(t, newModel(), demo.Options("effects", 120, 32)...)
 
 	// One full loop: in, held, and out again.
-	h.Wait("Custom: sweep").Wait("t = 1.00").Sleep(900 * time.Millisecond)
-	h.Wait("t = 0.00").Sleep(400 * time.Millisecond)
+	h.Wait("Custom: sweep").Wait("t = 1.00").Sleep(demo.Hold(900 * time.Millisecond))
+	h.Wait("t = 0.00").Sleep(demo.Hold(400 * time.Millisecond))
 
 	// Each backdrop in turn over the gallery, then none.
 	for _, name := range []string{"Dim", "Desaturate", "Recolor: tint", "Recolor: two colors"} {
-		h.Key("b").Wait("Backdrop: " + name).Sleep(900 * time.Millisecond)
+		h.Key("b").Wait("Backdrop: " + name).Sleep(demo.Hold(900 * time.Millisecond))
 	}
-	h.Key("b").Wait("backdrop (none)").WaitNot("Backdrop:").Sleep(400 * time.Millisecond)
+	h.Key("b").Wait("backdrop (none)").WaitNot("Backdrop:").Sleep(demo.Hold(400 * time.Millisecond))
 
-	h.Key("space").Sleep(300 * time.Millisecond)
+	h.Key("space").Sleep(demo.Hold(300 * time.Millisecond))
 	h.Key("q")
 	h.WaitFinished()
 }

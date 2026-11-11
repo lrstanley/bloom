@@ -14,7 +14,9 @@ package demo
 
 import (
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,6 +50,32 @@ func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
 			Effects: append([]reel.Effect{effects.Keys(time.Second), effects.Pause()}, extra...),
 		}),
 	}
+}
+
+// Recording reports whether the tours are being recorded, as "task demos"
+// does: STEEP_EXPORT_MODE is on, always, or true. Exporting only on failure
+// does not count.
+var Recording = sync.OnceValue(func() bool {
+	switch v := strings.ToLower(strings.TrimSpace(os.Getenv("STEEP_EXPORT_MODE"))); v {
+	case "on", "always":
+		return true
+	default:
+		on, _ := strconv.ParseBool(v)
+		return on
+	}
+})
+
+// Hold returns how long a tour holds on a screen so that its recording can
+// be followed: d when [Recording], and none otherwise, so the tests run
+// quickly. Use it only where the hold is for whoever watches the recording,
+// such as before the next key press, with a wait guarding the step after.
+// Where an animation must finish before an assertion, or before the pointer
+// goes to a spot that is still moving, sleep for the full time instead.
+func Hold(d time.Duration) time.Duration {
+	if Recording() {
+		return d
+	}
+	return 0
 }
 
 // ResizeInBand lets h.Resize reach the program: the harness has no
