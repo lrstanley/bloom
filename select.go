@@ -374,7 +374,11 @@ func (r *renderer) leafCanvas(i int) *canvas.Canvas {
 	if n.hover != nil && r.isHovered(b) {
 		n.style, n.styled = *n.hover, true
 	}
-	return r.cache.Get(r.textAt(i, n, b.rect.Dx(), b.rect.Dy()))
+	text := r.textAt(i, n, b.rect.Dx(), b.rect.Dy())
+	if n.trusted {
+		return r.cache.Get(text)
+	}
+	return r.cache.Sanitized(text)
 }
 
 // cells returns the cells of leaf l, parsing those of a leaf out of sight

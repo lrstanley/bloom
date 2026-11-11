@@ -39,6 +39,23 @@ For text that should scroll rather than be cut short, such as a long title in a 
 Any value with a `View() string` method can go in a layout, so you don't need `Text` for your own components or
 for [Bubbles](/layout/bubbles-components). `Text` is for plain strings, which don't have a method.
 
+### Text from outside your program
+
+A string can hold escape sequences that go to the terminal as they are instead of being drawn, such as an image
+drawn with the Kitty graphics protocol or sixel. `Text` and `Viewport` drop them, along with any other sequence
+that isn't a style or a hyperlink, so a log, a file, or a message you didn't write can't send commands to the
+terminal. When you made all of the text yourself and it holds an image, mark it trusted to keep them:
+
+```go
+bloom.Text(picture).Trusted()
+bloom.Viewport(buf).Trusted()
+```
+
+A component's view is drawn as it is, commands included, since that's how a component shows an image. If a
+component shows text from outside your program, clean the text first with
+[`canvas.Sanitize`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas#Sanitize), or show it in a `Text` or
+`Viewport` instead.
+
 ## Draw a box around a node
 
 `bloom.Box(style, child)` draws a Lip Gloss style's frame around a child: its margins, border, padding, and

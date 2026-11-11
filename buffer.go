@@ -74,14 +74,32 @@ func (l *longLine) reach(s string, a int) {
 	p := ansi.GetParser()
 	defer ansi.PutParser(p)
 	sc := last.scanner(s, l.method, p)
+	// A checkpoint starts at the first command before its glyph, if there
+	// is one, so that a trusted viewport draws it with the glyph.
+	sc.pass = true
+	cmd := -1
+	var cmdPen pen
 	next := last.x + checkpointEvery
 	for k := sc.next(); k != glyphEnd; k = sc.next() {
-		if k == glyphText && sc.x >= next && sc.w > 0 && !sc.tab {
-			l.cps = append(l.cps, checkpoint{x: sc.x, i: sc.at, pen: sc.pen})
+		if k == glyphPass && cmd < 0 {
+			cmd, cmdPen = sc.at, sc.pen
+		}
+		if k != glyphText {
+			continue
+		}
+		if sc.x >= next && sc.w > 0 && !sc.tab {
+			cp := checkpoint{x: sc.x, i: sc.at, pen: sc.pen}
+			if cmd >= 0 {
+				cp.i, cp.pen = cmd, cmdPen
+			}
+			l.cps = append(l.cps, cp)
 			if a < sc.x+checkpointEvery {
 				return
 			}
 			next = sc.x + checkpointEvery
+		}
+		if sc.w > 0 {
+			cmd = -1
 		}
 	}
 	l.done = true

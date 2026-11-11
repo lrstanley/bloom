@@ -70,6 +70,7 @@ Any value with a `View() string` method can also be a child.
 | `Style(style)` | colors and attributes for all of its rows, under the lines' own; put it in a `Box` for padding |
 | `LineStyle(fn)` | a style for each line in sight, across the whole row, under its own |
 | `Selectable()` | select its text with the mouse, all of it, with wrapped rows joined |
+| `Trusted()` | keep the commands in its lines meant for the terminal, such as images, which are dropped otherwise |
 
 | `Buffer` method | Does |
 | --- | --- |
@@ -108,6 +109,7 @@ Any value with a `View() string` method can also be a child.
 | `Truncate()` | one line, cut short with "…" |
 | `Cursor(c)` | show the terminal cursor at `c`, relative to the node |
 | `HoverStyle(style)` | render with `style` while the pointer is over the node |
+| `Trusted()` | keep the commands in the text meant for the terminal, such as images, which are dropped otherwise |
 | `ID(id)`, `Focusable()`, `On(handlers...)` | as for slots |
 
 Boxes, rows, columns, grids, and wraps have `ID(id)` and `On(handlers...)` too, and boxes have `HoverStyle(style)`

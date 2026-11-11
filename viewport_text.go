@@ -13,6 +13,7 @@ import (
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lrstanley/bloom/internal/escape"
 )
 
 // tabStop is how many columns apart the stops a tab in a [Buffer] moves to
@@ -26,19 +27,23 @@ const (
 	glyphEnd  glyphKind = iota
 	glyphText           // a glyph, or a space a tab is drawn as
 	glyphSeq            // a style or hyperlink sequence
+	glyphPass           // a command passed to the terminal, when kept
 )
 
 // scanner walks a line of a buffer as a viewport draws it: glyph by glyph,
 // measured as the canvas measures them when it parses a string, with tabs
 // drawn as spaces to the next stop, and control characters and escape
 // sequences other than styles and hyperlinks dropped. With a parser, it
-// follows the style text is drawn in, from the style the line starts in.
+// follows the style text is drawn in, from the style the line starts in,
+// and when pass is set, it finds the commands that [escape.PassThrough]
+// keeps too.
 type scanner struct {
 	s      string
 	i      int
 	state  byte
 	method ansi.Method
 	p      *ansi.Parser
+	pass   bool
 	pen    pen
 	adv    int // cells the last glyph took, to move past before the next
 	tabs   int // spaces left of a tab
@@ -72,7 +77,13 @@ func (sc *scanner) next() glyphKind {
 			sc.g, sc.w, sc.adv, sc.at = sc.s[at:at+1], 1, 1, at
 			return glyphText
 		}
-		seq, width, n, state := sc.method.DecodeSequenceInString(sc.s[at:], sc.state, sc.p)
+		// Decoding a sequence with too many parameters with a parser
+		// panics, so such a one is decoded without, and dropped.
+		p := sc.p
+		if c := sc.s[at]; (c == ansi.ESC || c == ansi.CSI || c == ansi.DCS) && escape.Overflows(sc.s[at:]) {
+			p = nil
+		}
+		seq, width, n, state := sc.method.DecodeSequenceInString(sc.s[at:], sc.state, p)
 		// The decoder's ASCII fast path does not look for combining marks
 		// after the character, as the canvas does when it parses.
 		if n == 1 && seq[0] > 0x1f && seq[0] < 0x7f && len(sc.s) > at+1 && sc.s[at+1] >= 0xc0 {
@@ -92,17 +103,21 @@ func (sc *scanner) next() glyphKind {
 			sc.tabs = tabStop - sc.x%tabStop - 1
 			sc.g, sc.w, sc.adv, sc.at, sc.tab, sc.tabFirst = " ", 1, 1, at, true, true
 			return glyphText
-		case sc.p != nil && ansi.HasCsiPrefix(seq) && sc.p.Command() == 'm':
-			uv.ReadStyle(sc.p.Params(), &sc.pen.style)
+		case sc.pass && escape.PassThrough(seq):
+			sc.g, sc.at = seq, at
+			return glyphPass
+		case p != nil && ansi.HasCsiPrefix(seq) && p.Command() == 'm':
+			uv.ReadStyle(p.Params(), &sc.pen.style)
 			sc.g, sc.at = seq, at
 			return glyphSeq
-		case sc.p != nil && ansi.HasOscPrefix(seq) && sc.p.Command() == 8:
-			uv.ReadLink(sc.p.Data(), &sc.pen.link)
+		case p != nil && ansi.HasOscPrefix(seq) && p.Command() == 8 && escape.CleanLink(seq):
+			uv.ReadLink(p.Data(), &sc.pen.link)
 			sc.g, sc.at = seq, at
 			return glyphSeq
-		case seq != "" && seq[0] >= 0xc0:
+		case seq != "" && seq[0] >= 0xc0 && !escape.IsC1(seq):
 			// A combining mark parted from its glyph by a sequence, which
-			// takes no cells of its own.
+			// takes no cells of its own. A C1 control is dropped, as a
+			// terminal may read it as the start of a sequence.
 			sc.g, sc.w, sc.at = seq, 0, at
 			return glyphText
 		}
@@ -211,22 +226,9 @@ func skipSeq(s string, i int) int {
 			return j + 1
 		}
 	case ']':
-		for j := i + 2; j < len(s); j++ {
-			switch {
-			case s[j] == 0x07:
-				return j + 1
-			case s[j] == ansi.ESC:
-				// Only as the start of the terminator: an escape inside a
-				// command starts a sequence of its own, which the cells may
-				// pass through to the terminal, so it must be dropped.
-				if j+1 < len(s) && s[j+1] == '\\' {
-					return j + 2
-				}
-				return -1
-			case s[j] < 0x20:
-				return -1
-			}
-		}
+		// One with anything but printable ASCII in it, such as an escape
+		// that starts a sequence of its own, is left for the scanner.
+		return escape.OSCEnd(s, i+2)
 	}
 	return -1
 }
@@ -261,8 +263,15 @@ func penAfter(s string, start pen) pen {
 	defer ansi.PutParser(p)
 	at := start
 	for i := strings.IndexByte(s, ansi.ESC); i >= 0 && i < len(s); {
-		seq, _, n, _ := ansi.GraphemeWidth.DecodeSequenceInString(s[i:], 0, p)
+		// Decoding a sequence with too many parameters with a parser
+		// panics, and such a one is not a style.
+		q := p
+		if escape.Overflows(s[i:]) {
+			q = nil
+		}
+		seq, _, n, _ := ansi.GraphemeWidth.DecodeSequenceInString(s[i:], 0, q)
 		switch {
+		case q == nil:
 		case ansi.HasCsiPrefix(seq) && p.Command() == 'm':
 			uv.ReadStyle(p.Params(), &at.style)
 		case ansi.HasOscPrefix(seq) && p.Command() == 8:
@@ -535,6 +544,7 @@ type rowStyle struct {
 	marks []overlay
 	fill  int
 	pens  *penSGRs
+	pass  bool // keep the commands that [escape.PassThrough] keeps
 }
 
 // penSGRs keeps the escape sequences of the styles that text was drawn in,
@@ -631,12 +641,19 @@ func cutRow(s string, from checkpoint, flags int32, method ansi.Method, a, b int
 	p := ansi.GetParser()
 	defer ansi.PutParser(p)
 	w := rowWriter{sc: from.scanner(s, method, p), line: st.line, marks: st.marks, pens: st.pens, in: -1}
+	w.sc.pass = st.pass
 	w.out.Grow(min(len(s)-from.i, b-a) + 32)
 
+	end := true // the row runs to the end of the line
 scan:
 	for k := w.sc.next(); k != glyphEnd; k = w.sc.next() {
 		if k == glyphSeq {
 			w.sequence()
+			continue
+		}
+		if k == glyphPass {
+			// Drawn with the glyph after it, if that is in the row.
+			w.pass = append(w.pass, w.sc.g...)
 			continue
 		}
 		x, gw := w.sc.x, w.sc.w
@@ -648,11 +665,18 @@ scan:
 			}
 			continue
 		case x+gw <= a:
+			w.pass = w.pass[:0]
 			continue
 		case x+gw > b:
+			end = false
 			break scan
 		}
 		w.glyph(x, a)
+	}
+	if end && w.started && len(w.pass) > 0 {
+		// Commands after the line's last glyph are drawn with it, as the
+		// canvas draws those after a string's last glyph.
+		w.out.Write(w.pass)
 	}
 	return w.finish(st.fill)
 }
@@ -714,11 +738,12 @@ type rowWriter struct {
 	line    string    // the style of the line, drawn over all of it
 	marks   []overlay // in order
 	pens    *penSGRs
-	mark    int  // the next mark to enter
-	in      int  // the mark being drawn, or -1
-	started bool // the row's first glyph was written
-	styled  bool // a style was written, to reset at the end
-	drawn   int  // cells written
+	mark    int    // the next mark to enter
+	pass    []byte // commands to draw with the next glyph
+	in      int    // the mark being drawn, or -1
+	started bool   // the row's first glyph was written
+	styled  bool   // a style was written, to reset at the end
+	drawn   int    // cells written
 }
 
 // setPen writes the style drawn over the line, and the style the text is in
@@ -791,6 +816,10 @@ func (w *rowWriter) glyph(x, a int) {
 		w.begin()
 	}
 	w.moveTo(x)
+	if len(w.pass) > 0 {
+		w.out.Write(w.pass)
+		w.pass = w.pass[:0]
+	}
 	if x < a {
 		cut := x + w.sc.w - a
 		w.out.WriteString(strings.Repeat(" ", cut))

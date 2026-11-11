@@ -22,6 +22,15 @@ For scrolling text, bloom has a [viewport of its own](/layout/scrolling#show-a-l
 is given its size by the layout, so it needs none of this. It also draws only the lines in sight, however long the
 text is, and keeps the same line at the top as lines wrap differently.
 
+A component's view reaches the terminal as it is, including any commands in it that aren't drawn, such as images.
+If a component shows text from outside your program, such as a file in a Bubbles viewport, clean it first with
+[`canvas.Sanitize`](https://pkg.go.dev/github.com/lrstanley/bloom/canvas#Sanitize), which keeps its styles and
+hyperlinks:
+
+```go
+m.viewport.SetContent(canvas.Sanitize(contents))
+```
+
 ## Give a component its size
 
 Give the slot the component is in an ID, then use [`bloom.Solve`](https://pkg.go.dev/github.com/lrstanley/bloom#Solve)

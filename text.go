@@ -24,10 +24,22 @@ type TextNode struct {
 	style    lipgloss.Style
 	styled   bool
 	truncate bool
+	trusted  bool
 }
 
-// Text returns a node showing s, a string that may hold ANSI styles.
+// Text returns a node showing s, a string that may hold ANSI styles and
+// hyperlinks. Escape sequences meant for the terminal rather than for
+// drawing text, such as images, are dropped unless the text is
+// [TextNode.Trusted].
 func Text(s string) TextNode { return TextNode{s: s} }
+
+// Trusted keeps the escape sequences in the text that are written to the
+// terminal as they are rather than drawn: APC, DCS, SOS and PM commands,
+// such as images drawn with the Kitty graphics protocol or sixel. They are
+// dropped otherwise, as text from outside the program, such as a log or a
+// file, could hold any of them, to delete images, query the terminal, and
+// such. Mark text trusted only when the program made all of it.
+func (n TextNode) Trusted() TextNode { n.trusted = true; return n }
 
 // Style renders the text with style at the size the node is given, so a
 // background fills the node and long lines wrap to its width. A width or

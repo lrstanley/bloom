@@ -9,6 +9,7 @@ import (
 
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/lrstanley/bloom/internal/escape"
 )
 
 // Measure returns the size of s, a string with ANSI styles: the width of its
@@ -36,7 +37,9 @@ func Parse(s string, method ansi.Method) *Canvas {
 
 func parseSized(s string, w, h int, method ansi.Method) *Canvas {
 	c := New(w, h, method)
-	uv.NewStyledString(s).Draw(c, c.Bounds())
+	// The parser panics on a sequence with too many parameters, which no
+	// style needs, but text from outside the program could hold.
+	uv.NewStyledString(escape.DropOverflows(s)).Draw(c, c.Bounds())
 	return c
 }
 
@@ -53,6 +56,7 @@ type Cache struct {
 type cacheEntry struct {
 	w, h   int
 	canvas *Canvas // nil until parsed
+	safe   *Canvas // parsed sanitized, nil until then
 	used   uint64
 }
 
@@ -92,6 +96,33 @@ func (c *Cache) Get(s string) *Canvas {
 	return e.canvas
 }
 
+// Sanitized returns s parsed after [Sanitize], sized as [Measure] reports
+// for s, for text that the program did not make all of.
+func (c *Cache) Sanitized(s string) *Canvas {
+	e := c.entry(s)
+	if e.safe == nil {
+		if t := Sanitize(s); t == s {
+			e.safe = c.Get(s)
+		} else {
+			e.safe = parseSized(t, e.w, e.h, c.method)
+			c.cells += e.w * e.h
+		}
+	}
+	return e.safe
+}
+
+// cellsOf returns how many cells the canvases of e hold.
+func (e *cacheEntry) cellsOf() int {
+	n := 0
+	if e.canvas != nil {
+		n += e.w * e.h
+	}
+	if e.safe != nil && e.safe != e.canvas {
+		n += e.w * e.h
+	}
+	return n
+}
+
 // EndFrame marks the end of a frame of frameCells cells. Entries unused for a
 // while are dropped, and when the cache holds much more than a few frames'
 // worth of cells, such as when a large view changes on every frame, every
@@ -101,9 +132,7 @@ func (c *Cache) EndFrame(frameCells int) {
 	if c.cells > limit || c.frame%cacheIdleFrames == 0 {
 		for s, e := range c.entries {
 			if e.used < c.frame && (c.cells > limit || e.used+cacheIdleFrames < c.frame) {
-				if e.canvas != nil {
-					c.cells -= e.w * e.h
-				}
+				c.cells -= e.cellsOf()
 				delete(c.entries, s)
 			}
 		}

@@ -60,6 +60,12 @@ import (
 // Child is anything that can be placed in a layout: every node of this
 // package, and any Bubble Tea component, which is drawn from its View
 // string. Use [Text] for a plain string.
+//
+// A component's view is drawn as it is, with any commands in it that are
+// written to the terminal rather than drawn, such as images, which [Text]
+// and [Viewport] drop unless they are trusted. A component that shows text
+// from outside the program, such as a file, should clean it with
+// [github.com/lrstanley/bloom/canvas.Sanitize] first.
 type Child interface {
 	View() string
 }

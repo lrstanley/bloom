@@ -316,6 +316,20 @@ func (r *renderer) blit(s string, rect, clip image.Rectangle) {
 	r.ops = append(r.ops, op{kind: opBlit, src: src, rect: rect, clip: clip})
 }
 
+// blitText is [renderer.blit] for text that the program may not have made
+// all of, which is sanitized unless it is trusted.
+func (r *renderer) blitText(s string, trusted bool, rect, clip image.Rectangle) {
+	if trusted {
+		r.blit(s, rect, clip)
+		return
+	}
+	var src *canvas.Canvas
+	if r.parse {
+		src = r.cache.Sanitized(s)
+	}
+	r.ops = append(r.ops, op{kind: opBlit, src: src, rect: rect, clip: clip})
+}
+
 // paint adds the ops and entries for box i, clipped to clip, whose nearest
 // ancestor with an entry is entry parent, and the selection over it if the
 // Root is selecting in it, once all of it is painted, so that what is drawn
@@ -361,7 +375,7 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		if r.parse {
 			text = r.textAt(i, n, b.rect.Dx(), b.rect.Dy())
 		}
-		r.blit(text, b.rect, vis)
+		r.blitText(text, n.trusted, b.rect, vis)
 		if n.cursor != nil {
 			r.placeCursor(n.cursor, b.rect.Min, vis)
 		}

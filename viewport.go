@@ -36,6 +36,7 @@ type ViewportNode struct {
 	lineStyle func(line int) lipgloss.Style
 	style     string // the escape sequence of Style's colors and attributes
 	onScroll  func(pos ViewportPos) tea.Cmd
+	trusted   bool
 }
 
 // Viewport returns a viewport showing the lines of buf, from the start
@@ -191,6 +192,14 @@ func (n ViewportNode) LineStyle(fn func(line int) lipgloss.Style) ViewportNode {
 	n.lineStyle = fn
 	return n
 }
+
+// Trusted keeps the escape sequences in the buffer's lines, and in the
+// text of its gutters, that are written to the terminal as they are rather
+// than drawn, as [TextNode.Trusted] does for a [Text]: APC, DCS, SOS and PM
+// commands, such as images. Each is drawn with the row holding the glyph
+// after it, or the last glyph of its line. Mark the viewport trusted only
+// when the program made all of what it shows.
+func (n ViewportNode) Trusted() ViewportNode { n.trusted = true; return n }
 
 // OnScroll scrolls the viewport with the mouse wheel, three rows a step, or
 // three columns sideways, running fn with the position to scroll to, to
@@ -574,7 +583,7 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 			gt := &n.gutters[g]
 			w := gt.size(buf.Len())
 			text := gt.text(GutterRow{Line: row.line, Continued: row.sub > 0, Lines: buf.Len()}, w)
-			r.blit(text, image.Rect(gx, y, gx+w, y+1), vis.Intersect(image.Rect(gx, y, content.Min.X, y+1)))
+			r.blitText(text, n.trusted, image.Rect(gx, y, gx+w, y+1), vis.Intersect(image.Rect(gx, y, content.Min.X, y+1)))
 			gx += w
 		}
 
@@ -588,12 +597,12 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 				marks = markCells(s, r.method, n.marks(row.line, plainText(s, r.method)), &r.vpPens, marks)
 			}
 		}
-		st := rowStyle{line: lineSGR, marks: marks, pens: &r.vpPens}
+		st := rowStyle{line: lineSGR, marks: marks, pens: &r.vpPens, pass: n.trusted}
 		if lineSGR != "" {
 			st.fill = content.Dx()
 		}
 		text := cutRow(s, buf.cutFrom(row.line, r.method, row.a), m.widths[row.line], r.method, row.a, row.b, &st)
-		r.blit(text, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
+		r.blitText(text, n.trusted, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
 	}
 	r.vpMarks = marks[:0]
 	if n.style != "" && len(rows) < content.Dy() {
