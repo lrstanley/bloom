@@ -71,6 +71,22 @@ border, and selecting text across the rows of a wrapped line.
 See also: [Scrolling](/layout/scrolling#show-a-lot-of-text).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/logs), or `go run ./logs`.
 
+## selection
+
+![The selection example: lines of a log dragged over and copied, a rectangle of timestamps selected with alt held, a selection across a request's fields, words selected with a double click, all of the log selected and copied, and a token selected inside a dialog over the log](/demos/selection.webp)
+
+Selecting text with the mouse and copying it. A drag selects a run of text, a drag with alt held selects a rectangle,
+and a double or triple click selects a word or a line. It covers four kinds of node:
+
+- A `Selectable()` viewport, whose selection takes lines scrolled out of sight and scrolls it when dragged past an edge.
+- A column of fields, selected across a value and its label without the border.
+- Styled text wrapped across rows, which is copied as one line.
+- A dialog layer, whose selection stays inside it, holding a masked token that implements `TextSource` so the real
+  token is copied.
+
+See also: [Scrolling](/layout/scrolling#select-text), [Mouse events](/input/mouse).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/selection), or `go run ./selection`.
+
 ## contextmenu
 
 ![The contextmenu example: right click menus on a file list and its empty space, duplicating, adding, sorting, and deleting files, with menus that open to the left near the edge](/demos/contextmenu.webp)
