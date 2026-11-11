@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"getsteep.dev/steep/snapshot"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/lrstanley/bloom"
 	"github.com/lrstanley/bloom/flex"
 	"github.com/lrstanley/bloom/fx"
-	"github.com/lrstanley/steep/snapshot"
 )
 
 // view is a component drawn from a fixed string.

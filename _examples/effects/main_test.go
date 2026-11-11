@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"getsteep.dev/steep"
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/steep"
 )
 
 func TestEffects(t *testing.T) {

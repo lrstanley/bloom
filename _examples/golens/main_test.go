@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"getsteep.dev/steep"
+	"getsteep.dev/steep/reel"
+	"getsteep.dev/steep/reel/effects"
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/steep"
-	"github.com/lrstanley/steep/reel"
-	"github.com/lrstanley/steep/reel/effects"
 )
 
 // at returns the cell where text first appears on screen, or -1, -1.

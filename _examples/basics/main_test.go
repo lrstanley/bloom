@@ -7,7 +7,7 @@ package main
 import (
 	"testing"
 
-	"github.com/lrstanley/steep/snapshot"
+	"getsteep.dev/steep/snapshot"
 )
 
 func TestBasics(t *testing.T) {

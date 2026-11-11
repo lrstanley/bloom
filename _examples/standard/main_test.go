@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lrstanley/steep"
+	"getsteep.dev/steep"
 )
 
 func TestStandard(t *testing.T) {

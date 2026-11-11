@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"getsteep.dev/steep"
+	"getsteep.dev/steep/reel"
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/steep"
-	"github.com/lrstanley/steep/reel"
 )
 
 func TestBorders(t *testing.T) {

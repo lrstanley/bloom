@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"getsteep.dev/steep"
+	"getsteep.dev/steep/reel"
+	"getsteep.dev/steep/snapshot"
 	"github.com/lrstanley/bloom/_examples/internal/demo"
-	"github.com/lrstanley/steep"
-	"github.com/lrstanley/steep/reel"
-	"github.com/lrstanley/steep/snapshot"
 )
 
 // column returns the column text starts at in the screen's first line

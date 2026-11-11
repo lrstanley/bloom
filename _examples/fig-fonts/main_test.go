@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"getsteep.dev/steep"
 	"github.com/lrstanley/bloom/_examples/internal/demo"
 	"github.com/lrstanley/bloom/fig/fonts"
-	"github.com/lrstanley/steep"
 )
 
 func TestFonts(t *testing.T) {
