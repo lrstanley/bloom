@@ -1,0 +1,12 @@
+# Go import paths a person might open in a browser, sent to the docs for the package. "go get" follows these too, so
+# every target must be a page on this site: each one carries the go-import meta tags, as every page does (see
+# src/lib/site.ts). A redirect to another site, such as pkg.go.dev, would break "go get".
+/bloom / 301
+/bloom/anim /motion/animating-values 301
+/bloom/canvas /motion/custom-effects 301
+/bloom/fig /layout/figlet-text 301
+/bloom/fig/* /layout/figlet-text 301
+/bloom/flex /concepts/how-layout-works 301
+/bloom/fx /reference/effects 301
+/bloom/on /input/mouse 301
+/bloom/* / 301

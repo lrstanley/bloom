@@ -11,7 +11,7 @@ import { DiscordIcon } from "./src/components/discord-icon";
 import { LlmsLinks } from "./src/components/llms-links";
 import { Logo } from "./src/components/logo";
 import { getMdxComponents } from "./src/components/mdx";
-import { SITE_URL, withBase } from "./src/lib/site";
+import { GO_IMPORT, GO_SOURCE, REPO_URL, SITE_URL, withBase } from "./src/lib/site";
 
 const docs = defineDocs({
     dir: "content",
@@ -45,7 +45,7 @@ const config = defineConfig({
         nav: {
             title: <Logo />,
         },
-        githubUrl: "https://github.com/lrstanley/bloom",
+        githubUrl: REPO_URL,
         links: [
             {
                 text: "pkg.go.dev",
@@ -78,6 +78,8 @@ const config = defineConfig({
         root() {
             return (
                 <>
+                    <meta name="go-import" content={GO_IMPORT} />
+                    <meta name="go-source" content={GO_SOURCE} />
                     <meta name="author" content="Liam Stanley" />
                     <meta name="copyright" content="© Liam Stanley" />
                     <meta name="theme-color" content="#0d0a12" />

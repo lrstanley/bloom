@@ -7,8 +7,12 @@
 //     anything else get the absolute site URL.
 //  2. Give llms.txt a title, summary, and the external references worth reading.
 //  3. Validate every internal link and #fragment in the generated HTML.
+//  4. Check that every page, the 404 page included, has the go-import and go-source meta tags in its <head>, since
+//     those are what resolve the bloomfx.dev/bloom Go import paths, and that every redirect in _redirects lands on a
+//     page.
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { GO_IMPORT, GO_SOURCE } from "../src/lib/site";
 
 const SITE = "https://bloomfx.dev";
 const BASE = new URL(SITE).pathname.replace(/\/$/, ""); // "" when served from the root
@@ -101,9 +105,44 @@ const idsOf = (file: string) => {
     return set;
 };
 
+if (!existsSync(join(OUT, "404.html"))) errors.push("no 404.html, which go get needs for paths with no page");
+
+/** The content of the <head> meta tag with the given name, or undefined. go get reads no further than the <head>. */
+const headMeta = (html: string, name: string) => {
+    const head = html.split(/<\/head>|<body[\s>]/i)[0] ?? "";
+    for (const [tag] of head.matchAll(/<meta\s[^>]*>/gi)) {
+        if (new RegExp(`\\sname="${name}"`).test(tag)) return /\scontent="([^"]*)"/.exec(tag)?.[1];
+    }
+    return undefined;
+};
+
+/** Whether a root-relative path is served as a page. */
+const isPage = (path: string) => {
+    const rel = path.replace(/^\//, "").replace(/\/$/, "");
+    return existsSync(join(OUT, rel, "index.html")) || existsSync(join(OUT, `${rel}.html`));
+};
+
+const redirectsPath = join(OUT, "_redirects");
+if (!existsSync(redirectsPath)) errors.push("no _redirects, which sends the Go import paths to their docs");
+else {
+    for (const line of readFileSync(redirectsPath, "utf8").split("\n")) {
+        const [from, to] = line.trim().split(/\s+/);
+        if (!from || from.startsWith("#") || !to) continue;
+        if (!to.startsWith("/") || !isPage(to)) errors.push(`_redirects: ${from} goes to ${to}, which is not a page here`);
+    }
+}
+
 for (const file of htmlFiles) {
     const page = "/" + file.slice(OUT.length + 1).replace(/(^|\/)index\.html$/, "");
-    for (const [, href = ""] of readFileSync(file, "utf8").matchAll(/<a\s[^>]*?href="([^"]*)"/g)) {
+    const html = readFileSync(file, "utf8");
+    for (const [name, want] of [
+        ["go-import", GO_IMPORT],
+        ["go-source", GO_SOURCE],
+    ] as const) {
+        const got = headMeta(html, name)?.replace(/&amp;/g, "&");
+        if (got !== want) errors.push(`${page}: ${name} meta tag is ${got === undefined ? "missing" : `"${got}"`}, want "${want}"`);
+    }
+    for (const [, href = ""] of html.matchAll(/<a\s[^>]*?href="([^"]*)"/g)) {
         if (/^(https?:|mailto:|tel:|\/\/)/.test(href)) continue;
 
         const [path = "", fragment] = href.replace(/&amp;/g, "&").split("#");
