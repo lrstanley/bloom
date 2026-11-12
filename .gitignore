@@ -12,3 +12,6 @@ dist
 *.out
 **/go.work*
 /docs/.wrangler
+
+# task fingerprints
+.task/

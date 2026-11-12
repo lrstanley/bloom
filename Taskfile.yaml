@@ -5,6 +5,7 @@ vars:
   MODULES: [".", _examples, _integration]
   MODRELEASE: github.com/lrstanley/x/cmd/modrelease@latest
 
+method: timestamp
 set: [errexit, nounset, pipefail]
 
 tasks:
@@ -33,10 +34,22 @@ tasks:
       - for: { var: MODULES, as: MODULE }
         cmd: cd {{.MODULE}} && go test -v -race -timeout 3m -count 3 -cpu 1,4 {{default "./..." .CLI_ARGS}}
   demos:
-    desc: record each example's tour to docs/public/demos/<example>.webp, for the docs pages (needs ffmpeg)
+    desc: record each example's tour to docs/public/demos/<example>.webp, for the docs pages (needs ffmpeg, --force to re-record)
     dir: _examples
     env:
       STEEP_EXPORT_MODE: "on"
+    # checksum, so a run whose tests fail after writing some of the demos isn't taken as done.
+    method: checksum
+    sources:
+      # the module but its tests, the fonts it embeds, and the examples (tests included).
+      - "../*.go"
+      - "../{anim,canvas,fig,flex,fx,internal,on}/**/*.go"
+      - "../go.{mod,sum}"
+      - exclude: "../{*,{anim,canvas,fig,flex,fx,internal,on}/**/*}_test.go"
+      - "../fig/fonts/data/*"
+      - "**/*"
+    generates:
+      - ../docs/public/demos/*.webp
     cmds:
       - go test -count 1 ./...
   # run with --github-release and --highlights, so the GitHub release is created with notes. first run the plan, and
@@ -57,6 +70,10 @@ tasks:
   docs:install:
     desc: install the docs' dependencies
     dir: docs
+    run: once
+    sources: [package.json, bun.lock]
+    status:
+      - test -d node_modules
     cmds:
       - bun install
   docs:dev:
@@ -69,6 +86,19 @@ tasks:
     desc: build the docs
     dir: docs
     deps: [docs:install]
+    # checksum, so a build whose checks fail after writing dist isn't taken as done.
+    method: checksum
+    sources:
+      - "content/**/*"
+      - "src/**/*"
+      - "public/**/*"
+      - scripts/postbuild.ts
+      - "*.config.*"
+      - tsconfig.json
+      - package.json
+      - bun.lock
+    generates:
+      - dist/public/index.html
     cmds:
       - bun run build
   docs:preview:
