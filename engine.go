@@ -365,6 +365,13 @@ func (e *engine) measureChild(i int, avail Size) Size {
 		return Size{}
 	case Measurer:
 		return n.Measure(avail)
+	case MinSizeNode:
+		s := e.measure(e.expand(i, n, avail), avail)
+		if !n.tooSmall(avail) {
+			// It fits, so it asks for at least its minimum.
+			s.W, s.H = max(s.W, n.min.W), max(s.H, n.min.H)
+		}
+		return s
 	case Layouter:
 		return e.measure(e.expand(i, n, avail), avail)
 	default:

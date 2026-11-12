@@ -1,15 +1,15 @@
 ---
 title: Responsive layouts
-description: Adapt a layout to the terminal's size by collapsing panels by priority, using percentages, and building layouts for the space a component is given.
+description: Adapt a layout to the terminal's size by collapsing panels by priority, using percentages, building layouts for the space a component is given, and showing a note when the window is too small.
 ---
 
 Terminal windows range from a narrow split pane to a full-screen monitor. bloom gives you three tools to adapt:
 collapsing panels when they don't fit, percentages, and components that build a different layout for the space
-they get.
+they get. Below the size where nothing adapts any further, it can show a note that the window is too small.
 
-The [responsive example](https://github.com/lrstanley/bloom/tree/master/_examples/responsive) uses all three as the terminal narrows and widens again:
+The [responsive example](https://github.com/lrstanley/bloom/tree/master/_examples/responsive) uses all of them as the terminal narrows and widens again:
 
-![The responsive example: paging and scrolling the reader, then the toolbar dropping its labels, the details panel, and the navigation as the terminal narrows](/demos/responsive.webp)
+![The responsive example: paging and scrolling the reader, then the toolbar dropping its labels, the details panel, and the navigation as the terminal narrows, and a note that the window is too small below the reader's minimum](/demos/responsive.webp)
 
 ## Collapse panels when space runs out
 
@@ -102,6 +102,42 @@ func (e editor) Layout(ctx bloom.Context) bloom.Child {
 
 `bloom.Render` with a size of zero draws a layout at its natural size, which gives the component a sensible
 `View` when it's used outside a bloom layout.
+
+## Show a note when the window is too small
+
+Some layouts can't be used below a certain size, however much collapses. Wrap the root of the layout in
+`MinSize(w, h, child)`, and in a smaller window bloom draws one line in its place, centered, and faded toward the
+terminal's background:
+
+```go
+func (m *model) View() tea.View {
+	return m.ui.View(m.width, m.height, bloom.MinSize(80, 24, m.layout()))
+}
+```
+
+```
+window too small, min 80x24
+```
+
+A width or height of zero has no minimum on that axis, and the note says only what's needed, such as
+`min 80w`. In a window too narrow for the whole line, it says only `window too small`.
+
+While the note is on screen the layout isn't drawn, so its mouse handlers don't run and focus skips its nodes.
+Keys still reach `Update`. Compare the window's size with the minimum to ignore the keys that would change a
+layout no one can see:
+
+```go
+case tea.KeyPressMsg:
+	if m.width < 80 || m.height < 24 {
+		break
+	}
+```
+
+Because the minimum is part of the tree, it can change from frame to frame, such as by page, and `MinSize` can
+wrap a single panel as well as the whole screen. Where it fits, its natural size is at least its minimum, so in
+an `Auto` slot, or drawn at its natural height, it's given that much.
+
+For a note of your own, check the size yourself and return it from your layout in place of the rest.
 
 ## Related
 

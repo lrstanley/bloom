@@ -19,6 +19,7 @@ is on [pkg.go.dev](https://pkg.go.dev/bloomfx.dev/bloom).
 | [`Skeleton(lines...)`](https://pkg.go.dev/bloomfx.dev/bloom#Skeleton) | placeholder bars for content still loading, a line for each width, 0 for a blank line |
 | [`Box(style, child)`](https://pkg.go.dev/bloomfx.dev/bloom#Box) | a Lip Gloss frame around a child |
 | [`Centered(child)`](https://pkg.go.dev/bloomfx.dev/bloom#Centered) | a child at its natural size in the middle of its space |
+| [`MinSize(w, h, child)`](https://pkg.go.dev/bloomfx.dev/bloom#MinSize) | a child, or a note that the window is too small below `w`×`h` |
 | [`Scroll(child, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
 | [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
 | [`ScrollbarOf(id)`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` or `Viewport` with ID `id` |

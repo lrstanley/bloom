@@ -39,6 +39,14 @@ func TestResponsive(t *testing.T) {
 	h.Resize(44, 26).Wait("showing reader ").Sleep(700 * time.Millisecond)
 	h.AssertSnapshot(snapshot.WithSuffix("narrow"))
 
+	// Below the size the reader needs, a note takes the layout's place.
+	h.Resize(34, 26).Wait("window too small, min 40x10").Sleep(demo.Hold(700 * time.Millisecond))
+	h.AssertSnapshot(snapshot.WithSuffix("too-small"))
+	// Narrower than the note, it says only that the window is too small.
+	h.Resize(20, 8).Wait("  window too small  ").Sleep(demo.Hold(700 * time.Millisecond))
+	h.AssertSnapshot(snapshot.WithSuffix("too-small-narrow"))
+	h.Resize(44, 26).Wait("showing reader ").Wait("row 1 of").Sleep(demo.Hold(500 * time.Millisecond))
+
 	h.Resize(120, 26).Wait("showing nav, reader, details").Sleep(demo.Hold(600 * time.Millisecond))
 	h.Key("q")
 	h.WaitFinished()

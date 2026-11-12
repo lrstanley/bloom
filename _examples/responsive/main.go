@@ -6,8 +6,9 @@
 // details panel collapses first and the article list second as the terminal
 // narrows; the toolbar is a Layouter that rebuilds itself for the space it
 // gets; the tags wrap onto as many lines as they need; the status bar is a
-// Measurer; and paging uses
-// bloom.Solve in Update to know how tall the reader is.
+// Measurer; paging uses bloom.Solve in Update to know how tall the reader
+// is; and below the size the reader needs, bloom.MinSize shows a note
+// saying the window is too small in place of the layout.
 //
 // Keys: up/down pick an article, pgup/pgdown or j/k scroll, q quits. The
 // mouse wheel scrolls the reader and a click picks an article.
@@ -58,6 +59,11 @@ const (
 	paneDetails paneID = "details"
 	paneContent paneID = "content" // the scrolled text, to know its height
 )
+
+// minWidth and minHeight are the smallest window the reader can be used in:
+// the reader's minimum width with its border, and the toolbar, status bar,
+// and a few rows of text.
+const minWidth, minHeight = 40, 10
 
 type article struct {
 	title string
@@ -159,6 +165,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		}
+		if m.tooSmall() {
+			// The layout isn't on screen, so keys that would change it wait.
+			break
+		}
+		switch msg.String() {
 		case "up":
 			m.pick(m.selected - 1)
 		case "down":
@@ -177,6 +189,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.offset = min(max(m.offset, 0), m.geometry().maxOffset)
 	return m, cmd
 }
+
+// tooSmall reports whether the window is too small for the reader, when
+// the note saying so is shown in its place.
+func (m *model) tooSmall() bool { return m.w < minWidth || m.h < minHeight }
 
 func (m *model) pick(i int) {
 	m.selected = min(max(i, 0), len(articles)-1)
@@ -267,7 +283,7 @@ func (m *model) status() statusbar {
 }
 
 func (m *model) View() tea.View {
-	v := m.ui.View(m.w, m.h, m.layout(m.status()))
+	v := m.ui.View(m.w, m.h, bloom.MinSize(minWidth, minHeight, m.layout(m.status())))
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.

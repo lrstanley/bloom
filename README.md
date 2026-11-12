@@ -74,7 +74,8 @@ over.
   `Percent`, and natural-size slots, `Min`/`Max`, gaps, alignment, and justification. No more measuring rendered
   strings and subtracting borders on every resize.
 - :heavy_check_mark: **Responsive by priority**: panels marked `Collapsible` drop out when the terminal is too
-  small, lowest priority first, and components can build a different layout for the space they're given.
+  small, lowest priority first, components can build a different layout for the space they're given, and
+  `MinSize` shows a "window too small" note in place of a layout that can't fit.
 - :heavy_check_mark: **Real layers**: `Overlay` draws dialogs, dropdowns, popovers, and toasts over the screen,
   anchored to a corner or to another node, with backdrops, drop shadows, and modal input.
 - :heavy_check_mark: **Mouse handlers**: clicks, double clicks, the wheel, hover, and drags go to handlers on the
