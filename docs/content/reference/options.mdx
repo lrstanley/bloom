@@ -56,7 +56,8 @@ Any value with a `View() string` method can also be a child.
 | --- | --- |
 | `Horizontal()` | one row tall, for content scrolled sideways |
 | `OnScroll(fn)` | drag the thumb, or click to jump, calling `fn` with the offset to scroll to |
-| `Thumb(glyph, style)`, `Track(glyph, style)` | how the part in view and the rest look; no track glyph leaves what's beneath |
+| `Style(bloom.ScrollbarStyle{...})` | how the thumb, the part in view, and the track, the rest, look; no track glyph leaves what's beneath |
+| `HoverStyle(bloom.ScrollbarStyle{...})` | how it looks while hovered or dragged; by default a vertical thumb grows to `█` |
 
 ## Viewport options
 

@@ -101,9 +101,19 @@ bloom.Box(panel, bloom.Scroll(bloom.Text(m.log).ID(paneLog), 0).X(m.logX)).
 ```
 
 Either one can also go beside the content, in a `Row`, or under it in a `Column` when horizontal, where it takes a
-column or a row. `Thumb(glyph, style)` sets how the part for what's in view looks, `"┃"` by default, or `"━"`
-when horizontal. `Track(glyph, style)` sets the rest, which is not drawn by default, so a border beneath it shows
-through. A scrollbar's natural length is zero, so on a border use `Stretch`.
+column or a row. A scrollbar's natural length is zero, so on a border use `Stretch`.
+
+### Style a scrollbar
+
+`Style` sets how a scrollbar looks, with a `bloom.ScrollbarStyle`: the glyph and style of its thumb, the part for
+what's in view, and of its track, the rest. Leave out what you don't change. An empty thumb glyph is `"┃"`, or `"━"`
+when horizontal, and an empty track draws nothing, so a border beneath it shows through:
+
+```go
+bloom.ScrollbarOf(paneArticle).Style(bloom.ScrollbarStyle{
+	ThumbStyle: lipgloss.NewStyle().Foreground(accent),
+})
+```
 
 ### Drag and click a scrollbar
 
@@ -120,6 +130,29 @@ bloom.ScrollbarOf(paneArticle).OnScroll(func(offset int) tea.Cmd {
 Pressing on the thumb and moving drags it, keeping the point you grabbed under the pointer. Pressing anywhere
 else on the scrollbar jumps so the thumb is centered there, and holding the button down keeps dragging. The
 scrollbar takes clicks only while it's drawn, so with nothing to scroll, clicks reach whatever is beneath it.
+
+### Grow under the pointer
+
+A scrollbar that works with the mouse shows it: while the pointer is over it, or it's being dragged, an empty thumb
+glyph grows to `"█"`. A horizontal one's `"━"` stays as it is, as no glyph a row tall grows evenly from the middle of a
+cell, so give it a `HoverStyle` to change it. It needs no more than the `OnScroll` (or the viewport's, for
+`ScrollbarOf` a viewport), and mouse motion reported with no button down:
+
+```go
+v.MouseMode = tea.MouseModeAllMotion
+```
+
+`HoverStyle` sets how it looks then instead, in place of its `Style`, such as to light it up, which works for either
+direction:
+
+```go
+bloom.ScrollbarOf(paneArticle).OnScroll(scroll).
+	Style(bloom.ScrollbarStyle{ThumbStyle: dim}).
+	HoverStyle(bloom.ScrollbarStyle{ThumbStyle: bright, Track: "│", TrackStyle: dim})
+```
+
+A thumb glyph of your own stays as it is under the pointer, unless a `HoverStyle` changes it. A scrollbar with no
+`OnScroll` takes no mouse, so it doesn't change.
 
 ## Select text in a scroll
 

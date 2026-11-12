@@ -154,6 +154,7 @@ type renderer struct {
 	entries  []entry
 	handlers [][]on.Handler // by entry
 	hovered  []mouseTarget  // the hoverable nodes under the pointer, kept by Root
+	dragged  *mouseTarget   // the node being dragged, if any, kept by Root
 	cursor   *tea.Cursor
 	cursorAt int // index of the op drawn after the cursor was placed
 	out      string
@@ -593,6 +594,11 @@ func (r *renderer) beginTravel(b *box, clip image.Rectangle) int {
 // last routed.
 func (r *renderer) isHovered(b *box) bool {
 	return len(r.hovered) > 0 && containsKey(r.hovered, b.key())
+}
+
+// isDragged reports whether box b is being dragged with the mouse.
+func (r *renderer) isDragged(b *box) bool {
+	return r.dragged != nil && r.dragged.key == b.key()
 }
 
 // placeCursor shows c, relative to origin, if that cell is inside clip.

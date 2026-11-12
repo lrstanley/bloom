@@ -28,8 +28,25 @@ type ScrollbarNode struct {
 	horizontal             bool
 	onScroll               func(offset int) tea.Cmd
 
-	thumb, track           string
-	thumbStyle, trackStyle lipgloss.Style
+	style ScrollbarStyle
+	hover *ScrollbarStyle
+}
+
+// ScrollbarStyle is how a scrollbar looks: its thumb, the part for what is
+// in view, and its track, the rest. The zero value is the default look.
+type ScrollbarStyle struct {
+	// Thumb is the glyph of the thumb, repeated along it. Empty is the
+	// default: "┃", growing to "█" while it is hovered or dragged, so a
+	// scrollbar that takes the mouse shows it under the pointer, or "━" when
+	// horizontal, which stays as it is, as no glyph a row tall grows from
+	// the middle of a cell as thick as "█" does across one.
+	Thumb      string
+	ThumbStyle lipgloss.Style
+
+	// Track is the glyph of the track. Empty draws nothing there, leaving a
+	// border beneath it shown.
+	Track      string
+	TrackStyle lipgloss.Style
 }
 
 // Scrollbar returns a scrollbar for content of total rows, visible of them
@@ -62,18 +79,42 @@ func (n ScrollbarNode) OnScroll(fn func(offset int) tea.Cmd) ScrollbarNode {
 	return n
 }
 
-// Thumb sets the glyph and style of the part of the scrollbar for what is in
-// view. The default glyph is "┃", or "━" when horizontal, with no style.
-func (n ScrollbarNode) Thumb(glyph string, style lipgloss.Style) ScrollbarNode {
-	n.thumb, n.thumbStyle = glyph, style
+// Style sets how the scrollbar looks. See [ScrollbarStyle] for the
+// defaults.
+func (n ScrollbarNode) Style(style ScrollbarStyle) ScrollbarNode {
+	n.style = style
 	return n
 }
 
-// Track sets the glyph and style of the rest of the scrollbar. The default
-// is no glyph, which draws nothing there, leaving a border beneath it shown.
-func (n ScrollbarNode) Track(glyph string, style lipgloss.Style) ScrollbarNode {
-	n.track, n.trackStyle = glyph, style
+// HoverStyle sets how the scrollbar looks while the pointer is over it, or
+// while it is being dragged, in place of its [ScrollbarNode.Style]. Without
+// one, it keeps its own style, whose empty thumb glyph grows (see
+// [ScrollbarStyle.Thumb]). Only a scrollbar that takes the mouse, with
+// [ScrollbarNode.OnScroll] or from the viewport it follows, is hovered,
+// which needs mouse motion reported with no button down, as with
+// [tea.MouseModeAllMotion].
+func (n ScrollbarNode) HoverStyle(style ScrollbarStyle) ScrollbarNode {
+	n.hover = &style
 	return n
+}
+
+// look returns the style of the scrollbar, hovered or not, with its thumb
+// glyph filled in.
+func (n ScrollbarNode) look(hovered bool) ScrollbarStyle {
+	s := n.style
+	if hovered && n.hover != nil {
+		s = *n.hover
+	}
+	switch {
+	case s.Thumb != "":
+	case n.horizontal:
+		s.Thumb = "━"
+	case hovered:
+		s.Thumb = "█"
+	default:
+		s.Thumb = "┃"
+	}
+	return s
 }
 
 // View implements [Child], drawing the node at its natural size.
@@ -209,25 +250,25 @@ func (r *renderer) paintScrollbar(i int, b *box, n ScrollbarNode, clip image.Rec
 	if start == end {
 		return
 	}
+	// Only a scrollbar that takes the mouse is hovered, as its look is what
+	// tells it does.
+	hovered := false
 	if n.onScroll != nil {
 		b.meta.handlers = append(b.meta.handlers[:0:0], r.scrollbarDrag(n, length, start, end))
-		r.addEntry(i, rect.Intersect(clip), clip, parent)
+		e := r.addEntry(i, rect.Intersect(clip), clip, parent)
+		r.entries[e].hoverable = true
+		hovered = r.isHovered(b) || r.isDragged(b)
 	}
 
-	thumb, glyph := image.Rect(rect.Min.X, rect.Min.Y+start, rect.Max.X, rect.Min.Y+end), n.thumb
+	thumb := image.Rect(rect.Min.X, rect.Min.Y+start, rect.Max.X, rect.Min.Y+end)
 	if n.horizontal {
 		thumb = image.Rect(rect.Min.X+start, rect.Min.Y, rect.Min.X+end, rect.Max.Y)
 	}
-	if glyph == "" {
-		glyph = "┃"
-		if n.horizontal {
-			glyph = "━"
-		}
+	look := n.look(hovered)
+	if look.Track != "" {
+		r.blit(r.column(2*i, look.Track, look.TrackStyle, length, n.horizontal), rect, clip)
 	}
-	if n.track != "" {
-		r.blit(r.column(2*i, n.track, n.trackStyle, length, n.horizontal), rect, clip)
-	}
-	r.blit(r.column(2*i+1, glyph, n.thumbStyle, end-start, n.horizontal), thumb, clip)
+	r.blit(r.column(2*i+1, look.Thumb, look.ThumbStyle, end-start, n.horizontal), thumb, clip)
 }
 
 // scrollbarDrag returns the drag handler of scrollbar n, whose track is

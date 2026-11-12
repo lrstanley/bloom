@@ -10,7 +10,8 @@
 //
 // Keys: up and down, or the mouse wheel, scroll the list; left and right
 // scroll the log; tab changes the filter; space pauses the effects; q quits.
-// The scrollbars can be dragged, or clicked to jump.
+// The scrollbars light up under the pointer, and can be dragged, or clicked
+// to jump.
 package main
 
 import (
@@ -48,6 +49,7 @@ var (
 	tab   = lipgloss.NewStyle().Foreground(muted)
 	onTab = tab.Foreground(accent).Bold(true)
 	thumb = lipgloss.NewStyle().Foreground(accent)
+	onBar = thumb.Foreground(pink)
 	icon  = lipgloss.NewStyle().Foreground(fg)
 	onTip = icon.Foreground(warn).Bold(true)
 	side  = lipgloss.NewStyle().Foreground(pink).Bold(true)
@@ -168,7 +170,9 @@ func (m *model) setFilter(i int) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
+	// All motion, not only while a button is held, for the hover styles of
+	// the tabs, the icons, and the scrollbars.
+	v.MouseMode = tea.MouseModeAllMotion
 	v.BackgroundColor = theme.Bg
 	// The loop slows down while the terminal is not focused.
 	v.ReportFocus = true
@@ -209,7 +213,8 @@ func (m *model) list(t float64) bloom.Child {
 		Edge(bloom.Top, bloom.End, m.tabs()).
 		Edge(bloom.Bottom, bloom.End, bloom.Text(fmt.Sprintf("%d-%d of %d",
 			min(first+1, n), min(first+rows, n), n)).Style(label)).
-		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneList).Thumb("┃", thumb))
+		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneList).
+			Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).HoverStyle(bloom.ScrollbarStyle{Thumb: "┃", ThumbStyle: onBar}))
 	// Single glyphs down the side, each one a button.
 	for _, a := range []struct{ glyph, does string }{{"+", "new secret"}, {"✎", "edit"}, {"⧉", "copy path"}, {"✕", "delete"}} {
 		box = box.Edge(bloom.Left, bloom.Start, bloom.Text(a.glyph).Style(icon).HoverStyle(onTip).
@@ -238,7 +243,8 @@ func (m *model) logBox() bloom.Child {
 	return bloom.Box(panel.Padding(0, 1), bloom.Viewport(m.log).ID(paneLog).At(m.logAt).Style(text).
 		OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.logAt = p; return nil })).
 		Edge(bloom.Left, bloom.Center, bloom.Text("LOG").Style(side)).
-		Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().Thumb("━", thumb))
+		Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().
+			Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).HoverStyle(bloom.ScrollbarStyle{ThumbStyle: onBar}))
 }
 
 // effectBox is a box with one looping border effect, at phase t, described

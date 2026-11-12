@@ -321,7 +321,9 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
 	v.BackgroundColor = theme.Bg
-	v.MouseMode = tea.MouseModeCellMotion
+	// All motion, not only while a button is held, so the scrollbar grows
+	// under the pointer.
+	v.MouseMode = tea.MouseModeAllMotion
 	return v
 }
 
@@ -347,9 +349,9 @@ func (m *model) layout() bloom.Child {
 	pane := bloom.Box(panel, log).
 		Edge(bloom.Top, bloom.Start, bloom.Text("server.log").Style(title)).
 		Edge(bloom.Top, bloom.End, bloom.Text(fmt.Sprintf("%d lines", m.log.Len())).Style(counter)).
-		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog).Thumb("┃", thumb))
+		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog).Style(bloom.ScrollbarStyle{ThumbStyle: thumb}))
 	if !m.wrap {
-		pane = pane.Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().Thumb("━", thumb))
+		pane = pane.Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().Style(bloom.ScrollbarStyle{ThumbStyle: thumb}))
 	}
 
 	left := " " + m.status

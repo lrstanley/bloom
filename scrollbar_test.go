@@ -11,7 +11,6 @@ import (
 
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -49,7 +48,7 @@ func TestScrollbarOf(t *testing.T) {
 	lines := strings.TrimSuffix(strings.Repeat("line\n", 20), "\n")
 	tree := func(text string, offset int) Child {
 		return Box(rounded, Scroll(Text(text).ID("body"), offset)).
-			Edge(Right, Stretch, ScrollbarOf("body").Thumb("#", lipgloss.NewStyle()))
+			Edge(Right, Stretch, ScrollbarOf("body").Style(ScrollbarStyle{Thumb: "#"}))
 	}
 	// 4 of 20 rows in view, from row 10: a thumb of one row, 10/16 of the
 	// way down the rest of the track.
@@ -79,13 +78,13 @@ func TestScrollbarOf(t *testing.T) {
 	clipped := Box(rounded, Scroll(Column(
 		Fixed(3, Text("a\nb\nc")),
 		Fixed(2, Scroll(Text(lines).ID("in"), 0)),
-	), 0)).Edge(Right, Stretch, ScrollbarOf("in").Thumb("#", lipgloss.NewStyle()))
+	), 0)).Edge(Right, Stretch, ScrollbarOf("in").Style(ScrollbarStyle{Thumb: "#"}))
 	if out := ansi.Strip(Render(8, 5, clipped)); strings.Contains(out, "#") {
 		t.Fatalf("a scrollbar was drawn for a scroll out of view:\n%s", out)
 	}
 
 	// In a row, it takes a column, and draws its track.
-	row := Row(Fill(Text("x")), Scrollbar(4, 2, 2).Track(".", lipgloss.NewStyle()))
+	row := Row(Fill(Text("x")), Scrollbar(4, 2, 2).Style(ScrollbarStyle{Track: "."}))
 	if inRow := ansi.Strip(Render(3, 4, row)); inRow != "x .\n  .\n  ┃\n  ┃" {
 		t.Fatalf("got:\n%q", inRow)
 	}
@@ -106,7 +105,7 @@ func TestScrollbarOfLayouter(t *testing.T) {
 	// the layouter's scroll is built more than once; the scrollbar follows
 	// the one on screen.
 	lines := strings.TrimSuffix(strings.Repeat("line\n", 20), "\n")
-	box := Box(rounded, scrollLayout{lines}).Edge(Right, Stretch, ScrollbarOf("body").Thumb("#", lipgloss.NewStyle()))
+	box := Box(rounded, scrollLayout{lines}).Edge(Right, Stretch, ScrollbarOf("body").Style(ScrollbarStyle{Thumb: "#"}))
 	if got := ansi.Strip(Render(12, 6, Row(box, Text("x")))); !strings.Contains(got, "#") {
 		t.Fatalf("no scrollbar for a scroll a layouter built:\n%s", got)
 	}
@@ -135,7 +134,7 @@ func TestScrollbarHorizontal(t *testing.T) {
 	// cell from the corners, have a thumb of 2 cells, 5/10 of the way along.
 	text := Text("0123456789abcdef").ID("text")
 	box := Box(rounded, Scroll(text, 0).X(5)).
-		Edge(Bottom, Stretch, ScrollbarOf("text").Horizontal().Thumb("#", lipgloss.NewStyle()))
+		Edge(Bottom, Stretch, ScrollbarOf("text").Horizontal().Style(ScrollbarStyle{Thumb: "#"}))
 	got := ansi.Strip(Render(8, 3, box))
 	if want := "╭──────╮\n│56789a│\n╰──##──╯"; got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
@@ -217,5 +216,91 @@ func TestScrollbarOnScroll(t *testing.T) {
 	r.ClickAt(7, 2)
 	if !clicked {
 		t.Fatal("a click on a border with no scrollbar did not reach the box")
+	}
+}
+
+func TestScrollbarLook(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		sb           ScrollbarNode
+		hovered      bool
+		thumb, track string
+	}{
+		{sb: Scrollbar(2, 1, 0), thumb: "┃"},
+		{sb: Scrollbar(2, 1, 0), hovered: true, thumb: "█"},
+		{sb: Scrollbar(2, 1, 0).Horizontal(), thumb: "━"},
+		{sb: Scrollbar(2, 1, 0).Horizontal(), hovered: true, thumb: "━"},
+		// A glyph of its own stays, without a hover style.
+		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#", Track: "."}), hovered: true, thumb: "#", track: "."},
+		// A hover style is used whole, its empty thumb grown.
+		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#", Track: "."}).HoverStyle(ScrollbarStyle{}), hovered: true, thumb: "█"},
+		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#"}).HoverStyle(ScrollbarStyle{Thumb: "@"}), thumb: "#"},
+	} {
+		if got := tc.sb.look(tc.hovered); got.Thumb != tc.thumb || got.Track != tc.track {
+			t.Errorf("%+v, hovered %v: thumb %q, track %q", tc.sb.style, tc.hovered, got.Thumb, got.Track)
+		}
+	}
+}
+
+func TestScrollbarHover(t *testing.T) {
+	t.Parallel()
+
+	lines := strings.TrimSuffix(strings.Repeat("line\n", 20), "\n")
+	offset := 0
+	scroll := func(o int) tea.Cmd { offset = o; return nil }
+	tree := func(sb ScrollbarNode) Child {
+		return Box(rounded, Scroll(Text(lines).ID("body"), offset)).Edge(Right, Stretch, sb)
+	}
+	// The right border's column, from y=1, under the top corner.
+	edge := func(out string) string {
+		var col strings.Builder
+		for _, line := range strings.Split(ansi.Strip(out), "\n")[1:5] {
+			r := []rune(line)
+			col.WriteRune(r[len(r)-1])
+		}
+		return col.String()
+	}
+
+	r := New()
+	sb := ScrollbarOf("body").OnScroll(scroll)
+	if got := edge(r.Render(8, 6, tree(sb))); got != "┃│││" {
+		t.Fatalf("before hover: %q", got)
+	}
+	// Over the track, the thumb grows; off the scrollbar, it shrinks back.
+	r.Update(move(7, 3))
+	if got := edge(r.Render(8, 6, tree(sb))); got != "█│││" {
+		t.Fatalf("hovered: %q", got)
+	}
+	r.Update(move(3, 3))
+	if got := edge(r.Render(8, 6, tree(sb))); got != "┃│││" {
+		t.Fatalf("after hover: %q", got)
+	}
+
+	// Dragged off the scrollbar, two rows down to offset 11, it keeps its
+	// hover look until released.
+	r.Update(down(7, 1))
+	r.Update(dragTo(2, 3))
+	if got := edge(r.Render(8, 6, tree(sb))); got != "││█│" {
+		t.Fatalf("dragged away: %q", got)
+	}
+	r.Update(release(2, 3))
+	if got := edge(r.Render(8, 6, tree(sb))); got != "││┃│" {
+		t.Fatalf("after the drag: %q", got)
+	}
+
+	// A hover style is used in place of its own style, whole.
+	offset = 0
+	styled := sb.Style(ScrollbarStyle{Thumb: "#", Track: "."}).HoverStyle(ScrollbarStyle{Thumb: "@"})
+	r.Update(move(7, 3))
+	if got := edge(r.Render(8, 6, tree(styled))); got != "@│││" {
+		t.Fatalf("hover style: %q", got)
+	}
+	// A scrollbar that takes no mouse is not hovered.
+	still := ScrollbarOf("body")
+	r.Render(8, 6, tree(still))
+	r.Update(move(7, 3))
+	if got := edge(r.Render(8, 6, tree(still))); got != "┃│││" {
+		t.Fatalf("hovered without OnScroll: %q", got)
 	}
 }

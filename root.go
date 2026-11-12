@@ -209,7 +209,7 @@ func (r *Root) Render(w, h int, c Child) string {
 			r.flash = selection{}
 		}
 	}
-	r.r.sel = *shown
+	r.r.sel, r.r.dragged = *shown, r.mouse.drag
 	out := r.r.render(w, h, c)
 	// Where the selection starts and ends is found in the frame, and
 	// followed from frame to frame by the text it is in.

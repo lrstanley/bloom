@@ -11,12 +11,14 @@ import (
 	"bloomfx.dev/bloom/_examples/internal/demo"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
+	"getsteep.dev/steep/reel/effects"
+	"getsteep.dev/steep/reel/vt"
 )
 
 func TestBorders(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("borders", 96, 26)...)
+	h := steep.NewHarness(t, newModel(), demo.Options("borders", 96, 26, effects.Mouse())...)
 
 	// The effects loop while the list scrolls under its scrollbar.
 	h.Wait("◆ secrets").Wait("1-16 of 36").Sleep(demo.Hold(1200 * time.Millisecond))
@@ -25,8 +27,11 @@ func TestBorders(t *testing.T) {
 	}
 	h.Wait("5-20 of 36").Sleep(demo.Hold(400 * time.Millisecond))
 
-	// The list's scrollbar is on its right border, x=60, from y=1. Its thumb
-	// can be grabbed and dragged, and a click on the rest of it jumps there.
+	// The list's scrollbar is on its right border, x=60, from y=1. Under the
+	// pointer, its thumb lights up, to show it can be used with the mouse.
+	// It can be grabbed and dragged, and a click on the rest of it jumps
+	// there.
+	h.Mouse(vt.MouseMotion, vt.MouseUnknown, 60, 8).Sleep(demo.Hold(900 * time.Millisecond))
 	h.LeftDrag(60, 4, 60, 10, reel.Delay(60*time.Millisecond)).Wait("18-33 of 36").Sleep(demo.Hold(700 * time.Millisecond))
 	h.LeftClick(60, 2).Wait("1-16 of 36").Sleep(demo.Hold(700 * time.Millisecond))
 

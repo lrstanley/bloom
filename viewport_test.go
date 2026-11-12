@@ -236,7 +236,7 @@ func TestViewportDrawsInBox(t *testing.T) {
 
 	b := NewBuffer(strings.TrimSuffix(strings.Repeat("line\n", 20), "\n"))
 	tree := Box(rounded, Viewport(b).ID("log").At(ViewportPos{Line: 10})).
-		Edge(Right, Stretch, ScrollbarOf("log").Thumb("#", lipgloss.NewStyle()))
+		Edge(Right, Stretch, ScrollbarOf("log").Style(ScrollbarStyle{Thumb: "#"}))
 	// 4 of 20 rows in view, from row 10: as a scroll would show them.
 	wantRender(t, 8, 6, tree,
 		"╭──────╮",
@@ -401,7 +401,7 @@ func TestViewportScrollbar(t *testing.T) {
 	tree := func() Child {
 		return Row(
 			Fill(Viewport(b).ID("log").At(pos).OnScroll(func(p ViewportPos) tea.Cmd { pos = p; return nil })),
-			Fixed(1, ScrollbarOf("log").Thumb("#", lipgloss.NewStyle())),
+			Fixed(1, ScrollbarOf("log").Style(ScrollbarStyle{Thumb: "#"})),
 		)
 	}
 	r := New()
