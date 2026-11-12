@@ -13,6 +13,7 @@
 package demo
 
 import (
+	"image/color"
 	"os"
 	"strconv"
 	"strings"
@@ -28,11 +29,54 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// look is the margin a tour's window is framed on: a linear gradient, angle
+// degrees clockwise from up, with a drop shadow under the window.
+type look struct {
+	angle  float64
+	colors []color.Color
+	shadow color.Color
+}
+
+var (
+	// plum is how most tours are framed: bloom's plum fading to its plum
+	// black, so the window stands out without pulling the eye from it.
+	plum = look{
+		angle:  160,
+		colors: []color.Color{lipgloss.Color("#3a1835"), lipgloss.Color("#120c17")},
+		shadow: color.NRGBA{R: 0x06, G: 0x03, B: 0x08, A: 0xd9},
+	}
+
+	// looks frames the tours that are shown off the most, the homepage's and
+	// the motion pages', on brighter gradients of bloom's petals.
+	looks = map[string]look{
+		"showcase": {
+			angle:  135,
+			colors: []color.Color{lipgloss.Color("#ff6f91"), lipgloss.Color("#ff9a8b"), lipgloss.Color("#ffc29b")},
+			shadow: color.NRGBA{R: 0x2b, G: 0x13, B: 0x28, A: 0xb3},
+		},
+		"effects": {
+			angle:  145,
+			colors: []color.Color{lipgloss.Color("#a3284f"), lipgloss.Color("#2b1328")},
+			shadow: color.NRGBA{R: 0x0d, G: 0x0a, B: 0x12, A: 0xd9},
+		},
+		"transitions": {
+			angle:  145,
+			colors: []color.Color{lipgloss.Color("#c4625a"), lipgloss.Color("#2b1328")},
+			shadow: color.NRGBA{R: 0x0d, G: 0x0a, B: 0x12, A: 0xd9},
+		},
+	}
+)
+
 // Options returns the steep options for a w×h true color tour, recorded to
 // name.webp in docs/public/demos, where the docs pages load it from, when
 // exporting is turned on. The extra effects are drawn after the others, as
 // [effects.Mouse] must be.
 func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
+	frame, ok := looks[name]
+	if !ok {
+		frame = plum
+	}
+
 	return []steep.Option{
 		steep.WithWindowSize(w, h),
 		// Relative to the test's package directory, _examples/<example>.
@@ -44,7 +88,10 @@ func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
 			Render: []render.Option{
 				render.WithWindowChrome(true),
 				render.WithPadding(10),
-				render.WithMargin(24, lipgloss.Color("#16161e")),
+				// The margin is as wide as the shadow's offset and blur together, so
+				// the image's edge doesn't cut the shadow off.
+				render.WithMarginGradient(40, frame.angle, frame.colors...),
+				render.WithShadow(0, 12, 28, frame.shadow),
 				render.WithBorderRadius(10),
 			},
 			Effects: append([]reel.Effect{effects.Keys(time.Second), effects.Pause()}, extra...),
