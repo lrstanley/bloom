@@ -49,12 +49,15 @@ func TestLogs(t *testing.T) {
 	h.Key("#").Sleep(demo.Hold(500 * time.Millisecond))
 	h.Key("#").Sleep(demo.Hold(300 * time.Millisecond))
 
-	// The wheel scrolls it.
+	// The wheel scrolls it, three rows a step. A step scrolls from where the
+	// last frame drawn had it, so each waits for the one before to be drawn
+	// (the line it scrolled off the top gone), or steps sent together land
+	// as one and the selection below starts on a row still moving.
 	at := h.Locate(reel.Contains("14:00:00.137"))
-	for range 3 {
-		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X, at.Y).Sleep(demo.Hold(150 * time.Millisecond))
+	for _, off := range []string{"14:00:00.274", "14:00:00.685", "14:00:00.959"} {
+		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X, at.Y).WaitNot(off).Sleep(demo.Hold(150 * time.Millisecond))
 	}
-	h.WaitNot("14:00:00.137").Sleep(demo.Hold(500 * time.Millisecond))
+	h.Sleep(demo.Hold(500 * time.Millisecond))
 
 	// A selection across the rows of a wrapped line copies the one line.
 	at = h.Locate(reel.Contains("payments: dial tcp"))
