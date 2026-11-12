@@ -6,6 +6,10 @@
   "compatibility_date": "2026-11-02",
   // opt out of wrangler's usage metrics (overrides the user's own preference).
   "send_metrics": false,
+  // "bun run preview" serves the build with wrangler dev, which doesn't read vite's preview.host.
+  "dev": {
+    "ip": "0.0.0.0"
+  },
   "assets": {
     "directory": "./dist/public",
     "not_found_handling": "404-page",

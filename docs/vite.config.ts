@@ -10,4 +10,10 @@ import { fumadocsMdx } from "fumadocs-mdx/vite";
 // site is static either way; public/_headers keeps the asset caching that adapter would add.
 export default defineConfig({
   plugins: [press({ basePath: "/", adapter: "waku/adapters/node" }), fumadocsMdx(), tailwindcss()],
+  server: {
+    host: "0.0.0.0",
+  },
+  preview: {
+    host: "0.0.0.0",
+  },
 });
