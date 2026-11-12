@@ -97,6 +97,7 @@ Effects that suit backdrops:
 | `fx.Recolor{Fg: c, Bg: c, Amount: 0.3}` | colors move toward `c` |
 | `fx.Recolor{Fg: fg, Bg: bg}` | everything redrawn in two colors, keeping the text |
 | `fx.Spotlight{Rect: r}` | everything dimmed except the rectangle `r` |
+| `fx.Braille{}` | everything, backgrounds too, redrawn as dark gray braille dots that follow the glyphs and lines beneath |
 
 Several effects can be combined: `Backdrop(fx.Desaturate{Amount: 1}, fx.Dim{Amount: 0.4})`.
 

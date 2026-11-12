@@ -134,13 +134,16 @@ var gallery = []struct {
 }
 
 var backdrops = []struct {
-	name   string
-	effect fx.Effect
+	name    string
+	effects []fx.Effect
 }{
-	{"Dim", fx.Dim{Amount: 0.6}},
-	{"Desaturate", fx.Desaturate{Amount: 1}},
-	{"Recolor: tint", fx.Recolor{Fg: accent, Bg: accent, Amount: 0.45}},
-	{"Recolor: two colors", fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.17), Bg: lipgloss.Darken(theme.Bg, 0.3)}},
+	{"Dim", []fx.Effect{fx.Dim{Amount: 0.6}}},
+	{"Desaturate", []fx.Effect{fx.Desaturate{Amount: 1}}},
+	{"Recolor: tint", []fx.Effect{fx.Recolor{Fg: accent, Bg: accent, Amount: 0.45}}},
+	{"Recolor: two colors", []fx.Effect{fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.17), Bg: lipgloss.Darken(theme.Bg, 0.3)}}},
+	{"Braille", []fx.Effect{fx.Braille{Seed: 7}}},
+	// Braille draws in grays; a Recolor after it tints them.
+	{"Braille: tinted", []fx.Effect{fx.Braille{Amount: 0.5, Seed: 7}, fx.Recolor{Fg: accent, Amount: 0.3}}},
 }
 
 type model struct {
@@ -234,7 +237,7 @@ func (m *model) layout() bloom.Child {
 
 	b := backdrops[m.backdrop]
 	label := bloom.Layer(bloom.Box(overlay, bloom.Text("Backdrop: "+b.name).Style(name))).
-		Backdrop(b.effect).
+		Backdrop(b.effects...).
 		Presence(m.overlay, fx.Fade{})
 
 	return bloom.Overlay(base, label)
