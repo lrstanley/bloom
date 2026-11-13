@@ -230,11 +230,11 @@ the animations shown throughout these docs, as animated WebP. Run this from the 
 again, into `docs/public/demos`. It needs [ffmpeg](https://ffmpeg.org) on your `PATH`:
 
 ```console
-task demos
+task docs:demos
 ```
 
 To record them somewhere else, set `STEEP_EXPORT_DIR`:
 
 ```console
-STEEP_EXPORT_DIR=/tmp/demos task demos
+STEEP_EXPORT_DIR=/tmp/demos task docs:demos --force
 ```

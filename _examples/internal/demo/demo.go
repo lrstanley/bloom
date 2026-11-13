@@ -3,8 +3,9 @@
 // the LICENSE file.
 
 // Package demo holds what the examples' tests share: the steep options for
-// a tour that is recorded when exporting is turned on, as with "task demos"
-// from the repository root. Set STEEP_EXPORT_DIR to record somewhere else:
+// a tour that is recorded when exporting is turned on, as with
+// "task docs:demos" from the repository root, which the docs build runs. Set
+// STEEP_EXPORT_DIR to record somewhere else:
 //
 //	STEEP_EXPORT_DIR=/tmp/previews STEEP_EXPORT_MODE=on go test -count 1 ./...
 //
@@ -99,7 +100,7 @@ func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
 	}
 }
 
-// Recording reports whether the tours are being recorded, as "task demos"
+// Recording reports whether the tours are being recorded, as "task docs:demos"
 // does: STEEP_EXPORT_MODE is on, always, or true. Exporting only on failure
 // does not count.
 var Recording = sync.OnceValue(func() bool {

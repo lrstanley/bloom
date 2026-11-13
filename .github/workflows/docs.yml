@@ -1,15 +1,18 @@
 name: docs
 
-# build-only check (links, types, etc). deployment is handled by Cloudflare Workers Builds, see docs/wrangler.jsonc.
+# builds the docs (links, types, etc), and deploys them to Cloudflare from master, see docs/wrangler.jsonc.
+#
+# the build records the site's demos from the examples' tests, which cover most of the repo (the module, its fonts,
+# the examples), so this ignores only what it can't use.
 
 on:
   pull_request:
     branches: [master]
-    paths: ["docs/**", "Taskfile.yaml", ".github/workflows/docs.yml"]
+    paths-ignore: ["_integration/**", ".gitignore", "**/*.md", ".github/ISSUE_TEMPLATE/**"]
     types: [opened, edited, reopened, synchronize, unlocked]
   push:
     branches: [master]
-    paths: ["docs/**", "Taskfile.yaml", ".github/workflows/docs.yml"]
+    paths-ignore: ["_integration/**", ".gitignore", "**/*.md", ".github/ISSUE_TEMPLATE/**"]
   workflow_dispatch: {}
 
 concurrency:
@@ -19,11 +22,29 @@ concurrency:
 jobs:
   docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
+      - uses: lrstanley/.github/composite/go-versions@master
+        id: go-version
+        with:
+          version: latest
+      - uses: lrstanley/.github/composite/install-go@master
+        with:
+          version: ${{ steps.go-version.outputs.version }}
       - uses: lrstanley/.github/composite/install-node@master
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # the task's plain install would accept a stale bun.lock.
+      - working-directory: docs
+        run: bun install --frozen-lockfile
       - uses: lrstanley/.github/composite/invoke-task@master
         with:
           task: docs:build
+      - if: github.ref == 'refs/heads/master'
+        working-directory: docs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler@4 deploy
