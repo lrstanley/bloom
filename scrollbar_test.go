@@ -228,13 +228,14 @@ func TestScrollbarLook(t *testing.T) {
 		thumb, track string
 	}{
 		{sb: Scrollbar(2, 1, 0), thumb: "┃"},
-		{sb: Scrollbar(2, 1, 0), hovered: true, thumb: "█"},
+		{sb: Scrollbar(2, 1, 0), hovered: true, thumb: "┃"},
 		{sb: Scrollbar(2, 1, 0).Horizontal(), thumb: "━"},
 		{sb: Scrollbar(2, 1, 0).Horizontal(), hovered: true, thumb: "━"},
 		// A glyph of its own stays, without a hover style.
 		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#", Track: "."}), hovered: true, thumb: "#", track: "."},
-		// A hover style is used whole, its empty thumb grown.
-		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#", Track: "."}).HoverStyle(ScrollbarStyle{}), hovered: true, thumb: "█"},
+		// A hover style is used whole, its empty thumb the default.
+		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#", Track: "."}).HoverStyle(ScrollbarStyle{}), hovered: true, thumb: "┃"},
+		{sb: Scrollbar(2, 1, 0).HoverStyle(ScrollbarStyle{Thumb: "█"}), hovered: true, thumb: "█"},
 		{sb: Scrollbar(2, 1, 0).Style(ScrollbarStyle{Thumb: "#"}).HoverStyle(ScrollbarStyle{Thumb: "@"}), thumb: "#"},
 	} {
 		if got := tc.sb.look(tc.hovered); got.Thumb != tc.thumb || got.Track != tc.track {
@@ -263,7 +264,16 @@ func TestScrollbarHover(t *testing.T) {
 	}
 
 	r := New()
-	sb := ScrollbarOf("body").OnScroll(scroll)
+	// With no hover style, it looks the same under the pointer.
+	plain := ScrollbarOf("body").OnScroll(scroll)
+	r.Render(8, 6, tree(plain))
+	r.Update(move(7, 3))
+	if got := edge(r.Render(8, 6, tree(plain))); got != "┃│││" {
+		t.Fatalf("hovered with no hover style: %q", got)
+	}
+	r.Update(move(3, 3))
+
+	sb := plain.HoverStyle(ScrollbarStyle{Thumb: "█"})
 	if got := edge(r.Render(8, 6, tree(sb))); got != "┃│││" {
 		t.Fatalf("before hover: %q", got)
 	}
@@ -297,7 +307,7 @@ func TestScrollbarHover(t *testing.T) {
 		t.Fatalf("hover style: %q", got)
 	}
 	// A scrollbar that takes no mouse is not hovered.
-	still := ScrollbarOf("body")
+	still := ScrollbarOf("body").HoverStyle(ScrollbarStyle{Thumb: "@"})
 	r.Render(8, 6, tree(still))
 	r.Update(move(7, 3))
 	if got := edge(r.Render(8, 6, tree(still))); got != "┃│││" {

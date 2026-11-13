@@ -214,7 +214,7 @@ func (m *model) list(t float64) bloom.Child {
 		Edge(bloom.Bottom, bloom.End, bloom.Text(fmt.Sprintf("%d-%d of %d",
 			min(first+1, n), min(first+rows, n), n)).Style(label)).
 		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneList).
-			Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).HoverStyle(bloom.ScrollbarStyle{Thumb: "┃", ThumbStyle: onBar}))
+			Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).HoverStyle(bloom.ScrollbarStyle{ThumbStyle: onBar}))
 	// Single glyphs down the side, each one a button.
 	for _, a := range []struct{ glyph, does string }{{"+", "new secret"}, {"✎", "edit"}, {"⧉", "copy path"}, {"✕", "delete"}} {
 		box = box.Edge(bloom.Left, bloom.Start, bloom.Text(a.glyph).Style(icon).HoverStyle(onTip).

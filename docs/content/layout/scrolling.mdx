@@ -131,19 +131,20 @@ Pressing on the thumb and moving drags it, keeping the point you grabbed under t
 else on the scrollbar jumps so the thumb is centered there, and holding the button down keeps dragging. The
 scrollbar takes clicks only while it's drawn, so with nothing to scroll, clicks reach whatever is beneath it.
 
-### Grow under the pointer
+### Change under the pointer
 
-A scrollbar that works with the mouse shows it: while the pointer is over it, or it's being dragged, an empty thumb
-glyph grows to `"█"`. A horizontal one's `"━"` stays as it is, as no glyph a row tall grows evenly from the middle of a
-cell, so give it a `HoverStyle` to change it. It needs no more than the `OnScroll` (or the viewport's, for
-`ScrollbarOf` a viewport), and mouse motion reported with no button down:
+`HoverStyle` sets how a scrollbar looks while the pointer is over it, or it's being dragged, in place of its `Style`.
+Without one, it looks the same. Setting the thumb glyph to `"█"` grows a vertical thumb, to show the scrollbar
+works with the mouse:
 
 ```go
-v.MouseMode = tea.MouseModeAllMotion
+bloom.ScrollbarOf(paneArticle).OnScroll(scroll).
+	Style(bloom.ScrollbarStyle{ThumbStyle: dim}).
+	HoverStyle(bloom.ScrollbarStyle{Thumb: "█", ThumbStyle: dim})
 ```
 
-`HoverStyle` sets how it looks then instead, in place of its `Style`, such as to light it up, which works for either
-direction:
+A horizontal thumb has no glyph that grows as evenly from the middle of a cell, so light it up instead, which works
+for either direction:
 
 ```go
 bloom.ScrollbarOf(paneArticle).OnScroll(scroll).
@@ -151,8 +152,14 @@ bloom.ScrollbarOf(paneArticle).OnScroll(scroll).
 	HoverStyle(bloom.ScrollbarStyle{ThumbStyle: bright, Track: "│", TrackStyle: dim})
 ```
 
-A thumb glyph of your own stays as it is under the pointer, unless a `HoverStyle` changes it. A scrollbar with no
-`OnScroll` takes no mouse, so it doesn't change.
+The hover style is used whole, so repeat any glyph or style of `Style` you want kept. It needs no more than the
+`OnScroll` (or the viewport's, for `ScrollbarOf` a viewport), and mouse motion reported with no button down:
+
+```go
+v.MouseMode = tea.MouseModeAllMotion
+```
+
+A scrollbar with no `OnScroll` takes no mouse, so it doesn't change.
 
 ## Select text in a scroll
 

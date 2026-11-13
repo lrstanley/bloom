@@ -53,6 +53,7 @@ var (
 	hint    = lipgloss.NewStyle().Foreground(muted)
 	numbers = lipgloss.NewStyle().Foreground(muted)
 	thumb   = lipgloss.NewStyle().Foreground(accent)
+	onBar   = thumb.Foreground(theme.Purple)
 	match   = lipgloss.NewStyle().Background(theme.Yellow).Foreground(theme.Bg)
 	current = lipgloss.NewStyle().Background(theme.Purple).Foreground(theme.Bg).Bold(true)
 	focused = lipgloss.NewStyle().Background(lipgloss.Lighten(theme.Bg, 0.06))
@@ -321,8 +322,8 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
 	v.BackgroundColor = theme.Bg
-	// All motion, not only while a button is held, so the scrollbar grows
-	// under the pointer.
+	// All motion, not only while a button is held, so the scrollbars light
+	// up under the pointer.
 	v.MouseMode = tea.MouseModeAllMotion
 	return v
 }
@@ -349,9 +350,11 @@ func (m *model) layout() bloom.Child {
 	pane := bloom.Box(panel, log).
 		Edge(bloom.Top, bloom.Start, bloom.Text("server.log").Style(title)).
 		Edge(bloom.Top, bloom.End, bloom.Text(fmt.Sprintf("%d lines", m.log.Len())).Style(counter)).
-		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog).Style(bloom.ScrollbarStyle{ThumbStyle: thumb}))
+		Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog).
+			Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).HoverStyle(bloom.ScrollbarStyle{ThumbStyle: onBar}))
 	if !m.wrap {
-		pane = pane.Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().Style(bloom.ScrollbarStyle{ThumbStyle: thumb}))
+		pane = pane.Edge(bloom.Bottom, bloom.Stretch, bloom.ScrollbarOf(paneLog).Horizontal().
+			Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).HoverStyle(bloom.ScrollbarStyle{ThumbStyle: onBar}))
 	}
 
 	left := " " + m.status

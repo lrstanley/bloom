@@ -36,10 +36,9 @@ type ScrollbarNode struct {
 // in view, and its track, the rest. The zero value is the default look.
 type ScrollbarStyle struct {
 	// Thumb is the glyph of the thumb, repeated along it. Empty is the
-	// default: "┃", growing to "█" while it is hovered or dragged, so a
-	// scrollbar that takes the mouse shows it under the pointer, or "━" when
-	// horizontal, which stays as it is, as no glyph a row tall grows from
-	// the middle of a cell as thick as "█" does across one.
+	// default: "┃", or "━" when horizontal. A hover style with "█" grows a
+	// vertical thumb under the pointer; no glyph a row tall grows as evenly
+	// from the middle of a cell.
 	Thumb      string
 	ThumbStyle lipgloss.Style
 
@@ -87,12 +86,16 @@ func (n ScrollbarNode) Style(style ScrollbarStyle) ScrollbarNode {
 }
 
 // HoverStyle sets how the scrollbar looks while the pointer is over it, or
-// while it is being dragged, in place of its [ScrollbarNode.Style]. Without
-// one, it keeps its own style, whose empty thumb glyph grows (see
-// [ScrollbarStyle.Thumb]). Only a scrollbar that takes the mouse, with
-// [ScrollbarNode.OnScroll] or from the viewport it follows, is hovered,
-// which needs mouse motion reported with no button down, as with
-// [tea.MouseModeAllMotion].
+// while it is being dragged, in place of its [ScrollbarNode.Style], whole.
+// Without one, it looks the same under the pointer. To grow a vertical
+// thumb, set its glyph to "█":
+//
+//	sb.Style(bloom.ScrollbarStyle{ThumbStyle: thumb}).
+//		HoverStyle(bloom.ScrollbarStyle{Thumb: "█", ThumbStyle: thumb})
+//
+// Only a scrollbar that takes the mouse, with [ScrollbarNode.OnScroll] or
+// from the viewport it follows, is hovered, which needs mouse motion
+// reported with no button down, as with [tea.MouseModeAllMotion].
 func (n ScrollbarNode) HoverStyle(style ScrollbarStyle) ScrollbarNode {
 	n.hover = &style
 	return n
@@ -109,8 +112,6 @@ func (n ScrollbarNode) look(hovered bool) ScrollbarStyle {
 	case s.Thumb != "":
 	case n.horizontal:
 		s.Thumb = "━"
-	case hovered:
-		s.Thumb = "█"
 	default:
 		s.Thumb = "┃"
 	}
