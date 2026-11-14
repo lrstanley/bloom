@@ -13,7 +13,9 @@ import (
 	"bloomfx.dev/bloom/flex"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/internal/anchor"
+	"bloomfx.dev/bloom/internal/memo"
 	"bloomfx.dev/bloom/internal/motion"
+	"bloomfx.dev/bloom/internal/same"
 	"bloomfx.dev/bloom/on"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -77,11 +79,11 @@ type engine struct {
 	cache      *canvas.Cache
 	memo       map[memoKey]Size // every measurement this frame
 	boxes      []box
-	kids       []int            // children of each box, in spans
-	stack      []int            // children of the boxes being built
-	frameMemos memos[frameMemo] // by box index, from the last layout
-	textMemos  memos[textMemo]  // by twice the box index, and once more for a width
-	scratch    lipgloss.Style   // for comparing styles without allocating
+	kids       []int                 // children of each box, in spans
+	stack      []int                 // children of the boxes being built
+	frameMemos memo.Table[frameMemo] // by box index, from the last layout
+	textMemos  memo.Table[textMemo]  // by twice the box index, and once more for a width
+	scratch    lipgloss.Style        // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
 	listUp     []listRec // items of the lists being expanded; see listWindow
@@ -115,8 +117,8 @@ func (e *engine) layout(w, h int, c Child) int {
 	clear(e.memo)
 	e.boxes, e.kids = e.boxes[:0], e.kids[:0]
 	e.vps, e.vpRows = e.vps[:0], e.vpRows[:0]
-	defer e.frameMemos.retire()
-	defer e.textMemos.retire()
+	defer e.frameMemos.Retire()
+	defer e.textMemos.Retire()
 	if c == nil || absent(c) {
 		if e.motion != nil {
 			e.motion.Begin(w, h)
@@ -448,14 +450,14 @@ func (e *engine) renderedSize(i int, n TextNode, w int) Size {
 	if w > 0 {
 		slot++
 	}
-	m := e.textMemos.at(slot)
+	m := e.textMemos.At(slot)
 	e.scratch = n.style
-	if v := &m.v; m.ok && v.w == w && v.truncate == n.truncate && v.s == n.s && sameStyle(&v.style, &e.scratch) {
+	if v := &m.V; m.OK && v.w == w && v.truncate == n.truncate && v.s == n.s && same.Style(&v.style, &e.scratch) {
 		return v.size
 	}
 	sw, sh := e.cache.Size(textOf(n, w, 0, e.method))
-	m.ok, m.v = true, textMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, size: Size{W: sw, H: sh}}
-	return m.v.size
+	m.OK, m.V = true, textMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, size: Size{W: sw, H: sh}}
+	return m.V.size
 }
 
 // axes returns a size's main and cross lengths for a row, or a column when
@@ -635,54 +637,18 @@ func (e *engine) frameOf(i int, style lipgloss.Style) frame {
 	if b.frameOK {
 		return b.frame
 	}
-	m := e.frameMemos.at(i)
-	if e.scratch = style; !m.ok || !sameStyle(&m.v.style, &e.scratch) {
-		m.ok, m.v = true, frameMemo{style: style, frame: frameOf(style)}
+	m := e.frameMemos.At(i)
+	if e.scratch = style; !m.OK || !same.Style(&m.V.style, &e.scratch) {
+		m.OK, m.V = true, frameMemo{style: style, frame: frameOf(style)}
 	}
-	b.frame, b.frameOK = m.v.frame, true
-	return m.v.frame
+	b.frame, b.frameOK = m.V.frame, true
+	return m.V.frame
 }
 
 // frameMemo is the frame of the style a box had in the last frame.
 type frameMemo struct {
 	style lipgloss.Style
 	frame frame
-}
-
-// memos keeps a value for each box, by its index, from one frame to the
-// next, for boxes that tend to stay the same. Values a frame did not use are
-// dropped once it is done, as they would keep what they refer to alive.
-type memos[T any] struct {
-	slots []memo[T]
-	gen   uint64 // the frame being drawn
-}
-
-// memo is a value kept for a box, once ok.
-type memo[T any] struct {
-	ok   bool
-	used uint64 // the frame it was last used in
-	v    T
-}
-
-// at returns the memo at index i, marked used by this frame.
-func (m *memos[T]) at(i int) *memo[T] {
-	if i >= len(m.slots) {
-		m.slots = append(m.slots, make([]memo[T], i+1-len(m.slots))...)
-	}
-	s := &m.slots[i]
-	s.used = m.gen
-	return s
-}
-
-// retire drops the memos this frame did not use, and ends it.
-func (m *memos[T]) retire() {
-	slots, gen := m.slots, m.gen
-	for i := range slots {
-		if slots[i].used != gen && slots[i].ok {
-			slots[i] = memo[T]{}
-		}
-	}
-	m.gen++
 }
 
 // boxContent returns the box of what is inside box node n at index i, or -1

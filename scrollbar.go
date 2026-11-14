@@ -8,6 +8,7 @@ import (
 	"image"
 	"strings"
 
+	"bloomfx.dev/bloom/internal/same"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -322,9 +323,9 @@ func (r *renderer) column(i int, glyph string, style lipgloss.Style, n int, hori
 	if !r.parse {
 		return ""
 	}
-	m := r.columns.at(i)
+	m := r.columns.At(i)
 	r.style = style
-	if v := &m.v; m.ok && v.glyph == glyph && v.n == n && v.horizontal == horizontal && sameStyle(&v.style, &r.style) {
+	if v := &m.V; m.OK && v.glyph == glyph && v.n == n && v.horizontal == horizontal && same.Style(&v.style, &r.style) {
 		return v.out
 	}
 	var out string
@@ -333,6 +334,6 @@ func (r *renderer) column(i int, glyph string, style lipgloss.Style, n int, hori
 	} else {
 		out = strings.TrimSuffix(strings.Repeat(style.Render(glyph)+"\n", n), "\n")
 	}
-	m.ok, m.v = true, columnMemo{glyph: glyph, style: style, n: n, horizontal: horizontal, out: out}
+	m.OK, m.V = true, columnMemo{glyph: glyph, style: style, n: n, horizontal: horizontal, out: out}
 	return out
 }

@@ -10,15 +10,14 @@ import (
 	"math"
 	"strings"
 	"time"
-	"unicode"
 
 	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/internal/textsel"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/clipperhouse/uax29/v2/words"
 )
 
 // SelectionMsg is sent when text is selected with the mouse in a node made
@@ -551,83 +550,7 @@ func (r *renderer) cellAt(p image.Point) *uv.Cell {
 // wordAt returns the columns of the word at p in leaf i, inclusive, and
 // whether there is one there.
 func (r *renderer) wordAt(i int, p image.Point) (x0, x1 int, ok bool) {
-	w := r.leaves[i].rect.Dx()
-	if w <= 0 || p.X >= w {
-		return 0, 0, false
-	}
-	row, offs := r.wordRow[:0], r.wordOffs[:0]
-	for x := range w {
-		c := r.leafCell(i, x, p.Y)
-		offs = append(offs, len(row))
-		switch {
-		case c == nil || c.Content == "" && c.Width != 0:
-			row = append(row, ' ')
-		case c.Width == 0:
-			// The second half of a wide character: part of the first.
-			offs[x] = offs[max(x-1, 0)]
-		default:
-			row = append(row, c.Content...)
-		}
-	}
-	r.wordRow, r.wordOffs = row, offs
-
-	segs := r.wordSegs[:0]
-	at, hit := offs[p.X], -1
-	for it := words.FromBytes(row); it.Next(); {
-		if at >= it.Start() && at < it.End() {
-			hit = len(segs)
-		}
-		segs = append(segs, wordSeg{start: it.Start(), end: it.End(), word: r.wordish(it.Value())})
-	}
-	r.wordSegs = segs
-	if hit < 0 || !segs[hit].word {
-		return 0, 0, false
-	}
-	lo, hi := hit, hit
-	for lo > 0 && segs[lo-1].word {
-		lo--
-	}
-	for hi < len(segs)-1 && segs[hi+1].word {
-		hi++
-	}
-	x0 = -1
-	for x, off := range offs {
-		if off >= segs[lo].start && off < segs[hi].end {
-			if x0 < 0 {
-				x0 = x
-			}
-			x1 = x
-		}
-	}
-	return x0, x1, x0 >= 0
-}
-
-// wordSeg is a segment of a row that Unicode text segmentation found, and
-// whether it is part of a word.
-type wordSeg struct {
-	start, end int
-	word       bool
-}
-
-// wordish reports whether seg, a segment Unicode text segmentation found, is
-// part of a word: one with a letter, digit, or symbol such as an emoji, or
-// one of only the word characters, which join the words around them.
-func (r *renderer) wordish(seg []byte) bool {
-	s := string(seg)
-	if strings.TrimSpace(s) == "" {
-		return false
-	}
-	for _, c := range s {
-		if unicode.IsLetter(c) || unicode.IsDigit(c) || unicode.IsMark(c) || unicode.Is(unicode.So, c) {
-			return true
-		}
-	}
-	for _, c := range s {
-		if !strings.ContainsRune(r.wordChars, c) {
-			return false
-		}
-	}
-	return true
+	return r.words.At(r.leaves[i].rect.Dx(), p.X, func(x int) *uv.Cell { return r.leafCell(i, x, p.Y) })
 }
 
 // paintSelection finds the selection in the leaves of box i, the selected
@@ -749,7 +672,7 @@ func (r *renderer) eachSelected(o *op, fn func(p image.Point)) {
 		}
 		from, to := r.leafSpan(g, i)
 		for y := max(from.Y, in.Min.Y); y <= min(to.Y, in.Max.Y-1); y++ {
-			x0, x1 := rowSpan(from, to, y, l.rect.Dx())
+			x0, x1 := textsel.RowSpan(from, to, y, l.rect.Dx())
 			for x := max(x0, in.Min.X); x <= min(x1, in.Max.X-1); x++ {
 				fn(l.rect.Min.Add(image.Pt(x, y)))
 			}
@@ -768,19 +691,6 @@ func (r *renderer) leafSpan(g *selRange, i int) (from, to image.Point) {
 		to = g.pb
 	}
 	return from, to
-}
-
-// rowSpan returns the columns of row y that a run from from to to takes,
-// in an area w cells wide.
-func rowSpan(from, to image.Point, y, w int) (x0, x1 int) {
-	x0, x1 = 0, w-1
-	if y == from.Y {
-		x0 = from.X
-	}
-	if y == to.Y {
-		x1 = to.X
-	}
-	return x0, x1
 }
 
 // blockRect returns the rectangle of a block selection, as laid out.
@@ -826,9 +736,9 @@ func (r *renderer) readable(c *uv.Cell) {
 	if bg == nil {
 		bg = r.env.Bg
 	}
-	if contrast(fg, bg) < minContrast {
+	if textsel.Contrast(fg, bg) < minContrast {
 		c.Style.Fg = r.env.Fg
-		if contrast(r.env.Bg, bg) > contrast(r.env.Fg, bg) {
+		if textsel.Contrast(r.env.Bg, bg) > textsel.Contrast(r.env.Fg, bg) {
 			c.Style.Fg = r.env.Bg
 		}
 	}
@@ -865,26 +775,6 @@ func (r *renderer) flashCell(c *uv.Cell, p image.Point, t float64, area image.Re
 	c.Style = plain
 	c.Style.Bg = r.mixer.Mix(from, to, k*2)
 	r.readable(c)
-}
-
-// contrast returns the contrast ratio of a and b, as WCAG measures it, from
-// 1 for the same luminance to 21 for black and white.
-func contrast(a, b color.Color) float64 {
-	la, lb := luminance(a), luminance(b)
-	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
-}
-
-// luminance returns the relative luminance of c, as WCAG defines it.
-func luminance(c color.Color) float64 {
-	r, g, b, _ := c.RGBA()
-	lin := func(v uint32) float64 {
-		s := float64(v) / 0xffff
-		if s <= 0.04045 {
-			return s / 12.92
-		}
-		return math.Pow((s+0.055)/1.055, 2.4)
-	}
-	return 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b)
 }
 
 // selectedText returns the text of the selection found in the last frame.
@@ -929,29 +819,29 @@ func (r *renderer) leafText(l *selLeaf, from, to image.Point) string {
 		return ""
 	}
 	if l.truncated && from.Y == to.Y {
-		if s, ok := cutText(src, lineBreaks.Replace(ansi.Strip(l.text)), from.Y, from.X, to.X); ok {
+		if s, ok := textsel.CutText(src, lineBreaks.Replace(ansi.Strip(l.text)), from.Y, from.X, to.X); ok {
 			return s
 		}
 	}
-	var joins []join
+	var joins []textsel.Join
 	if l.text != "" && !l.truncated && to.Y > from.Y {
-		joins = wrapJoins(src, l.text)
+		joins = textsel.WrapJoins(src, l.text)
 	}
 	var b strings.Builder
 	for y := from.Y; y <= to.Y; y++ {
-		x0, x1 := rowSpan(from, to, y, l.rect.Dx())
-		b.WriteString(strings.TrimRight(rowText(src.CellAt, x0, x1, y), " "))
+		x0, x1 := textsel.RowSpan(from, to, y, l.rect.Dx())
+		b.WriteString(strings.TrimRight(textsel.RowText(src.CellAt, x0, x1, y), " "))
 		if y < to.Y {
-			j := joinBreak
+			j := textsel.JoinBreak
 			if y < len(joins) {
 				j = joins[y]
 			}
 			switch j {
-			case joinBreak:
+			case textsel.JoinBreak:
 				b.WriteByte('\n')
-			case joinSpace:
+			case textsel.JoinSpace:
 				b.WriteByte(' ')
-			case joinNone:
+			case textsel.JoinNone:
 			}
 		}
 	}
@@ -976,132 +866,9 @@ func (r *renderer) blockText(g *selRange) string {
 		if y > area.Min.Y {
 			b.WriteByte('\n')
 		}
-		b.WriteString(strings.TrimRight(rowText(cell, area.Min.X, area.Max.X-1, y), " "))
+		b.WriteString(strings.TrimRight(textsel.RowText(cell, area.Min.X, area.Max.X-1, y), " "))
 	}
 	return strings.TrimRight(b.String(), "\n")
-}
-
-// rowText returns the text of the cells from x0 to x1 of row y, inclusive,
-// with a blank where there is no cell, taking whole a wide character that
-// x0 is the second half of.
-func rowText(cell func(x, y int) *uv.Cell, x0, x1, y int) string {
-	for x0 > 0 {
-		if c := cell(x0, y); c == nil || c.Width != 0 {
-			break
-		}
-		x0--
-	}
-	var b strings.Builder
-	for x := x0; x <= x1; x++ {
-		switch c := cell(x, y); {
-		case c == nil || c.Content == "" && c.Width != 0:
-			b.WriteByte(' ')
-		case c.Width == 0:
-			// The second half of a wide character.
-		default:
-			b.WriteString(c.Content)
-		}
-	}
-	return b.String()
-}
-
-// cutText returns the text of full, a line drawn cut to fit with "…" in row
-// y of src, that the cells from x0 to x1 of the row select, and whether the
-// row was cut. A selection that takes the "…" takes the rest of the line,
-// and one that ends just before it, the rest of the word it cut.
-func cutText(src *canvas.Canvas, full string, y, x0, x1 int) (string, bool) {
-	if y < 0 || y >= src.Height() {
-		return "", false
-	}
-	cut := -1
-	for x := src.Width() - 1; x >= 0; x-- {
-		c := src.CellAt(x, y)
-		if c.Content == "…" {
-			cut = x
-			break
-		}
-		if c.Content != "" && c.Content != " " {
-			break
-		}
-	}
-	if cut < 0 {
-		return "", false
-	}
-	// What is shown before the cut is where it starts in full, after any
-	// padding of its style.
-	start := 0
-	for start < cut {
-		if c := src.CellAt(start, y); c.Content != "" && c.Content != " " {
-			break
-		}
-		start++
-	}
-	shown := rowText(src.CellAt, start, cut-1, y)
-	at := strings.Index(full, shown)
-	if at < 0 {
-		return "", false
-	}
-	offset := func(x int) int {
-		if x <= start {
-			return at
-		}
-		return at + len(rowText(src.CellAt, start, min(x, cut)-1, y))
-	}
-	from, to := offset(x0), len(full)
-	if x1 < cut {
-		to = offset(x1 + 1)
-		if x1 == cut-1 {
-			for to < len(full) && full[to] != ' ' {
-				to++
-			}
-		}
-	}
-	return strings.TrimRight(full[from:max(to, from)], " "), true
-}
-
-// join is what comes between two rows of a text node in the text copied.
-type join uint8
-
-const (
-	joinBreak join = iota // a line break of its own
-	joinSpace             // wrapped where it broke at a space
-	joinNone              // wrapped in the middle of a word
-)
-
-// wrapJoins returns what ends each row of src, the cells of text s as
-// drawn, in the text copied: the rows s wrapped to fit are joined, as the
-// lines they are, by finding each row's text in s in turn. Where a row is
-// not found in s, such as a border its style drew, it ends with a break.
-func wrapJoins(src *canvas.Canvas, s string) []join {
-	plain := strings.ReplaceAll(ansi.Strip(s), "\t", "    ")
-	joins := make([]join, src.Height())
-	at, prev := 0, -1
-	for y := range joins {
-		row := strings.TrimSpace(rowText(src.CellAt, 0, src.Width()-1, y))
-		if row == "" {
-			prev = -1
-			continue
-		}
-		gap := at
-		for gap < len(plain) && (plain[gap] == ' ' || plain[gap] == '\n') {
-			gap++
-		}
-		if !strings.HasPrefix(plain[gap:], row) {
-			prev = -1
-			continue
-		}
-		if prev >= 0 && prev == y-1 {
-			switch skipped := plain[at:gap]; {
-			case strings.Contains(skipped, "\n"):
-			case skipped != "":
-				joins[prev] = joinSpace
-			default:
-				joins[prev] = joinNone
-			}
-		}
-		at, prev = gap+len(row), y
-	}
-	return joins
 }
 
 // Selection returns the text selected with the mouse and whether any is
@@ -1357,8 +1124,8 @@ func (r *Root) scrollStep(f *Frame) (dx, dy, h int) {
 		return 0, 0, -1
 	}
 	p := s.pointer
-	dx = edgeStep(p.X, shown.Min.X, shown.Max.X, all.Min.X, all.Max.X)
-	dy = edgeStep(p.Y, shown.Min.Y, shown.Max.Y, all.Min.Y, all.Max.Y)
+	dx = textsel.EdgeStep(p.X, shown.Min.X, shown.Max.X, all.Min.X, all.Max.X)
+	dy = textsel.EdgeStep(p.Y, shown.Min.Y, shown.Max.Y, all.Min.Y, all.Max.Y)
 	if dx == 0 && dy == 0 {
 		return 0, 0, -1
 	}
@@ -1368,20 +1135,6 @@ func (r *Root) scrollStep(f *Frame) (dx, dy, h int) {
 		return 0, 0, -1
 	}
 	return dx, dy, h
-}
-
-// edgeStep returns -1 when p is before lo, where what is shown of content
-// from start to end starts, and some of it is out of sight there, 1 when p
-// is at or past hi, where what is shown ends, and some of it is out of
-// sight there, or 0.
-func edgeStep(p, lo, hi, start, end int) int {
-	switch {
-	case p < lo && start < lo:
-		return -1
-	case p >= hi && end > hi:
-		return 1
-	}
-	return 0
 }
 
 // scrollSelection scrolls the text under the end of the selection a step,

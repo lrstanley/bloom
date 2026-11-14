@@ -10,6 +10,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	"bloomfx.dev/bloom/internal/linebuf"
 	"charm.land/lipgloss/v2"
 )
 
@@ -104,8 +105,8 @@ func TestViewportTrustedPlacesCommands(t *testing.T) {
 		{"at the end of its line", "ab" + apc, func(n ViewportNode) ViewportNode { return n.Wrap(WrapChars) }, 1, []string{"a", "b" + apc}},
 		{"not when its glyph is scrolled past", "ab" + apc + "cd", func(n ViewportNode) ViewportNode { return n.At(ViewportPos{X: 3}) }, 1, []string{"d"}},
 		{"when the glyph after it starts the row", "ab" + apc + "cd", func(n ViewportNode) ViewportNode { return n.At(ViewportPos{X: 2}) }, 2, []string{apc + "cd"}},
-		{"at a checkpoint of a long line", strings.Repeat("a", checkpointEvery) + apc + strings.Repeat("b", longLineBytes), func(n ViewportNode) ViewportNode { return n.At(ViewportPos{X: checkpointEvery}) }, 2, []string{apc + "bb"}},
-		{"at a checkpoint after a combining mark", strings.Repeat("a", checkpointEvery) + apc + "\u0301" + strings.Repeat("b", longLineBytes), func(n ViewportNode) ViewportNode { return n.At(ViewportPos{X: checkpointEvery}) }, 2, []string{apc + "bb"}},
+		{"at a checkpoint of a long line", strings.Repeat("a", linebuf.CheckpointEvery) + apc + strings.Repeat("b", linebuf.LongLineBytes), func(n ViewportNode) ViewportNode { return n.At(ViewportPos{X: linebuf.CheckpointEvery}) }, 2, []string{apc + "bb"}},
+		{"at a checkpoint after a combining mark", strings.Repeat("a", linebuf.CheckpointEvery) + apc + "\u0301" + strings.Repeat("b", linebuf.LongLineBytes), func(n ViewportNode) ViewportNode { return n.At(ViewportPos{X: linebuf.CheckpointEvery}) }, 2, []string{apc + "bb"}},
 	}
 	styles := regexp.MustCompile("\x1b\\[[0-9;:]*m")
 	for _, tc := range tests {

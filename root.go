@@ -123,9 +123,9 @@ func New(opts ...Option) *Root {
 	r.r.motion = motion.New(c.now)
 	r.r.screen = r.handlerFrame
 	r.r.selStyle = newSelStyle(c.selStyle, c.selStyled)
-	r.r.wordChars = defaultWordChars
+	r.r.words.Chars = defaultWordChars
 	if c.wordChars != nil {
-		r.r.wordChars = *c.wordChars
+		r.r.words.Chars = *c.wordChars
 	}
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
 	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)

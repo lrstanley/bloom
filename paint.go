@@ -5,14 +5,15 @@
 package bloom
 
 import (
-	"bytes"
 	"image"
-	"reflect"
 	"slices"
-	"unsafe"
 
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/internal/linebuf"
+	"bloomfx.dev/bloom/internal/memo"
+	"bloomfx.dev/bloom/internal/same"
+	"bloomfx.dev/bloom/internal/textsel"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -63,65 +64,8 @@ func (o *op) equal(p *op) bool {
 		return false
 	}
 	for i := range o.effects {
-		if !sameEffect(o.effects[i], p.effects[i]) {
+		if !same.Effect(o.effects[i], p.effects[i]) {
 			return false
-		}
-	}
-	return true
-}
-
-// sameStyle reports whether a and b render the same. Styles cannot be
-// compared with ==, so they are compared deeply, but first by their bytes,
-// which is far cheaper and matches the usual case of styles copied from the
-// same one each frame. A style with a transform function never matches, as
-// the function may give something else each time, and is rendered every time.
-func sameStyle(a, b *lipgloss.Style) bool {
-	if a.GetTransform() != nil || b.GetTransform() != nil {
-		return false
-	}
-	size := unsafe.Sizeof(*a)
-	if bytes.Equal(unsafe.Slice((*byte)(unsafe.Pointer(a)), size), unsafe.Slice((*byte)(unsafe.Pointer(b)), size)) {
-		return true
-	}
-	return reflect.DeepEqual(a, b)
-}
-
-// sameEffect reports whether a and b are equal, treating effects that cannot
-// be compared, like an [fx.Func], as different.
-func sameEffect(a, b fx.Effect) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
-	return va.Type() == vb.Type() && fixed(va) && a == b
-}
-
-// fixed reports whether v is comparable and cannot change without changing
-// v itself. An effect behind a pointer can change without the pointer
-// changing, including one wrapped by another effect, such as [fx.Delay].
-func fixed(v reflect.Value) bool {
-	if !v.Comparable() {
-		return false
-	}
-	k := v.Kind()
-	if k == reflect.Pointer || k == reflect.UnsafePointer || k == reflect.Chan {
-		return false
-	}
-	if k == reflect.Interface {
-		return v.IsNil() || fixed(v.Elem())
-	}
-	if k == reflect.Struct {
-		for _, f := range v.Fields() {
-			if !fixed(f) {
-				return false
-			}
-		}
-	}
-	if k == reflect.Array {
-		for i := range v.Len() {
-			if !fixed(v.Index(i)) {
-				return false
-			}
 		}
 	}
 	return true
@@ -133,14 +77,15 @@ func fixed(v reflect.Value) bool {
 type renderer struct {
 	engine
 
-	styled   memos[styledMemo] // by box index, from the last frame
-	columns  memos[columnMemo] // by twice the box index, for scrollbars
-	drag     scrollbarDrag     // the scrollbar being dragged, if any
-	vpMarks  []overlay         // scratch for the marks of a viewport's line
-	vpPens   penSGRs           // the styles of viewports' text, kept from frame to frame
-	vpCell   vpCellMemo        // the viewport row whose cells selection last asked for
-	style    lipgloss.Style    // scratch for comparing styles without allocating
-	fxs      []fx.Effect       // effects of this frame's ops, copied from the tree
+	styled   memo.Table[styledMemo] // by box index, from the last frame
+	columns  memo.Table[columnMemo] // by twice the box index, for scrollbars
+	drag     scrollbarDrag          // the scrollbar being dragged, if any
+	vpMarks  []linebuf.Overlay      // scratch for the marks of a viewport's line, in cells
+	vpSpans  []linebuf.Overlay      // and as they were given, in bytes
+	vpPens   linebuf.SGRs           // the styles of viewports' text, kept from frame to frame
+	vpCell   vpCellMemo             // the viewport row whose cells selection last asked for
+	style    lipgloss.Style         // scratch for comparing styles without allocating
+	fxs      []fx.Effect            // effects of this frame's ops, copied from the tree
 	prevFxs  []fx.Effect
 	env      canvas.Env
 	mixer    canvas.Mixer
@@ -167,18 +112,14 @@ type renderer struct {
 	// sel is the Root's selection, found in the text leaves of the node it
 	// is in as rng, and drawn over them with selStyle, or as the copy flash
 	// at flashT when that is not negative.
-	sel       selection
-	leaves    []selLeaf
-	rng       selRange
-	rngSeq    int // the seq of the selection rng is for, or -1
-	selStyle  selStyle
-	wordChars string
-	flashT    float64
+	sel      selection
+	leaves   []selLeaf
+	rng      selRange
+	rngSeq   int // the seq of the selection rng is for, or -1
+	selStyle selStyle
+	flashT   float64
 
-	// Scratch for finding words.
-	wordRow  []byte
-	wordOffs []int
-	wordSegs []wordSeg
+	words textsel.Words // finds words, for a double click
 }
 
 func newRenderer(method ansi.Method) *renderer {
@@ -233,8 +174,8 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 		r.paintMoves(0)
 		r.paintFloats(0)
 	}
-	r.styled.retire()
-	r.columns.retire()
+	r.styled.Retire()
+	r.columns.Retire()
 	return root
 }
 
@@ -301,15 +242,15 @@ func (r *renderer) textAt(i int, n TextNode, w, h int) string {
 	if !n.styled && !n.truncate {
 		return n.s
 	}
-	m := r.styled.at(i)
+	m := r.styled.At(i)
 	// Comparing through pointers to storage that outlives the call keeps
 	// the styles from being copied to the heap.
 	r.style = n.style
-	if v := &m.v; m.ok && v.w == w && v.h == h && v.truncate == n.truncate && v.s == n.s && sameStyle(&v.style, &r.style) {
+	if v := &m.V; m.OK && v.w == w && v.h == h && v.truncate == n.truncate && v.s == n.s && same.Style(&v.style, &r.style) {
 		return v.out
 	}
 	out := textOf(n, w, h, r.method)
-	m.ok, m.v = true, styledMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out}
+	m.OK, m.V = true, styledMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out}
 	return out
 }
 

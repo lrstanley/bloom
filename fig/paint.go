@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"reflect"
 
+	"bloomfx.dev/bloom/internal/same"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -218,33 +219,5 @@ func (p fill) Shade(f *Figure, c Cell) uv.Style {
 // cacheable reports whether p can be a map key, and cannot change without
 // changing p itself, so that what it rendered can be kept.
 func cacheable(p Paint) bool {
-	return fixed(reflect.ValueOf(p))
-}
-
-func fixed(v reflect.Value) bool {
-	if !v.IsValid() {
-		return true
-	}
-	if !v.Comparable() {
-		return false
-	}
-	switch v.Kind() { //nolint:exhaustive // other kinds are plain values.
-	case reflect.Pointer, reflect.UnsafePointer, reflect.Chan, reflect.Func, reflect.Map, reflect.Slice:
-		return false
-	case reflect.Interface:
-		return v.IsNil() || fixed(v.Elem())
-	case reflect.Struct:
-		for _, fv := range v.Fields() {
-			if !fixed(fv) {
-				return false
-			}
-		}
-	case reflect.Array:
-		for i := range v.Len() {
-			if !fixed(v.Index(i)) {
-				return false
-			}
-		}
-	}
-	return true
+	return same.Fixed(reflect.ValueOf(p))
 }

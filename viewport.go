@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"bloomfx.dev/bloom/internal/linebuf"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -84,6 +85,31 @@ func (p ViewportPos) AtEnd() bool { return p.Line == math.MaxInt }
 // line while there are lines above its top to fill it.
 func (n ViewportNode) At(pos ViewportPos) ViewportNode { n.pos = pos; return n }
 
+// WrapMode is how a [Viewport] fits lines wider than it is.
+type WrapMode uint8
+
+const (
+	// WrapNone shows lines whole, cut off at the viewport's right edge,
+	// and scrolled sideways with [ViewportPos.X]. It is the default.
+	WrapNone = WrapMode(linebuf.None)
+	// WrapWords wraps lines at the spaces between words, and after
+	// hyphens, as Lip Gloss wraps a [Text], breaking a word only when it is
+	// wider than the viewport.
+	WrapWords = WrapMode(linebuf.Words)
+	// WrapChars wraps lines at the viewport's width, wherever it falls.
+	WrapChars = WrapMode(linebuf.Chars)
+)
+
+// styleSGR returns the escape sequence that sets the colors and attributes
+// of style, kept in c when it is not nil, or "" for a style that sets none.
+func styleSGR(c *linebuf.SGRs, style lipgloss.Style) string {
+	s := cellStyle(style)
+	if linebuf.ZeroStyle(&s) {
+		return ""
+	}
+	return c.Of(&s)
+}
+
 // Wrap sets how lines wider than the viewport are fitted to it. The default
 // is [WrapNone].
 func (n ViewportNode) Wrap(mode WrapMode) ViewportNode { n.wrap = mode; return n }
@@ -131,7 +157,7 @@ func (n ViewportNode) Gutter(width int, fn func(row GutterRow) string) ViewportN
 // left as wide as the largest number and a space, drawn in style's colors
 // and attributes. Rows that continue a wrapped line have none.
 func (n ViewportNode) LineNumbers(style lipgloss.Style) ViewportNode {
-	n.gutters = append(slices.Clip(n.gutters), gutter{numbers: overlaySGR(style), lines: true})
+	n.gutters = append(slices.Clip(n.gutters), gutter{numbers: styleSGR(nil, style), lines: true})
 	return n
 }
 
@@ -180,7 +206,7 @@ func MarkMatches(re *regexp.Regexp, style lipgloss.Style) func(line int, text st
 // [ViewportNode.LineStyle], and their marks. Its padding, borders, and
 // margins are not drawn: put the viewport in a [Box] for those.
 func (n ViewportNode) Style(style lipgloss.Style) ViewportNode {
-	n.style = overlaySGR(style)
+	n.style = styleSGR(nil, style)
 	return n
 }
 
@@ -311,8 +337,8 @@ type ViewportView struct {
 }
 
 // index returns the rows of the view's buffer at its width.
-func (v ViewportView) index() *wrapIndex {
-	return v.buf.index(v.method, v.wrap, v.Width)
+func (v ViewportView) index() *linebuf.Index {
+	return v.buf.s.Index(v.method, linebuf.Mode(v.wrap), v.Width)
 }
 
 // AtRow returns the position with row at the top, counting the rows of all
@@ -322,12 +348,12 @@ func (v ViewportView) AtRow(row int) ViewportPos {
 		return ViewportPos{}
 	}
 	x := v.index()
-	bottom := max(x.total()-v.Rows, 0)
+	bottom := max(x.Total()-v.Rows, 0)
 	row = min(max(row, 0), bottom)
 	if v.follow && row == bottom {
 		return ViewportPos{Line: ViewportEnd.Line, X: v.Pos.X}
 	}
-	line, sub := x.lineAt(row)
+	line, sub := x.LineAt(row)
 	return ViewportPos{Line: line, Row: sub, X: v.Pos.X}
 }
 
@@ -377,7 +403,7 @@ func (v ViewportView) Reveal(line int) ViewportPos {
 	}
 	x := v.index()
 	line = min(max(line, 0), v.buf.Len()-1)
-	start, rows := x.rowsBefore(line), x.rowsOf(line)
+	start, rows := x.RowsBefore(line), x.RowsOf(line)
 	switch {
 	case start < v.Row:
 		return v.AtRow(start)
@@ -425,8 +451,8 @@ func (e *engine) measureViewport(n ViewportNode, avail Size) Size {
 	}
 	lines := n.buf.Len()
 	g := gutterWidth(n.gutters, lines)
-	m := n.buf.measure(e.method)
-	w := m.widest
+	m := n.buf.s.Measure(e.method)
+	w := m.Widest
 	if n.wrap != WrapNone {
 		w = min(w, max(avail.W-g, 0))
 	}
@@ -434,22 +460,22 @@ func (e *engine) measureViewport(n ViewportNode, avail Size) Size {
 		// Empty lines, or no room to wrap in: a row a line.
 		return Size{W: g, H: lines}
 	}
-	if n.wrap == WrapNone || m.widest <= w {
+	if n.wrap == WrapNone || m.Widest <= w {
 		return Size{W: w + g, H: lines}
 	}
 	if avail.H >= unbounded {
-		return Size{W: w + g, H: n.buf.index(e.method, n.wrap, w).total()}
+		return Size{W: w + g, H: n.buf.s.Index(e.method, linebuf.Mode(n.wrap), w).Total()}
 	}
 	// Only whether the lines fill avail matters, so they are counted until
 	// they do.
 	h := 0
 	var starts []int
 	for i := 0; i < lines && h < avail.H; i++ {
-		if m.width(i) <= w {
+		if m.Width(i) <= w {
 			h++
 			continue
 		}
-		h += len(n.buf.rowStarts(i, e.method, w, n.wrap, &starts))
+		h += len(n.buf.s.RowStarts(i, e.method, w, linebuf.Mode(n.wrap), &starts))
 	}
 	return Size{W: w + g, H: h}
 }
@@ -475,9 +501,9 @@ func (e *engine) layoutViewport(i int, n ViewportNode, r image.Rectangle) {
 func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 	v := &l.view
 	w, h := l.content.Dx(), l.content.Dy()
-	m := n.buf.measure(e.method)
-	x := n.buf.index(e.method, n.wrap, w)
-	v.Lines, v.Width, v.Widest, v.TotalRows = lines, w, m.widest, x.total()
+	m := n.buf.s.Measure(e.method)
+	x := n.buf.s.Index(e.method, linebuf.Mode(n.wrap), w)
+	v.Lines, v.Width, v.Widest, v.TotalRows = lines, w, m.Widest, x.Total()
 	if lines == 0 || w <= 0 {
 		return
 	}
@@ -489,13 +515,13 @@ func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 	case p.Line >= lines:
 		row = bottom
 	case p.Line >= 0:
-		row = x.rowsBefore(p.Line) + min(max(p.Row, 0), x.rowsOf(p.Line)-1)
+		row = x.RowsBefore(p.Line) + min(max(p.Row, 0), x.RowsOf(p.Line)-1)
 	}
 	row = min(row, bottom)
-	line, sub := x.lineAt(row)
+	line, sub := x.LineAt(row)
 	col := 0
-	if x.cum == nil {
-		col = min(max(p.X, 0), max(m.widest-w, 0))
+	if x.Uniform() {
+		col = min(max(p.X, 0), max(m.Widest-w, 0))
 	}
 	v.Row, v.First, v.Pos = row, line, ViewportPos{Line: line, Row: sub, X: col}
 	if n.follow && row == bottom {
@@ -504,14 +530,14 @@ func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 
 	var scratch []int
 	for y := 0; y < h && line < lines; line++ {
-		if x.cum == nil || x.rowsOf(line) == 1 {
+		if x.Uniform() || x.RowsOf(line) == 1 {
 			e.vpRows = append(e.vpRows, vpRow{line: line, a: col, b: col + w})
 			y++
 			sub = 0
 			continue
 		}
-		starts := n.buf.rowStarts(line, e.method, w, n.wrap, &scratch)
-		end := m.width(line)
+		starts := n.buf.s.RowStarts(line, e.method, w, linebuf.Mode(n.wrap), &scratch)
+		end := m.Width(line)
 		for k := sub; k < len(starts) && y < h; k++ {
 			rowEnd := end
 			if k+1 < len(starts) {
@@ -570,10 +596,6 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 	}
 	// Rows are only laid out for a buffer.
 	buf, rows := n.buf, r.vpRows[l.rows[0]:l.rows[1]]
-	var m *bufMeasure
-	if len(rows) > 0 {
-		m = buf.measure(r.method)
-	}
 	content := l.content
 	lineSGR, marks, markLine := "", r.vpMarks[:0], -1
 	for k, row := range rows {
@@ -587,21 +609,27 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 			gx += w
 		}
 
-		s := buf.lines[row.line]
 		if row.line != markLine {
 			markLine, lineSGR, marks = row.line, n.style, marks[:0]
 			if n.lineStyle != nil {
-				lineSGR += r.vpPens.overlay(n.lineStyle(row.line))
+				lineSGR += styleSGR(&r.vpPens, n.lineStyle(row.line))
 			}
 			if n.marks != nil {
-				marks = markCells(s, r.method, n.marks(row.line, plainText(s, r.method)), &r.vpPens, marks)
+				s := buf.s.Line(row.line)
+				spans := r.vpSpans[:0]
+				given := n.marks(row.line, linebuf.PlainText(s, r.method))
+				for k := range given {
+					m := &given[k]
+					spans = append(spans, linebuf.Overlay{Start: m.Start, End: m.End, SGR: styleSGR(&r.vpPens, m.Style)})
+				}
+				marks, r.vpSpans = linebuf.MarkCells(s, r.method, spans, marks), spans[:0]
 			}
 		}
-		st := rowStyle{line: lineSGR, marks: marks, pens: &r.vpPens, pass: n.trusted}
+		st := linebuf.RowStyle{Line: lineSGR, Marks: marks, Pens: &r.vpPens, Pass: n.trusted}
 		if lineSGR != "" {
-			st.fill = content.Dx()
+			st.Fill = content.Dx()
 		}
-		text := cutRow(s, buf.cutFrom(row.line, r.method, row.a), m.widths[row.line], r.method, row.a, row.b, &st)
+		text := buf.s.CutRow(row.line, r.method, row.a, row.b, &st)
 		r.blitText(text, n.trusted, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
 	}
 	r.vpMarks = marks[:0]
@@ -635,27 +663,25 @@ func (r *renderer) vpRowCells(l *vpLayout, y int) (cells string) {
 	if y < 0 || y >= v.TotalRows || v.buf == nil {
 		return ""
 	}
-	if m := &r.vpCell; m.buf == v.buf && m.rev == v.buf.rev && m.y == y && m.width == v.Width && m.wrap == v.wrap {
+	if m := &r.vpCell; m.buf == v.buf && m.rev == v.buf.s.Rev() && m.y == y && m.width == v.Width && m.wrap == v.wrap {
 		return m.cells
 	}
 	var scratch []int
 	line, a, b := v.rowAt(v.index(), y, &scratch)
-	s := v.buf.lines[line]
-	m := v.buf.measure(v.method)
-	cells = cutRow(s, v.buf.cutFrom(line, v.method, a), m.widths[line], v.method, a, b, nil)
-	r.vpCell = vpCellMemo{buf: v.buf, rev: v.buf.rev, y: y, width: v.Width, wrap: v.wrap, cells: cells}
+	cells = v.buf.s.CutRow(line, v.method, a, b, nil)
+	r.vpCell = vpCellMemo{buf: v.buf, rev: v.buf.s.Rev(), y: y, width: v.Width, wrap: v.wrap, cells: cells}
 	return cells
 }
 
 // rowAt returns the line that row y of the lines of v shows, with index x,
 // and the cells of it the row takes, from a up to end, which for its last
 // row is past the end of the line. Wrapped rows are worked out in scratch.
-func (v ViewportView) rowAt(x *wrapIndex, y int, scratch *[]int) (line, a, end int) {
-	line, sub := x.lineAt(y)
-	if x.cum == nil || x.rowsOf(line) == 1 {
+func (v ViewportView) rowAt(x *linebuf.Index, y int, scratch *[]int) (line, a, end int) {
+	line, sub := x.LineAt(y)
+	if x.Uniform() || x.RowsOf(line) == 1 {
 		return line, 0, math.MaxInt
 	}
-	starts := v.buf.rowStarts(line, v.method, v.Width, v.wrap, scratch)
+	starts := v.buf.s.RowStarts(line, v.method, v.Width, linebuf.Mode(v.wrap), scratch)
 	a, end = starts[sub], math.MaxInt
 	if sub+1 < len(starts) {
 		end = starts[sub+1]
@@ -686,8 +712,7 @@ func vpText(l *vpLayout, from, to image.Point, block bool) string {
 	rowCells := func(y int) (line, a, end int) { return v.rowAt(x, y, &scratch) }
 	// text returns the text of the cells of line from lo to hi.
 	text := func(line, lo, hi int) string {
-		s := v.buf.lines[line]
-		return strings.TrimRight(cellText(s, v.buf.cutFrom(line, v.method, lo), v.method, lo, hi), " ")
+		return strings.TrimRight(v.buf.s.CellText(line, v.method, lo, hi), " ")
 	}
 	to.Y = min(to.Y, v.TotalRows-1)
 	if block {
@@ -708,7 +733,7 @@ func vpText(l *vpLayout, from, to image.Point, block bool) string {
 			lo = min(a+from.X, end)
 		}
 		// The rows of the line, from this one, up to the last selected.
-		last := min(to.Y, x.rowsBefore(line)+x.rowsOf(line)-1)
+		last := min(to.Y, x.RowsBefore(line)+x.RowsOf(line)-1)
 		hi := math.MaxInt
 		if last == to.Y {
 			_, la, lend := rowCells(last)

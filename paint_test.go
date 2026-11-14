@@ -157,25 +157,6 @@ func TestBorderFxNoBorder(t *testing.T) {
 	}
 }
 
-func TestSameStyle(t *testing.T) {
-	t.Parallel()
-
-	a := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Padding(1)
-	b := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Padding(1)
-	c := a.Bold(true)
-	upper := a.Transform(strings.ToUpper)
-	switch {
-	case !sameStyle(&a, &a):
-		t.Fatal("a style differs from itself")
-	case !sameStyle(&a, &b):
-		t.Fatal("equal styles built apart differ")
-	case sameStyle(&a, &c):
-		t.Fatal("different styles match")
-	case sameStyle(&upper, &upper):
-		t.Fatal("a style with a transform matches")
-	}
-}
-
 func TestFrameFollowsStyleChanges(t *testing.T) {
 	t.Parallel()
 
@@ -188,13 +169,6 @@ func TestFrameFollowsStyleChanges(t *testing.T) {
 	r.Render(20, 3, tree(0))
 	r.Render(20, 3, tree(3))
 	expectRect(t, r.Frame(), "x", image.Rect(4, 1, 5, 2))
-	// Frames no box used are dropped, along with their styles.
-	r.Render(20, 3, Text("plain"))
-	for i, m := range r.r.frameMemos.slots {
-		if m.ok {
-			t.Fatalf("the frame of box %d is still kept", i)
-		}
-	}
 }
 
 // BenchmarkBorderFrame draws a 200×60 box with a title, a counter, and a
