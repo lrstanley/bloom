@@ -1,0 +1,64 @@
+// Copyright (c) Liam Stanley <liam@liam.sh>. All rights reserved. Use of
+// this source code is governed by the MIT license that can be found in
+// the LICENSE file.
+
+package bloom
+
+import (
+	"image"
+	"slices"
+	"strings"
+	"testing"
+
+	"charm.land/lipgloss/v2"
+)
+
+// sizeProbe records the sizes it is laid out at, and wraps a long line above
+// a last row.
+type sizeProbe struct{ sizes *[]Size }
+
+func (p sizeProbe) Layout(ctx Context) Child {
+	*p.sizes = append(*p.sizes, Size{W: ctx.Width, H: ctx.Height})
+	return Box(rounded, Column(Text(strings.Repeat("word ", 20)).Style(lipgloss.NewStyle()), Text("LAST")))
+}
+
+func (sizeProbe) View() string { return "" }
+
+func TestLayerFixedWidthFitsHeight(t *testing.T) {
+	t.Parallel()
+	base := Text(strings.Repeat(strings.Repeat(".", 120)+"\n", 20))
+	tests := []struct {
+		name  string
+		w     int
+		want  image.Rectangle
+		width int
+	}{
+		// 100 cells of text wrap to 3 rows in 38, plus "LAST" and borders.
+		{"fixed width", 40, image.Rect(40, 7, 80, 13), 40},
+		// A width past the screen is clamped to it before measuring.
+		{"clamped width", 200, image.Rect(0, 8, 120, 12), 120},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var sizes []Size
+			f := Solve(120, 20, Overlay(base, Layer(sizeProbe{&sizes}).Size(tt.w, 0).ID("l")))
+			expectRect(t, f, "l", tt.want)
+			if slices.ContainsFunc(sizes, func(s Size) bool { return s.W != tt.width }) {
+				t.Fatalf("laid out at %v; want only width %d", sizes, tt.width)
+			}
+			if got := Render(120, 20, Overlay(base, Layer(sizeProbe{&sizes}).Size(tt.w, 0))); !strings.Contains(got, "LAST") {
+				t.Fatalf("last row cut off:\n%s", got)
+			}
+		})
+	}
+}
+
+func TestLayerFixedHeightMeasuresAtHeight(t *testing.T) {
+	t.Parallel()
+	var sizes []Size
+	Solve(120, 20, Overlay(Text("base"), Layer(sizeProbe{&sizes}).Size(0, 3)))
+	if slices.ContainsFunc(sizes, func(s Size) bool { return s.H != 3 }) {
+		t.Fatalf("laid out at %v; want only height 3", sizes)
+	}
+}

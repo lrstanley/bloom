@@ -543,9 +543,11 @@ func (n LayerNode) Offset(x, y int) LayerNode { n.offsetX, n.offsetY = x, y; ret
 // the screen's for a layer that floats, shrinking it if needed.
 func (n LayerNode) Margin(cells int) LayerNode { n.margin = max(cells, 0); return n }
 
-// Size sets the layer's size; zero for either is the child's natural size.
-// The size is clamped to the overlay, or the screen for a layer that floats,
-// less the margin.
+// Size sets the layer's size; zero for either is the child's natural size
+// on that axis, measured with the other axis at the layer's size, so a layer
+// of fixed width is as tall as its content wraps to at that width. The size
+// is clamped to the overlay, or the screen for a layer that floats, less the
+// margin.
 func (n LayerNode) Size(w, h int) LayerNode { n.w, n.h = w, h; return n }
 
 // AnchorTo places the layer against side of the node with ID id, such as a

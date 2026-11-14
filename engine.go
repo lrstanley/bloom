@@ -895,14 +895,16 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 }
 
 // layerSize returns the size of layer n, whose child is box kid, within
-// area.
+// area. A side the layer fits to its child is measured with the other side
+// at the layer's size, as the child is drawn, so content that wraps in a
+// layer of fixed width gets the height it wraps to there.
 func (e *engine) layerSize(n LayerNode, kid int, area image.Rectangle) (w, h int) {
-	w, h = max(n.w, 0), max(n.h, 0)
+	w, h = min(max(n.w, 0), area.Dx()), min(max(n.h, 0), area.Dy())
 	if w == 0 || h == 0 {
-		s := e.measure(kid, Size{W: area.Dx(), H: area.Dy()})
+		s := e.measure(kid, Size{W: cmp.Or(w, area.Dx()), H: cmp.Or(h, area.Dy())})
 		w, h = cmp.Or(w, s.W), cmp.Or(h, s.H)
 	}
-	return min(w, area.Dx()), min(h, area.Dy())
+	return w, h
 }
 
 // animate returns where box i, with ID id, is drawn on its way to target:
