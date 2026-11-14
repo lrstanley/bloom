@@ -99,7 +99,15 @@ type Context struct {
 
 	wc     bool          // text is measured with ansi.WcWidth rather than ansi.GraphemeWidth
 	screen func() *Frame // the Root's frame on screen, or nil outside a Root
+	side   Direction     // the side the layer the component is in went on; see Side
 }
+
+// Side returns the side or corner of its node that the layer the component
+// is in was placed against with [LayerNode.AnchorTo], which is the opposite
+// of the one asked for when the layer did not fit there. A menu can use it
+// to draw its edge facing the node. It reports false for a component that
+// is not in a layer, or is in one that is not anchored to a node.
+func (c Context) Side() (Direction, bool) { return c.side, c.side != 0 }
 
 // Frame returns the frame on screen when it is called, rather than when the
 // component was laid out, for the mouse handlers it makes to read where its

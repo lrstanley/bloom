@@ -12,6 +12,7 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/on"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -488,5 +489,223 @@ func TestCenteredIgnoresSlotSizing(t *testing.T) {
 		Centered(Auto(Text("x").ID("x")).Align(Stretch)),
 	} {
 		expectRect(t, Solve(9, 5, c), "x", image.Rect(4, 2, 5, 3))
+	}
+}
+
+// sided is a menu that draws an arrow toward the node its layer is against,
+// and is taller below it than above it, as given by its Context.
+type sided struct{}
+
+func (sided) View() string { return "" }
+
+func (sided) Layout(ctx Context) Child {
+	side, ok := ctx.Side()
+	if !ok {
+		return Text("none").ID("arrow")
+	}
+	if side == Top {
+		return Column(Text("item"), Text("item"), Text("vvvv").ID("arrow"))
+	}
+	return Column(Text("^^^^").ID("arrow"), Text("item"), Text("item"), Text("item"))
+}
+
+func TestContextSide(t *testing.T) {
+	t.Parallel()
+
+	tree := func(row int) Child {
+		return Overlay(
+			Column(Fixed(row, nil), Text("field").ID("field")),
+			Layer(sided{}).ID("menu").AnchorTo("field", Bottom),
+		)
+	}
+
+	// Below the field, with room.
+	r := New()
+	r.Render(10, 10, tree(2))
+	f := r.Frame()
+	expectRect(t, f, "menu", image.Rect(0, 3, 4, 7))
+	expectRect(t, f, "arrow", image.Rect(0, 3, 4, 4))
+
+	// Near the bottom, the menu is built again for the top, at its size
+	// there, with the arrow toward the field.
+	r.Render(10, 10, tree(8))
+	f = r.Frame()
+	expectRect(t, f, "menu", image.Rect(0, 5, 4, 8))
+	expectRect(t, f, "arrow", image.Rect(0, 7, 4, 8))
+	lines := strings.Split(ansi.Strip(r.Render(10, 10, tree(8))), "\n")
+	if got := strings.TrimSpace(lines[7]); got != "vvvv" {
+		t.Fatalf("row above the field is %q, want the arrow\n%s", got, strings.Join(lines, "\n"))
+	}
+
+	// A gap below the field stays a gap above it, once built again.
+	r.Render(10, 10, Overlay(
+		Column(Fixed(8, nil), Text("field").ID("field")),
+		Layer(sided{}).ID("menu").AnchorTo("field", Bottom).Offset(0, 1),
+	))
+	expectRect(t, r.Frame(), "menu", image.Rect(0, 4, 4, 7))
+
+	// Select all finds what is on screen, not what was built for the
+	// bottom before the menu flipped.
+	r.Render(10, 10, Overlay(
+		Column(Fixed(8, nil), Text("field").ID("field")),
+		Layer(Column(sided{}).ID("body").Selectable()).AnchorTo("field", Bottom),
+	))
+	if !r.SelectAll("body") {
+		t.Fatal("select all found nothing in the menu")
+	}
+	if got, _ := r.Selection(); got != "item\nitem\nvvvv" {
+		t.Fatalf("selected %q", got)
+	}
+
+	// Outside an anchored layer, there is no side.
+	if got := ansi.Strip(Render(10, 1, sided{})); strings.TrimSpace(got) != "none" {
+		t.Fatalf("outside a layer drew %q", got)
+	}
+	if got := ansi.Strip(Render(10, 1, Overlay(Text(""), Layer(sided{})))); !strings.Contains(got, "none") {
+		t.Fatalf("in a layer that is not anchored drew %q", got)
+	}
+}
+
+// field is a 1-row overlay with a 3-row menu anchored below its input,
+// floating or not.
+func field(float bool) Child {
+	menu := Layer(Text("m1\nm2\nm3")).ID("menu").AnchorTo("input", Bottom)
+	if float {
+		menu = menu.Float()
+	}
+	return Overlay(Text("input").ID("input"), menu)
+}
+
+func TestFloatPastItsOverlay(t *testing.T) {
+	t.Parallel()
+
+	tree := func(float bool) Child {
+		return Column(Fixed(1, field(float)), Text("one"), Text("two"), Text("three"), Text("four"))
+	}
+
+	// Kept to its overlay, the menu has one row, over the input.
+	f := Solve(10, 5, tree(false))
+	expectRect(t, f, "menu", image.Rect(0, 0, 2, 1))
+
+	f = Solve(10, 5, tree(true))
+	expectRect(t, f, "menu", image.Rect(0, 1, 2, 4))
+	// The menu covers what it is over, as a layer does.
+	want := strings.Join([]string{"input", "m1e", "m2o", "m3ree", "four"}, "\n")
+	if got := trimLines(ansi.Strip(Render(10, 5, tree(true)))); got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+
+	// It flips against the screen, not its overlay.
+	f = Solve(10, 5, Column(Fixed(4, nil), Fixed(1, field(true))))
+	expectRect(t, f, "menu", image.Rect(0, 1, 2, 4))
+
+	if got := Debug(10, 5, tree(true)); !strings.Contains(got, `Layer id="menu" 0,1 2x3 anchorTo="input"/bottom float`) {
+		t.Fatalf("debug tree does not show the menu floating:\n%s", got)
+	}
+}
+
+// trimLines trims the spaces at the end of each line of s.
+func trimLines(s string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = strings.TrimRight(l, " ")
+	}
+	return strings.Join(lines, "\n")
+}
+
+// dialogTree is a modal dialog with a field whose menu floats past its
+// bottom edge, and a toast declared after the dialog, over the menu.
+func dialogTree(l *log, effects bool) Child {
+	menu := Layer(Column(
+		Text("opt1").ID("opt1").Focusable().On(on.Click(l.add("opt1"))),
+		Text("opt2").ID("opt2").Focusable(),
+		Text("opt3").ID("opt3").Focusable(),
+	)).ID("menu").AnchorTo("input", Bottom).Float().On(on.ClickOutside(l.add("close menu")))
+	body := Overlay(Column(Text("title"), Text("input").ID("input").Focusable()), menu)
+	dialog := Layer(Box(rounded, body)).ID("dialog").Modal().Anchor(Start, Start).
+		On(on.ClickOutside(l.add("close dialog")))
+	if effects {
+		dialog = dialog.Transition(1, fx.Dim{})
+	}
+	toast := Layer(Text("TOAST")).Anchor(Start, Start).Offset(3, 5)
+	return Overlay(Text(strings.Repeat("base\n", 8)), dialog, toast)
+}
+
+func TestFloatInDialog(t *testing.T) {
+	t.Parallel()
+
+	for _, effects := range []bool{false, true} {
+		var l log
+		r := New()
+		got := trimLines(ansi.Strip(r.Render(10, 8, dialogTree(&l, effects))))
+		// The dialog's box is rows 0 to 3. The menu goes over its bottom edge
+		// and past it, over the base, and under the toast declared after the
+		// dialog.
+		want := strings.Join([]string{
+			"╭─────╮",
+			"│title│",
+			"│input│",
+			"╰opt1─╯",
+			"bopt2",
+			"bopTOAST",
+			"base",
+			"base",
+		}, "\n")
+		if got != want {
+			t.Fatalf("effects %v: got:\n%s\nwant:\n%s", effects, got, want)
+		}
+
+		f := r.Frame()
+		expectRect(t, f, "menu", image.Rect(1, 3, 5, 6))
+		if hit := f.Hit(2, 5); len(hit) < 3 || hit[0] != "dialog" || hit[len(hit)-1] != "opt3" {
+			t.Fatalf("effects %v: hit %v under the menu, outside the dialog", effects, hit)
+		}
+
+		// A click on the menu, outside the dialog's box, is inside the dialog.
+		r.ClickAt(2, 3)
+		expect(t, &l, "opt1")
+		// A click on the base closes both.
+		r.ClickAt(8, 6)
+		expect(t, &l, "close dialog", "close menu")
+
+		// Focus inside the dialog's scope reaches the menu.
+		var focus Focus[string]
+		focus.Push("dialog")
+		var order []string
+		for range 4 {
+			focus.Next(f)
+			id, _ := focus.Current()
+			order = append(order, id)
+		}
+		if want := []string{"input", "opt1", "opt2", "opt3"}; strings.Join(order, ",") != strings.Join(want, ",") {
+			t.Fatalf("effects %v: focus went %v, want %v", effects, order, want)
+		}
+	}
+}
+
+func TestAnchorInsideFloat(t *testing.T) {
+	t.Parallel()
+
+	// A submenu anchored to an item of a menu that floats past its overlay
+	// finds the item, though it is outside that overlay.
+	menu := Overlay(
+		Text("sub").ID("item"),
+		Layer(Text("submenu")).ID("submenu").AnchorTo("item", Right).Float(),
+	)
+	tree := Column(Fixed(1, Overlay(
+		Text("input").ID("input"),
+		Layer(Column(Text("first"), menu)).ID("menu").AnchorTo("input", Bottom).Float(),
+	)))
+	f := Solve(20, 5, tree)
+	expectRect(t, f, "item", image.Rect(0, 2, 5, 3))
+	expectRect(t, f, "submenu", image.Rect(5, 2, 12, 3))
+
+	// A node in a layer that floats off screen is no anchor.
+	f = Solve(20, 5, Overlay(
+		Overlay(Text(""), Layer(Text("item").ID("item")).Anchor(Start, Start).Offset(100, 0).Float()),
+		Layer(Text("tip")).ID("tip").AnchorTo("item", Right),
+	))
+	if r, ok := f.Rect("tip"); ok {
+		t.Fatalf("tip at %v, though its anchor is off screen", r)
 	}
 }

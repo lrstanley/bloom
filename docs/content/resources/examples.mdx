@@ -107,6 +107,17 @@ backdrops, shadows, a spring entrance, and a toast.
 See also: [Dialogs and modals](/layers/dialogs), [Focus](/input/focus), [Dropdowns](/layers/dropdowns).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/forms), or `go run ./forms`.
 
+## dropdowns
+
+![The dropdowns example: a select on the bottom bar whose list opens above it, then a settings dialog whose lists hang past its edge, picked with the mouse and the keyboard](/demos/dropdowns.webp)
+
+Selects that keep their lists next to them, in overlays of their own, with `Float` so a list is drawn whole past the
+edge of the dialog it's in. A list near the bottom of the screen flips above its field, and reads the side it opened
+on from `Context.Side` to draw its edges.
+
+See also: [Dropdowns](/layers/dropdowns), [Dialogs and modals](/layers/dialogs).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/dropdowns), or `go run ./dropdowns`.
+
 ## borders
 
 ![The borders example: a list with a title, clickable filter tabs, its position, and icon buttons on its border, its scrollbar lighting up under the pointer, then dragged and clicked, a log scrolled sideways with a horizontal scrollbar and its name down its side, next to boxes looping each border effect](/demos/borders.webp)

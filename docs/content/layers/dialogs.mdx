@@ -172,6 +172,12 @@ second := bloom.Layer(overwrite).ID(overwriteDialog).Modal().
 	Presence(m.overwrite, fx.Fade{})
 ```
 
+## Dropdowns in a dialog
+
+A dialog's content can have overlays of its own, such as a select with its dropdown. Give the dropdown's layer
+`Float()`, so it's drawn whole past the dialog's edge rather than cut off by it. See
+[Keep the dropdown with its component](/layers/dropdowns#keep-the-dropdown-with-its-component).
+
 ## Animate without a presence
 
 `Presence` is the simplest way to show and hide a layer, but `Transition(t, effects...)` takes any progress from

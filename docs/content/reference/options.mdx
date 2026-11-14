@@ -130,10 +130,11 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | Method | Does |
 | --- | --- |
 | `Anchor(x, y)` | place on each axis: `Start`, `Center` (default), `End` |
-| `AnchorTo(id, side)` | place against a side of another node |
+| `AnchorTo(id, side)` | place against a side of another node, flipping to the other side when it doesn't fit |
 | `Offset(x, y)` | move from where it's anchored |
 | `Size(w, h)` | set the size; zero uses the natural size |
-| `Margin(n)` | stay `n` cells from the screen's edges |
+| `Margin(n)` | stay `n` cells from the overlay's edges |
+| `Float()` | place and draw against the whole screen, past the edges of its overlay and of a dialog it's in |
 | `Modal()` | take every mouse event from what's beneath, and be a focus scope |
 | `Backdrop(effects...)` | apply effects to everything beneath |
 | `Shadow(x, y, effects...)` | apply effects beneath, offset like a drop shadow |

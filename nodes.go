@@ -516,6 +516,7 @@ type LayerNode struct {
 	anchor    any
 	side      Direction
 	modal     bool
+	float     bool
 	absent    bool
 	clear     bool
 	backdrop  []fx.Effect
@@ -538,24 +539,55 @@ func (n LayerNode) Anchor(x, y Align) LayerNode { n.x, n.y = x, y; return n }
 // Offset moves the layer from where it is anchored.
 func (n LayerNode) Offset(x, y int) LayerNode { n.offsetX, n.offsetY = x, y; return n }
 
-// Margin keeps the layer at least cells away from the overlay's edges,
-// shrinking it if needed.
+// Margin keeps the layer at least cells away from the overlay's edges, or
+// the screen's for a layer that floats, shrinking it if needed.
 func (n LayerNode) Margin(cells int) LayerNode { n.margin = max(cells, 0); return n }
 
 // Size sets the layer's size; zero for either is the child's natural size.
-// The size is clamped to the overlay, less the margin.
+// The size is clamped to the overlay, or the screen for a layer that floats,
+// less the margin.
 func (n LayerNode) Size(w, h int) LayerNode { n.w, n.h = w, h; return n }
 
-// AnchorTo places the layer against side of the node with ID id in the
-// overlay's base, such as a dropdown below its input, and aligned with its
-// start, shifted to stay on screen. A corner places the layer diagonally off
-// that corner of the node, such as below it and to its right for
-// BottomRight. The zero value is Bottom. The layer is hidden while no such
-// node is on screen.
+// AnchorTo places the layer against side of the node with ID id, such as a
+// dropdown below its input, and aligned with its start, shifted to stay
+// inside the overlay. A corner places the layer diagonally off that corner
+// of the node, such as below it and to its right for BottomRight. The zero
+// value is Bottom.
+//
+// A layer that does not fit on that side goes on the opposite one when it
+// fits there, such as above its input near the bottom of the screen, and is
+// shifted over the node otherwise. A corner flips each way on its own. A
+// [Layouter] in the layer reads the side it went on from [Context.Side], and
+// [LayerNode.Offset] is mirrored with it, so a gap stays between the layer
+// and the node.
+//
+// The node can be anywhere laid out before the layer: in the overlay's base,
+// or, for a layer that floats, anywhere on screen. The layer is hidden while
+// no such node is on screen.
 func (n LayerNode) AnchorTo[K comparable](id K, side Direction) LayerNode {
 	n.anchor, n.side = id, side
 	return n
 }
+
+// Float places and draws the layer against the whole screen rather than the
+// overlay it is in, so a component can keep its popover next to it, in its
+// own overlay, without the popover being cut off at the edges of that
+// overlay or of a dialog it is in:
+//
+//	bloom.Overlay(field, bloom.Layer(menu).AnchorTo(fieldID, bloom.Bottom).Float())
+//
+// It is drawn once everything else in the layer its overlay is in, such as a
+// dialog, has been drawn, or in the overlay base it is in, or in the whole
+// tree, so it covers the rest of that, and layers declared after it, such as
+// a toast, cover it. Inside a node drawn with effects, such as a dialog
+// fading in, it waits for that node, and is drawn without them. It is shown
+// only while its own overlay is on screen.
+//
+// Mouse handlers, [on.ClickOutside], modal layers, and focus treat it as
+// part of what it is declared in: a click on it is not outside the dialog
+// it is in, and its focusable nodes are in that dialog's focus scope. A
+// modal layer that floats takes mouse events from the whole screen.
+func (n LayerNode) Float() LayerNode { n.float = true; return n }
 
 // Modal makes the layer take every mouse event from what is beneath it.
 // Clicks outside it run its [on.ClickOutside] handlers, such as to close a

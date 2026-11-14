@@ -300,9 +300,15 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 	b := &r.boxes[i]
 	vis := b.rect.Intersect(clip)
 	kid := func(k int, inner bool) {
-		if k >= 0 {
-			r.collectLeaves(k, vis, childPath(path, r.boxes[k].slot), inner)
+		if k < 0 {
+			return
 		}
+		in := vis
+		if r.boxes[k].float {
+			// A layer that floats is clipped to the screen, not to what it is in.
+			in = r.area
+		}
+		r.collectLeaves(k, in, childPath(path, r.boxes[k].slot), inner)
 	}
 	leaf := func(cells bool) *selLeaf {
 		// A leaf is known by where it is in the selected node, rather than
@@ -661,7 +667,9 @@ func (r *renderer) selectAll(s *selection, vis image.Rectangle) bool {
 	r.rngSeq = -1
 	box := -1
 	for k := range r.boxes {
-		if b := &r.boxes[k]; b.meta.selectable && !b.hidden && b.key() == s.key {
+		// A box never laid out, such as one built for a side its layer did not go
+		// on, is not the node on screen.
+		if b := &r.boxes[k]; b.meta.selectable && !b.hidden && !b.rect.Empty() && b.key() == s.key {
 			box = k
 			break
 		}

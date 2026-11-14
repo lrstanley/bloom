@@ -12,6 +12,7 @@ import (
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/flex"
 	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/internal/anchor"
 	"bloomfx.dev/bloom/internal/motion"
 	"bloomfx.dev/bloom/on"
 	"charm.land/lipgloss/v2"
@@ -26,6 +27,7 @@ type box struct {
 	child    Child
 	meta     meta
 	modal    bool
+	float    bool // a layer placed and drawn against the screen; see LayerNode.Float
 	parent   int
 	kidsOff  int
 	kidsLen  int
@@ -92,6 +94,9 @@ type engine struct {
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
 	area  image.Rectangle
+	// side is the side of its node that the layer being arranged went on,
+	// for the Context of the components in it, or zero.
+	side Direction
 }
 
 // memoKey is a box measured within some space.
@@ -184,7 +189,7 @@ func (e *engine) build(c Child, parent, slot int) int {
 			kids = append(kids, l)
 		}
 	case LayerNode:
-		b.meta, b.modal, kids = n.meta, n.modal, []Child{n.child}
+		b.meta, b.modal, b.float, kids = n.meta, n.modal, n.float, []Child{n.child}
 	case ListNode:
 		// Its items are built once it knows how much space it has.
 		b.meta = n.meta
@@ -256,7 +261,7 @@ func (e *engine) expand(i int, l Layouter, avail Size) int {
 		return b.expanded
 	}
 	root := -1
-	if child := l.Layout(Context{Width: avail.W, Height: avail.H, wc: e.method == ansi.WcWidth, screen: e.screen}); child != nil {
+	if child := l.Layout(Context{Width: avail.W, Height: avail.H, wc: e.method == ansi.WcWidth, screen: e.screen, side: e.side}); child != nil {
 		root = e.build(child, i, -1)
 	}
 	e.boxes[i].expanded, e.boxes[i].expandedFor = root, avail
@@ -866,43 +871,52 @@ func (e *engine) arrangeFlex(i int, n FlexNode, r image.Rectangle) {
 // arrangeLayer places a layer of an overlay laid out in r.
 func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 	n, _ := e.boxes[i].child.(LayerNode)
+	if n.float {
+		r = e.area
+	}
 	area := r.Inset(n.margin)
 	kid := e.firstKid(i)
 
-	w, h := max(n.w, 0), max(n.h, 0)
-	if w == 0 || h == 0 {
-		s := e.measure(kid, Size{W: area.Dx(), H: area.Dy()})
-		w, h = cmp.Or(w, s.W), cmp.Or(h, s.H)
-	}
-	w, h = min(w, area.Dx()), min(h, area.Dy())
-
-	at := area.Min.Add(image.Pt(n.x.offset(w, area.Dx()), n.y.offset(h, area.Dy())))
+	// The components in the layer see the side it goes on, which is the one
+	// asked for until it is known whether the layer fits there.
+	defer func(side Direction) { e.side = side }(e.side)
+	e.side = 0
+	var target image.Rectangle
 	if n.anchor != nil {
-		target, ok := e.rectOf(n.anchor)
-		if !ok {
+		var ok bool
+		if target, ok = e.rectOf(n.anchor); !ok {
 			e.boxes[i].hidden = true
 			return
 		}
-		// The layer goes beyond the side or corner, against the way from it
-		// across the node, and lines up with the node's start otherwise.
-		at = target.Min
-		dx, dy := cmp.Or(n.side, Bottom).Vector()
-		switch {
-		case dx < 0:
-			at.X = target.Max.X
-		case dx > 0:
-			at.X = target.Min.X - w
-		}
-		switch {
-		case dy < 0:
-			at.Y = target.Max.Y
-		case dy > 0:
-			at.Y = target.Min.Y - h
-		}
-		at.X = min(max(at.X, area.Min.X), area.Max.X-w)
-		at.Y = min(max(at.Y, area.Min.Y), area.Max.Y-h)
+		e.side = cmp.Or(n.side, Bottom)
 	}
-	at = at.Add(image.Pt(n.offsetX, n.offsetY))
+
+	built := len(e.boxes)
+	w, h := e.layerSize(n, kid, area)
+	at := area.Min.Add(image.Pt(n.x.offset(w, area.Dx()), n.y.offset(h, area.Dy())))
+	if n.anchor != nil {
+		var side Direction
+		off := image.Pt(n.offsetX, n.offsetY)
+		at, side = anchor.Place(target, area, image.Pt(w, h), e.side, off)
+		if side != e.side && len(e.boxes) > built {
+			// Measuring built components, which may have built themselves
+			// for the side asked for, so the layer's child is built again
+			// for the side it goes on, and placed there at its new size.
+			// What was built before stays in the arena, unreachable and
+			// never arranged, as boxes a Layouter built for other space do.
+			kid = e.build(n.child, i, 0)
+			b := &e.boxes[i]
+			b.kidsOff, b.kidsLen = len(e.kids), 1
+			e.kids = append(e.kids, kid)
+			asked := e.side
+			e.side = side
+			w, h = e.layerSize(n, kid, area)
+			at = anchor.On(target, area, image.Pt(w, h), asked, side, off)
+		}
+		e.side = side
+	} else {
+		at = at.Add(image.Pt(n.offsetX, n.offsetY))
+	}
 
 	lr := image.Rectangle{Min: at, Max: at.Add(image.Pt(w, h))}
 	if e.motion != nil && n.id != nil && n.animation != nil {
@@ -912,6 +926,17 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 	}
 	e.boxes[i].rect = lr
 	e.arrange(kid, lr)
+}
+
+// layerSize returns the size of layer n, whose child is box kid, within
+// area.
+func (e *engine) layerSize(n LayerNode, kid int, area image.Rectangle) (w, h int) {
+	w, h = max(n.w, 0), max(n.h, 0)
+	if w == 0 || h == 0 {
+		s := e.measure(kid, Size{W: area.Dx(), H: area.Dy()})
+		w, h = cmp.Or(w, s.W), cmp.Or(h, s.H)
+	}
+	return min(w, area.Dx()), min(h, area.Dy())
 }
 
 // animate returns where box i, with ID id, is drawn on its way to target:
@@ -943,8 +968,10 @@ func (e *engine) shown(id any) int {
 		if b.meta.id != id || b.hidden {
 			continue
 		}
-		vis := b.rect
-		for p := b.parent; p >= 0 && !vis.Empty(); p = e.boxes[p].parent {
+		// A layer that floats is clipped to the screen, not to what it is in.
+		vis := b.rect.Intersect(e.area)
+		for p := i; !vis.Empty() && !e.boxes[p].float && e.boxes[p].parent >= 0; {
+			p = e.boxes[p].parent
 			vis = vis.Intersect(e.boxes[p].rect)
 		}
 		if !vis.Empty() {

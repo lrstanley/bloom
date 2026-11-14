@@ -61,6 +61,10 @@ func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lea
 	}
 
 	hidden = hidden || b.hidden
+	if b.float {
+		// A layer that floats is clipped to the screen, not to what it is in.
+		clip = e.area
+	}
 	if hidden {
 		sb.WriteString(" hidden")
 	} else {
@@ -81,6 +85,9 @@ func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lea
 	}
 	if b.modal {
 		attrs = append(attrs, "modal")
+	}
+	if b.float {
+		attrs = append(attrs, "float")
 	}
 	if b.meta.focusable {
 		attrs = append(attrs, "focusable")

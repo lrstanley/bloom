@@ -70,8 +70,73 @@ The side is `bloom.Bottom`, `bloom.Top`, `bloom.Left`, or `bloom.Right`, or a co
 - `TopLeft`, `TopRight`, `BottomLeft`, and `BottomRight` put it diagonally off that corner, such as below the node
   and to its right for `BottomRight`.
 
-The layer is shifted to stay on screen, so a menu anchored near the right edge moves left rather than being cut
-off. Use `Offset(x, y)` to nudge it, such as one row down to leave a gap.
+A layer that doesn't fit on that side goes on the opposite one when it fits there. A dropdown below an input near
+the bottom of the screen opens above it, rather than covering the input. A corner flips each way on its own, so
+`BottomRight` can become `TopRight`, `BottomLeft`, or `TopLeft`. A layer that fits on neither side stays on the side
+asked for, shifted to stay inside the overlay, over the node.
+
+Along the side, the layer is shifted rather than flipped, so a menu anchored near the right edge moves left rather
+than being cut off. Use `Offset(x, y)` to nudge it, such as one row down to leave a gap. When the layer flips, the
+offset flips with it, so the gap stays between the layer and the node.
+
+### Draw for the side it opened on
+
+A menu often draws the edge facing its node differently, such as leaving it open so the menu joins the input. Make
+the menu a [`Layouter`](/layout/responsive), and read the side it went on from
+[`Context.Side`](https://pkg.go.dev/bloomfx.dev/bloom#Context.Side). It's the side the layer was actually placed
+on, in the same frame, so the menu never draws the wrong edge:
+
+```go
+type menu struct{ options []string }
+
+func (m menu) View() string { return "" }
+
+func (m menu) Layout(ctx bloom.Context) bloom.Child {
+	box := menuStyle.BorderTop(false) // below the input: open at the top
+	if side, _ := ctx.Side(); side == bloom.Top {
+		box = menuStyle.BorderBottom(false) // above it: open at the bottom
+	}
+	return bloom.Box(box, m.list())
+}
+```
+
+`m.list()` stands for the menu's options. `Side` reports false for a component that isn't in an anchored layer.
+
+## Keep the dropdown with its component
+
+A layer is placed and clipped inside the overlay it's in. A dropdown in a small overlay, such as one around a single
+field in a dialog, would be cut off at the overlay's edges. One way around that is to collect every open dropdown
+into the overlay at the top of the screen, but then each program has to know which of its components have one.
+
+[`Float()`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode.Float) places and draws a layer against the whole
+screen instead. A component can then return its field and its dropdown together, in an overlay of its own, and the
+dropdown is drawn whole wherever the component is:
+
+```go
+func (s *Select) Layout(ctx bloom.Context) bloom.Child {
+	field := bloom.Text(s.value).Style(fieldStyle).ID(s.id).Focusable()
+
+	var layers []bloom.LayerNode
+	if s.open {
+		layers = append(layers, bloom.Layer(s.menu()).AnchorTo(s.id, bloom.Bottom).Float())
+	}
+	return bloom.Row(bloom.Overlay(field, layers...)).On(on.ClickOutside(s.close))
+}
+```
+
+Put the select in a dialog, and its dropdown hangs past the dialog's edge:
+
+![The dropdowns example: a select on the bottom bar whose list opens above it, then a settings dialog whose lists hang past its edge, picked with the mouse and the keyboard](/demos/dropdowns.webp)
+
+A layer that floats is drawn once everything else in the layer it's in has been drawn, or the overlay base it's in,
+so it covers the rest of the dialog. Layers declared after that dialog, such as a toast, are drawn over it. Inside
+something drawn with effects, such as a dialog fading in, it's drawn once that has been drawn, without the effects.
+It's shown only while its own overlay is on screen.
+
+For the mouse and focus, the layer is still where it's declared. A click on the dropdown, even outside the dialog,
+is inside the dialog, so the dialog's `on.ClickOutside` doesn't run, and the click outside handler above, on the row
+that holds both the field and the dropdown, runs only for clicks on neither. The dropdown's focusable nodes are in
+the dialog's focus scope.
 
 ## Follow the node
 
@@ -119,3 +184,5 @@ if m.hovered != "" {
 - [Dialogs and modals](/layers/dialogs)
 - [Mouse events](/input/mouse)
 - The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with an autocomplete dropdown
+- The [`dropdowns` example](https://github.com/lrstanley/bloom/tree/master/_examples/dropdowns), with selects that
+  keep their dropdowns, in a dialog and on a bar at the bottom of the screen

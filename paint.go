@@ -150,7 +150,9 @@ type renderer struct {
 	targets  []target
 	ops      []op
 	prevOps  []op
-	moves    []deferredMove // slots moving with effects, painted last
+	moves    []deferredMove  // slots moving with effects, painted last
+	floats   []deferredFloat // layers that float, waiting for what they are in to be painted
+	open     int             // effect passes begun and not yet ended
 	entries  []entry
 	handlers [][]on.Handler // by entry
 	hovered  []mouseTarget  // the hoverable nodes under the pointer, kept by Root
@@ -222,12 +224,14 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 	clear(r.entries)
 	clear(r.handlers)
 	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
+	r.floats, r.open = r.floats[:0], 0
 	clear(r.leaves)
 	r.leaves, r.rngSeq = r.leaves[:0], -1
 	root := r.layout(w, h, c)
 	if root >= 0 {
 		r.paint(root, r.area, -1)
 		r.paintMoves(0)
+		r.paintFloats(0)
 	}
 	r.styled.retire()
 	r.columns.retire()
@@ -399,10 +403,9 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		if border := n.bordered(b.rect); len(n.borderFx) > 0 && !border.Empty() {
 			// Drawn on its own, so the effects see only the frame, with the
 			// border as the outer cells of what they are given.
-			push := len(r.ops)
-			r.ops = append(r.ops, op{kind: opPush, rect: b.rect})
+			push := r.push(b.rect)
 			r.blit(frame, b.rect, b.rect)
-			r.ops = append(r.ops, op{
+			r.pop(op{
 				kind: opPop, rect: b.rect, clip: vis, viewport: clip, sub: border,
 				t: n.borderT, effects: r.snapshot(n.borderFx),
 				push: push, entries: [2]int{len(r.entries), len(r.entries)},
@@ -422,11 +425,16 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		r.paint(r.firstKid(i), vis, parent)
 	case OverlayNode:
 		kids := r.kidsOf(i)
-		mark := len(r.moves)
+		mark, floats := len(r.moves), len(r.floats)
 		r.paint(kids[0], vis, parent)
 		r.paintMoves(mark)
+		r.paintFloats(floats)
 		for _, k := range kids[1:] {
-			r.paintLayer(k, vis, parent)
+			if r.boxes[k].float {
+				r.floats = append(r.floats, deferredFloat{box: k, parent: parent})
+			} else {
+				r.paintLayer(k, vis, parent)
+			}
 		}
 	case drawableNode:
 		r.ops = append(r.ops, op{kind: opDraw, draw: n.d, rect: b.rect, clip: vis})
@@ -449,8 +457,7 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 // drawn whole, as effects may move cells that start out clipped into view.
 // The entries from index from on move with the cells.
 func (r *renderer) paintEffects(i int, rect, clip image.Rectangle, t float64, effects []fx.Effect, parent, from int) {
-	push := len(r.ops)
-	r.ops = append(r.ops, op{kind: opPush, rect: rect})
+	push := r.push(rect)
 	mark := len(r.moves)
 	r.paint(i, rect, parent)
 	r.paintMoves(mark)
@@ -461,10 +468,50 @@ func (r *renderer) paintEffects(i int, rect, clip image.Rectangle, t float64, ef
 // for t, for a node at rect, moving from moved if it is moving with effects,
 // to be composited inside clip. Entries from index from on move with them.
 func (r *renderer) popEffects(rect, clip, moved image.Rectangle, t float64, effects []fx.Effect, push, from int) {
-	r.ops = append(r.ops, op{
+	r.pop(op{
 		kind: opPop, rect: rect, clip: clip, viewport: clip, t: t, from: moved,
 		effects: r.snapshot(effects), push: push, entries: [2]int{from, len(r.entries)},
 	})
+}
+
+// push begins an effect pass: what is drawn until its pop goes into cells
+// of its own covering rect. It returns the index of its op.
+func (r *renderer) push(rect image.Rectangle) int {
+	r.ops = append(r.ops, op{kind: opPush, rect: rect})
+	r.open++
+	return len(r.ops) - 1
+}
+
+// pop ends the innermost effect pass with o.
+func (r *renderer) pop(o op) {
+	r.ops = append(r.ops, o)
+	r.open--
+}
+
+// deferredFloat is a layer that floats, box, waiting for what it is in to
+// be painted, with its nearest ancestor with an entry.
+type deferredFloat struct {
+	box, parent int
+}
+
+// paintFloats paints the layers that float found since index mark, once
+// what they are in is painted: the layer, or the base of the overlay, that
+// their overlay is in, or the whole tree. Each is painted against the whole
+// screen, over the rest of what it is in, and under what is painted after
+// it, such as later layers. While an effect pass is open, they wait for
+// what the pass is in, as they would be cut off at the edges of its cells
+// and moved by its effects.
+func (r *renderer) paintFloats(mark int) {
+	if r.open > 0 {
+		return
+	}
+	// A layer is painted as what its own floats are in, which leaves them
+	// painted, and r.floats as it found it.
+	for k := mark; k < len(r.floats); k++ {
+		f := r.floats[k]
+		r.paintLayer(f.box, r.area, f.parent)
+	}
+	r.floats = r.floats[:mark]
 }
 
 // snapshot copies effects into storage the renderer owns, so that the
@@ -480,6 +527,7 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	if b.hidden || b.rect.Empty() {
 		return
 	}
+	defer r.paintFloats(len(r.floats))
 	n, _ := b.child.(LayerNode)
 	if len(n.backdrop) > 0 {
 		r.ops = append(r.ops, op{kind: opEffects, rect: clip, viewport: clip, t: n.t, effects: r.snapshot(n.backdrop)})
@@ -586,8 +634,7 @@ func (r *renderer) paintMoves(mark int) {
 // own covering where it was and where it is, inside clip, returning the
 // index of the op that starts them.
 func (r *renderer) beginTravel(b *box, clip image.Rectangle) int {
-	r.ops = append(r.ops, op{kind: opPush, rect: b.rect.Union(b.from).Intersect(clip).Union(b.rect)})
-	return len(r.ops) - 1
+	return r.push(b.rect.Union(b.from).Intersect(clip).Union(b.rect))
 }
 
 // isHovered reports whether the pointer was over box b when the mouse was
