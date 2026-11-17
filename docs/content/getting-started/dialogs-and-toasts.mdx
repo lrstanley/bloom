@@ -81,6 +81,10 @@ Add a color, and styles for the dialog and its buttons, to the `var` block:
 Then, in `View`, keep the column you already have as `base`, build the dialog, and render both:
 
 ```go
+	title := ""
+	if len(m.notes) > 0 {
+		title = m.notes[m.selected].title
+	}
 	content := bloom.Column(
 		bloom.Text(fmt.Sprintf("Delete %q?", title)).Style(heading),
 		bloom.Text("This can't be undone."),
@@ -96,8 +100,9 @@ Then, in `View`, keep the column you already have as `base`, build the dialog, a
 	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog))
 ```
 
-`title` is the selected note's title. `bloom.Fixed(1, nil)` is a blank row, and `bloom.Space()` is empty space
-that grows, pushing the buttons to the right. `Gap(2)` puts two columns between the children of the row.
+`title` is the selected note's title, or empty once every note is deleted. `bloom.Fixed(1, nil)` is a blank
+row, and `bloom.Space()` is empty space that grows, pushing the buttons to the right. `Gap(2)` puts two columns
+between the children of the row.
 
 Run it and the dialog is always on screen. Next, you'll make it appear only when needed.
 
@@ -106,10 +111,12 @@ Run it and the dialog is always on screen. Next, you'll make it appear only when
 
 ### Show and hide it with a presence
 
-An `anim.Presence` is a number from 0 (hidden) to 1 (shown) that animates between the two. Add the `anim` and
-`fx` imports:
+An `anim.Presence` is a number from 0 (hidden) to 1 (shown) that animates between the two. Add the `anim`,
+`fx`, and `time` imports:
 
 ```go
+	"time"
+
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 ```
@@ -149,7 +156,13 @@ Two more options are set here:
 - `Backdrop(fx.Dim{Amount: 0.6})` dims everything beneath the dialog. It follows the presence too, so the screen
   darkens as the dialog appears.
 
-Open it with <kbd>d</kbd> by returning `m.confirm.Show()` from `Update`, and you have an animated modal dialog.
+Open it with <kbd>d</kbd> by returning `m.confirm.Show()` from `Update`, next to the arrow keys, and you have an
+animated modal dialog:
+
+```go
+		case "d":
+			return m, m.confirm.Show()
+```
 
 </Step>
 <Step>
@@ -188,17 +201,23 @@ func (m *model) button(id buttonID, label string) bloom.Child {
 }
 ```
 
-Modify the code that creates the dialog buttons to use this new function.
+`press` runs when a button is pressed. For now, both buttons close the dialog; you'll make **Delete** delete in
+the next step:
 
-Before:
 ```go
-        bloom.Text("Cancel").Style(button),
-        bloom.Text("Delete").Style(button),
+func (m *model) press(id buttonID) tea.Cmd {
+	return m.closeDialog()
+}
 ```
-After:
+
+Then, in `View`, replace the two `bloom.Text` buttons in the dialog's row with calls to `button`:
+
 ```go
-        m.button("cancel", "Cancel"),
-        m.button("delete", "Delete"),
+		bloom.Row(
+			bloom.Space(),
+			m.button("cancel", "Cancel"),
+			m.button("delete", "Delete"),
+		).Gap(2),
 ```
 
 Give the dialog layer the ID `confirmDialog`. A modal layer is a **focus scope**: after
@@ -238,6 +257,35 @@ in a `cmd` variable, declared with `var cmd tea.Cmd` at the top of `Update`, and
 		if cmd, ok = m.focus.Update(msg, m.ui.Frame()); !ok {
 			cmd = m.key(msg)
 		}
+	}
+	return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
+```
+
+The rest of the keys move out of `Update` into a `key` method. While the dialog is open, <kbd>esc</kbd> closes
+it and the keys for the notes behind it do nothing. Otherwise the keys work as before, except that
+<kbd>d</kbd> now calls `openDialog`:
+
+```go
+func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	if m.confirm.Shown() {
+		if msg.String() == "esc" {
+			return m.closeDialog()
+		}
+		return nil
+	}
+
+	switch msg.String() {
+	case "q":
+		return tea.Quit
+	case "up":
+		m.selected = max(m.selected-1, 0)
+	case "down":
+		m.selected = min(m.selected+1, len(m.notes)-1)
+	case "d":
+		return m.openDialog()
+	}
+	return nil
+}
 ```
 
 A click on the backdrop, outside the modal dialog, should close it. `on.ClickOutside` on the dialog's layer runs
@@ -279,8 +327,10 @@ the layer goes on each axis: `bloom.Start`, `bloom.Center`, or `bloom.End`.
 
 Give it its own presence, `toast anim.Presence`, and a `deleted string` field for the message, with the presence
 created with `anim.NewPresence()`, and add it to
-`anim.Update(msg, &m.confirm, &m.toast)`. `ShowFor` shows it and hides it again after a duration, with no timer
-messages of your own:
+`anim.Update(msg, &m.confirm, &m.toast)`.
+
+Now make **Delete** delete. Import `slices`, and replace `press` with one that removes the selected note and
+shows the toast. `ShowFor` shows it and hides it again after a duration, with no timer messages of your own:
 
 ```go
 func (m *model) press(id buttonID) tea.Cmd {
@@ -292,6 +342,21 @@ func (m *model) press(id buttonID) tea.Cmd {
 	}
 	return m.closeDialog()
 }
+```
+
+Once the last note is deleted, there's no selected note for the reader pane to show. In `View`, show a
+placeholder instead:
+
+```go
+	body := bloom.Child(bloom.Text("Nothing here.").Style(prose))
+	if len(m.notes) > 0 {
+		current := m.notes[m.selected]
+		body = bloom.Column(
+			bloom.Text(current.title).Style(heading.Padding(0, 1)),
+			bloom.Text(current.body).Style(prose),
+		)
+	}
+	reader := bloom.Box(panel, body)
 ```
 
 </Step>
