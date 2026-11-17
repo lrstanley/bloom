@@ -188,6 +188,19 @@ func (m *model) button(id buttonID, label string) bloom.Child {
 }
 ```
 
+Modify the code that creates the dialog buttons to use this new function.
+
+Before:
+```go
+        bloom.Text("Cancel").Style(button),
+        bloom.Text("Delete").Style(button),
+```
+After:
+```go
+        m.button("cancel", "Cancel"),
+        m.button("delete", "Delete"),
+```
+
 Give the dialog layer the ID `confirmDialog`. A modal layer is a **focus scope**: after
 `m.focus.Push(confirmDialog)`, focus can only move between the focusable nodes inside it, until
 `m.focus.Pop()` puts it back where it was.
