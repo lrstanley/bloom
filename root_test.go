@@ -206,20 +206,32 @@ func TestBubbleTeaEventLoop(t *testing.T) {
 		done <- err
 	}()
 
-	// OnMouse comes from the last view drawn, so wait for one.
-	<-out.drawn
-	// SGR mouse reports, 1-based: a left press and release at 0,0.
-	if _, err := feed.Write([]byte("\x1b[<0;1;1M\x1b[<0;1;1m")); err != nil {
-		t.Fatal(err)
+	// One deadline for drawing, reading the input, and the command; on it,
+	// the program is stopped before its steps are read.
+	timeout := time.After(5 * time.Second)
+	fail := func(why string) {
+		t.Helper()
+		p.Kill()
+		<-done
+		_ = feed.Close()
+		t.Fatalf("%s; steps %q", why, m.steps)
 	}
+	// OnMouse comes from the last view drawn, so wait for one.
+	select {
+	case <-out.drawn:
+	case <-timeout:
+		fail("nothing was drawn")
+	}
+	// SGR mouse reports, 1-based: a left press and release at 0,0. The
+	// pipe blocks until the program reads them, and fails once closed.
+	go func() { _, _ = feed.Write([]byte("\x1b[<0;1;1M\x1b[<0;1;1m")) }()
 	select {
 	case err := <-done:
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(5 * time.Second):
-		p.Kill()
-		t.Fatalf("the click's command never ran; steps %q", m.steps)
+	case <-timeout:
+		fail("the click's command never ran")
 	}
 	_ = feed.Close()
 

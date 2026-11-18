@@ -191,13 +191,21 @@ func TestBackdrops(t *testing.T) {
 
 	t.Run("strength follows t", func(t *testing.T) {
 		t.Parallel()
-		s := region()
-		Dim{Amount: 1}.Apply(s, 0)
-		Desaturate{Amount: 1}.Apply(s, 0)
-		Recolor{Fg: white, Bg: white, Amount: 1}.Apply(s, 0)
-		Recolor{Fg: white}.Apply(s, 0)
-		if c := s.Cell(0, 0); rgba(c.Style.Fg) != red {
-			t.Fatalf("t=0 changed the color to %v", c.Style.Fg)
+		// At t=0 each leaves every cell of a fresh region as it was.
+		for _, e := range []Effect{
+			Dim{Amount: 1}, Desaturate{Amount: 1}, Recolor{Fg: white, Bg: white, Amount: 1}, Recolor{Fg: white},
+			Braille{}, Spotlight{Rect: image.Rect(1, 0, 2, 1)},
+		} {
+			s, fresh := region(), region()
+			e.Apply(s, 0)
+			for y := range s.Height() {
+				for x := range s.Width() {
+					c, f := s.Cell(x, y), fresh.Cell(x, y)
+					if c.Content != f.Content || !sameColor(c.Style.Fg, f.Style.Fg) || !sameColor(c.Style.Bg, f.Style.Bg) {
+						t.Fatalf("%T at t=0 changed cell %d,%d from %+v to %+v", e, x, y, f, c)
+					}
+				}
+			}
 		}
 	})
 
@@ -229,4 +237,12 @@ func BenchmarkDimFullScreen(b *testing.B) {
 	for i := 0; b.Loop(); i++ {
 		Dim{Amount: 0.6}.Apply(frame.Region(frame.Bounds(), env, mixer), float64(i%30)/30)
 	}
+}
+
+// sameColor reports whether a and b are both unset, or the same color.
+func sameColor(a, b color.Color) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return rgba(a) == rgba(b)
 }

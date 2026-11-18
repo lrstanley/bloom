@@ -78,9 +78,13 @@ func TestValueIgnoresOtherFrames(t *testing.T) {
 	b.To(1)
 	stale := a.frameMsg()
 	a.Set(5)
-	c.advance(time.Second)
+	a.To(6) // a frame of the animation before Set is stale in this one too
+	c.advance(50 * time.Millisecond)
 	if a.Update(stale) != nil || a.Float() != 5 {
 		t.Fatal("a frame from before Set moved the value")
+	}
+	if a.Update(a.frameMsg()); a.Float() <= 5 {
+		t.Fatal("the current frame did not move the value")
 	}
 	if b.Update(stale) != nil || b.Float() != 0 {
 		t.Fatal("another value's frame moved the value")
@@ -189,6 +193,17 @@ func TestPresenceShowFor(t *testing.T) {
 	if p.Update(stale) != nil || !p.Shown() {
 		t.Fatal("an earlier ShowFor's timer hid it")
 	}
+
+	// A ShowFor replaces the timer of the one before it.
+	first := hideMsg{id: p.v.id, gen: p.hide}
+	p.ShowFor(time.Second)
+	second := hideMsg{id: p.v.id, gen: p.hide}
+	if p.Update(first); !p.Shown() {
+		t.Fatal("the timer of the ShowFor before hid it")
+	}
+	if p.Update(second); p.Shown() {
+		t.Fatal("not hidden once the last ShowFor's time was up")
+	}
 }
 
 func TestPresenceFloat(t *testing.T) {
@@ -197,14 +212,19 @@ func TestPresenceFloat(t *testing.T) {
 	c := &clock{now: time.Unix(0, 0)}
 	p := NewPresence(Spring(20, 0.2), Clock(c.Now))
 	p.Show()
-	peak := 0.0
+	over := 0
 	for range 30 {
 		c.advance(16 * time.Millisecond)
 		p.Update(p.v.frameMsg())
-		peak = max(peak, p.Float())
+		if p.Float() > 1 {
+			over++
+			if p.Progress() != 1 {
+				t.Fatalf("Float %v, Progress %v: Progress should stay at 1 as Float overshoots", p.Float(), p.Progress())
+			}
+		}
 	}
-	if peak <= 1 || p.Progress() > 1 {
-		t.Fatalf("peak %v, progress %v: Float should overshoot while Progress stays at 1", peak, p.Progress())
+	if over == 0 {
+		t.Fatal("Float never overshot")
 	}
 }
 

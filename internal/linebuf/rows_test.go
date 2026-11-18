@@ -165,8 +165,8 @@ func TestRowsCovered(t *testing.T) {
 		}
 	}
 
-	// The cells of a row are cut once while it is asked for again, and
-	// again when the text changes.
+	// The cells kept for a row are cut again when another row, the text, or
+	// the width they were wrapped at changes.
 	var m RowMemo
 	if got := r.RowCells(1, &m); got != "world" {
 		t.Fatalf("row 1 is %q", got)
@@ -177,5 +177,8 @@ func TestRowsCovered(t *testing.T) {
 	s.Replace(TextEdit{From: Pos{0, 0}, To: Pos{0, 5}, Text: "HOWDY"})
 	if got := s.Index(ansi.GraphemeWidth, Words, 6).RowCells(0, &m); got != "HOWDY " {
 		t.Fatalf("row 0 is %q after the edit", got)
+	}
+	if got := s.Index(ansi.GraphemeWidth, Words, 20).RowCells(0, &m); got != "HOWDY world" {
+		t.Fatalf("row 0 is %q at another width", got)
 	}
 }

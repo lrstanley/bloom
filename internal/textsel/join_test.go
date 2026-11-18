@@ -128,7 +128,7 @@ func TestPainter(t *testing.T) {
 	area := image.Rect(0, 0, 40, 1)
 	mid, far := uv.Cell{Content: "a"}, uv.Cell{Content: "a"}
 	p.Flash(&mid, image.Pt(20, 0), 0.5, area, env, &mixer)
-	p.Flash(&far, image.Pt(39, 0), 0, area, env, &mixer)
+	p.Flash(&far, image.Pt(39, 0), 0.5, area, env, &mixer)
 	want := uv.Cell{Content: "a"}
 	p.Highlight(&want, env, &mixer)
 	if mid.Style.Bg != want.Style.Bg || far.Style.Bg != nil {

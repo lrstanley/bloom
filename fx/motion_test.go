@@ -82,22 +82,24 @@ func TestDecode(t *testing.T) {
 		t.Fatal("different seeds, same result")
 	}
 
-	// Each column has at most one leading glyph and nothing but its own
-	// content above it, and a revealed cell stays revealed.
-	s := textLayer(text)
-	Decode{Seed: 3}.Apply(s, 0.5)
+	// Each column shows its own content, then at most one leading glyph,
+	// as its last cell shown, then hidden cells.
+	early := textLayer(text)
+	Decode{Seed: 3}.Apply(early, 0.5)
 	var hiddenCells, heads int
-	for x := range s.Width() {
-		seenHidden := false
-		for y := range s.Height() {
-			c := s.Cell(x, y)
-			switch {
-			case !s.Visible(x, y):
+	for x := range early.Width() {
+		head, seenHidden := -1, false
+		for y := range early.Height() {
+			switch c := early.Cell(x, y); {
+			case !early.Visible(x, y):
 				hiddenCells++
 				seenHidden = true
 			case seenHidden:
 				t.Fatalf("column %d shows a cell below a hidden one", x)
+			case head >= 0:
+				t.Fatalf("column %d shows %d,%d below its leading glyph at %d,%d", x, x, y, x, head)
 			case c.Content != string(text[x]):
+				head = y
 				heads++
 			}
 		}
@@ -105,13 +107,9 @@ func TestDecode(t *testing.T) {
 	if hiddenCells == 0 || heads == 0 {
 		t.Fatalf("t=0.5 hid %d cells and has %d leading glyphs", hiddenCells, heads)
 	}
-	if heads > s.Width() {
-		t.Fatalf("%d leading glyphs in %d columns", heads, s.Width())
-	}
 
 	// Once the whole of a cell is shown it stays as it is.
-	early, late := textLayer(text), textLayer(text)
-	Decode{Seed: 3}.Apply(early, 0.5)
+	late := textLayer(text)
 	Decode{Seed: 3}.Apply(late, 0.8)
 	for y := range early.Height() {
 		for x := range early.Width() {
@@ -122,13 +120,25 @@ func TestDecode(t *testing.T) {
 		}
 	}
 
-	// Wide glyphs and blanks are not replaced.
-	wide := textLayer("漢字 ab")
-	Decode{}.Apply(wide, 0.01)
-	for x := range wide.Width() {
-		if c := wide.Cell(x, 0); c.Width == 2 && c.Content != "漢" && c.Content != "字" {
-			t.Fatalf("wide glyph replaced by %q", c.Content)
+	// Wide glyphs are not replaced, while narrow ones beside them lead.
+	led := false
+	for i := range 50 {
+		at := float64(i) / 50
+		wide := textLayer("漢字ab")
+		Decode{}.Apply(wide, at)
+		for x, orig := range []string{"漢", "", "字", "", "a", "b"} {
+			c := wide.Cell(x, 0)
+			switch {
+			case !wide.Visible(x, 0) || orig == "":
+			case c.Width == 2 && c.Content != orig:
+				t.Fatalf("t=%.2f: wide glyph %q replaced by %q", at, orig, c.Content)
+			case c.Width == 1 && c.Content != orig:
+				led = true
+			}
 		}
+	}
+	if !led {
+		t.Fatal("no narrow glyph led beside the wide ones")
 	}
 }
 
@@ -166,16 +176,24 @@ func TestGlitch(t *testing.T) {
 		t.Parallel()
 		s := textLayer(text)
 		Glitch{Seed: 1}.Apply(s, 0)
-		recolored := 0
+		// Even rows shifted lean red, odd ones cyan; rows left in place keep
+		// their colors.
+		var split [2]int
 		for y := range s.Height() {
 			for x := range s.Width() {
-				if c := s.Cell(x, y); s.Visible(x, y) && c.Style.Fg != nil {
-					recolored++
+				c := s.Cell(x, y)
+				if !s.Visible(x, y) || c.Style.Fg == nil {
+					continue
 				}
+				r, _, b, _ := c.Style.Fg.RGBA()
+				if red := y%2 == 0; red != (r > b) {
+					t.Fatalf("row %d split toward %v, want red %t", y, c.Style.Fg, red)
+				}
+				split[y%2]++
 			}
 		}
-		if recolored == 0 {
-			t.Fatal("no colors were split")
+		if split[0] == 0 || split[1] == 0 {
+			t.Fatalf("colors split on %d even and %d odd cells, want both", split[0], split[1])
 		}
 	})
 
@@ -186,13 +204,7 @@ func TestGlitch(t *testing.T) {
 			s := textLayer(strings.TrimSuffix(wide, "\n"))
 			Glitch{Seed: 4}.Apply(s, float64(step)/16)
 			for y := range s.Height() {
-				for x := 0; x < s.Width(); {
-					w := s.Cell(x, y).Width
-					if w == 0 || (w == 2 && (x+1 >= s.Width() || s.Cell(x+1, y).Width != 0)) {
-						t.Fatalf("step %d: wide glyph at %d,%d split", step, x, y)
-					}
-					x += w
-				}
+				assertRowWhole(t, s, y)
 			}
 		}
 	})

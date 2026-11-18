@@ -123,8 +123,10 @@ func TestApp(t *testing.T) {
 	h.Key("?").Wait("Keyboard help").WaitSettle()
 	h.AssertSnapshot()
 
-	// Focus is confined to the dialog, which has nothing to focus.
-	h.Key("tab").Wait("focus: none")
+	// Focus is confined to the dialog, which has nothing to focus. Opening
+	// it already shows "focus: none", so a wait would pass before the tab is
+	// handled: settle, then check the tab did not leave the dialog.
+	h.Key("tab").WaitSettle().Assert("focus: none")
 
 	// A click on the backdrop closes the dialog and gives focus back.
 	h.LeftClick(1, 1).WaitNot("Keyboard help").Wait("focus: 0")

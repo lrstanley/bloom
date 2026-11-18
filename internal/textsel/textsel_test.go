@@ -160,7 +160,7 @@ func TestWordLongLine(t *testing.T) {
 		"start " + strings.Repeat(" ", 1<<22) + "mid" + strings.Repeat(" ", 1<<22) + " end",
 	} {
 		start := time.Now()
-		n := len(wholeWords(s, chars))
+		all := wholeWords(s, chars)
 		whole := time.Since(start)
 
 		mid := len(s) / 2
@@ -175,7 +175,25 @@ func TestWordLongLine(t *testing.T) {
 		}
 		around := time.Since(start) / 10
 		if around > whole/4 {
-			t.Errorf("finding a word in a line of %d bytes and %d words took %s, and segmenting all of it %s", len(s), n, around, whole)
+			t.Errorf("finding a word in a line of %d bytes and %d words took %s, and segmenting all of it %s", len(s), len(all), around, whole)
+		}
+
+		// And finds the word that segmenting all of it does: the one mid
+		// is in, which is also the first to end after mid and the last to
+		// start before mid+1.
+		k := slices.IndexFunc(all, func(w [2]int) bool { return w[0] <= mid && mid < w[1] })
+		if k < 0 {
+			t.Fatalf("no word at byte %d", mid)
+		}
+		want := all[k]
+		if from, to, ok := Word(s, mid, chars); !ok || [2]int{from, to} != want {
+			t.Errorf("Word at %d = %d-%d %v, want %v", mid, from, to, ok, want)
+		}
+		if end, ok := WordEnd(s, mid, chars); !ok || end != want[1] {
+			t.Errorf("WordEnd at %d = %d %v, want %d", mid, end, ok, want[1])
+		}
+		if from, ok := WordStart(s, mid+1, chars); !ok || from != want[0] {
+			t.Errorf("WordStart at %d = %d %v, want %d", mid+1, from, ok, want[0])
 		}
 	}
 }

@@ -143,7 +143,7 @@ func TestMarquee(t *testing.T) {
 			t.Parallel()
 
 			got := ansi.Strip(Render(tt.width, 1, tt.node))
-			if want := padTo(tt.want, tt.width, ansi.GraphemeWidth); got != want {
+			if want := tt.want + strings.Repeat(" ", tt.width-ansi.StringWidth(tt.want)); got != want {
 				t.Fatalf("rendered %q, want %q", got, want)
 			}
 		})

@@ -151,9 +151,16 @@ func TestListDebug(t *testing.T) {
 	t.Parallel()
 
 	inner := func(int) Child { return List(2, func(i int) Child { return Text(strconv.Itoa(i)) }) }
-	got := Debug(4, 4, List(2, inner))
-	if !strings.Contains(got, "Text") {
-		t.Fatalf("got:\n%s", got)
+	// Each list, and each item of the inner ones, where it is drawn.
+	want := `bloom.ListNode 0,0 4x4
+├─ bloom.ListNode 0,0 4x2
+│  ├─ Text "0" 0,0 4x1
+│  └─ Text "1" 0,1 4x1
+└─ bloom.ListNode 0,2 4x2
+   ├─ Text "0" 0,2 4x1
+   └─ Text "1" 0,3 4x1`
+	if got := strings.TrimSpace(Debug(4, 4, List(2, inner))); got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
 

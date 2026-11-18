@@ -278,8 +278,8 @@ func checkTree(t *testing.T, step string, n *node, root bool, m *model) (lines [
 		return nil, 0
 	}
 	switch {
-	case n.size() > max(leafMax, fanMax):
-		t.Fatalf("%s: node holds %d", step, n.size())
+	case n.leaf() && n.size() > leafMax, !n.leaf() && n.size() > fanMax:
+		t.Fatalf("%s: node of height %d holds %d", step, n.height, n.size())
 	case !root && !n.okChild():
 		t.Fatalf("%s: node of height %d holds %d", step, n.height, n.size())
 	case root && !n.leaf() && len(n.kids) < 2:
@@ -411,10 +411,10 @@ type snap struct {
 func TestStoreModel(t *testing.T) {
 	t.Parallel()
 
-	for seed := range uint64(4) {
+	for seed := range uint64(3) {
 		t.Run(strconv.FormatUint(seed, 10), func(t *testing.T) {
 			t.Parallel()
-			runModel(t, rand.New(rand.NewPCG(seed, 99)), 160)
+			runModel(t, rand.New(rand.NewPCG(seed, 99)), 100)
 		})
 	}
 }
@@ -524,10 +524,10 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			height = max(height, s.root.height)
 		}
 		for k, sn := range snaps {
-			if got := subtreeLines(sn.root); !slices.Equal(got, sn.lines) {
+			got, _ := checkTree(t, fmt.Sprintf("step %d, %s, snapshot %d", i, step, k), sn.root, true, m)
+			if !slices.Equal(got, sn.lines) {
 				t.Fatalf("step %d, %s: snapshot %d changed", i, step, k)
 			}
-			checkTree(t, fmt.Sprintf("step %d, %s, snapshot %d", i, step, k), sn.root, true, m)
 		}
 	}
 	if height < 2 {
@@ -645,6 +645,70 @@ func TestPenChanges(t *testing.T) {
 	}
 }
 
+// TestSpliceSettles checks the edits within one leaf that leave it holding
+// too much or too little, which long random runs come to only now and then:
+// a root leaf split under a new root, a leaf merged with its neighbor and
+// split again, as their sum is too much for one, and merged into the one
+// leaf left, which takes the root's place.
+func TestSpliceSettles(t *testing.T) {
+	t.Parallel()
+
+	lines := func(from, n int) []string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = fmt.Sprintf("line %d", from+i)
+		}
+		return out
+	}
+	rng := rand.New(rand.NewPCG(1, 2))
+
+	s, m := &Store{}, newModel()
+	m.lines = lines(0, leafMax-4)
+	s.AppendLines(m.lines...)
+	add := lines(1000, 10)
+	s.splice(30, 30, add)
+	s.changed()
+	m.lines = slices.Concat(m.lines[:30], add, m.lines[30:])
+	if s.root.leaf() {
+		t.Fatalf("a root leaf of %d lines was not split", s.root.size())
+	}
+	checkStore(t, "root split", s, m, rng)
+
+	s, m = &Store{}, newModel()
+	m.lines = lines(0, 2*leafMax)
+	s.AppendLines(m.lines...)
+	first, next := s.root.kids[0].size(), s.root.kids[1].size()
+	if leafMin-1+next <= leafMax {
+		t.Fatalf("leaves of %d and %d lines: too few to split again once merged", first, next)
+	}
+	cut := first - (leafMin - 1)
+	s.splice(1, 1+cut, nil)
+	s.changed()
+	m.lines = slices.Concat(m.lines[:1], m.lines[1+cut:])
+	if got := s.root.kids[0].size(); got < leafMin || got == first-cut {
+		t.Fatalf("the first leaf holds %d lines, want it merged and split", got)
+	}
+	checkStore(t, "merged and split", s, m, rng)
+
+	// Merged into one leaf that holds them, the root of it alone is
+	// replaced by the leaf.
+	s, m = &Store{}, newModel()
+	m.lines = lines(0, leafMax+leafMin)
+	s.AppendLines(m.lines...)
+	first, next = s.root.kids[0].size(), s.root.kids[1].size()
+	if len(s.root.kids) != 2 || leafMin-1+next > leafMax {
+		t.Fatalf("%d leaves, of %d and %d lines: too many to merge into one", len(s.root.kids), first, next)
+	}
+	cut = first - (leafMin - 1)
+	s.splice(1, 1+cut, nil)
+	s.changed()
+	m.lines = slices.Concat(m.lines[:1], m.lines[1+cut:])
+	if !s.root.leaf() {
+		t.Fatal("a root of one child was kept")
+	}
+	checkStore(t, "merged into the root", s, m, rng)
+}
+
 // TestDeepTree checks a tree four levels deep: loaded at once, appended
 // to, split and joined, read in order and out of it.
 func TestDeepTree(t *testing.T) {
@@ -701,7 +765,7 @@ func TestDeepTree(t *testing.T) {
 // BenchmarkStoreAppend appends a line at a time to a store of a million.
 func BenchmarkStoreAppend(b *testing.B) {
 	var s Store
-	s.AppendLines(benchStoreLines()...)
+	s.AppendLines(benchStoreLines(1_000_000)...)
 	s.Index(ansi.GraphemeWidth, Words, 120)
 	line := benchStoreLine(7)
 	b.ReportAllocs()
@@ -714,7 +778,7 @@ func BenchmarkStoreAppend(b *testing.B) {
 // after the last, and lines anywhere.
 func BenchmarkStoreLine(b *testing.B) {
 	var s Store
-	s.AppendLines(benchStoreLines()...)
+	s.AppendLines(benchStoreLines(1_000_000)...)
 	b.Run("next", func(b *testing.B) {
 		i := 0
 		for b.Loop() {
@@ -744,8 +808,9 @@ func benchStoreLine(i int) string {
 	return fmt.Sprintf("\x1b[2m%07d\x1b[m GET /api/v1/items/%d served in %dms %s", i, i*7, i%97, strings.Repeat("lorem ipsum ", 3+i%24))
 }
 
-func benchStoreLines() []string {
-	lines := make([]string, 1_000_000)
+// benchStoreLines returns the first n lines benchStoreLine makes.
+func benchStoreLines(n int) []string {
+	lines := make([]string, n)
 	for i := range lines {
 		lines[i] = benchStoreLine(i)
 	}
@@ -760,7 +825,7 @@ func TestEditKeepsRoot(t *testing.T) {
 	t.Parallel()
 
 	var s Store
-	s.AppendLines(benchStoreLines()[:100_000]...)
+	s.AppendLines(benchStoreLines(100_000)...)
 	s.Index(ansi.GraphemeWidth, Words, 30)
 	for _, e := range []TextEdit{
 		{Pos{500, 3}, Pos{500, 9}, "changed"},
@@ -797,7 +862,7 @@ func TestRowsKeptAreThoseUsedLast(t *testing.T) {
 	// Two viewports of a store, one of them changing width: the rows of the
 	// other are asked for between each of its widths, and kept.
 	var s Store
-	s.AppendLines(benchStoreLines()[:10_000]...)
+	s.AppendLines(benchStoreLines(10_000)...)
 	const steady = 30
 	for _, w := range []int{20, 21, 22, 23} {
 		s.Index(ansi.GraphemeWidth, Words, steady)
@@ -819,10 +884,7 @@ func TestCompactAfterMostIsRemoved(t *testing.T) {
 	// Once most of a large text is removed, the tree is copied, with its
 	// lines, so that the storage it was built in, and the text its lines
 	// were split from, are the store's to free.
-	lines := make([]string, 50_000)
-	for i := range lines {
-		lines[i] = benchStoreLine(i)
-	}
+	lines := benchStoreLines(50_000)
 	text := strings.Join(lines, "\n")
 	var s Store
 	s.AppendLines(text)

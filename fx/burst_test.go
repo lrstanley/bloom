@@ -96,16 +96,25 @@ func TestBurst(t *testing.T) {
 
 	t.Run("fades", func(t *testing.T) {
 		t.Parallel()
-		s := apply(Burst{At: at}, 0.95)
-		for y := range s.Height() {
-			for x := range s.Width() {
-				if c := s.Cell(x, y); c.Content == burstFaded && rgba(c.Style.Fg) == rgba(burstPalette[0]) {
-					t.Fatalf("particle at %d,%d has not faded", x, y)
+		// One particle, drawn nearer the black background near its end
+		// than early on.
+		origin := at
+		lum := func(at float64) uint32 {
+			t.Helper()
+			s := apply(Burst{At: origin, Count: 1}, at)
+			for y := range s.Height() {
+				for x := range s.Width() {
+					if c := s.Cell(x, y); c.Content != " " {
+						r, g, b, _ := c.Style.Fg.RGBA()
+						return r + g + b
+					}
 				}
 			}
+			t.Fatalf("t=%.2f drew no particle", at)
+			return 0
 		}
-		if particles(s) == 0 {
-			t.Fatal("t=0.95 drew nothing")
+		if early, late := lum(0.2), lum(0.95); late >= early {
+			t.Fatalf("the particle is as bright at the end, %d, as early on, %d", late, early)
 		}
 	})
 

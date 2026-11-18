@@ -17,16 +17,6 @@ import (
 	"getsteep.dev/steep/reel/effects"
 )
 
-// at returns the cell where text first appears on screen, or -1, -1.
-func at(view, text string) (x, y int) {
-	for y, line := range strings.Split(view, "\n") {
-		if before, _, ok := strings.Cut(line, text); ok {
-			return len([]rune(before)), y
-		}
-	}
-	return -1, -1
-}
-
 func TestAnalyze(t *testing.T) {
 	t.Parallel()
 
@@ -62,8 +52,21 @@ func TestAnalyze(t *testing.T) {
 	if line := add.src[s.line]; line[s.col:s.col+s.n] != "tagsIn" {
 		t.Errorf("site of tagsIn is %q", line[s.col:s.col+s.n])
 	}
-	if path := prog.pathTo(find("render.wrap")); len(path) != 5 {
-		t.Errorf("path to wrap = %v, want 5 steps", path)
+	// The shortest path to wrap is from main, through the functions that
+	// call it, each an index into the calls of the one before.
+	path := prog.pathTo(find("render.wrap"))
+	var route []string
+	var at *fn
+	for k, i := range path {
+		if k == 0 {
+			at = prog.roots[i]
+		} else {
+			at = at.calls[i]
+		}
+		route = append(route, at.qualified())
+	}
+	if got, want := strings.Join(route, " "), "main.main main.run main.find render.Text.Render render.wrap"; got != want {
+		t.Errorf("path to wrap = %q, want %q", got, want)
 	}
 }
 
@@ -127,8 +130,8 @@ func TestGoLens(t *testing.T) {
 	h.Wait("normalize").Sleep(400 * time.Millisecond)
 
 	// A click selects a function anywhere in the tree.
-	x, y := at(h.View(), "normalize")
-	h.LeftClick(x+2, y).Wait("normalize sorts tags").Sleep(demo.Hold(600 * time.Millisecond))
+	at := h.Locate(reel.Contains("normalize"))
+	h.LeftClick(at.X+2, at.Y).Wait("normalize sorts tags").Sleep(demo.Hold(600 * time.Millisecond))
 	step("left")
 	step("left")
 	h.Wait("add saves a note")

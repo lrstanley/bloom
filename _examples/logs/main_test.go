@@ -5,6 +5,7 @@
 package main
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
@@ -38,10 +39,13 @@ func TestLogs(t *testing.T) {
 	// A search marks its matches, and moves between them through the whole
 	// log, wrapping around.
 	h.Key("/").Type("timeout", reel.Delay(60*time.Millisecond)).Sleep(demo.Hold(300 * time.Millisecond))
+	// A line holds one match, so each move is to another line, and back.
 	h.Key("enter").Wait(`"timeout" on line`).Sleep(demo.Hold(800 * time.Millisecond))
-	h.Key("n").Sleep(demo.Hold(500 * time.Millisecond))
-	h.Key("n").Sleep(demo.Hold(500 * time.Millisecond))
-	h.Key("N").Sleep(demo.Hold(500 * time.Millisecond))
+	first := foundLine(t, h)
+	h.Key("n").WaitFor(reel.NotMatches(onLine(first))).Sleep(demo.Hold(500 * time.Millisecond))
+	second := foundLine(t, h)
+	h.Key("n").WaitFor(reel.NotMatches(onLine(second))).Sleep(demo.Hold(500 * time.Millisecond))
+	h.Key("N").WaitFor(reel.Matches(onLine(second))).Sleep(demo.Hold(500 * time.Millisecond))
 
 	// To the start of a quarter of a million lines, and back to the end,
 	// following again.
@@ -71,4 +75,22 @@ func TestLogs(t *testing.T) {
 	if m := h.FinalModelAs[*model](); !m.pos.AtEnd() || m.log.Len() <= preloaded {
 		t.Fatalf("finished at %+v with %d lines", m.pos, m.log.Len())
 	}
+}
+
+// foundRe matches the status of a search for "timeout", and the line found.
+var foundRe = regexp.MustCompile(`"timeout" on line (\d+)`)
+
+// foundLine returns the line the search for "timeout" last found.
+func foundLine(t *testing.T, h *steep.Harness) string {
+	t.Helper()
+	m := foundRe.FindStringSubmatch(h.View())
+	if m == nil {
+		t.Fatalf("no match found:\n%s", h.View())
+	}
+	return m[1]
+}
+
+// onLine matches the status of a search for "timeout" found on line n.
+func onLine(n string) *regexp.Regexp {
+	return regexp.MustCompile(`"timeout" on line ` + n + `\b`)
 }

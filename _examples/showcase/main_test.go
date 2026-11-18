@@ -30,14 +30,9 @@ func locate(view, text string) (x, y int, ok bool) {
 // find returns the cell text starts at on screen, waiting for it first: a
 // tint's wave can still be scrambling the panes when a slow (such as -race)
 // run gets here.
-func find(t *testing.T, h *steep.Harness, text string) (x, y int) {
-	t.Helper()
-	view := h.Wait(text).View()
-	x, y, ok := locate(view, text)
-	if !ok {
-		t.Fatalf("%q is not on screen:\n%s", text, view)
-	}
-	return x, y
+func find(h *steep.Harness, text string) (x, y int) {
+	at := h.Locate(reel.Contains(text))
+	return at.X, at.Y
 }
 
 // movedPast holds once the Activity pane's title is right of the Services
@@ -62,9 +57,8 @@ func checkMovedPast(h *steep.Harness) {
 
 // pick clicks the tint named name in the sidebar, and waits for the panes
 // to wave back in with its colors.
-func pick(t *testing.T, h *steep.Harness, name string) {
-	t.Helper()
-	x, y := find(t, h, name)
+func pick(h *steep.Harness, name string) {
+	x, y := find(h, name)
 	h.LeftClick(x+2, y).Wait("▸ " + name).Sleep(1800 * time.Millisecond)
 }
 
@@ -79,23 +73,23 @@ func TestShowcase(t *testing.T) {
 	h.Wait("▸ TokyoNight").Wait("billing").Sleep(1500 * time.Millisecond)
 
 	// A click selects a service.
-	x, y := find(t, h, "billing")
+	x, y := find(h, "billing")
 	h.LeftClick(x, y).Wait("billing is slow").Sleep(demo.Hold(500 * time.Millisecond))
-	pick(t, h, "Rose Pine")
+	pick(h, "Rose Pine")
 
 	// A pane dragged by its title floats under the pointer, and the others
 	// make room as it passes them.
-	x1, y1 := find(t, h, "⠿ Activity")
-	x2, y2 := find(t, h, "⠿ Services")
+	x1, y1 := find(h, "⠿ Activity")
+	x2, y2 := find(h, "⠿ Services")
 	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+20, y2+4, reel.Delay(20*time.Millisecond))
 	checkMovedPast(h)
-	pick(t, h, "Catppuccin Mocha")
+	pick(h, "Catppuccin Mocha")
 
 	// A double click zooms a pane, and another gives the rest their width
 	// back.
-	x, y = find(t, h, "⠿ Palette")
+	x, y = find(h, "⠿ Palette")
 	h.LeftClick(x+3, y, reel.Repeat(2)).WaitNot("⠿ Services").Sleep(1200 * time.Millisecond)
-	x, y = find(t, h, "⠿ Palette")
+	x, y = find(h, "⠿ Palette")
 	h.LeftClick(x+3, y, reel.Repeat(2)).Wait("⠿ Services").Sleep(demo.Hold(1000 * time.Millisecond))
 
 	// The tour spotlights each part in turn.
@@ -103,7 +97,7 @@ func TestShowcase(t *testing.T) {
 	h.Key("?").Wait("Double click to zoom").Sleep(demo.Hold(1600 * time.Millisecond))
 	h.Key("?").Wait("lowest priority first").Sleep(demo.Hold(1600 * time.Millisecond))
 	h.Key("esc").WaitNot("lowest priority first").Sleep(demo.Hold(300 * time.Millisecond))
-	pick(t, h, "Kanagawa Wave")
+	pick(h, "Kanagawa Wave")
 
 	// Narrowing the terminal collapses the palette, then the sidebar.
 	h.Resize(96, 24).WaitNot("⠿ Palette").Sleep(demo.Hold(900 * time.Millisecond))
@@ -122,8 +116,8 @@ func TestDragPastCollapsed(t *testing.T) {
 
 	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(96, 24), steep.WithTimeout(20*time.Second))
 	h.Wait("billing").WaitNot("⠿ Palette").Sleep(800 * time.Millisecond)
-	x1, y1 := find(t, h, "⠿ Activity")
-	x2, y2 := find(t, h, "⠿ Services")
+	x1, y1 := find(h, "⠿ Activity")
+	x2, y2 := find(h, "⠿ Services")
 	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+24, y2+4, reel.Delay(20*time.Millisecond))
 	checkMovedPast(h)
 	h.Key("q")

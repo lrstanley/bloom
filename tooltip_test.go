@@ -99,8 +99,8 @@ func (g *tipRig) showing() string {
 // and it is drawn exactly when it shows.
 func (g *tipRig) want(text string) {
 	g.t.Helper()
-	if got := g.showing(); got != text {
-		g.t.Fatalf("showing %q, want %q", got, text)
+	if got, ok := g.r.Tooltip(); got != text || ok != (text != "") {
+		g.t.Fatalf("showing %q (%t), want %q", got, ok, text)
 	}
 	if text != "" && !strings.Contains(ansi.Strip(g.out), text) {
 		g.t.Fatalf("%q shows but is not drawn:\n%s", text, ansi.Strip(g.out))
@@ -220,7 +220,9 @@ func TestTooltipRestTimer(t *testing.T) {
 		return Column(Text(" "), Text("alpha").Tooltip("quick", TipDelay(100*time.Millisecond)))
 	})
 	g.move(1, 1)
-	g.wait(100 * time.Millisecond)
+	g.wait(99 * time.Millisecond)
+	g.want("")
+	g.wait(time.Millisecond)
 	g.want("quick")
 
 	// A negative Delay shows it at once.
@@ -668,8 +670,11 @@ func TestTooltipPointerAndFocusReplaceEachOther(t *testing.T) {
 	g.want("")
 	g.wait(defaultTipDelay)
 	g.want("tip two")
-	// The pointer moving inside its own node does not close the focus's.
+	// The pointer moving inside its own node does not close the focus's,
+	// nor rest there to replace it.
 	g.move(14, 1)
+	g.want("tip two")
+	g.wait(defaultTipDelay)
 	g.want("tip two")
 	// A key press while the pointer waits stops the wait.
 	g.move(1, 1)
@@ -786,47 +791,43 @@ func TestTooltipChip(t *testing.T) {
 		return func() Child { return Column(Text(" "), Text(" "), Text("alpha").Tooltip(text, opts...)) }
 	}
 
-	// A tooltip's style replaces the root's, which replaces the default.
-	g := newTipRig(t, 30, 3, tip("tip a", TipStyle(lipgloss.NewStyle())))
-	g.move(1, 2)
-	g.wait(defaultTipDelay)
-	if g.rows()[1] != "tip a"+strings.Repeat(" ", 25) {
-		t.Fatalf("unstyled chip drawn as %q", g.rows()[1])
-	}
-	g = newTipRig(t, 30, 3, tip("tip a"), WithTooltips(Tooltips{Style: lipgloss.NewStyle().Padding(0, 2)}))
-	g.move(1, 2)
-	g.wait(defaultTipDelay)
-	if !strings.HasPrefix(g.rows()[1], "  tip a  ") {
-		t.Fatalf("root's style drawn as %q", g.rows()[1])
+	// A tooltip's style replaces the root's, which replaces the default. It
+	// is wrapped at MaxWidth, at the screen's width, and at 60 cells by
+	// default. want is the rows the chip is drawn on, rows 0 and 1.
+	padded := WithTooltips(Tooltips{Style: lipgloss.NewStyle().Padding(0, 2)})
+	long := strings.Repeat("abcd ", 13) + "abcd"
+	blank := func(n int) string { return strings.Repeat(" ", n) }
+	for _, tt := range []struct {
+		name string
+		w    int
+		tree func() Child
+		opts []Option
+		want [2]string
+	}{
+		{"own style over the root's", 30, tip("tip a", TipStyle(lipgloss.NewStyle())), []Option{padded}, [2]string{blank(30), "tip a" + blank(25)}},
+		{"root's style", 30, tip("tip a"), []Option{padded}, [2]string{blank(30), "  tip a" + blank(23)}},
+		{"wrapped at MaxWidth", 30, tip("one two three"), []Option{WithTooltips(Tooltips{MaxWidth: 11})}, [2]string{" one two" + blank(22), " three" + blank(24)}},
+		{"wrapped at the screen's width", 11, tip("one two three"), nil, [2]string{" one two   ", " three     "}},
+		{"wrapped at 60 by default", 80, tip(long), nil, [2]string{strings.Repeat(" abcd", 11) + blank(25), strings.Repeat(" abcd", 3) + blank(65)}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			g := newTipRig(t, tt.w, 3, tt.tree, tt.opts...)
+			g.move(1, 2)
+			g.wait(defaultTipDelay)
+			if rows := g.rows(); rows[0] != tt.want[0] || rows[1] != tt.want[1] {
+				t.Errorf("drawn as:\n%q\n%q", rows[0], rows[1])
+			}
+		})
 	}
 
 	// The default has a background, between the terminal's colors.
-	g = newTipRig(t, 30, 3, tip("tip a"))
+	g := newTipRig(t, 30, 3, tip("tip a"))
 	g.move(1, 2)
 	g.wait(defaultTipDelay)
 	if !strings.Contains(g.out, "48;2;") {
 		t.Fatalf("default chip has no background: %q", g.out)
-	}
-
-	// Wrapped at MaxWidth, and at the screen's width.
-	g = newTipRig(t, 30, 3, tip("one two three"), WithTooltips(Tooltips{MaxWidth: 11}))
-	g.move(1, 2)
-	g.wait(defaultTipDelay)
-	if rows := g.rows(); !strings.HasPrefix(rows[0], " one two    ") || !strings.HasPrefix(rows[1], " three      ") {
-		t.Fatalf("wrapped at 11 as:\n%s", strings.Join(rows, "\n"))
-	}
-	g = newTipRig(t, 11, 3, tip("one two three"))
-	g.move(1, 2)
-	g.wait(defaultTipDelay)
-	if rows := g.rows(); rows[0] != " one two   " || rows[1] != " three     " {
-		t.Fatalf("wrapped at the screen's width as:\n%s", strings.Join(rows, "\n"))
-	}
-	// And at 60 cells by default.
-	g = newTipRig(t, 80, 3, tip(strings.Repeat("abcd ", 13)+"abcd"))
-	g.move(1, 2)
-	g.wait(defaultTipDelay)
-	if rows := g.rows(); strings.Count(rows[0], "abcd") != 11 || strings.Count(rows[1], "abcd") != 3 {
-		t.Fatalf("wrapped by default as:\n%s", strings.Join(rows, "\n"))
 	}
 
 	// Escape sequences meant for the terminal are dropped.
@@ -1544,6 +1545,7 @@ func TestTooltipPinnedTogether(t *testing.T) {
 		t.Fatalf("drawn as:\n%s", ansi.Strip(g.out))
 	}
 	noOverlaps(t, g.chips(), nil)
+	cx, cy := g.at(" tip c ")
 	again := g.out
 	g.draw()
 	if unsafe.StringData(again) != unsafe.StringData(g.out) {
@@ -1553,6 +1555,9 @@ func TestTooltipPinnedTogether(t *testing.T) {
 	g.draw()
 	if g.count("tip a") != 0 || g.count("tip b") != 0 || g.count("tip c") != 1 {
 		t.Fatalf("drawn once a is unpinned as:\n%s", ansi.Strip(g.out))
+	}
+	if x, y := g.at(" tip c "); x != cx || y != cy {
+		t.Fatalf("tip c moved from %d,%d to %d,%d once a was unpinned:\n%s", cx, cy, x, y, ansi.Strip(g.out))
 	}
 	last = false
 	g.draw()
@@ -1632,12 +1637,18 @@ func TestTooltipMovesForPinned(t *testing.T) {
 	g.move(5, 1)
 	g.wait(defaultTipDelay)
 	g.want("tip a")
+	ax, ay := g.at(" tip a ")
 	pinned = true
 	g.draw()
 	if g.count("tip a") != 1 || g.count("tip b") != 1 {
 		t.Fatalf("drawn as:\n%s", ansi.Strip(g.out))
 	}
 	noOverlaps(t, g.chips(), nil)
+	// The pointer's moves out of the pinned one's way, rather than the
+	// other way around.
+	if x, y := g.at(" tip a "); x == ax && y == ay {
+		t.Fatalf("the pointer's tooltip stayed at %d,%d:\n%s", x, y, ansi.Strip(g.out))
+	}
 }
 
 // TestTooltipMovedOffScreen checks that an effect moving a node off screen
@@ -1929,7 +1940,7 @@ func TestTooltipSinkNode(t *testing.T) {
 	tree := func() Child {
 		return Column(
 			Row(Fixed(6, Text("alpha").Tooltip("a tooltip much too long for the sink")), Fill(Text(" "))),
-			Row(Fixed(8, Text("status:")), Fixed(12, TooltipSink()), Fill(Text(" "))),
+			Row(Fixed(8, Text("status:")), Fixed(12, TooltipSink().ID("status")), Fill(Text(" "))),
 			Row(Fixed(8, Text("again:")), Fill(TooltipSink())),
 		)
 	}
@@ -1940,8 +1951,12 @@ func TestTooltipSinkNode(t *testing.T) {
 	if rows[1] != "status: a tooltip m…"+strings.Repeat(" ", 20) || rows[2] != "again:  a tooltip much too long for the…" {
 		t.Fatalf("drawn as:\n%s", ansi.Strip(g.out))
 	}
-	if f := g.r.Frame(); len(f.tips) != 1 || f.Truncated("status") {
-		t.Fatalf("%d tooltips in the frame, want 1", len(f.tips))
+	f := g.r.Frame()
+	if _, ok := f.Rect("status"); !ok {
+		t.Fatal("the sink is not in the frame")
+	}
+	if len(f.tips) != 1 || f.Truncated("status") {
+		t.Fatalf("%d tooltips in the frame, want 1; the sink cut: %v", len(f.tips), f.Truncated("status"))
 	}
 	if len(g.chips()) != 0 {
 		t.Fatalf("a chip floats beside the sinks:\n%s", ansi.Strip(g.out))
@@ -2066,8 +2081,14 @@ func TestTooltipWideGlyphs(t *testing.T) {
 			g := newTipRig(t, 30, 6, func() Child {
 				return Column(Text(" "), Text(" "), Text(" "), Text(" "), Row(Fixed(3, nil), Fixed(5, Text("x").Tooltip(s).TooltipOpen(true)), Fill(Text(" "))), Text(" "))
 			}, WithTooltips(Tooltips{MaxWidth: 6}))
-			if g.count(word) != 3 {
-				t.Fatalf("%q not drawn whole:\n%s", s, ansi.Strip(g.out))
+			chips, rows := g.chips(), g.rows()
+			if g.count(word) != 3 || len(chips) != 1 || chips[0].Dx() != 6 || chips[0].Dy() != 3 {
+				t.Fatalf("%q not drawn whole, a word a row in a chip 6 wide, at %v:\n%s", s, chips, ansi.Strip(g.out))
+			}
+			for y := chips[0].Min.Y; y < chips[0].Max.Y; y++ {
+				if strings.Count(rows[y], word) != 1 {
+					t.Fatalf("row %d of the chip is %q, want one %q:\n%s", y, rows[y], word, ansi.Strip(g.out))
+				}
 			}
 		})
 	}

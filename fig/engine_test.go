@@ -10,7 +10,9 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"image"
 	"image/color"
+	"slices"
 	"strings"
 	"testing"
 
@@ -100,10 +102,20 @@ func TestCutSeams(t *testing.T) {
 	}
 	fg := f.Figure("ABA", fig.Options{Width: 3})
 	w, h := fg.Size()
+	var at []image.Point
 	for _, s := range fg.Seams() {
 		if s.X >= w || s.Y >= h {
 			t.Errorf("seam %+v outside the %dx%d figure", s, w, h)
+			continue
 		}
+		// Each seam kept is where the cell it merged is drawn.
+		if c := fg.At(s.X, s.Y); c.Content != s.Content {
+			t.Errorf("seam %+v is on a cell of %q", s, c.Content)
+		}
+		at = append(at, image.Pt(s.X, s.Y))
+	}
+	if want := []image.Point{{1, 0}, {1, 0}, {2, 1}}; !slices.Equal(at, want) {
+		t.Errorf("seams at %v, want %v", at, want)
 	}
 }
 
@@ -292,7 +304,7 @@ func TestPaints(t *testing.T) {
 	f.Render(count)
 	first := calls
 	f.Render(count)
-	if calls != 2*first {
+	if first == 0 || calls != 2*first {
 		t.Errorf("a PaintFunc was not rendered again: %d calls, then %d", first, calls)
 	}
 	if f.Render(nil) != f.String() {

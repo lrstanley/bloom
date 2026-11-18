@@ -206,13 +206,20 @@ func TestLayoutAnimationTicks(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("running animation stopped ticking")
 	}
+	// Another root's tick, while this one's is pending, queues nothing and
+	// leaves this one's to run.
+	if r.Update(layoutFrameMsg{root: New()}) != nil {
+		t.Fatal("accepted foreign root tick")
+	}
+	now = now.Add(500 * time.Millisecond)
+	r.View(80, 10, tree(20))
+	if cmd = r.Update(cmd()); cmd == nil {
+		t.Fatal("a foreign root's tick stopped this one's")
+	}
 	now = now.Add(time.Second)
 	r.View(80, 10, tree(20))
 	if r.Update(cmd()) != nil {
 		t.Fatal("settled animation kept ticking")
-	}
-	if r.Update(layoutFrameMsg{root: New()}) != nil {
-		t.Fatal("accepted foreign root tick")
 	}
 }
 

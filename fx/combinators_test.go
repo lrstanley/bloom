@@ -111,17 +111,11 @@ func TestStagger(t *testing.T) {
 				t.Fatalf("t=0.25: the first row shows %d cells, want 10", shown[0])
 			}
 			for y := range s.Height() {
-				row := visibleRow(s, y)
-				if strings.Trim(strings.ReplaceAll(row, "_", ""), string(rune('a'+y))) != "" {
-					t.Fatalf("t=%.2f: row %d holds %q, cells left their row", at, y, row)
-				}
-				// Slid cells are clipped to the node: they end at its right
-				// edge only once the row is done.
-				if shown[y] > 0 && shown[y] < 20 && !strings.HasPrefix(strings.TrimLeft(row, "_"), string(rune('a'+y))) {
-					t.Fatalf("t=%.2f: row %d is %q", at, y, row)
-				}
-				if shown[y] > 0 && shown[y] < 20 && strings.HasPrefix(row, "_") && row[len(row)-1] == '_' {
-					t.Fatalf("t=%.2f: row %d is %q, a slide leaves the left side empty", at, y, row)
+				// A row's own cells, slid in from the left and clipped to the
+				// node, then the cells not reached yet, without holes.
+				row := rowText(s, y)
+				if want := strings.Repeat(string(rune('a'+y)), shown[y]) + strings.Repeat("~", s.Width()-shown[y]); row != want {
+					t.Fatalf("t=%.2f: row %d is %q, want %q", at, y, row, want)
 				}
 				if shown[y] < want[y] {
 					t.Fatalf("t=%.2f: row %d shows %d cells, fewer than %d before", at, y, shown[y], want[y])
@@ -147,7 +141,7 @@ func TestStagger(t *testing.T) {
 		t.Parallel()
 		s := textLayerAt(gridText(10, 4), image.Pt(2, 2), 20, 10)
 		Stagger{Effect: Slide{From: Left}, From: Top}.Apply(s, 1)
-		if hidden(s) != 0 || visibleRow(s, 3) != "dddddddddd" {
+		if hidden(s) != 0 || rowText(s, 3) != "dddddddddd" {
 			t.Fatal("t=1 changed the node")
 		}
 	})
@@ -285,9 +279,12 @@ func TestCombinatorsComparable(t *testing.T) {
 		Shade{Seed: 2},
 		Blinds{From: Top, Size: 2},
 		Wave{From: Left},
+		Braille{Amount: 0.5, Seed: 2},
 	}
+	// Comparing the values, rather than their types, catches one that holds
+	// an effect that is not comparable.
 	for _, e := range same {
-		if !reflect.TypeOf(e).Comparable() {
+		if !reflect.ValueOf(e).Comparable() {
 			t.Errorf("%T is not comparable", e)
 		}
 	}

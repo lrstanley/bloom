@@ -5,6 +5,7 @@
 package fig_test
 
 import (
+	"image/color"
 	"strings"
 	"testing"
 	"time"
@@ -53,14 +54,15 @@ func TestTextNode(t *testing.T) {
 	want := trimRows(small.Figure("Bloom", fig.Options{}).String())
 	paint := fig.Gradient(lipgloss.Color("#ff6f91"), lipgloss.Color("#ffc29b"))
 	tests := []struct {
-		name string
-		node fig.TextNode
+		name  string
+		node  fig.TextNode
+		paint fig.Paint // that the strokes are drawn in, or nil
 	}{
-		{"static", fig.Text("Bloom").Font(small)},
-		{"painted", fig.Text("Bloom").Font(small).Paint(paint)},
-		{"each at rest", fig.Text("Bloom").Font(small).Each(1, hideUntilDone)},
-		{"layers at rest", fig.Text("Bloom").Font(small).ID("t").Animate()},
-		{"layers painted", fig.Text("Bloom").Font(small).ID("t").Animate().Paint(paint.Blend())},
+		{"static", fig.Text("Bloom").Font(small), nil},
+		{"painted", fig.Text("Bloom").Font(small).Paint(paint), paint},
+		{"each at rest", fig.Text("Bloom").Font(small).Each(1, hideUntilDone), nil},
+		{"layers at rest", fig.Text("Bloom").Font(small).ID("t").Animate(), nil},
+		{"layers painted", fig.Text("Bloom").Font(small).ID("t").Animate().Paint(paint.Blend()), paint.Blend()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,8 +70,39 @@ func TestTextNode(t *testing.T) {
 			if got := plain(tt.node, 60, 10); got != want {
 				t.Fatalf("got\n%s\nwant\n%s", got, want)
 			}
+			if tt.paint == nil {
+				return
+			}
+			// Each stroke is in the color the figure painted alone has there.
+			f := small.Figure("Bloom", fig.Options{})
+			ref := canvas.Parse(f.Render(tt.paint), ansi.GraphemeWidth)
+			got := canvas.Parse(bloom.Render(60, 10, tt.node), ansi.GraphemeWidth)
+			w, h := f.Size()
+			strokes := 0
+			for y := range h {
+				for x := range w {
+					r, g := ref.CellAt(x, y), got.CellAt(x, y)
+					if r.Content == " " || r.Style.Fg == nil {
+						continue
+					}
+					strokes++
+					if g.Style.Fg == nil || !sameColor(g.Style.Fg, r.Style.Fg) {
+						t.Fatalf("stroke at %d,%d drawn in %v, want %v", x, y, g.Style.Fg, r.Style.Fg)
+					}
+				}
+			}
+			if strokes == 0 {
+				t.Fatal("the figure painted alone has no colored strokes")
+			}
 		})
 	}
+}
+
+// sameColor reports whether a and b are the same color.
+func sameColor(a, b color.Color) bool {
+	ar, ag, ab, aa := a.RGBA()
+	br, bg, bb, ba := b.RGBA()
+	return ar == br && ag == bg && ab == bb && aa == ba
 }
 
 func TestTextNodeSize(t *testing.T) {
@@ -109,9 +142,22 @@ func TestEachStaggers(t *testing.T) {
 	// Halfway, with the first glyph starting at 0 and the second at 0.5,
 	// each taking half of t, the first is done and the second is not.
 	got := plain(n.Each(0.5, hideUntilDone), 20, 4)
-	whole := trimRows(fonts.Mini().Figure("ab", fig.Options{}).String())
-	if got == "" || got == whole {
-		t.Fatalf("halfway shows %q, want only the first glyph of\n%s", got, whole)
+	f := fonts.Mini().Figure("ab", fig.Options{})
+	w, h := f.Size()
+	rows := make([]string, h)
+	for y := range h {
+		var row strings.Builder
+		for x := range w {
+			if c := f.At(x, y); c.Glyph == 0 {
+				row.WriteString(c.Content)
+			} else {
+				row.WriteByte(' ')
+			}
+		}
+		rows[y] = row.String()
+	}
+	if first := trimRows(strings.Join(rows, "\n")); got != first || first == "" {
+		t.Fatalf("halfway shows\n%s\nwant only the first glyph of\n%s", got, f.String())
 	}
 	if start := plain(n.Each(0, hideUntilDone), 20, 4); start != "" {
 		t.Fatalf("at 0 shows\n%s", start)
@@ -179,9 +225,24 @@ func TestTransparentBanner(t *testing.T) {
 	base := bloom.Text(strings.Repeat(strings.Repeat("x", 30)+"\n", 6))
 	banner := fig.Text("o").Font(fonts.Small()).ID("b").Animate()
 	got := plain(bloom.Overlay(base, bloom.Layer(banner).Anchor(bloom.Start, bloom.Start).Transparent()), 30, 6)
-	// The banner's blank cells show the x's beneath.
-	if !strings.Contains(got, "x") || strings.Count(got, "x") == 30*6 {
-		t.Fatalf("got\n%s", got)
+	// The banner's strokes are drawn over the x's, and its blank cells,
+	// inside its bounds too, show them.
+	f := fonts.Small().Figure("o", fig.Options{})
+	fw, fh := f.Size()
+	rows := make([]string, 6)
+	for y := range rows {
+		var row strings.Builder
+		for x := range 30 {
+			if c := f.At(x, y); x < fw && y < fh && c.Content != " " {
+				row.WriteString(c.Content)
+			} else {
+				row.WriteByte('x')
+			}
+		}
+		rows[y] = row.String()
+	}
+	if want := strings.Join(rows, "\n"); got != want || !strings.Contains(f.String(), " ") {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}
 }
 

@@ -73,13 +73,13 @@ func TestMinSizeNoteFaded(t *testing.T) {
 	// The note is drawn in a gray between the terminal's foreground and its
 	// background, white on black until the terminal reports its own.
 	got := Render(40, 1, MinSize(80, 24, Text("app")))
-	var gray int
+	var r, g, b int
 	at := strings.Index(got, "\x1b[38;2;")
 	if at < 0 {
 		t.Fatalf("the note has no color of its own: %q", got)
 	}
-	if _, err := fmt.Sscanf(got[at:], "\x1b[38;2;%d;%d;%dm", &gray, &gray, &gray); err != nil || gray <= 0x40 || gray >= 0xc0 {
-		t.Fatalf("the note is not faded: %q", got)
+	if _, err := fmt.Sscanf(got[at:], "\x1b[38;2;%d;%d;%dm", &r, &g, &b); err != nil || r != g || g != b || r <= 0x40 || r >= 0xc0 {
+		t.Fatalf("the note is not faded to gray: %q", got)
 	}
 }
 

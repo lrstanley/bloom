@@ -66,7 +66,11 @@ func TestFly(t *testing.T) {
 	// A node with nothing left of it, such as a slot shrunk to nothing, has
 	// nothing to fly.
 	empty := flyLayer("", image.Rect(4, 1, 4, 3), from, 10)
+	before := reached(empty)
 	Fly{}.Apply(empty, 0.5)
+	if got := reached(empty); got != before {
+		t.Fatalf("an empty node changed %q to %q", before, got)
+	}
 
 	// It starts out whole where it was, and ends where it is.
 	s := flyLayer(text, node, from, 10)
@@ -91,11 +95,17 @@ func TestFly(t *testing.T) {
 	if strings.Trim(strings.ReplaceAll(got, "\n", ""), "~dh") == "" {
 		t.Fatalf("t=0.44 shows nothing in flight:\n%s", got)
 	}
+	// What is in flight is not yet where it lands.
+	for x := range 4 {
+		if rows := strings.Split(got, "\n"); rows[1][x] == "abcd"[x] || rows[2][x] == "efgh"[x] {
+			t.Fatalf("t=0.44, column %d has landed:\n%s", x, got)
+		}
+	}
 	s = flyLayer(text, node, from, 10)
 	Fly{Seed: 1}.Apply(s, 0.56)
 	got = reached(s)
-	if rows := strings.Split(got, "\n"); rows[1][0] != 'a' || rows[2][0] != 'e' {
-		t.Fatalf("t=0.56, want a and e landed:\n%s", got)
+	if rows := strings.Split(got, "\n"); rows[1][0] != 'a' || rows[2][0] != 'e' || rows[1][3] == 'd' || rows[2][3] == 'h' {
+		t.Fatalf("t=0.56, want a and e landed, and d and h not yet:\n%s", got)
 	}
 
 	// A node that changed size starts out filling where it was, and nothing

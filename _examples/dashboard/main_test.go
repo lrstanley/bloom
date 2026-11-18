@@ -5,6 +5,7 @@
 package main
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,12 +31,13 @@ func TestTour(t *testing.T) {
 	h.Key("enter").WaitNot("Restart ingest?").Wait("restarting ingest").Sleep(demo.Hold(500 * time.Millisecond))
 
 	// Every effect, on a toast.
-	for _, k := range []string{"1", "2", "3", "4", "5", "6"} {
-		h.Key(k).Sleep(demo.Hold(900 * time.Millisecond))
+	for i, name := range []string{"fade", "slide", "wipe", "dissolve", "typewriter", "scramble"} {
+		h.Key(strconv.Itoa(i + 1)).Wait("✓ " + name).Sleep(demo.Hold(900 * time.Millisecond))
 	}
 
 	// The sidebar springs shut and open again.
-	h.Key("ctrl+b").Sleep(demo.Hold(700 * time.Millisecond)).Key("ctrl+b").Sleep(demo.Hold(700 * time.Millisecond))
+	h.Key("ctrl+b").WaitNot("● api").Sleep(demo.Hold(700 * time.Millisecond))
+	h.Key("ctrl+b").Wait("● api").Sleep(demo.Hold(700 * time.Millisecond))
 
 	// Narrow terminals collapse the log panel first, then the sidebar. The
 	// status bar stays one row, cutting the key hints rather than the timing.

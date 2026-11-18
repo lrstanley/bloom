@@ -58,7 +58,7 @@ func TestLaunch(t *testing.T) {
 
 	// Cards shimmer as placeholders until the data arrives, which takes
 	// their place without moving anything.
-	h.Wait("deploy").Wait("████").WaitNot("Requests").Sleep(600 * time.Millisecond)
+	h.Wait("deploy").Wait("████").WaitNot("Requests")
 	loading := row(h.View(), "╰")
 	h.Wait("Requests").Wait("1,021").Wait("updates: 0").Sleep(600 * time.Millisecond)
 	if loaded := row(h.View(), "╰"); loaded != loading {
@@ -68,7 +68,7 @@ func TestLaunch(t *testing.T) {
 
 	// An update rolls the numbers to their new values. Pausing ignores the
 	// next one.
-	h.SendProgram(statsMsg(1)).Wait("updates: 1").Wait("1,069").Sleep(900 * time.Millisecond)
+	h.SendProgram(statsMsg(1)).Wait("updates: 1").Wait("1,069").Sleep(demo.Hold(900 * time.Millisecond))
 	h.Key("ctrl+p").Wait("(paused)").SendProgram(statsMsg(2)).Sleep(300 * time.Millisecond)
 	if v := h.View(); !strings.Contains(v, "updates: 1 (paused)") {
 		t.Fatalf("a paused update went through:\n%s", v)
@@ -76,20 +76,21 @@ func TestLaunch(t *testing.T) {
 	h.Key("ctrl+p").WaitNot("(paused)")
 
 	// The tour spotlights each card in turn and decodes what it says.
-	h.Key("ctrl+t").Wait("Traffic").Wait("tour: 1").Sleep(1200 * time.Millisecond)
+	h.Key("ctrl+t").Wait("Traffic").Wait("tour: 1").Sleep(demo.Hold(1200 * time.Millisecond))
 	h.Key("ctrl+t").Wait("Latency").Wait("tour: 2").Sleep(1200 * time.Millisecond)
 	h.AssertSnapshot(snapshot.WithSuffix("tour"))
-	h.Key("ctrl+t").Wait("Failed requests").Sleep(1200 * time.Millisecond)
-	h.Key("ctrl+t").WaitNot("Failed requests").Wait("tour: 0").Sleep(300 * time.Millisecond)
+	h.Key("ctrl+t").Wait("Failed requests").Sleep(demo.Hold(1200 * time.Millisecond))
+	h.Key("ctrl+t").WaitNot("Failed requests").Wait("tour: 0").Sleep(demo.Hold(300 * time.Millisecond))
 
 	// A wrong confirmation shakes the input.
 	h.Type("paymets", reel.Delay(30*time.Millisecond)).Wait("paymets")
 	h.Key("enter")
 	cols := seen(h, 600*time.Millisecond, func(v string) int { return column(v, "paymets") })
+	delete(cols, -1) // a frame drawn without the input is not a place it moved to
 	if len(cols) < 2 {
 		t.Fatalf("the input did not move while shaking: columns %v", cols)
 	}
-	h.Wait(`type "payments" to confirm`).Sleep(300 * time.Millisecond)
+	h.Wait(`type "payments" to confirm`).Sleep(demo.Hold(300 * time.Millisecond))
 
 	// The right one deploys, with confetti that settles and a LIVE badge.
 	for range len("paymets") {

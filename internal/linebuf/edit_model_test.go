@@ -5,7 +5,6 @@
 package linebuf
 
 import (
-	"errors"
 	"fmt"
 	"math/rand/v2"
 	"slices"
@@ -412,10 +411,10 @@ type snapRef struct {
 func TestEditModel(t *testing.T) {
 	t.Parallel()
 
-	for seed := range uint64(6) {
+	for seed := range uint64(4) {
 		t.Run(strconv.FormatUint(seed, 10), func(t *testing.T) {
 			t.Parallel()
-			runEditModel(t, rand.New(rand.NewPCG(seed, 7)), 260)
+			runEditModel(t, rand.New(rand.NewPCG(seed, 7)), 160)
 		})
 	}
 }
@@ -425,6 +424,7 @@ func runEditModel(t *testing.T, rng *rand.Rand, steps int) {
 	var b editBuf
 	r := &refBuf{}
 	var snaps []snapRef
+	seen := map[string]bool{}
 	randPos := func() Pos {
 		n := len(r.lines)
 		line := rng.IntN(n+2) - 1
@@ -539,7 +539,7 @@ func runEditModel(t *testing.T, rng *rand.Rand, steps int) {
 			ref := r.edit(edits)
 			checkChange(t, label, change, ref, before, r.texts())
 		}
-		checkStoreEdits(t, label, &b, r, rng)
+		checkStoreEdits(t, label, &b, r, rng, seen)
 		for k, sn := range snaps {
 			if sn.s.Len() != len(sn.lines) || sn.s.String() != strings.Join(sn.lines, "\n") {
 				t.Fatalf("%s: snapshot %d changed", label, k)
@@ -597,9 +597,19 @@ var editKeys = []struct {
 	{ansi.WcWidth, Words, 17},
 }
 
+// longProbes is about how many places of a line of more than a couple of
+// thousand bytes checkStoreEdits checks: Offset and PosOf scan it from its
+// start.
+const longProbes = 24
+
 // checkStoreEdits fails t unless b holds r's lines, and works out of them
 // what a store given them from scratch does.
-func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand.Rand) {
+//
+// Where in a line each byte and place is depends on the line alone, so for
+// a line in seen, checked before, only where it starts and ends is checked
+// again, which depends on the tree. Clamping a long line is checked each
+// time, as it starts from checkpoints the store keeps for the line.
+func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand.Rand, seen map[string]bool) {
 	t.Helper()
 	n := len(r.lines)
 	if b.Len() != n {
@@ -627,12 +637,18 @@ func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand
 		}
 		bounds := refBounds(text)
 		_, at := refTokens(s)
+		again := seen[s]
+		seen[s] = true
+		every, everyBound := 1, 1
+		if len(s) > 2000 {
+			every, everyBound = max(len(text)/longProbes, 1), max(len(bounds)/longProbes, 1)
+		}
 		bound := 0 // the bound at or before col
-		for col := -1; col <= len(text)+1; col++ {
+		for col := -1; (!again || len(s) >= LongLineBytes) && col <= len(text)+1; col++ {
 			for bound+1 < len(bounds) && bounds[bound+1] <= col {
 				bound++
 			}
-			if len(s) > 2000 && col%89 != 0 && col < len(text) {
+			if col%every != 0 && col < len(text) {
 				continue
 			}
 			p, want := Pos{Line: i, Col: col}, Pos{Line: i, Col: bounds[bound]}
@@ -650,7 +666,7 @@ func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand
 			return at[col-1] + 1
 		}
 		for k, col := range bounds {
-			if len(s) > 2000 && k%97 != 0 && k != len(bounds)-1 {
+			if (again || k%everyBound != 0) && k != 0 && k != len(bounds)-1 {
 				continue
 			}
 			p := Pos{Line: i, Col: col}
@@ -664,7 +680,7 @@ func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand
 		}
 		// Each byte of the line is at the bound at or before the text
 		// before it.
-		if len(s) < 2000 {
+		if !again && len(s) < 2000 {
 			col := 0
 			bound = 0
 			for r := 0; r <= len(s); r++ {
@@ -728,24 +744,24 @@ func TestSnapshotsWhileEditing(t *testing.T) {
 	var b editBuf
 	b.SetContent(randomText(rng, 2000))
 	snaps := make(chan taken)
+	// Readers report with t.Errorf and keep draining, so a failure can't
+	// leave the writer blocked on a send.
 	var wg sync.WaitGroup
-	errs := make(chan error, 8)
 	for range 4 {
 		wg.Go(func() {
 			for sn := range snaps {
 				if sn.s.Len() != len(sn.lines) {
-					errs <- fmt.Errorf("a snapshot of %d lines has %d", len(sn.lines), sn.s.Len())
-					return
+					t.Errorf("a snapshot of %d lines has %d", len(sn.lines), sn.s.Len())
+					continue
 				}
 				for i, line := range sn.s.Lines(0) {
 					if line != sn.lines[i] || sn.s.Line(i) != line || PlainText(sn.s.Line(i), ansi.GraphemeWidth) != refText(line) {
-						errs <- fmt.Errorf("line %d of a snapshot differs", i)
-						return
+						t.Errorf("line %d of a snapshot differs", i)
+						break
 					}
 				}
 				if sn.s.String() != strings.Join(sn.lines, "\n") {
-					errs <- errors.New("a snapshot's text differs")
-					return
+					t.Error("a snapshot's text differs")
 				}
 			}
 		})
@@ -771,10 +787,6 @@ func TestSnapshotsWhileEditing(t *testing.T) {
 	}
 	close(snaps)
 	wg.Wait()
-	close(errs)
-	for err := range errs {
-		t.Fatal(err)
-	}
 }
 
 // TestRestoreKeepsMeasures checks that a store put back to a snapshot

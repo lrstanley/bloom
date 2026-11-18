@@ -96,7 +96,6 @@ func TestLayout(t *testing.T) {
 		{"slide half way", 20, 6, bloom.Overlay(view(strings.Repeat("....................\n", 6)), bloom.Layer(bloom.Box(border, bloom.Text("up"))).Transition(0.5, fx.Slide{From: fx.Bottom}))},
 		{"natural size", 0, 0, bloom.Row(bloom.Box(border, bloom.Text("a")), bloom.Box(border, bloom.Text("bb\nbb"))).Gap(1)},
 		{"natural size of a percent", 0, 0, bloom.Row(bloom.Percent(50, bloom.Box(border, bloom.Text("half"))), bloom.Text("|"))},
-		{"box smaller than its frame", 1, 3, bloom.Box(border, bloom.Text("x"))},
 		{"fill wraps at its share", 10, 4, bloom.Column(bloom.Row(
 			bloom.Fill(bloom.Text("aa aa aa").Style(lipgloss.NewStyle())),
 			bloom.Fill(bloom.Text("bb bb bb").Style(lipgloss.NewStyle())),

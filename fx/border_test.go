@@ -66,23 +66,44 @@ func TestBorderEffectsChangeOnlyTheEdge(t *testing.T) {
 			t.Parallel()
 			s := boxSurface()
 			e.Apply(s, 0.4)
-			for _, p := range []image.Point{{1, 1}, {4, 2}} {
-				if c := s.Cell(p.X, p.Y); c.Content != "." || c.Style.Fg != nil {
-					t.Fatalf("changed the cell inside at %v: %+v", p, c)
+			// Every cell inside is as it was, and some of the edge is not.
+			fresh := boxSurface()
+			w, h := s.Width(), s.Height()
+			edge := 0
+			for y := range h {
+				for x := range w {
+					if sameCell(s, fresh, x, y) {
+						continue
+					}
+					if x > 0 && y > 0 && x < w-1 && y < h-1 {
+						t.Fatalf("changed the cell inside at %d,%d: %+v", x, y, s.Cell(x, y))
+					}
+					edge++
 				}
 			}
-			// The loop is seamless.
+			if edge == 0 {
+				t.Fatal("changed nothing on the edge at t=0.4")
+			}
+			// The loop is seamless, all the way around.
 			a, b := boxSurface(), boxSurface()
 			e.Apply(a, 0)
 			e.Apply(b, 1)
-			for i := range 6 {
-				ca, cb := a.Cell(i, 0), b.Cell(i, 0)
-				if ca.Content != cb.Content || rgba(a.Fg(ca)) != rgba(b.Fg(cb)) {
-					t.Fatalf("t=0 and t=1 differ at %d,0", i)
+			for y := range h {
+				for x := range w {
+					if !sameCell(a, b, x, y) {
+						t.Fatalf("t=0 and t=1 differ at %d,%d", x, y)
+					}
 				}
 			}
 		})
 	}
+}
+
+// sameCell reports whether cell x, y of a and b shows the same, in the same
+// colors.
+func sameCell(a, b *canvas.Surface, x, y int) bool {
+	ca, cb := a.Cell(x, y), b.Cell(x, y)
+	return ca.Content == cb.Content && rgba(a.Fg(ca)) == rgba(b.Fg(cb)) && rgba(a.Bg(ca)) == rgba(b.Bg(cb))
 }
 
 func TestComet(t *testing.T) {

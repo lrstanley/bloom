@@ -201,8 +201,12 @@ func TestMixer(t *testing.T) {
 	if got := toRGBA(m.Gray(red, 1)); got.R != got.G || got.G != got.B {
 		t.Fatalf("Gray = %v", got)
 	}
-	if m.Mix(black, white, 0.25) != m.Mix(black, white, 0.25) {
-		t.Fatal("Mix is not remembered")
+	// A blend is worked out once, and the next asked for is the one kept.
+	var fresh Mixer
+	first := fresh.Mix(black, white, 0.25)
+	kept := len(fresh.memo)
+	if again := fresh.Mix(black, white, 0.25); kept != 1 || len(fresh.memo) != 1 || again != first {
+		t.Fatalf("Mix kept %d blends, then %d", kept, len(fresh.memo))
 	}
 }
 

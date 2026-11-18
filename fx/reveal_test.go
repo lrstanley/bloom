@@ -7,6 +7,7 @@ package fx
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -53,22 +54,6 @@ func textLayerAt(text string, at image.Point, fw, fh int) *canvas.Surface {
 	}
 	rect := image.Rectangle{Min: at, Max: at.Add(image.Pt(cells.Width(), cells.Height()))}
 	return cells.Layer(rect, frame.Bounds(), frame, env, &canvas.Mixer{})
-}
-
-// visibleRow returns the glyphs of row y that are shown, with '_' for those
-// that are hidden.
-func visibleRow(s *canvas.Surface, y int) string {
-	var b strings.Builder
-	for x := range s.Width() {
-		switch c := s.Cell(x, y); {
-		case c.Width == 0:
-		case !s.Visible(x, y):
-			b.WriteByte('_')
-		default:
-			b.WriteString(c.Content)
-		}
-	}
-	return b.String()
 }
 
 // rowsShown returns how many cells of each row are shown.
@@ -239,12 +224,12 @@ func TestUnfold(t *testing.T) {
 		if len(got) > 1 {
 			// The borders are intact from the start, the middle is the
 			// node's middle.
-			if top, bottom := visibleRow(s, got[0]), visibleRow(s, got[len(got)-1]); top != "┌────┐" || bottom != "└────┘" {
+			if top, bottom := rowText(s, got[0]), rowText(s, got[len(got)-1]); top != "┌────┐" || bottom != "└────┘" {
 				t.Fatalf("t=%.2f: band is %q ... %q", tt.t, top, bottom)
 			}
 			for _, y := range got[1 : len(got)-1] {
-				if want := fmt.Sprintf("│%-4d│", y); visibleRow(s, y) != want {
-					t.Fatalf("t=%.2f: row %d is %q, want %q", tt.t, y, visibleRow(s, y), want)
+				if want := fmt.Sprintf("│%-4d│", y); rowText(s, y) != want {
+					t.Fatalf("t=%.2f: row %d is %q, want %q", tt.t, y, rowText(s, y), want)
 				}
 			}
 		}
@@ -352,26 +337,29 @@ func TestBlinds(t *testing.T) {
 		name string
 		e    Blinds
 		t    float64
-		rows string // the rows of a 7×7 node that are shown, as 0/1, or columns
+		// The rows of an 8×8 node shown in its column 4, as 0/1, and the
+		// columns in its row 3: of 8, the slats of the edges opposite each
+		// other differ.
+		rows string
 		cols string
 	}{
-		{"top", Blinds{From: Top, Size: 3}, 0.5, "1001001", "1111111"},
-		{"bottom", Blinds{From: Bottom, Size: 3}, 0.5, "1001001", "1111111"},
-		{"bottom, two thirds", Blinds{From: Bottom, Size: 3}, 0.7, "1011011", "1111111"},
-		{"default size", Blinds{From: Top}, 0.5, "1001001", "1111111"},
-		{"left", Blinds{From: Left, Size: 2}, 0.5, "1111111", "1010101"},
-		{"right", Blinds{From: Right, Size: 2}, 0.5, "1111111", "1010101"},
+		{"top", Blinds{From: Top, Size: 3}, 0.5, "10010010", "11111111"},
+		{"bottom", Blinds{From: Bottom, Size: 3}, 0.5, "01001001", "00000000"},
+		{"bottom, two thirds", Blinds{From: Bottom, Size: 3}, 0.7, "11011011", "11111111"},
+		{"default size", Blinds{From: Top}, 0.5, "10010010", "11111111"},
+		{"left", Blinds{From: Left, Size: 2}, 0.5, "11111111", "10101010"},
+		{"right", Blinds{From: Right, Size: 2}, 0.5, "00000000", "01010101"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			s := boxLayer(7, 7)
+			s := boxLayer(8, 8)
 			tt.e.Apply(s, tt.t)
 			var rows, cols strings.Builder
-			for y := range 7 {
+			for y := range 8 {
 				rows.WriteByte(map[bool]byte{true: '1', false: '0'}[s.Visible(4, y)])
 			}
-			for x := range 7 {
+			for x := range 8 {
 				cols.WriteByte(map[bool]byte{true: '1', false: '0'}[s.Visible(x, 3)])
 			}
 			if rows.String() != tt.rows || cols.String() != tt.cols {
@@ -386,6 +374,9 @@ func TestWave(t *testing.T) {
 
 	for _, from := range []Direction{Bottom, Top, Left, Right} {
 		s := boxLayer(40, 12)
+		// A terminal foreground unlike the box's white, to tell the crest by.
+		glow := color.RGBA{R: 0xff, G: 0xff, A: 0xff}
+		s.Env.Fg = glow
 		Wave{From: from}.Apply(s, 0.5)
 
 		// The front comes from the edge: cells at the start are shown, those
@@ -406,25 +397,36 @@ func TestWave(t *testing.T) {
 			t.Fatalf("from %d: near visible=%v, far visible=%v", from, s.Visible(near.X, near.Y), s.Visible(far.X, far.Y))
 		}
 
-		// A crest of brightened cells trails the front.
-		crest, plain := 0, 0
+		// A crest trails the front, both its colors moved toward the
+		// terminal's foreground; behind it, cells are as they were.
+		crest, lit, plain := 0, 0, 0
 		for y := range 12 {
 			for x := range 40 {
 				if !s.Visible(x, y) {
 					continue
 				}
-				if c := s.Cell(x, y); rgba(c.Style.Bg) != rgba(blue) {
-					crest++
-					if rgba(c.Style.Fg).G < 0xff && rgba(c.Style.Fg) != rgba(white) {
-						t.Fatalf("crest cell %d,%d has fg %v, not moved toward the foreground", x, y, c.Style.Fg)
-					}
-				} else {
+				c := s.Cell(x, y)
+				fg, bg := rgba(c.Style.Fg), rgba(c.Style.Bg)
+				if fg == rgba(white) && bg == rgba(blue) {
 					plain++
+					continue
+				}
+				// The foreground moves more than the background, which the
+				// crest's faint tail leaves as it was.
+				crest++
+				if fg.R != 0xff || fg.G != 0xff || fg.B == 0xff {
+					t.Fatalf("crest cell %d,%d has fg %v, not moved toward %v", x, y, fg, glow)
+				}
+				if bg != rgba(blue) {
+					lit++
+					if bg.R == 0 || bg.G == 0 {
+						t.Fatalf("crest cell %d,%d has bg %v, not moved toward %v", x, y, bg, glow)
+					}
 				}
 			}
 		}
-		if crest == 0 || plain == 0 {
-			t.Fatalf("from %d: %d crest and %d plain cells at t=0.5", from, crest, plain)
+		if crest == 0 || lit == 0 || plain == 0 {
+			t.Fatalf("from %d: %d crest cells, %d with their background lit, and %d plain at t=0.5", from, crest, lit, plain)
 		}
 	}
 }
@@ -511,13 +513,7 @@ func TestUnfoldInColumnsKeepsGlyphsWhole(t *testing.T) {
 		s := textLayer("世a\nbcd\nef世")
 		Stagger{Effect: Unfold{}, From: Left}.Apply(s, at)
 		for y := range s.Height() {
-			for x := 0; x < s.Width(); {
-				w := s.Cell(x, y).Width
-				if w == 0 || (w == 2 && (x+1 >= s.Width() || s.Cell(x+1, y).Width != 0)) {
-					t.Fatalf("t=%v: glyph at %d,%d split", at, x, y)
-				}
-				x += w
-			}
+			assertRowWhole(t, s, y)
 		}
 	}
 }

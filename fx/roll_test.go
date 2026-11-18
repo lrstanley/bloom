@@ -94,6 +94,11 @@ func TestRoll(t *testing.T) {
 		if got := rowText(s, 0); got != to {
 			t.Fatalf("shows %q just before the end, want %q", got, to)
 		}
+		for x := range len(to) {
+			if fg := s.Cell(x, 0).Style.Fg; fg != nil {
+				t.Fatalf("digit %d still tinted %v just before the end", x, fg)
+			}
+		}
 	})
 }
 

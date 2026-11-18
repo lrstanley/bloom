@@ -107,6 +107,7 @@ func TestSequenceLoop(t *testing.T) {
 		{50 * ms, 1, 2},
 		{150 * ms, 0.5, 1},
 		{200 * ms, 0.5, 1},
+		{10 * time.Second, 0.5, 1}, // the app was suspended for 50 whole cycles
 	}
 	for i, tt := range tests {
 		if !tick(c, &s, tt.advance) {
@@ -122,31 +123,21 @@ func TestSequenceLoop(t *testing.T) {
 	}
 }
 
-func TestSequenceLoopCatchesUp(t *testing.T) {
-	t.Parallel()
-
-	c := &clock{now: time.Unix(0, 0)}
-	s := newTestSequence(c, Jump(0), To(1), Hold(100*ms)) // a 200ms cycle
-	s.Loop()
-	tick(c, &s, 10*time.Second+50*ms) // the app was suspended for 10 whole cycles
-	if !near(s.Float(), 0.5) || s.Step() != 1 {
-		t.Fatalf("after a long pause: %v in step %d, want 0.5 in step 1", s.Float(), s.Step())
-	}
-}
-
 func TestSequenceShortLoopSkipsMissedRuns(t *testing.T) {
 	t.Parallel()
 
 	c := &clock{now: time.Unix(0, 0)}
 	s := newTestSequence(c, Jump(0), To(1, Duration(time.Microsecond)), Hold(time.Microsecond))
 	s.Loop()
+	// Replaying the 1.8 billion runs missed takes far longer than a second,
+	// even without the race detector; skipping them takes microseconds.
 	start := time.Now()
-	tick(c, &s, time.Hour)
-	if elapsed := time.Since(start); elapsed > 50*ms {
+	tick(c, &s, time.Hour+time.Microsecond/2) // half way through the tween
+	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("catching up on an hour of a 2µs loop took %v", elapsed)
 	}
-	if !s.Animating() {
-		t.Fatal("the loop stopped")
+	if !s.Animating() || !near(s.Float(), 0.5) || s.Step() != 1 {
+		t.Fatalf("after an hour: %v in step %d, running %t, want 0.5 in step 1", s.Float(), s.Step(), s.Animating())
 	}
 }
 
@@ -223,18 +214,31 @@ func TestSequenceReplayMidRun(t *testing.T) {
 func TestSequenceHoldWaitsOnce(t *testing.T) {
 	t.Parallel()
 
-	c := &clock{now: time.Unix(0, 0)}
-	s := newTestSequence(c, Hold(time.Second), Jump(1))
-	if s.Play() == nil {
-		t.Fatal("a hold asked for no frame")
-	}
-	if cmd := s.Update(s.frameMsg()); cmd == nil || s.Step() != 0 {
-		t.Fatal("an early frame should wait for the rest of the hold")
-	}
-	c.advance(time.Second)
-	if s.Update(s.frameMsg()) != nil || s.Float() != 1 || s.Animating() {
-		t.Fatalf("after the hold: %v, animating %v", s.Float(), s.Animating())
-	}
+	// A hold waits for its end with one tick, and a frame before it, for
+	// the rest of it, rather than ticking at the frame rate.
+	synctest.Test(t, func(t *testing.T) {
+		c := &clock{now: time.Unix(0, 0)}
+		s := newTestSequence(c, Hold(time.Second), Jump(1))
+		cmd := s.Play()
+		if cmd == nil {
+			t.Fatal("a hold asked for no frame")
+		}
+		if d := delay(cmd); d != time.Second {
+			t.Fatalf("a hold of a second waited %v", d)
+		}
+		c.advance(400 * ms)
+		cmd = s.Update(s.frameMsg())
+		if cmd == nil || s.Step() != 0 {
+			t.Fatal("an early frame should wait for the rest of the hold")
+		}
+		if d := delay(cmd); d != 600*ms {
+			t.Fatalf("an early frame 400ms in waited %v", d)
+		}
+		c.advance(600 * ms)
+		if s.Update(s.frameMsg()) != nil || s.Float() != 1 || s.Animating() {
+			t.Fatalf("after the hold: %v, animating %v", s.Float(), s.Animating())
+		}
+	})
 }
 
 func TestSequenceStepOptions(t *testing.T) {

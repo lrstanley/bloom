@@ -156,18 +156,7 @@ func TestMoveInSubKeepsGlyphsWhole(t *testing.T) {
 	for _, d := range []image.Point{{1, 0}, {-1, 0}} {
 		s := layerOf("世ab世")
 		s.Sub(image.Rect(1, 0, 5, 1)).Move(image.Rect(0, 0, 4, 1), d)
-		for x := 0; x < s.Width(); {
-			w := s.Cell(x, 0).Width
-			if w == 0 {
-				t.Fatalf("move by %v: tail at %d without its glyph: %q", d, x, shown(s))
-			}
-			for i := 1; i < w; i++ {
-				if x+i >= s.Width() || s.Cell(x+i, 0).Width != 0 {
-					t.Fatalf("move by %v: glyph at %d lost its tail: %q", d, x, shown(s))
-				}
-			}
-			x += w
-		}
+		assertWhole(t, s.c)
 	}
 }
 

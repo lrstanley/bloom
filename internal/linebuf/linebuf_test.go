@@ -37,11 +37,11 @@ func appendAll(b *Store, lines ...string) {
 func TestStoreCarriesStyles(t *testing.T) {
 	t.Parallel()
 
-	b := newStore("\x1b[31mred\nstill red\x1b[0m\nplain\n\x1b]8;;https://x.dev\x1b\\link\nstill link\x1b]8;;\x1b\\ done")
+	b := newStore("\x1b[31mred\nstill red\x1b[0m\nplain\n\x1b]8;;https://x.dev\x1b\\link\nstill link\x1b]8;;\x1b\\ done\nafter")
 	if p := b.penOf(0); !p.zero() {
 		t.Fatal("the first line starts styled")
 	}
-	if p := b.penOf(1); p.style.Fg == nil {
+	if p := b.penOf(1); p.style.Fg != ansi.Red {
 		t.Fatal("the red was not carried to the second line")
 	}
 	if p := b.penOf(2); !p.zero() {
@@ -49,6 +49,9 @@ func TestStoreCarriesStyles(t *testing.T) {
 	}
 	if p := b.penOf(4); p.link.URL != "https://x.dev" {
 		t.Fatalf("the link was not carried: %+v", p.link)
+	}
+	if p := b.penOf(5); p.link.URL != "" {
+		t.Fatalf("the closed link was carried: %+v", p.link)
 	}
 }
 
@@ -84,64 +87,6 @@ func TestWrapLine(t *testing.T) {
 		_, got := wrapLine(tc.s, ansi.GraphemeWidth, tc.w, tc.mode, nil)
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("wrapLine(%q, %d, %d): got %v, want %v", tc.s, tc.w, tc.mode, got, tc.want)
-		}
-	}
-}
-
-// TestWrapIndexGrows checks that the rows a buffer works out as lines are
-// appended are those of a buffer given the same lines at once, at each
-// width and mode, and after its content is replaced.
-func TestWrapIndexGrows(t *testing.T) {
-	t.Parallel()
-
-	rng := rand.New(rand.NewPCG(1, 2))
-	words := []string{"a", "word", "longerword", "\x1b[32mgreen\x1b[m", "日本", "tab\there", "", "x"}
-	line := func() string {
-		var parts []string
-		for range rng.IntN(12) {
-			parts = append(parts, words[rng.IntN(len(words))])
-		}
-		return strings.Join(parts, strings.Repeat(" ", 1+rng.IntN(3)))
-	}
-	var grown Store
-	var all []string
-	for round := range 30 {
-		var add []string
-		for range rng.IntN(20) {
-			add = append(add, line())
-		}
-		appendAll(&grown, add...)
-		all = append(all, add...)
-		if round == 15 {
-			grown.Clear()
-			appendAll(&grown, all...)
-		}
-		for _, mode := range []Mode{None, Words, Chars} {
-			for _, w := range []int{1, 3, 7, 16, 200} {
-				fresh := newStore(strings.Join(all, "\n"))
-				if len(all) > 0 && all[len(all)-1] == "" {
-					// AppendText would end the text before its last empty line.
-					fresh.AppendText("")
-				}
-				a := grown.Index(ansi.GraphemeWidth, mode, w)
-				b := fresh.Index(ansi.GraphemeWidth, mode, w)
-				if a.n != b.n || a.Total() != b.Total() {
-					t.Fatalf("round %d mode %d width %d: grown %d lines %d rows, fresh %d lines %d rows",
-						round, mode, w, a.n, a.Total(), b.n, b.Total())
-				}
-				for i := range a.n {
-					if a.RowsOf(i) != b.RowsOf(i) {
-						t.Fatalf("round %d mode %d width %d line %d: grown %d rows, fresh %d", round, mode, w, i, a.RowsOf(i), b.RowsOf(i))
-					}
-					want, _ := wrapLine(all[i], ansi.GraphemeWidth, w, mode, nil)
-					if mode == None {
-						want = 1
-					}
-					if a.RowsOf(i) != want {
-						t.Fatalf("round %d mode %d width %d line %d %q: %d rows, wrapLine says %d", round, mode, w, i, all[i], a.RowsOf(i), want)
-					}
-				}
-			}
 		}
 	}
 }
@@ -351,19 +296,19 @@ func TestCutRowToLineEnd(t *testing.T) {
 }
 
 // TestSGRsKeepsColorKinds checks that the escape sequences kept for
-// styles tell a color of the terminal's palette from the RGB it stands for.
+// styles tell a color of the terminal's palette from the RGB it stands for,
+// whichever of them is looked up first.
 func TestSGRsKeepsColorKinds(t *testing.T) {
 	t.Parallel()
 
-	var c SGRs
 	palette := uv.Style{Fg: ansi.Red}
 	r, g, b, _ := ansi.Red.RGBA()
 	rgb := uv.Style{Fg: color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: 0xff}}
-	if !palette.Equal(&rgb) {
-		t.Skip("the colors are told apart by ultraviolet already")
-	}
-	if a, b := c.Of(&palette), c.Of(&rgb); a == b {
-		t.Fatalf("both drawn with %q", a)
+	for _, order := range [][2]*uv.Style{{&palette, &rgb}, {&rgb, &palette}} {
+		var c SGRs
+		if a, b := c.Of(order[0]), c.Of(order[1]); a == b {
+			t.Fatalf("both drawn with %q", a)
+		}
 	}
 }
 

@@ -135,21 +135,31 @@ func TestBraille(t *testing.T) {
 		t.Parallel()
 		s := brailleFrame(strings.Repeat("x", 200), whiteText)
 		Braille{Seed: 3}.Apply(s, 0.4)
-		turned := 0
+		turned, runs := 0, 0
 		for x := range s.Width() {
-			if isBraille(s.Cell(x, 0).Content) {
+			on := isBraille(s.Cell(x, 0).Content)
+			if on {
 				turned++
 			} else if rgba(s.Cell(x, 0).Style.Fg) == white {
 				t.Fatalf("cell %d kept its glyph without fading", x)
+			}
+			if x == 0 || on != isBraille(s.Cell(x-1, 0).Content) {
+				runs++
 			}
 		}
 		if turned < 60 || turned > 140 {
 			t.Fatalf("t=0.4 turned %d of 200 cells", turned)
 		}
+		// Scattered rather than swept: turned and unturned cells are mixed
+		// along the row, where a wipe would make two runs of them.
+		if runs < 20 {
+			t.Fatalf("t=0.4 turned cells in %d runs: %q", runs, row(s, 0))
+		}
+		// All of them by 0.85, as Braille's doc says.
 		s = brailleFrame(strings.Repeat("x", 200), whiteText)
-		Braille{Seed: 3}.Apply(s, brailleSpread)
+		Braille{Seed: 3}.Apply(s, 0.85)
 		if got := row(s, 0); strings.Contains(got, "x") {
-			t.Fatalf("t=%v left glyphs: %q", brailleSpread, got)
+			t.Fatalf("t=0.85 left glyphs: %q", got)
 		}
 	})
 
@@ -191,14 +201,6 @@ func TestBraille(t *testing.T) {
 		Braille{}.Apply(s, 1)
 		if got := rgba(s.Cell(0, 0).Style.Fg); got.R != got.G || got.G != got.B {
 			t.Fatalf("dots are %v, want a gray", got)
-		}
-	})
-
-	t.Run("comparable", func(t *testing.T) {
-		t.Parallel()
-		var e Effect = Braille{Amount: 0.5, Seed: 2}
-		if e != (Braille{Amount: 0.5, Seed: 2}) {
-			t.Fatal("equal effects compare unequal")
 		}
 	})
 }

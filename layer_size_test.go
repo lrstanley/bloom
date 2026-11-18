@@ -44,7 +44,7 @@ func TestLayerFixedWidthFitsHeight(t *testing.T) {
 			var sizes []Size
 			f := Solve(120, 20, Overlay(base, Layer(sizeProbe{&sizes}).Size(tt.w, 0).ID("l")))
 			expectRect(t, f, "l", tt.want)
-			if slices.ContainsFunc(sizes, func(s Size) bool { return s.W != tt.width }) {
+			if len(sizes) == 0 || slices.ContainsFunc(sizes, func(s Size) bool { return s.W != tt.width }) {
 				t.Fatalf("laid out at %v; want only width %d", sizes, tt.width)
 			}
 			if got := Render(120, 20, Overlay(base, Layer(sizeProbe{&sizes}).Size(tt.w, 0))); !strings.Contains(got, "LAST") {
@@ -57,8 +57,11 @@ func TestLayerFixedWidthFitsHeight(t *testing.T) {
 func TestLayerFixedHeightMeasuresAtHeight(t *testing.T) {
 	t.Parallel()
 	var sizes []Size
-	Solve(120, 20, Overlay(Text("base"), Layer(sizeProbe{&sizes}).Size(0, 3)))
-	if slices.ContainsFunc(sizes, func(s Size) bool { return s.H != 3 }) {
+	f := Solve(120, 20, Overlay(Text("base"), Layer(sizeProbe{&sizes}).Size(0, 3).ID("l")))
+	if r, ok := f.Rect("l"); !ok || r.Dy() != 3 {
+		t.Fatalf("layer at %v, in the frame %v; want 3 rows", r, ok)
+	}
+	if len(sizes) == 0 || slices.ContainsFunc(sizes, func(s Size) bool { return s.H != 3 }) {
 		t.Fatalf("laid out at %v; want only height 3", sizes)
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/internal/linebuf"
@@ -406,6 +407,12 @@ func TestBufferChangesSince(t *testing.T) {
 		for i := range got {
 			if Pos(got[i].End()) != want[i].End() {
 				t.Fatalf("changes since %d: change %d ends at %v, want %v", rev, i, got[i].End(), want[i].End())
+			}
+			// Both edits end at 0,1, so where they map places tells them apart.
+			for _, p := range []Pos{{0, 0}, {0, 2}, {0, 3}} {
+				if g := Pos(got[i].Map(linebuf.Pos(p), false)); g != want[i].Map(p) {
+					t.Fatalf("changes since %d: change %d maps %v to %v, want %v", rev, i, p, g, want[i].Map(p))
+				}
 			}
 		}
 	}
@@ -1004,9 +1011,11 @@ func TestViewportScrollbar(t *testing.T) {
 	if v, _ := f.Viewport("w"); v.Pos.X != 6 || v.Widest != 16 || v.Width != 4 {
 		t.Fatalf("horizontal: %+v", v)
 	}
-	got := ansi.Strip(Render(8, 2, Column(Viewport(wide).ID("w").At(ViewportPos{X: 6}), ScrollbarOf("w").Horizontal())))
-	if !strings.Contains(got, "━") {
-		t.Fatalf("no horizontal scrollbar:\n%s", got)
+	// 16 columns, 8 in view from column 6: a thumb of 4 cells, 6/16 of the
+	// way along the 8 cells of the track.
+	got := ansi.Strip(Render(8, 2, Column(Viewport(wide).ID("w").At(ViewportPos{X: 6}), ScrollbarOf("w").Horizontal().Style(ScrollbarStyle{Thumb: "#"}))))
+	if want := "6789abcd\n   #### "; got != want {
+		t.Fatalf("got:\n%q\nwant:\n%q", got, want)
 	}
 }
 
@@ -1184,15 +1193,12 @@ func TestViewportSelectionScrolled(t *testing.T) {
 		r.Update(msg)
 		r.Render(3, 2, tree())
 	}
-	if pos.Line == 0 {
-		t.Fatal("the selection did not scroll the viewport")
+	if pos != (ViewportPos{Line: 3}) {
+		t.Fatalf("the selection scrolled the viewport to %+v, want line 3", pos)
 	}
 	r.Update(release(0, 3))
 	r.Render(3, 2, tree())
-	got, _ := r.Selection()
-	if !strings.HasPrefix(got, "a\nb\nc") {
-		t.Fatalf("selected %q", got)
-	}
+	wantSelection(t, r, "a\nb\nc\nd\ne\nf")
 }
 
 // highlighted returns the rows of frame out, w cells wide, with the cells
@@ -1430,11 +1436,10 @@ func TestViewportFrameUnchanged(t *testing.T) {
 	b := NewBuffer(strings.Repeat("\x1b[2mdim\x1b[m line\tcol\n", 50))
 	r := New()
 	tree := func() Child { return Viewport(b).Wrap(WrapWords).LineNumbers(lipgloss.NewStyle()) }
-	r.Render(10, 5, tree())
+	first := r.Render(10, 5, tree())
 	b.Append("more")
-	r.r.paintTree(10, 5, tree())
-	if !r.r.sameOps() {
-		t.Fatal("an unchanged viewport drew different ops")
+	if again := r.Render(10, 5, tree()); unsafe.StringData(first) != unsafe.StringData(again) {
+		t.Fatal("a viewport unchanged in sight was drawn again")
 	}
 }
 
@@ -1474,8 +1479,8 @@ func TestLineStyleUnderText(t *testing.T) {
 	if bg := c.CellAt(0, 0).Style.Bg; bg == nil {
 		t.Fatal("the line's background is not under the red text")
 	}
-	if fg := c.CellAt(5, 0).Style.Fg; fg == nil || fg == red {
-		t.Fatalf("plain text after the reset drawn in %v, not the line's color", fg)
+	if fg := c.CellAt(5, 0).Style.Fg; fg == nil || !sameRGBA(fg, lipgloss.Color("#00ff00")) {
+		t.Fatalf("plain text after the reset drawn in %v, not the line's green", fg)
 	}
 }
 
@@ -1494,8 +1499,8 @@ func TestViewportStyle(t *testing.T) {
 			t.Errorf("cell %v has no background", p)
 		}
 	}
-	if fg := c.CellAt(4, 0).Style.Fg; fg == nil || fg == ansi.Red {
-		t.Fatalf("text after the reset drawn in %v, not the viewport's color", fg)
+	if fg := c.CellAt(4, 0).Style.Fg; fg == nil || !sameRGBA(fg, lipgloss.Color("#00ff00")) {
+		t.Fatalf("text after the reset drawn in %v, not the viewport's green", fg)
 	}
 	// With no buffer at all, its rows are filled too.
 	c = canvas.Parse(Render(4, 2, Viewport(nil).Style(base)), ansi.GraphemeWidth)
@@ -1513,10 +1518,13 @@ func TestViewportLongLine(t *testing.T) {
 	for sb.Len() < 6*linebuf.LongLineBytes {
 		sb.WriteString("word \x1b[31mred\x1b[m 日本\tlongerword ")
 	}
-	b := NewBuffer("\x1b[32mopen\n" + sb.String() + "\nafter")
-	wrapped := Render(60, 8, Viewport(b).Wrap(WrapWords).At(ViewportPos{Line: 1, Row: 120}))
-	if strings.Count(ansi.Strip(wrapped), "\n") != 7 {
-		t.Fatalf("wrapped:\n%s", wrapped)
+	text := "\x1b[32mopen\n" + sb.String() + "\nafter"
+	wrapped := Render(60, 8, Viewport(NewBuffer(text)).Wrap(WrapWords).At(ViewportPos{Line: 1, Row: 120}))
+	// The rows drawn from the start of the line, in a buffer of its own,
+	// that has no checkpoints to start from.
+	whole := strings.Split(Render(60, 128, Viewport(NewBuffer(text)).Wrap(WrapWords).At(ViewportPos{Line: 1})), "\n")
+	if want := strings.Join(whole[120:], "\n"); wrapped != want || strings.TrimSpace(ansi.Strip(want)) == "" {
+		t.Fatalf("wrapped from row 120:\n%s\nwant:\n%s", wrapped, want)
 	}
 }
 
@@ -1640,11 +1648,7 @@ func TestViewportCaretKeyboard(t *testing.T) {
 	// A range changed in the same Update as it is copied is the one copied,
 	// and one out of the buffer is clamped to it.
 	sel = Range{Anchor: Pos{0, 6}, Head: Pos{1, 99}}
-	for _, m := range drainSequences(r.CopySelection()) {
-		if c, ok := m.(CopyMsg); ok && (c.Text != "world\nsecond" || c.ID != "v") {
-			t.Fatalf("CopyMsg %+v", c)
-		}
-	}
+	wantCopy(t, r.CopySelection(), "v", "world\nsecond")
 	now = now.Add(2 * flashFor)
 	if got := highlighted(r.Render(12, 3, tree()), 12); got[0] != "......world " || got[1] != "second......" {
 		t.Fatalf("highlighted %q", got)
@@ -1976,7 +1980,7 @@ func TestViewportCaretWords(t *testing.T) {
 						t.Fatalf("mode %d, chars %q: a double click at %d, %d, past the text of its row, selected %v-%v",
 							mode, chars, x, y, got.Anchor, got.Head)
 					case !sel.Empty():
-						if !ok || got != (Range{Anchor: from, Head: to}) {
+						if !ok || to == p || got != (Range{Anchor: from, Head: to}) {
 							t.Fatalf("mode %d, chars %q: a double click at %d, %d selected %v-%v, WordAt(%v) has %v-%v (%v)",
 								mode, chars, x, y, got.Anchor, got.Head, p, from, to, ok)
 						}

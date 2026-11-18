@@ -13,10 +13,12 @@ import (
 	"time"
 
 	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -679,14 +681,9 @@ func TestCopySelection(t *testing.T) {
 		t.Fatalf("the band is still drawn after the flash: %q", out)
 	}
 
-	var msg CopyMsg
-	for _, m := range drainSequences(cmd) {
-		if c, ok := m.(CopyMsg); ok {
-			msg = c
-		}
-	}
-	if copied != "alpha" || msg.Text != "alpha" || msg.ID != "text" || msg.Err != nil {
-		t.Fatalf("copied %q, sent %+v, want alpha from text", copied, msg)
+	wantCopy(t, cmd, "text", "alpha")
+	if copied != "alpha" {
+		t.Fatalf("copied %q, want alpha", copied)
 	}
 }
 
@@ -699,10 +696,12 @@ func TestCopySelectionMotionOff(t *testing.T) {
 		WithClock(func() time.Time { return now }),
 		WithClipboard(func(string) error { return nil }),
 	)
+	ticks := 0 // the flash's ticks asked for, once selecting is done
 	selected := "48;2;66;66;66m"
 	copyHalfWay := func() string {
 		t.Helper()
 		selectDrag(r, 10, 1, tree, 0, [2]int{0, 0}, [2]int{4, 0})
+		r.after = func(time.Duration, func(time.Time) tea.Msg) tea.Cmd { ticks++; return nil }
 		if r.CopySelection() == nil {
 			t.Fatal("nothing copied")
 		}
@@ -710,25 +709,48 @@ func TestCopySelectionMotionOff(t *testing.T) {
 		return r.Render(10, 1, tree())
 	}
 
-	// With motion off, copying sweeps no band.
-	if out := copyHalfWay(); strings.Contains(out, selected) {
-		t.Fatalf("band swept with motion off: %q", out)
+	// With motion off, copying sweeps no band, nor asks for a tick.
+	if out := copyHalfWay(); strings.Contains(out, selected) || ticks != 0 {
+		t.Fatalf("band swept with motion off, %d ticks: %q", ticks, out)
 	}
 
 	// Back on, it sweeps again.
 	anim.SetMotion(true)
-	if out := copyHalfWay(); !strings.Contains(out, selected) {
-		t.Fatalf("no band with motion back on: %q", out)
+	if out := copyHalfWay(); !strings.Contains(out, selected) || ticks != 1 {
+		t.Fatalf("no band with motion back on, %d ticks: %q", ticks, out)
 	}
 
-	// Turned off part way, the band is gone from the next render, before
-	// its next tick, which then stops.
+	// Turned off part way, its next tick stops it, and asks for no other,
+	// and the band is gone from the next render.
 	anim.SetMotion(false)
+	r.Update(flashMsg{root: r})
+	if ticks != 1 {
+		t.Fatal("the flash kept ticking with motion off")
+	}
 	if out := r.Render(10, 1, tree()); strings.Contains(out, selected) {
 		t.Fatalf("band still drawn after motion was turned off: %q", out)
 	}
-	if r.Update(flashMsg{root: r}) != nil {
-		t.Fatal("the flash kept ticking with motion off")
+	// Nor is it drawn when motion goes off before the tick.
+	anim.SetMotion(true)
+	copyHalfWay()
+	anim.SetMotion(false)
+	if out := r.Render(10, 1, tree()); strings.Contains(out, selected) {
+		t.Fatalf("band drawn after motion was turned off, before its tick: %q", out)
+	}
+}
+
+// wantCopy fails t unless cmd, from CopySelection, sends exactly one
+// CopyMsg, of text from the node with ID id, without an error.
+func wantCopy(t *testing.T, cmd tea.Cmd, id any, text string) {
+	t.Helper()
+	var msgs []CopyMsg
+	for _, m := range drainSequences(cmd) {
+		if c, ok := m.(CopyMsg); ok {
+			msgs = append(msgs, c)
+		}
+	}
+	if len(msgs) != 1 || msgs[0].Text != text || msgs[0].ID != id || msgs[0].Err != nil {
+		t.Fatalf("sent %+v, want one CopyMsg of %q from %v", msgs, text, id)
 	}
 }
 
@@ -756,11 +778,18 @@ func drainSequences(cmd tea.Cmd) []tea.Msg {
 func TestSelectionStyle(t *testing.T) {
 	t.Parallel()
 
-	tree := func() Child { return Text("ab").Selectable() }
+	// The selected cells are drawn reversed and bold, and the one after
+	// them as it is.
+	tree := func() Child { return Text("abc").Selectable() }
 	r := New(WithSelectionStyle(lipgloss.NewStyle().Reverse(true).Bold(true)))
-	selectDrag(r, 2, 1, tree, 0, [2]int{0, 0}, [2]int{1, 0})
-	if out := r.Render(2, 1, tree()); !strings.Contains(out, "\x1b[1;7mab") {
-		t.Fatalf("selection not drawn reversed and bold: %q", out)
+	selectDrag(r, 3, 1, tree, 0, [2]int{0, 0}, [2]int{1, 0})
+	wantSelection(t, r, "ab")
+	c := canvas.Parse(r.Render(3, 1, tree()), ansi.GraphemeWidth)
+	const both = uv.AttrReverse | uv.AttrBold
+	for x, want := range []uint8{both, both, 0} {
+		if got := c.CellAt(x, 0).Style.Attrs & both; got != want {
+			t.Errorf("cell %d drawn with attributes %b, want %b", x, got, want)
+		}
 	}
 }
 
@@ -828,7 +857,7 @@ func TestSelectScrollsAContainer(t *testing.T) {
 	tree := func() Child {
 		return Column(
 			Fixed(2, Scroll(Column(Text("one"), Text("two"), Text("three"), Text("four")).Selectable(), offset)).
-				On(on.Scroll(func(_, dy int) tea.Cmd { offset = min(max(offset+dy, 0), 2); return nil })),
+				On(scrolled(&offset, 2)),
 			Text("status"),
 		)
 	}
@@ -844,6 +873,8 @@ func TestSelectScrollsAContainer(t *testing.T) {
 	if offset != 1 {
 		t.Fatalf("offset %d after a tick, want 1", offset)
 	}
+	r.Render(6, 3, tree())
+	wantSelection(t, r, "one\ntwo\nthree\nf")
 }
 
 func TestSelectAll(t *testing.T) {
@@ -1057,15 +1088,7 @@ func TestSelectTextMap(t *testing.T) {
 	wantSelection(t, r, "delta epsilon\nzeta\neta")
 
 	// A copy reads it from the component's text.
-	var copied string
-	for _, m := range drainSequences(r.CopySelection()) {
-		if c, isCopy := m.(CopyMsg); isCopy {
-			copied = c.Text
-		}
-	}
-	if copied != "delta epsilon\nzeta\neta" {
-		t.Fatalf("copied %q", copied)
-	}
+	wantCopy(t, r.CopySelection(), "pane", "delta epsilon\nzeta\neta")
 }
 
 func TestSelectTextMapWordsAndWide(t *testing.T) {
@@ -1222,11 +1245,7 @@ func TestSelectEditableKeyboard(t *testing.T) {
 	if cmd == nil || f.sel != span(0, 5) {
 		t.Fatalf("copy returned %v, left range %+v", cmd, f.sel)
 	}
-	for _, m := range drainSequences(cmd) {
-		if c, ok := m.(CopyMsg); ok && (c.Text != "hello" || c.ID != "input") {
-			t.Fatalf("CopyMsg %+v", c)
-		}
-	}
+	wantCopy(t, cmd, "input", "hello")
 	if copied != "hello" {
 		t.Fatalf("copied %q", copied)
 	}
@@ -1269,15 +1288,8 @@ func TestSelectEditableKeyboard(t *testing.T) {
 
 	// CopySelection sees a range made since, at once, too.
 	f.sel = span(0, 2)
-	var msg CopyMsg
-	for _, m := range drainSequences(r.CopySelection()) {
-		if c, ok := m.(CopyMsg); ok {
-			msg = c
-		}
-	}
-	if msg.Text != "he" {
-		t.Fatalf("copied %+v, want the range made since the last copy", msg)
-	}
+	// It is the range made since the last copy.
+	wantCopy(t, r.CopySelection(), "input", "he")
 }
 
 func TestSelectionTextKept(t *testing.T) {
@@ -1509,11 +1521,9 @@ func TestSelectionReadAfterEdits(t *testing.T) {
 	selectDrag(r, 8, 2, from, 0, [2]int{5, 0}, [2]int{2, 1})
 	wantSelection(t, r, "\ntai")
 	b.Insert(b.End(), "d")
-	early, _ := r.Selection()
+	wantSelection(t, r, "d\ntai")
 	r.Render(8, 2, from())
-	if late, _ := r.Selection(); early != late {
-		t.Fatalf("selected %q before the next frame, and %q after it", early, late)
-	}
+	wantSelection(t, r, "d\ntai")
 
 	// A selection whose text is removed is gone before the next frame, as
 	// it is after it.
@@ -1558,9 +1568,7 @@ func TestSelectionReadAfterEdits(t *testing.T) {
 	b.Delete(Pos{Col: 4}, Pos{Line: 1})
 	wantSelection(t, r, "")
 	r.Render(6, 3, across())
-	if _, ok := r.Selection(); !ok {
-		t.Fatal("the rectangle is not there in the next frame")
-	}
+	wantSelection(t, r, "bc\n\nai")
 	// Nor when the edit moves its corner out of where the viewport was.
 	b = NewBuffer("abcd\nefgh")
 	r = New()
