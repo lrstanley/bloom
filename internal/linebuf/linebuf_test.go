@@ -250,11 +250,13 @@ func TestCountRowsInParallel(t *testing.T) {
 	}
 	var b Store
 	appendAll(&b, lines...)
-	m := b.Measure(ansi.GraphemeWidth)
+	b.Measure(ansi.GraphemeWidth)
 	widths := make([]int32, len(lines))
 	measureLines(lines, ansi.GraphemeWidth, widths)
-	if !slices.Equal(m.widths, widths) {
-		t.Fatal("widths measured in parallel differ")
+	for i, w := range widths {
+		if b.flags(i, ansi.GraphemeWidth) != w {
+			t.Fatalf("line %d: width measured in parallel differs", i)
+		}
 	}
 	for _, mode := range []Mode{Words, Chars} {
 		x := b.Index(ansi.GraphemeWidth, mode, 13)
@@ -299,7 +301,7 @@ func TestLongLines(t *testing.T) {
 	b := newStore("\x1b[32mopen\n" + sb.String() + "\nafter")
 	s, start := b.Line(1), b.penOf(1)
 	m := b.Measure(ansi.GraphemeWidth)
-	width, flags := m.Width(1), m.widths[1]
+	width, flags := m.Width(1), b.flags(1, ansi.GraphemeWidth)
 	// Checkpoints are made only as far along the line as they are wanted.
 	l := b.longLine(1, ansi.GraphemeWidth)
 	b.cutFrom(1, ansi.GraphemeWidth, 3000)
@@ -388,4 +390,29 @@ type sliceColor []uint8
 func (c sliceColor) RGBA() (r, g, b, a uint32) {
 	v := uint32(c[0]) * 0x101
 	return v, v, v, 0xffff
+}
+
+func TestClampLongLine(t *testing.T) {
+	t.Parallel()
+
+	// A long line that is not plain is clamped from a checkpoint, to what
+	// scanning it from its start gives: through characters of many bytes,
+	// wide ones, combining marks, tabs, and styles.
+	line := strings.Repeat("café \x1b[31m日本\x1b[m é\tok ", 4_000)
+	var s Store
+	s.AppendLines("short", line)
+	n := textLen(line)
+	for col := 0; col <= n+3; col += 97 {
+		_, want := textCol(line, col)
+		if got := s.Clamp(Pos{Line: 1, Col: col}); got != (Pos{Line: 1, Col: want}) {
+			t.Fatalf("byte %d clamps to %d, want %d", col, got.Col, want)
+		}
+	}
+	// And from the end back, with the checkpoints all there.
+	for col := n; col >= 0; col -= 1_013 {
+		_, want := textCol(line, col)
+		if got := s.Clamp(Pos{Line: 1, Col: col}); got.Col != want {
+			t.Fatalf("byte %d clamps to %d, want %d", col, got.Col, want)
+		}
+	}
 }

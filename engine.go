@@ -13,6 +13,7 @@ import (
 	"bloomfx.dev/bloom/flex"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/internal/anchor"
+	"bloomfx.dev/bloom/internal/linebuf"
 	"bloomfx.dev/bloom/internal/memo"
 	"bloomfx.dev/bloom/internal/motion"
 	"bloomfx.dev/bloom/internal/same"
@@ -86,12 +87,13 @@ type engine struct {
 	scratch    lipgloss.Style        // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
+	apart      bool      // it builds the items of lists apart from a frame; see itemApart
 	listUp     []listRec // items of the lists being expanded; see listWindow
 	listDown   []listRec
-	vps        []vpLayout      // the viewports laid out this frame
-	vpRows     []vpRow         // the rows they show, in spans
-	motion     *motion.Tracker // nil for pooled renderers, which keep no state between frames
-	screen     func() *Frame   // the Root's frame on screen, for Context.Frame; nil outside a Root
+	vps        []vpLayout        // the viewports laid out this frame
+	vpRows     []linebuf.RowSpan // the rows they show, in spans
+	motion     *motion.Tracker   // nil for pooled renderers, which keep no state between frames
+	screen     func() *Frame     // the Root's frame on screen, for Context.Frame; nil outside a Root
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
@@ -197,11 +199,16 @@ func (e *engine) build(c Child, parent, slot int) int {
 		b.meta = n.meta
 	case ViewportNode:
 		b.meta = n.meta
+		if n.caret != nil {
+			// Its caret is set from the mouse, as the range of an Editable is.
+			b.meta.selectable = true
+		}
 		if n.onScroll != nil {
 			b.meta.handlers = with(n.handlers, []on.Handler{e.viewportScroll(n, b.key())})
 		}
 	default:
-		if _, ok := c.(TextSource); ok {
+		switch c.(type) {
+		case TextSource, TextMap:
 			b.meta.selectable = true
 		}
 	}

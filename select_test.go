@@ -5,6 +5,7 @@
 package bloom
 
 import (
+	"fmt"
 	"image"
 	"reflect"
 	"strings"
@@ -853,4 +854,710 @@ func TestSelectAll(t *testing.T) {
 		}
 		wantSelection(t, r, "")
 	}
+}
+
+// scroller is a TextMap that shows its lines from line top, wrapped at
+// width cells less the gutter of two cells it draws beside each row, in
+// height rows, as a component that scrolls and wraps its own text does.
+type scroller struct {
+	lines         []string
+	top           int
+	width, height int
+}
+
+// srow is a row of a scroller: the bytes of a line from from up to to.
+type srow struct{ line, from, to int }
+
+const gutterW = 2
+
+// rows returns the rows the scroller shows.
+func (s *scroller) rows() []srow {
+	var rows []srow
+	w := s.width - gutterW
+	for i := s.top; i < len(s.lines) && len(rows) < s.height; i++ {
+		line, from, cells := s.lines[i], 0, 0
+		for at, c := range line {
+			cw := ansi.StringWidth(string(c))
+			if cells+cw > w {
+				rows = append(rows, srow{line: i, from: from, to: at})
+				from, cells = at, 0
+			}
+			cells += cw
+		}
+		rows = append(rows, srow{line: i, from: from, to: len(line)})
+	}
+	return rows[:min(len(rows), s.height)]
+}
+
+func (s *scroller) View() string {
+	out := make([]string, s.height)
+	rows := s.rows()
+	for y := range out {
+		text := ""
+		if y < len(rows) {
+			r := rows[y]
+			text = "> " + s.lines[r.line][r.from:r.to]
+		}
+		out[y] = text + strings.Repeat(" ", max(s.width-ansi.StringWidth(text), 0))
+	}
+	return strings.Join(out, "\n")
+}
+
+func (s *scroller) clamp(p Pos) Pos {
+	switch {
+	case p.Line < 0:
+		return Pos{}
+	case p.Line >= len(s.lines):
+		return Pos{Line: len(s.lines) - 1, Col: len(s.lines[len(s.lines)-1])}
+	}
+	return Pos{Line: p.Line, Col: min(max(p.Col, 0), len(s.lines[p.Line]))}
+}
+
+func (s *scroller) PosAt(cell image.Point, _ Size) Pos {
+	rows := s.rows()
+	switch {
+	case cell.Y < 0:
+		return Pos{Line: rows[0].line, Col: rows[0].from}
+	case cell.Y >= len(rows):
+		return s.clamp(Pos{Line: len(s.lines)})
+	}
+	r := rows[cell.Y]
+	x := gutterW
+	for at, c := range s.lines[r.line][r.from:r.to] {
+		cw := ansi.StringWidth(string(c))
+		if cell.X < x+cw {
+			return Pos{Line: r.line, Col: r.from + at}
+		}
+		x += cw
+	}
+	return Pos{Line: r.line, Col: r.to}
+}
+
+func (s *scroller) Cells(from, to Pos, _ Size, row func(y, x0, x1 int)) {
+	from, to = s.clamp(from), s.clamp(to)
+	for y, r := range s.rows() {
+		if r.line < from.Line || r.line > to.Line {
+			continue
+		}
+		lo, hi := r.from, r.to
+		if r.line == from.Line {
+			lo = max(lo, from.Col)
+		}
+		if r.line == to.Line {
+			hi = min(hi, to.Col)
+		}
+		if lo >= hi {
+			continue
+		}
+		cells := func(b int) int { return gutterW + ansi.StringWidth(s.lines[r.line][r.from:b]) }
+		row(y, cells(lo), cells(hi))
+	}
+}
+
+func (s *scroller) Text(from, to Pos) string {
+	from, to = s.clamp(from), s.clamp(to)
+	if from.Line == to.Line {
+		return s.lines[from.Line][from.Col:max(to.Col, from.Col)]
+	}
+	parts := []string{s.lines[from.Line][from.Col:]}
+	parts = append(parts, s.lines[from.Line+1:to.Line]...)
+	return strings.Join(append(parts, s.lines[to.Line][:to.Col]), "\n")
+}
+
+func TestSelectTextMap(t *testing.T) {
+	t.Parallel()
+
+	s := &scroller{lines: []string{"alpha beta", "gamma delta epsilon", "zeta", "eta theta", "iota"}, width: 10, height: 3}
+	tree := func() Child {
+		return Fixed(3, s).ID("pane").On(on.Scroll(func(_, dy int) tea.Cmd {
+			s.top = min(max(s.top+dy, 0), len(s.lines)-1)
+			return nil
+		}))
+	}
+	r := New()
+	// Selectable without being made so. "alpha be" is the first row, beside
+	// the gutter, and "ta" the second: the character under the pointer is
+	// selected, and the gutter is not.
+	msg, ok := selectDrag(r, 10, 3, tree, 0, [2]int{0, 0}, [2]int{3, 1})
+	if !ok || msg.Text != "alpha beta" || msg.ID != "pane" {
+		t.Fatalf("SelectionMsg = %+v (%v), want all of the first line", msg, ok)
+	}
+	wantHighlighted(t, r.Render(10, 3, tree()), 10, "..alpha be", "..ta......", "..........")
+
+	// Scrolled, the selection stays on its text, and is still read from it
+	// scrolled out of sight.
+	s.top = 1
+	wantHighlighted(t, r.Render(10, 3, tree()), 10, "..........", "..........", "..........")
+	wantSelection(t, r, "alpha beta")
+
+	// From "delta" on, held below the pane, the drag scrolls it through its
+	// handler, and goes on to text that was out of sight.
+	s.top = 0
+	r.Render(10, 3, tree())
+	r.Update(down(8, 2))
+	r.Render(10, 3, tree())
+	if cmd := r.Update(dragTo(4, 5)); cmd == nil {
+		t.Fatal("dragging past the edge did not start scrolling")
+	}
+	r.Render(10, 3, tree())
+	for range 2 {
+		r.Update(selScrollMsg{root: r})
+		r.Render(10, 3, tree())
+	}
+	if s.top != 2 {
+		t.Fatalf("top %d after two ticks, want 2", s.top)
+	}
+	r.Update(dragTo(4, 1))
+	r.Render(10, 3, tree())
+	r.Update(release(4, 1))
+	r.Render(10, 3, tree())
+	wantSelection(t, r, "delta epsilon\nzeta\neta")
+
+	// A copy reads it from the component's text.
+	var copied string
+	for _, m := range drainSequences(r.CopySelection()) {
+		if c, isCopy := m.(CopyMsg); isCopy {
+			copied = c.Text
+		}
+	}
+	if copied != "delta epsilon\nzeta\neta" {
+		t.Fatalf("copied %q", copied)
+	}
+}
+
+func TestSelectTextMapWordsAndWide(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1, 0)
+	s := &scroller{lines: []string{"ab 日本 cd", "one two three four"}, width: 12, height: 3}
+	tree := func() Child { return s }
+	r := New(WithClock(func() time.Time { return now }))
+	// Ending on the first half of 本 takes all of it, and starting on the
+	// second half of 日 too.
+	selectDrag(r, 12, 3, tree, 0, [2]int{6, 0}, [2]int{7, 0})
+	wantSelection(t, r, "日本")
+	wantHighlighted(t, r.Render(12, 3, tree()), 12, ".....日本...", "............", "............")
+
+	click := func(x, y int) { selectDrag(r, 12, 3, tree, 0, [2]int{x, y}) }
+	// A double click selects the word, as drawn.
+	now = now.Add(time.Second)
+	click(7, 1)
+	click(7, 1)
+	wantSelection(t, r, "two")
+	// A triple click the whole line, on all the rows it wraps to.
+	click(7, 1)
+	wantSelection(t, r, "one two three four")
+	// The first row's wide characters are a dot each.
+	wantHighlighted(t, r.Render(12, 3, tree()), 12, "..........", "..one two th", "..ree four..")
+}
+
+func TestSelectTextMapBesideText(t *testing.T) {
+	t.Parallel()
+
+	s := &scroller{lines: []string{"first line", "second"}, width: 8, height: 3}
+	tree := func() Child {
+		return Column(Text("title"), Fixed(3, s)).Selectable()
+	}
+	r := New()
+	// From the title into the middle of the component, which wraps "first
+	// line" to "first " and "line".
+	selectDrag(r, 8, 4, tree, 0, [2]int{1, 0}, [2]int{3, 2})
+	wantSelection(t, r, "itle\nfirst li")
+	// Through it, from before it to after it.
+	tree2 := func() Child {
+		return Column(Text("title"), Fixed(3, s), Text("end")).Selectable()
+	}
+	selectDrag(r, 8, 5, tree2, 0, [2]int{0, 0}, [2]int{1, 4})
+	wantSelection(t, r, "title\nfirst line\nsecond\nen")
+	// Inside it, alt held selects as a drag does, not a rectangle.
+	selectDrag(r, 8, 5, tree2, tea.ModAlt, [2]int{4, 1}, [2]int{3, 3})
+	wantSelection(t, r, "rst line\nse")
+}
+
+// input is an Editable of one line of plain text, as an input is.
+type input struct {
+	text string
+	sel  Range
+}
+
+func (f *input) View() string { return f.text }
+
+func (f *input) clamp(p Pos) Pos {
+	if p.Line > 0 {
+		return Pos{Col: len(f.text)}
+	}
+	return Pos{Col: min(max(p.Col, 0), len(f.text))}
+}
+
+func (f *input) PosAt(cell image.Point, _ Size) Pos { return f.clamp(Pos{Col: cell.X}) }
+
+func (f *input) Cells(from, to Pos, _ Size, row func(y, x0, x1 int)) {
+	row(0, f.clamp(from).Col, f.clamp(to).Col)
+}
+
+func (f *input) Text(from, to Pos) string { return f.text[f.clamp(from).Col:f.clamp(to).Col] }
+
+func (f *input) Selection() Range { return f.sel }
+
+func (f *input) Select(r Range) { f.sel = Range{Anchor: f.clamp(r.Anchor), Head: f.clamp(r.Head)} }
+
+func caret(col int) Range { return Range{Anchor: Pos{Col: col}, Head: Pos{Col: col}} }
+
+func span(anchor, head int) Range { return Range{Anchor: Pos{Col: anchor}, Head: Pos{Col: head}} }
+
+func TestSelectEditableMouse(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1, 0)
+	f := &input{text: "hello big world"}
+	tree := func() Child { return Column(Fixed(1, f).ID("input"), Text("other text").Selectable()) }
+	r := New(WithClock(func() time.Time { return now }))
+
+	// A click puts the caret under it.
+	selectDrag(r, 15, 2, tree, 0, [2]int{3, 0})
+	if f.sel != caret(3) {
+		t.Fatalf("after a click, range %+v", f.sel)
+	}
+	wantSelection(t, r, "")
+	// Shift moves the caret and keeps the anchor.
+	now = now.Add(time.Second)
+	selectDrag(r, 15, 2, tree, tea.ModShift, [2]int{8, 0})
+	if f.sel != span(3, 8) {
+		t.Fatalf("after shift+click, range %+v", f.sel)
+	}
+	wantSelection(t, r, "lo bi")
+	// A drag runs from the caret at the press to the caret at the pointer,
+	// either way, and sends what it selected.
+	now = now.Add(time.Second)
+	if msg, ok := selectDrag(r, 15, 2, tree, 0, [2]int{10, 0}, [2]int{6, 0}); !ok || msg.Text != "big " || msg.ID != "input" {
+		t.Fatalf("SelectionMsg = %+v (%v)", msg, ok)
+	}
+	if f.sel != span(10, 6) {
+		t.Fatalf("after a drag, range %+v", f.sel)
+	}
+	wantHighlighted(t, r.Render(15, 2, tree()), 15, "......big .....", "...............")
+
+	// A double click selects the word, and a triple click the line.
+	now = now.Add(time.Second)
+	selectDrag(r, 15, 2, tree, 0, [2]int{12, 0})
+	selectDrag(r, 15, 2, tree, 0, [2]int{12, 0})
+	wantSelection(t, r, "world")
+	selectDrag(r, 15, 2, tree, 0, [2]int{12, 0})
+	wantSelection(t, r, "hello big world")
+
+	// Selecting elsewhere collapses it to its caret.
+	now = now.Add(time.Second)
+	selectDrag(r, 15, 2, tree, 0, [2]int{0, 1}, [2]int{4, 1})
+	if f.sel != caret(15) {
+		t.Fatalf("after selecting elsewhere, range %+v", f.sel)
+	}
+	wantSelection(t, r, "other")
+	// No highlight is drawn over an empty range.
+	wantHighlighted(t, r.Render(15, 2, tree()), 15, "...............", "other..........")
+}
+
+func TestSelectEditableKeyboard(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1, 0)
+	f := &input{text: "hello world"}
+	tree := func() Child { return Column(Fixed(1, f).ID("input"), Text("other text").Selectable()) }
+	var copied string
+	r := New(WithClock(func() time.Time { return now }), WithClipboard(func(s string) error { copied = s; return nil }))
+	selectDrag(r, 11, 2, tree, 0, [2]int{0, 1}, [2]int{4, 1})
+	wantSelection(t, r, "other")
+
+	// A range the component makes itself, such as with shift+right, is the
+	// selection at once, before a frame is drawn, and clears the other.
+	f.sel = span(0, 5)
+	wantSelection(t, r, "hello")
+	if out := highlighted(r.Render(11, 2, tree()), 11); out[1] != "..........." {
+		t.Fatalf("the other selection is still drawn: %q", out)
+	}
+	// Copying it leaves it as it is, and sweeps the band across it.
+	cmd := r.CopySelection()
+	if cmd == nil || f.sel != span(0, 5) {
+		t.Fatalf("copy returned %v, left range %+v", cmd, f.sel)
+	}
+	for _, m := range drainSequences(cmd) {
+		if c, ok := m.(CopyMsg); ok && (c.Text != "hello" || c.ID != "input") {
+			t.Fatalf("CopyMsg %+v", c)
+		}
+	}
+	if copied != "hello" {
+		t.Fatalf("copied %q", copied)
+	}
+	steady := highlighted(r.Render(11, 2, tree()), 11)[0]
+	now = now.Add(flashFor / 2)
+	if band := highlighted(r.Render(11, 2, tree()), 11)[0]; band == steady {
+		t.Fatalf("no band half way through the flash: %q", band)
+	}
+	now = now.Add(flashFor)
+	if got := highlighted(r.Render(11, 2, tree()), 11)[0]; got != "hello......" {
+		t.Fatalf("the selection is not drawn after the flash: %q", got)
+	}
+	// A range that changes while the flash runs ends it.
+	r.CopySelection()
+	now = now.Add(flashFor / 2)
+	f.sel = span(0, 4)
+	if got := highlighted(r.Render(11, 2, tree()), 11)[0]; got != "hell......." {
+		t.Fatalf("the flash went on over a changed range: %q", got)
+	}
+
+	// Clearing it collapses it to its caret.
+	r.ClearSelection()
+	if f.sel != caret(4) {
+		t.Fatalf("after ClearSelection, range %+v", f.sel)
+	}
+	wantSelection(t, r, "")
+	// Selecting all of it, by the ID of the slot it is in.
+	if !r.SelectAll("input") || f.sel != span(0, 11) {
+		t.Fatalf("after SelectAll, range %+v", f.sel)
+	}
+	wantSelection(t, r, "hello world")
+	// No message is sent for what the component selects.
+	f.sel = span(6, 11)
+	for _, m := range drain(r.Update(nil)) {
+		if _, ok := m.(SelectionMsg); ok {
+			t.Fatal("a SelectionMsg was sent for a range the component made")
+		}
+	}
+	wantSelection(t, r, "world")
+
+	// CopySelection sees a range made since, at once, too.
+	f.sel = span(0, 2)
+	var msg CopyMsg
+	for _, m := range drainSequences(r.CopySelection()) {
+		if c, ok := m.(CopyMsg); ok {
+			msg = c
+		}
+	}
+	if msg.Text != "he" {
+		t.Fatalf("copied %+v, want the range made since the last copy", msg)
+	}
+}
+
+func TestSelectionTextKept(t *testing.T) {
+	t.Parallel()
+
+	// From item 1 to item 52 of a list showing four, scrolled back to the
+	// top, so that the items read are built apart from the frame.
+	built, texts := map[int]int{}, 0
+	label := "item"
+	withText := false
+	offset := 0
+	tree := func() Child {
+		n := List(100, func(i int) Child { built[i]++; return Text(fmt.Sprintf("%s %02d", label, i)) }).
+			Offset(offset).Selectable().On(scrolled(&offset, 96))
+		if withText {
+			n = n.ItemText(func(i int) string { texts++; return fmt.Sprintf("%s %02d", label, i) })
+		}
+		return n
+	}
+	r := New()
+	r.after = immediate
+	r.Render(8, 4, tree())
+	r.Update(down(2, 1))
+	r.Render(8, 4, tree())
+	r.Update(dragTo(3, 2))
+	r.Render(8, 4, tree())
+	wheel(r, 8, 4, tree, 3, 2, 50)
+	r.Update(release(3, 2))
+	offset = 0
+	r.Render(8, 4, tree())
+	want := "em 01\n" + listRows(2, 52) + "\nitem"
+
+	// Read again in the same frame, it builds nothing.
+	clear(built)
+	wantSelection(t, r, want)
+	once := len(built)
+	for range 3 {
+		wantSelection(t, r, want)
+	}
+	if len(built) != once || once == 0 {
+		t.Fatalf("built %d items over four reads, %d for the first", len(built), once)
+	}
+	for i, n := range built {
+		if n != 1 {
+			t.Fatalf("item %d built %d times over four reads", i, n)
+		}
+	}
+	// The next frame reads the items scrolled away as it would build them
+	// then, once.
+	label = "next"
+	r.Render(8, 4, tree())
+	clear(built)
+	for range 2 {
+		wantSelection(t, r, "xt 01\n"+strings.ReplaceAll(listRows(2, 52), "item", "next")+"\nnext")
+	}
+	if len(built) != once {
+		t.Fatalf("built %d items over two reads in the next frame, want %d", len(built), once)
+	}
+
+	// Copying it after reading it builds nothing either.
+	label = "item"
+	r.Render(8, 4, tree())
+	wantSelection(t, r, want)
+	clear(built)
+	if cmd := r.CopySelection(); cmd == nil {
+		t.Fatal("nothing copied")
+	}
+	if len(built) != 0 {
+		t.Fatalf("built %d items to copy what was read", len(built))
+	}
+
+	// Given the text of each item, it is read once too.
+	withText, label = true, "item"
+	offset = 0
+	r.Render(8, 4, tree())
+	r.Update(down(2, 1))
+	r.Render(8, 4, tree())
+	r.Update(dragTo(3, 2))
+	r.Render(8, 4, tree())
+	wheel(r, 8, 4, tree, 3, 2, 50)
+	r.Update(release(3, 2))
+	offset = 0
+	r.Render(8, 4, tree())
+	texts = 0
+	for range 4 {
+		wantSelection(t, r, want)
+	}
+	if texts != 48 {
+		t.Fatalf("read the text of %d items over four reads, want 48", texts)
+	}
+}
+
+func TestSelectionTextFollowsRange(t *testing.T) {
+	t.Parallel()
+
+	// The range found again at the release, where the last frame did not
+	// see the pointer, is read as it is then.
+	tree := func() Child { return Text("hello world\nsecond line").ID("t").Selectable() }
+	r := New()
+	r.after = immediate
+	r.Render(12, 2, tree())
+	r.Update(down(0, 0))
+	r.Render(12, 2, tree())
+	r.Update(dragTo(4, 0))
+	r.Render(12, 2, tree())
+	wantSelection(t, r, "hello")
+	r.Update(release(5, 1))
+	wantSelection(t, r, "hello world\nsecond")
+
+	// A selection made in the same frame is read as it is.
+	r.Render(12, 2, tree())
+	wantSelection(t, r, "hello world\nsecond")
+	if !r.SelectAll("t") {
+		t.Fatal("select all found nothing")
+	}
+	wantSelection(t, r, "hello world\nsecond line")
+}
+
+func TestSelectionTextFollowsEdits(t *testing.T) {
+	t.Parallel()
+
+	// In a viewport in sight, edited after the frame.
+	b := NewBuffer("hello world\nsecond line")
+	tree := func() Child { return Viewport(b).Selectable() }
+	r := New()
+	selectDrag(r, 12, 2, tree, 0, [2]int{0, 0}, [2]int{4, 1})
+	wantSelection(t, r, "hello world\nsecon")
+	b.Replace(Pos{Line: 0, Col: 0}, Pos{Line: 0, Col: 5}, "HOWDY")
+	wantSelection(t, r, "HOWDY world\nsecon")
+	b.Insert(Pos{Line: 1, Col: 0}, ">")
+	wantSelection(t, r, "HOWDY world\n>secon")
+
+	// In a viewport of an item of a list that the frame did not build.
+	bufs := map[int]*Buffer{}
+	offset := 0
+	item := func(i int) Child {
+		if bufs[i] == nil {
+			bufs[i] = NewBuffer(fmt.Sprintf("view %d", i))
+		}
+		return Viewport(bufs[i])
+	}
+	list := func() Child { return List(20, item).Offset(offset).ID("list").Selectable() }
+	r = New()
+	r.Render(8, 4, list())
+	if !r.SelectAll("list") {
+		t.Fatal("select all found nothing")
+	}
+	got, _ := r.Selection()
+	if !strings.Contains(got, "\nview 10\n") {
+		t.Fatalf("selected %q, want item 10 in it", got)
+	}
+	bufs[10].Replace(Pos{}, Pos{Col: 4}, "VIEW")
+	if got, _ = r.Selection(); !strings.Contains(got, "\nVIEW 10\n") {
+		t.Fatalf("selected %q after item 10 was edited", got)
+	}
+
+	// The range of a viewport's caret, changed after the frame, and its
+	// buffer, edited after it.
+	b = NewBuffer("hello world\nsecond line")
+	sel := Range{Anchor: Pos{0, 0}, Head: Pos{0, 5}}
+	caret := func() Child { return Viewport(b).ID("v").Caret(&sel) }
+	r = New()
+	r.Render(12, 2, caret())
+	wantSelection(t, r, "hello")
+	sel.Head = Pos{1, 6}
+	wantSelection(t, r, "hello world\nsecond")
+	b.Replace(Pos{Line: 1, Col: 0}, Pos{Line: 1, Col: 6}, "SECOND")
+	wantSelection(t, r, "hello world\nSECOND")
+	// Shown with another buffer in the next frame.
+	b = NewBuffer("other text\nin another buffer")
+	r.Render(12, 2, caret())
+	wantSelection(t, r, "other text\nin ano")
+
+	// The range of another viewport's caret, the same range, made the
+	// selection.
+	b1, b2 := NewBuffer("first buffer"), NewBuffer("second buffer")
+	sel1, sel2 := Range{Head: Pos{0, 5}}, Range{}
+	two := func() Child {
+		return Column(Fixed(1, Viewport(b1).Caret(&sel1)), Fixed(1, Viewport(b2).Caret(&sel2)))
+	}
+	r = New()
+	r.Render(13, 2, two())
+	wantSelection(t, r, "first")
+	sel2 = sel1
+	wantSelection(t, r, "secon")
+}
+
+func TestSelectionTextAskedAgain(t *testing.T) {
+	t.Parallel()
+
+	// A TextMap and an Editable tell their text when asked, which may have
+	// changed since it was last asked.
+	s := &scroller{lines: []string{"first line", "second"}, width: 12, height: 2}
+	tree := func() Child { return Column(Text("title"), Fixed(2, s)).Selectable() }
+	r := New()
+	selectDrag(r, 12, 3, tree, 0, [2]int{0, 0}, [2]int{5, 2})
+	wantSelection(t, r, "title\nfirst line\nseco")
+	s.lines[1] = "SECOND"
+	wantSelection(t, r, "title\nfirst line\nSECO")
+
+	f := &input{text: "hello big world", sel: span(0, 5)}
+	r = New()
+	r.Render(15, 1, f)
+	wantSelection(t, r, "hello")
+	f.text = "HELLO big world"
+	wantSelection(t, r, "HELLO")
+}
+
+func TestSelectionReadAfterEdits(t *testing.T) {
+	t.Parallel()
+
+	// A viewport the selection runs through, from the text before it to the
+	// text after, is read to where its text ends now.
+	b := NewBuffer("abcdef")
+	through := func() Child { return Column(Text("head"), Fixed(1, Viewport(b)), Text("tail")).Selectable() }
+	r := New()
+	selectDrag(r, 8, 3, through, 0, [2]int{0, 0}, [2]int{3, 2})
+	wantSelection(t, r, "head\nabcdef\ntail")
+	b.Delete(Pos{}, Pos{Col: 1})
+	wantSelection(t, r, "head\nbcdef\ntail")
+	b.Insert(b.End(), "gh")
+	wantSelection(t, r, "head\nbcdefgh\ntail")
+
+	// A selection that starts past the end of a viewport's text, and runs on
+	// into the next leaf, reads the same before the next frame as after it.
+	b = NewBuffer("abc")
+	from := func() Child { return Column(Fixed(1, Viewport(b)), Text("tail")).Selectable() }
+	r = New()
+	selectDrag(r, 8, 2, from, 0, [2]int{5, 0}, [2]int{2, 1})
+	wantSelection(t, r, "\ntai")
+	b.Insert(b.End(), "d")
+	early, _ := r.Selection()
+	r.Render(8, 2, from())
+	if late, _ := r.Selection(); early != late {
+		t.Fatalf("selected %q before the next frame, and %q after it", early, late)
+	}
+
+	// A selection whose text is removed is gone before the next frame, as
+	// it is after it.
+	b = NewBuffer("abcde")
+	gone := func() Child { return Viewport(b).Selectable() }
+	r = New()
+	selectDrag(r, 8, 1, gone, 0, [2]int{1, 0}, [2]int{2, 0})
+	wantSelection(t, r, "bc")
+	b.Delete(Pos{Col: 1}, Pos{Col: 3})
+	wantSelection(t, r, "")
+	r.Render(8, 1, gone())
+	wantSelection(t, r, "")
+
+	// A rectangle in a viewport stays on its rows as lines are put in above
+	// them, and is lost with the text it was in.
+	b = NewBuffer("abcd\nefgh\nijkl\nmnop")
+	block := func() Child { return Viewport(b).Selectable() }
+	r = New()
+	selectDrag(r, 6, 5, block, tea.ModAlt, [2]int{1, 1}, [2]int{2, 2})
+	wantSelection(t, r, "fg\njk")
+	b.Insert(Pos{}, "new\n")
+	wantSelection(t, r, "fg\njk")
+	b.SetContent("other")
+	wantSelection(t, r, "")
+
+	// So is one with a corner in a viewport and the other in another leaf.
+	b = NewBuffer("abcd\nefgh")
+	across := func() Child { return Column(Fixed(2, Viewport(b)), Text("tail")).Selectable() }
+	r = New()
+	selectDrag(r, 6, 3, across, tea.ModAlt, [2]int{1, 1}, [2]int{2, 2})
+	wantSelection(t, r, "fg\nai")
+	b.SetContent("other\ntext")
+	wantSelection(t, r, "")
+
+	// A rectangle read from cells, across leaves, is not read from those of
+	// a viewport edited since they were laid out, which may have fewer
+	// rows now: it is there again in the next frame.
+	b = NewBuffer("abcd\nefgh")
+	r = New()
+	selectDrag(r, 6, 3, across, tea.ModAlt, [2]int{1, 1}, [2]int{2, 2})
+	wantSelection(t, r, "fg\nai")
+	b.Delete(Pos{Col: 4}, Pos{Line: 1})
+	wantSelection(t, r, "")
+	r.Render(6, 3, across())
+	if _, ok := r.Selection(); !ok {
+		t.Fatal("the rectangle is not there in the next frame")
+	}
+	// Nor when the edit moves its corner out of where the viewport was.
+	b = NewBuffer("abcd\nefgh")
+	r = New()
+	selectDrag(r, 6, 3, across, tea.ModAlt, [2]int{1, 1}, [2]int{2, 2})
+	b.Insert(Pos{}, "new\n")
+	wantSelection(t, r, "")
+}
+
+func TestSelectWordsAcrossLeaves(t *testing.T) {
+	t.Parallel()
+
+	// A double click dragged out of a viewport, whose words are found in its
+	// text, into a text node, whose words are found in its cells, takes the
+	// word at each end.
+	now := time.Unix(1, 0)
+	b := NewBuffer("view text")
+	tree := func() Child { return Column(Fixed(1, Viewport(b)), Text("plain words here")).Selectable() }
+	r := New(WithClock(func() time.Time { return now }))
+	selectDrag(r, 16, 2, tree, 0, [2]int{1, 0})
+	now = now.Add(time.Millisecond)
+	selectDrag(r, 16, 2, tree, 0, [2]int{1, 0}, [2]int{8, 1})
+	wantSelection(t, r, "view text\nplain words")
+}
+
+func TestViewportCaretRedrawnForItsText(t *testing.T) {
+	t.Parallel()
+
+	// A tab made spaces draws the same cells, with the range over fewer.
+	b := NewBuffer("a\tz")
+	sel := Range{Head: Pos{Col: 2}}
+	tree := func() Child { return Viewport(b).ID("v").Caret(&sel) }
+	r := New()
+	wantHighlighted(t, r.Render(8, 1, tree()), 8, "a   ....")
+	b.Replace(Pos{Col: 1}, Pos{Col: 2}, "   ")
+	wantHighlighted(t, r.Render(8, 1, tree()), 8, "a ......")
+
+	// And so does another buffer that draws the same cells.
+	b = NewBuffer("a\tz")
+	r = New()
+	wantHighlighted(t, r.Render(8, 1, tree()), 8, "a   ....")
+	b = NewBuffer("a   z")
+	wantHighlighted(t, r.Render(8, 1, tree()), 8, "a ......")
 }

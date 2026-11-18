@@ -5,6 +5,7 @@
 package bloom
 
 import (
+	"fmt"
 	"image"
 
 	"bloomfx.dev/bloom/on"
@@ -16,11 +17,12 @@ import (
 type ListNode struct {
 	meta
 
-	count  int
-	item   func(i int) Child
-	offset int
-	keep   int // -1 for none
-	gap    int
+	count    int
+	item     func(i int) Child
+	itemText func(i int) string
+	offset   int
+	keep     int // -1 for none
+	gap      int
 }
 
 // List returns a list of count items, top to bottom, where item returns the
@@ -34,6 +36,15 @@ type ListNode struct {
 // [Frame.List] tells which items a frame showed, and [ScrollbarOf] the list's
 // ID makes a scrollbar for it, in items. In space of unbounded height, such
 // as inside a [Scroll], every item from the first is laid out.
+//
+// Item is also called outside of a frame, in Update, to read the text of a
+// selection in the list (see [ListNode.Selectable]): [Root.Selection],
+// [Root.CopySelection], and the Root as it sends a [SelectionMsg] build the
+// items selected that the last frame did not, at the width the list was
+// laid out at. Until the next frame, item must give the items of the list as
+// it was drawn, for any index below count, even after the program has
+// changed what the list holds. When it panics then, such as with an index
+// out of range, the panic is raised again saying so.
 func List(count int, item func(i int) Child) ListNode {
 	return ListNode{count: max(count, 0), item: item, keep: -1}
 }
@@ -67,7 +78,29 @@ func (n ListNode) On(handlers ...on.Handler) ListNode {
 // the drag starts selects a rectangle of cells instead. The innermost
 // selectable node under the pointer takes the drag, unless a node inside it
 // has an [on.Drag] handler. See [Root.Selection] for the text selected.
+//
+// A selection is kept in the items it starts and ends in, by their index, so
+// it stays as they scroll out of sight and back, and reaches the items
+// between them, which the list does not build: dragging past the list's
+// edge, when its [on.Scroll] handler moves its offset, takes the items that
+// scroll into sight. The text selected is that of every item it covers,
+// built or not. When the list's items change, the selection keeps to the
+// same indexes, and ends when an index it is in is past the count, or the
+// list leaves the frame. A rectangle selected with alt held is of the cells
+// in sight: nothing is selected while a corner of it is scrolled away.
 func (n ListNode) Selectable() ListNode { n.selectable = true; return n }
+
+// ItemText sets the text a selection takes from item i of the list when the
+// item is selected whole and the list did not build it, such as when it is
+// scrolled out of sight, rather than building the item to read it. It must
+// return what selecting all of the item would: the text of its nodes, joined
+// as a selection joins them, a line to a row and a space between nodes side
+// by side. The items a selection starts and ends in are built to read, as
+// it starts and ends at a place in them as laid out.
+//
+// It is called outside of a frame, as item is (see [List]), for each such
+// item every time the text is read.
+func (n ListNode) ItemText(text func(i int) string) ListNode { n.itemText = text; return n }
 
 // View implements [Child], drawing the node at its natural size.
 func (n ListNode) View() string { return Render(0, 0, n) }
@@ -115,7 +148,13 @@ func (e *engine) listItem(win *listWindow, j int) listRec {
 		return (*arena)[at]
 	}
 	r := listRec{box: -1}
-	if c := win.n.item(j); c != nil && !absent(c) {
+	var c Child
+	if e.apart {
+		c = itemApart(win.n.count, j, win.n.item)
+	} else {
+		c = win.n.item(j)
+	}
+	if c != nil && !absent(c) {
 		// The item's index is its slot, so it is followed from frame to frame
 		// as the list scrolls, rather than where it is on screen.
 		r.box = e.build(c, win.i, j)
@@ -123,6 +162,41 @@ func (e *engine) listItem(win *listWindow, j int) listRec {
 	}
 	*arena = append(*arena, r)
 	return r
+}
+
+// itemApart calls fn, the item function of a list of count items as it was
+// last drawn, or the function it was given with [ListNode.ItemText], for
+// item j, outside of a frame, to read the text of a selection. The program
+// may have changed what the list holds since, so that fn panics, such as
+// with an index out of range: it panics again with an [itemError], which
+// says so.
+func itemApart[T any](count, j int, fn func(i int) T) T {
+	defer func() {
+		if v := recover(); v != nil {
+			panic(itemError{item: j, count: count, value: v})
+		}
+	}()
+	return fn(j)
+}
+
+// itemError is what a list's item function panicked with when it was called
+// outside of a frame: for item, of a list of count items, with value.
+type itemError struct {
+	item, count int
+	value       any
+}
+
+func (p itemError) Error() string {
+	return fmt.Sprintf("bloom: a List's item function panicked for item %d, called outside of a frame to read the "+
+		"selected text: %v. The list was last drawn with %d items, and until the next frame its functions are "+
+		"called for any of those: read the selection before changing what the list holds, or return nil for an "+
+		"index it no longer has", p.item, p.value, p.count)
+}
+
+// Unwrap returns what the function panicked with, when it is an error.
+func (p itemError) Unwrap() error {
+	err, _ := p.value.(error)
+	return err
 }
 
 // listSpan returns the rows item j of the list of win spans: its height and

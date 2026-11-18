@@ -38,6 +38,9 @@ type ViewportNode struct {
 	style     string // the escape sequence of Style's colors and attributes
 	onScroll  func(pos ViewportPos) tea.Cmd
 	trusted   bool
+	caret     *Range
+	onCaret   func(sel Range) tea.Cmd
+	cursor    *tea.Cursor
 }
 
 // Viewport returns a viewport showing the lines of buf, from the start
@@ -249,11 +252,65 @@ func (n ViewportNode) On(handlers ...on.Handler) ViewportNode {
 
 // Selectable lets the left button select text in the viewport by dragging
 // over it, as a terminal selects text, but kept inside the viewport.
-// Holding alt as the drag starts selects a rectangle of cells instead. See
+// Holding alt as the drag starts selects a rectangle of cells instead, and a
+// triple click selects the whole line, on all the rows it wraps to. See
 // [Root.Selection] for the text selected, which takes the lines scrolled out
 // of sight as well, with the rows of a wrapped line joined again, and
 // without the gutters.
+//
+// The selection is kept on the buffer's text, rather than on the rows
+// drawn, so that it stays on the same text as the viewport scrolls and
+// wraps its lines differently, and as lines are appended, and the buffer is
+// edited, such as to take out the first lines of a capped log. Setting the
+// buffer's content again, as [Buffer.SetContent] does, clears it.
 func (n ViewportNode) Selectable() ViewportNode { n.selectable = true; return n }
+
+// Caret makes the viewport an editing surface: sel is what is selected in
+// its buffer, the caret at its Head, kept in the model. The viewport reads
+// it whenever it is drawn, and [Root.Selection] whenever it is asked, so a
+// range the program changes with the keyboard is seen in the same Update,
+// and the mouse writes it, as it does the range of an [Editable]: a press
+// puts the caret under the pointer, before the character there, and with
+// shift held moves the Head there and keeps the Anchor; a drag moves the
+// Head; a double click selects the word, found in the buffer's text as
+// [WithWordChars] tells, and a triple click the line. A press past the end of a row its line wraps after
+// leaves the caret at the end of that row, with [Range.EndOfRow] set, rather
+// than at the start of the next. A range that holds text is drawn as the
+// selection is, and is the one selection on the screen: [Root.CopySelection]
+// copies it and leaves it, [Root.ClearSelection] collapses it to its Head,
+// and [Root.SelectAll], given the viewport's ID, selects all of the buffer.
+// The viewport is selectable without [ViewportNode.Selectable], and dragging
+// past its edge scrolls it through [ViewportNode.OnScroll].
+//
+// So that the caret has a cell at the end of a line as wide as the
+// viewport, the lines are laid out one column narrower than it, the last
+// column kept for the caret, whether they wrap or scroll sideways. An empty
+// buffer has the caret at its top-left, and takes edits as one empty line.
+//
+// Following the range through the edits to the buffer is the program's to
+// do, with the [Change] each edit returns, such as to put the caret at
+// [Change.End] after typing. A range out of the buffer's bounds is clamped
+// where it is drawn and read. The methods of [ViewportView] move the caret
+// by the rows the lines wrap to, to the ends of rows, and by pages, and
+// keep it in sight.
+func (n ViewportNode) Caret(sel *Range) ViewportNode { n.caret = sel; return n }
+
+// OnCaret calls fn when the mouse moves the caret or changes what is
+// selected, after the range given to [ViewportNode.Caret] is written, such
+// as to forget the column kept while moving up and down. Its command is
+// run as the mouse event's.
+func (n ViewportNode) OnCaret(fn func(sel Range) tea.Cmd) ViewportNode {
+	n.onCaret = fn
+	return n
+}
+
+// Cursor shows the terminal cursor at the caret, the Head of the range given
+// to [ViewportNode.Caret], drawn on the side of a wrap its EndOfRow tells,
+// as [ViewportView.CaretCell] has it, while it is in sight, in c's shape and
+// color, as [TextNode.Cursor] does at a cell: give it only while the
+// viewport has focus. The position of c is not used. It does nothing without
+// a caret.
+func (n ViewportNode) Cursor(c *tea.Cursor) ViewportNode { n.cursor = c; return n }
 
 // View implements [Child], drawing the node at its natural size.
 func (n ViewportNode) View() string { return Render(0, 0, n) }
@@ -325,7 +382,8 @@ type ViewportView struct {
 	// Lines is how many lines the buffer had.
 	Lines int
 	// Width is how many columns wide the lines were shown in, besides the
-	// gutters.
+	// gutters, and besides the column kept for the caret of a viewport
+	// given [ViewportNode.Caret].
 	Width int
 	// Widest is how many columns the widest line took.
 	Widest int
@@ -334,10 +392,12 @@ type ViewportView struct {
 	method ansi.Method
 	wrap   WrapMode
 	follow bool
+	gutter int  // how many columns the gutters took
+	caret  bool // a column past Width is kept for the caret
 }
 
 // index returns the rows of the view's buffer at its width.
-func (v ViewportView) index() *linebuf.Index {
+func (v ViewportView) index() linebuf.Index {
 	return v.buf.s.Index(v.method, linebuf.Mode(v.wrap), v.Width)
 }
 
@@ -428,6 +488,218 @@ func (v ViewportView) Percent() float64 {
 	return 1
 }
 
+// The methods below find positions in the buffer, and move the caret of a
+// range, by the rows its lines are laid out in, as the keys of an editor
+// move it, and take and give cells relative to the viewport's top-left, its
+// gutters included, as the mouse does. Those that move a caret find the row
+// it is on with its side, [Range.EndOfRow], and give it the side it needs
+// where they move it to; the Anchor is left as it is, for the program to
+// collapse the range to the caret unless shift is held.
+
+// top returns the row at the top of the viewport, with x the index of the
+// rows of its buffer as it is now, as a frame would lay it out from Pos.
+func (v ViewportView) top(x linebuf.Index) int {
+	bottom := max(x.Total()-v.Rows, 0)
+	switch p := v.Pos; {
+	case p.Line >= v.buf.Len():
+		return bottom
+	case p.Line >= 0:
+		return min(x.RowsBefore(p.Line)+min(max(p.Row, 0), x.RowsOf(p.Line)-1), bottom)
+	}
+	return 0
+}
+
+// cols returns how many columns of text the viewport shows: its width, and
+// the caret's column.
+func (v ViewportView) cols() int {
+	if v.caret {
+		return v.Width + 1
+	}
+	return v.Width
+}
+
+// PosAt returns the position in the buffer of the character drawn at cell,
+// relative to the viewport's top-left, as the mouse finds it to put a caret
+// there: before the character, the end of the row for a cell past its
+// text, the start of the buffer for a cell above its first row, and its end
+// for one below its last. A row a line wraps after ends where the next row
+// starts, past the spaces that hang off a row wrapped at words. The cells
+// of the gutters are columns before the first in sight.
+func (v ViewportView) PosAt(cell image.Point) Pos {
+	return v.CaretAt(cell).Head
+}
+
+// CaretAt returns the empty range at cell, relative to the viewport's
+// top-left, as a click puts the caret there: at the position
+// [ViewportView.PosAt] gives, with EndOfRow set when the cell is past the
+// text of a row its line wraps after, so that the caret stays on that row
+// rather than going to the start of the next.
+func (v ViewportView) CaretAt(cell image.Point) Range {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return Range{}
+	}
+	rs := v.index()
+	var scratch []int
+	row := cell.Y + v.top(rs)
+	p := rs.PosAt(row, cell.X-v.gutter+v.Pos.X, &scratch)
+	return Range{Anchor: Pos(p), Head: Pos(p), EndOfRow: rs.EndsRow(p, row, &scratch)}
+}
+
+// CellOf returns the cell, relative to the viewport's top-left, that p,
+// clamped to the buffer, is drawn at, and whether that is in sight. A
+// position where a line wraps is drawn at the start of the row after, and
+// one among the spaces that hang off the end of a row wrapped at words, at
+// the column past its text. [ViewportView.CaretCell] finds where a caret
+// is drawn, which may be at the end of the row before.
+func (v ViewportView) CellOf(p Pos) (image.Point, bool) { return v.cellAt(p, false) }
+
+// CaretCell returns the cell, relative to the viewport's top-left, that the
+// caret of sel, at its Head, is drawn at, and whether that is in sight: as
+// [ViewportView.CellOf] has it, but at a place its line wraps with
+// EndOfRow set, past the cells of the row before, in the caret's column at
+// the latest.
+func (v ViewportView) CaretCell(sel Range) (image.Point, bool) {
+	return v.cellAt(sel.Head, sel.EndOfRow)
+}
+
+// cellAt is CellOf, and with end, CaretCell.
+func (v ViewportView) cellAt(p Pos, end bool) (image.Point, bool) {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return image.Pt(v.gutter, 0), v.Rows > 0 && v.cols() > 0
+	}
+	rs := v.index()
+	var scratch []int
+	row, cell := rs.CaretIn(linebuf.Pos(p), end, &scratch)
+	at := image.Pt(v.gutter+cell-v.Pos.X, row-v.top(rs))
+	in := at.Y >= 0 && at.Y < v.Rows && cell >= v.Pos.X && cell-v.Pos.X < v.cols()
+	return at, in
+}
+
+// Column returns the column of its row that the caret of sel is drawn at,
+// counting from the start of the row rather than from where the viewport
+// is scrolled to, to keep while moving up and down with
+// [ViewportView.MoveRows].
+func (v ViewportView) Column(sel Range) int {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return 0
+	}
+	var scratch []int
+	_, cell := v.index().CaretIn(linebuf.Pos(sel.Head), sel.EndOfRow, &scratch)
+	return cell
+}
+
+// MoveRows returns sel with its Head moved n rows down from the row its
+// caret is drawn on, or up for a negative n, counting the rows the lines
+// wrap to, to column of that row, as an arrow key moves a caret: to the
+// character boundary nearest the column, never inside a wide character or
+// a tab, and to the end of the row, as [ViewportView.RowEnd] has it, for a
+// column at or past the row's cells. A move above the first row goes to the
+// start of the text, and one below the last row to its end. The Anchor is
+// kept, and EndOfRow is set for the Head at the end of a row its line wraps
+// after.
+func (v ViewportView) MoveRows(sel Range, n, column int) Range {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return sel.WithHead(Pos{})
+	}
+	rs := v.index()
+	var scratch []int
+	row, _ := rs.CaretIn(linebuf.Pos(sel.Head), sel.EndOfRow, &scratch)
+	switch row += n; {
+	case row < 0:
+		return sel.WithHead(Pos{})
+	case row >= rs.Total():
+		return sel.WithHead(v.buf.End())
+	}
+	p, end := rs.AtColumn(row, column, &scratch)
+	sel = sel.WithHead(Pos(p))
+	sel.EndOfRow = end
+	return sel
+}
+
+// ScrollRows returns sel with its Head moved n rows as [ViewportView.MoveRows]
+// moves it, and the position scrolled n rows the same way, so that the
+// caret stays on the row of the viewport it was on, as page up and page
+// down move it. Near the top or the bottom, the viewport scrolls as far as
+// it can, and the caret still moves. The position has the caret in sight,
+// scrolled as [ViewportView.Show] scrolls it when it would not be, such as
+// for a caret that was out of sight.
+func (v ViewportView) ScrollRows(sel Range, n, column int) (Range, ViewportPos) {
+	sel = v.MoveRows(sel, n, column)
+	if v.buf == nil || v.buf.Len() == 0 {
+		return sel, v.Pos
+	}
+	rs := v.index()
+	top := min(max(v.top(rs)+n, 0), max(rs.Total()-v.Rows, 0))
+	var scratch []int
+	row, cell := rs.CaretIn(linebuf.Pos(sel.Head), sel.EndOfRow, &scratch)
+	return sel, v.show(rs, v.AtRow(top), top, row, cell)
+}
+
+// RowStart returns sel with its Head moved to the start of the row its
+// caret is drawn on, as the home key moves a caret, its Anchor kept.
+func (v ViewportView) RowStart(sel Range) Range {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return sel.WithHead(Pos{})
+	}
+	rs := v.index()
+	var scratch []int
+	row, _ := rs.CaretIn(linebuf.Pos(sel.Head), sel.EndOfRow, &scratch)
+	return sel.WithHead(Pos(rs.PosAt(row, 0, &scratch)))
+}
+
+// RowEnd returns sel with its Head moved to the end of the row its caret
+// is drawn on, as the end key moves a caret, its Anchor kept: the end of
+// the line on its last row, and on a row the line wraps after, the place
+// it wraps, where the next row starts, after any spaces that hang off a
+// row wrapped at words, with EndOfRow set so that the caret is drawn at
+// the end of the row rather than at the start of the next.
+func (v ViewportView) RowEnd(sel Range) Range {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return sel.WithHead(Pos{})
+	}
+	rs := v.index()
+	var scratch []int
+	row, _ := rs.CaretIn(linebuf.Pos(sel.Head), sel.EndOfRow, &scratch)
+	p, end := rs.RowEnd(row, &scratch)
+	sel = sel.WithHead(Pos(p))
+	sel.EndOfRow = end
+	return sel
+}
+
+// Show returns the position scrolled as little as it takes for the caret
+// of sel to be in sight, at the cell [ViewportView.CaretCell] gives, down
+// or up, and while the lines do not wrap, sideways, such as to keep a caret
+// in sight as it moves. It is Pos when the caret is in sight.
+func (v ViewportView) Show(sel Range) ViewportPos {
+	if v.buf == nil || v.buf.Len() == 0 {
+		return v.Pos
+	}
+	rs := v.index()
+	var scratch []int
+	row, cell := rs.CaretIn(linebuf.Pos(sel.Head), sel.EndOfRow, &scratch)
+	return v.show(rs, v.Pos, v.top(rs), row, cell)
+}
+
+// show returns pos, with top the row at its top, scrolled as little as it
+// takes for cell of row to be in sight.
+func (v ViewportView) show(x linebuf.Index, pos ViewportPos, top, row, cell int) ViewportPos {
+	switch {
+	case row < top:
+		pos = v.AtRow(row)
+	case row >= top+max(v.Rows, 1):
+		pos = v.AtRow(row - max(v.Rows, 1) + 1)
+	}
+	if x.Uniform() {
+		switch cols := max(v.cols(), 1); {
+		case cell < pos.X:
+			pos.X = cell
+		case cell >= pos.X+cols:
+			pos.X = cell - cols + 1
+		}
+	}
+	return pos
+}
+
 // vpLayout is a viewport as laid out in a frame: where it was scrolled to,
 // where its lines go, and the rows in sight, a span of the engine's vpRows.
 type vpLayout struct {
@@ -436,21 +708,23 @@ type vpLayout struct {
 	rows    [2]int
 }
 
-// vpRow is a row of a viewport in sight: the cells from a up to b of a
-// line, and which of the line's rows it is.
-type vpRow struct {
-	line, sub, a, b int
-}
-
 // measureViewport returns the natural size of viewport n within avail: as
 // wide as its widest line, besides its gutters, and as tall as its lines,
 // wrapped to that width, no more than avail.
 func (e *engine) measureViewport(n ViewportNode, avail Size) Size {
+	// A caret has a column of its own, past the lines.
+	caret := 0
+	if n.caret != nil {
+		caret = 1
+	}
 	if n.buf == nil || n.buf.Len() == 0 {
+		if caret > 0 {
+			return Size{W: gutterWidth(n.gutters, 0) + caret, H: 1}
+		}
 		return Size{}
 	}
 	lines := n.buf.Len()
-	g := gutterWidth(n.gutters, lines)
+	g := gutterWidth(n.gutters, lines) + caret
 	m := n.buf.s.Measure(e.method)
 	w := m.Widest
 	if n.wrap != WrapNone {
@@ -468,16 +742,7 @@ func (e *engine) measureViewport(n ViewportNode, avail Size) Size {
 	}
 	// Only whether the lines fill avail matters, so they are counted until
 	// they do.
-	h := 0
-	var starts []int
-	for i := 0; i < lines && h < avail.H; i++ {
-		if m.Width(i) <= w {
-			h++
-			continue
-		}
-		h += len(n.buf.s.RowStarts(i, e.method, w, linebuf.Mode(n.wrap), &starts))
-	}
-	return Size{W: w + g, H: h}
+	return Size{W: w + g, H: n.buf.s.CountRows(e.method, linebuf.Mode(n.wrap), w, avail.H)}
 }
 
 // layoutViewport works out where viewport n, box i, laid out in r, is
@@ -485,10 +750,11 @@ func (e *engine) measureViewport(n ViewportNode, avail Size) Size {
 func (e *engine) layoutViewport(i int, n ViewportNode, r image.Rectangle) {
 	l := vpLayout{content: r}
 	l.rows[0] = len(e.vpRows)
-	l.view = ViewportView{buf: n.buf, method: e.method, wrap: n.wrap, follow: n.follow, Rows: r.Dy()}
+	l.view = ViewportView{buf: n.buf, method: e.method, wrap: n.wrap, follow: n.follow, Rows: r.Dy(), caret: n.caret != nil}
 	if n.buf != nil {
 		lines := n.buf.Len()
-		l.content.Min.X += min(gutterWidth(n.gutters, lines), r.Dx())
+		l.view.gutter = min(gutterWidth(n.gutters, lines), r.Dx())
+		l.content.Min.X += l.view.gutter
 		e.viewportRows(&l, n, lines)
 	}
 	l.rows[1] = len(e.vpRows)
@@ -501,6 +767,11 @@ func (e *engine) layoutViewport(i int, n ViewportNode, r image.Rectangle) {
 func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 	v := &l.view
 	w, h := l.content.Dx(), l.content.Dy()
+	if n.caret != nil {
+		// The last column is the caret's, past the end of a line as wide as
+		// the lines are laid out.
+		w = max(w-1, 0)
+	}
 	m := n.buf.s.Measure(e.method)
 	x := n.buf.s.Index(e.method, linebuf.Mode(n.wrap), w)
 	v.Lines, v.Width, v.Widest, v.TotalRows = lines, w, m.Widest, x.Total()
@@ -528,26 +799,7 @@ func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 		v.Pos = ViewportPos{Line: ViewportEnd.Line, X: col}
 	}
 
-	var scratch []int
-	for y := 0; y < h && line < lines; line++ {
-		if x.Uniform() || x.RowsOf(line) == 1 {
-			e.vpRows = append(e.vpRows, vpRow{line: line, a: col, b: col + w})
-			y++
-			sub = 0
-			continue
-		}
-		starts := n.buf.s.RowStarts(line, e.method, w, linebuf.Mode(n.wrap), &scratch)
-		end := m.Width(line)
-		for k := sub; k < len(starts) && y < h; k++ {
-			rowEnd := end
-			if k+1 < len(starts) {
-				rowEnd = starts[k+1]
-			}
-			e.vpRows = append(e.vpRows, vpRow{line: line, sub: k, a: starts[k], b: min(rowEnd, starts[k]+w)})
-			y++
-		}
-		sub = 0
-	}
+	e.vpRows = x.InSight(line, sub, h, col, e.vpRows)
 }
 
 // viewportOf returns how box i, a viewport, was laid out.
@@ -594,6 +846,11 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 	if l == nil || !r.parse {
 		return
 	}
+	if r.rooted && n.buf != nil {
+		// A buffer with no word characters of its own finds words as a
+		// double click here does.
+		n.buf.shownWith(r.words.Chars)
+	}
 	// Rows are only laid out for a buffer.
 	buf, rows := n.buf, r.vpRows[l.rows[0]:l.rows[1]]
 	content := l.content
@@ -604,20 +861,20 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 		for g := range n.gutters {
 			gt := &n.gutters[g]
 			w := gt.size(buf.Len())
-			text := gt.text(GutterRow{Line: row.line, Continued: row.sub > 0, Lines: buf.Len()}, w)
+			text := gt.text(GutterRow{Line: row.Line, Continued: row.Sub > 0, Lines: buf.Len()}, w)
 			r.blitText(text, n.trusted, image.Rect(gx, y, gx+w, y+1), vis.Intersect(image.Rect(gx, y, content.Min.X, y+1)))
 			gx += w
 		}
 
-		if row.line != markLine {
-			markLine, lineSGR, marks = row.line, n.style, marks[:0]
+		if row.Line != markLine {
+			markLine, lineSGR, marks = row.Line, n.style, marks[:0]
 			if n.lineStyle != nil {
-				lineSGR += styleSGR(&r.vpPens, n.lineStyle(row.line))
+				lineSGR += styleSGR(&r.vpPens, n.lineStyle(row.Line))
 			}
 			if n.marks != nil {
-				s := buf.s.Line(row.line)
+				s := buf.s.Line(row.Line)
 				spans := r.vpSpans[:0]
-				given := n.marks(row.line, linebuf.PlainText(s, r.method))
+				given := n.marks(row.Line, linebuf.PlainText(s, r.method))
 				for k := range given {
 					m := &given[k]
 					spans = append(spans, linebuf.Overlay{Start: m.Start, End: m.End, SGR: styleSGR(&r.vpPens, m.Style)})
@@ -629,7 +886,7 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 		if lineSGR != "" {
 			st.Fill = content.Dx()
 		}
-		text := buf.s.CutRow(row.line, r.method, row.a, row.b, &st)
+		text := buf.s.CutRow(row.Line, r.method, row.A, row.B, &st)
 		r.blitText(text, n.trusted, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
 	}
 	r.vpMarks = marks[:0]
@@ -639,6 +896,53 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 			r.blit(blank, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
 		}
 	}
+}
+
+// paintCaret notes box i, viewport n given a caret, drawn at vis, whose
+// range is kept in the model, adds the op that draws the range over it, and
+// shows the cursor at its Head.
+func (r *renderer) paintCaret(i int, n ViewportNode, vis image.Rectangle) {
+	l := r.viewportOf(i)
+	if l == nil {
+		return
+	}
+	b := &r.boxes[i]
+	if n.cursor != nil {
+		if at, ok := l.view.CaretCell(*n.caret); ok {
+			c := *n.cursor
+			c.X, c.Y = at.X, at.Y
+			r.placeCursor(&c, b.rect.Min, vis)
+		}
+	}
+	if !r.parse {
+		return
+	}
+	buf, sel, fn := n.buf, n.caret, n.onCaret
+	rect, shown := viewportLeaf(l, vis)
+	h := heldLeaf{
+		leaf: selLeaf{key: b.key(), box: i, rect: rect, clip: shown, vp: l},
+		get:  func() Range { return clampRange(buf, *sel) },
+		set: func(rg Range) tea.Cmd {
+			*sel = clampRange(buf, rg)
+			if fn != nil {
+				return fn(*sel)
+			}
+			return nil
+		},
+	}
+	if buf != nil {
+		h.leaf.rev = buf.Rev()
+	}
+	r.addHeld(h, b.rect, vis)
+}
+
+// clampRange returns rg with its ends clamped to the text of buf, and
+// EndOfRow kept.
+func clampRange(buf *Buffer, rg Range) Range {
+	if buf == nil {
+		return Range{}
+	}
+	return Range{Anchor: buf.Clamp(rg.Anchor), Head: buf.Clamp(rg.Head), EndOfRow: rg.EndOfRow}
 }
 
 // viewportLeaf returns the text leaf of viewport box i laid out as l,
@@ -657,93 +961,76 @@ func viewportLeaf(l *vpLayout, clip image.Rectangle) (rect, vis image.Rectangle)
 
 // vpRowCells returns the cells of row y of the lines of the viewport laid
 // out as l, all of it from its first cell, kept for the next call, as
-// selecting a word asks for each cell of a row in turn.
+// reading the cells of a selection asks for each cell of a row in turn.
 func (r *renderer) vpRowCells(l *vpLayout, y int) (cells string) {
 	v := &l.view
-	if y < 0 || y >= v.TotalRows || v.buf == nil {
+	if y < 0 || v.buf == nil {
 		return ""
 	}
-	if m := &r.vpCell; m.buf == v.buf && m.rev == v.buf.s.Rev() && m.y == y && m.width == v.Width && m.wrap == v.wrap {
-		return m.cells
+	// The rows are those the lines take now, which an edit since the frame
+	// may have left fewer of.
+	rows := v.index()
+	if y >= rows.Total() {
+		return ""
 	}
-	var scratch []int
-	line, a, b := v.rowAt(v.index(), y, &scratch)
-	cells = v.buf.s.CutRow(line, v.method, a, b, nil)
-	r.vpCell = vpCellMemo{buf: v.buf, rev: v.buf.s.Rev(), y: y, width: v.Width, wrap: v.wrap, cells: cells}
-	return cells
+	return rows.RowCells(y, &r.vpCell)
 }
 
-// rowAt returns the line that row y of the lines of v shows, with index x,
-// and the cells of it the row takes, from a up to end, which for its last
-// row is past the end of the line. Wrapped rows are worked out in scratch.
-func (v ViewportView) rowAt(x *linebuf.Index, y int, scratch *[]int) (line, a, end int) {
-	line, sub := x.LineAt(y)
-	if x.Uniform() || x.RowsOf(line) == 1 {
-		return line, 0, math.MaxInt
+// vpWord returns the word of the buffer of the viewport laid out as l that
+// the character at cell at of its lines is in, and whether there is one:
+// none for a cell with no character, past the text of its row. It is found
+// in the buffer's text, rather than in the cells of the row, so that a word
+// wrapped across rows is found whole, with the buffer's word characters, or
+// the Root's when it was given none.
+func (r *renderer) vpWord(l *vpLayout, at image.Point) (from, to Pos, ok bool) {
+	v := &l.view
+	if v.buf == nil || v.buf.Len() == 0 || at.X < 0 {
+		return Pos{}, Pos{}, false
 	}
-	starts := v.buf.s.RowStarts(line, v.method, v.Width, linebuf.Mode(v.wrap), scratch)
-	a, end = starts[sub], math.MaxInt
-	if sub+1 < len(starts) {
-		end = starts[sub+1]
+	p, ok := v.index().CharAt(at.Y, at.X, &r.vpScratch)
+	if !ok {
+		return Pos{}, Pos{}, false
 	}
-	return line, a, end
+	return v.buf.wordAt(Pos(p), v.buf.chars(r.words.Chars), false)
 }
 
-// vpCellMemo is the row of a viewport whose cells were last asked for.
-type vpCellMemo struct {
-	buf      *Buffer
-	rev      uint64
-	y, width int
-	wrap     WrapMode
-	cells    string
+// vpCells calls fn with each cell on screen inside clip, of the rows in
+// sight of the viewport laid out as l, that the text from from up to to
+// takes. A row the selection runs on past is taken to the viewport's right
+// edge, for the line break or the wrap after it.
+func (r *renderer) vpCells(l *vpLayout, from, to Pos, clip image.Rectangle, fn func(p image.Point)) {
+	v := &l.view
+	if v.buf == nil {
+		return
+	}
+	rows := v.index()
+	for k, row := range r.vpRows[l.rows[0]:l.rows[1]] {
+		y := l.content.Min.Y + k
+		if y < clip.Min.Y || y >= clip.Max.Y {
+			continue
+		}
+		lo, hi, ok := rows.Covered(row, linebuf.Pos(from), linebuf.Pos(to))
+		if !ok {
+			continue
+		}
+		x0, x1 := l.content.Min.X+lo-row.A, l.content.Max.X
+		if hi != math.MaxInt {
+			x1 = min(x1, l.content.Min.X+hi-row.A)
+		}
+		for px := max(x0, clip.Min.X); px < min(x1, clip.Max.X); px++ {
+			fn(image.Pt(px, y))
+		}
+	}
 }
 
-// vpText returns the text of the lines of the viewport laid out as l from
-// cell from to cell to, in reading order, as laid out, with the rows of a
-// wrapped line joined.
-func vpText(l *vpLayout, from, to image.Point, block bool) string {
+// vpBlockText returns the text of the cells of the lines of the viewport
+// laid out as l in the rectangle with corners from and to, inclusive, as
+// laid out, a line to a row.
+func vpBlockText(l *vpLayout, from, to image.Point) string {
 	v := &l.view
 	if v.buf == nil || v.buf.Len() == 0 {
 		return ""
 	}
-	x := v.index()
-	var b strings.Builder
-	var scratch []int
-	rowCells := func(y int) (line, a, end int) { return v.rowAt(x, y, &scratch) }
-	// text returns the text of the cells of line from lo to hi.
-	text := func(line, lo, hi int) string {
-		return strings.TrimRight(v.buf.s.CellText(line, v.method, lo, hi), " ")
-	}
-	to.Y = min(to.Y, v.TotalRows-1)
-	if block {
-		for y := max(from.Y, 0); y <= to.Y; y++ {
-			if y > from.Y {
-				b.WriteByte('\n')
-			}
-			line, a, end := rowCells(y)
-			lo, hi := a+from.X, min(a+to.X, end-1)
-			b.WriteString(text(line, lo, hi))
-		}
-		return strings.TrimRight(b.String(), "\n")
-	}
-	for y := max(from.Y, 0); y <= to.Y; {
-		line, a, end := rowCells(y)
-		lo := a
-		if y == from.Y {
-			lo = min(a+from.X, end)
-		}
-		// The rows of the line, from this one, up to the last selected.
-		last := min(to.Y, x.RowsBefore(line)+x.RowsOf(line)-1)
-		hi := math.MaxInt
-		if last == to.Y {
-			_, la, lend := rowCells(last)
-			hi = min(la+to.X, lend-1)
-		}
-		if y > from.Y {
-			b.WriteByte('\n')
-		}
-		b.WriteString(text(line, lo, hi))
-		y = last + 1
-	}
-	return b.String()
+	rows := v.index()
+	return rows.BlockText(from.X, from.Y, to.X, min(to.Y, rows.Total()-1))
 }

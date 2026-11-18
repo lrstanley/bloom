@@ -5,7 +5,9 @@
 // Package linebuf keeps the lines of text a viewport shows, and works out
 // what it draws of them: how wide each line is, the rows it wraps to, and
 // the cells of a row as a string that draws them, as fast as a line of a
-// log a million lines long needs.
+// log a million lines long needs. It makes the edits to the lines, follows
+// positions in them through the edits, and finds the positions that the
+// cells of the rows show.
 package linebuf
 
 import (
@@ -201,6 +203,7 @@ const CheckpointEvery = 1024
 // in there, to start scanning the line from.
 type checkpoint struct {
 	x, i int // its cell, and its byte
+	t    int // the bytes of the line's text before it, as PlainText gives it
 	pen  pen
 }
 

@@ -187,6 +187,12 @@ func debugNode(c Child) (kind string, attrs []string) {
 		if n.follow {
 			attrs = append(attrs, "follow")
 		}
+		if n.caret != nil {
+			attrs = append(attrs, fmt.Sprintf("caret=%d:%d", n.caret.Head.Line, n.caret.Head.Col))
+			if n.caret.EndOfRow {
+				attrs = append(attrs, "end-of-row")
+			}
+		}
 		return "Viewport", attrs
 	default:
 		return fmt.Sprintf("%T", c), nil

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"bloomfx.dev/bloom/internal/textsel"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 )
@@ -97,14 +98,10 @@ type mouse struct {
 	lastClick   nodeKey // the node clicked last, if it has a double click handler
 	lastClickAt time.Time
 
-	// What the presses in a row on a selectable node selected, the last at
-	// selAt on selKey at selTime, if selOK, for a double click to select a
-	// word and a triple click a line.
-	selUnit selUnit
-	selOK   bool
-	selKey  nodeKey
-	selAt   image.Point
-	selTime time.Time
+	// The presses in a row on a selectable node, the last on selKey, for a
+	// double click to select a word and a triple click a line.
+	clicks textsel.Clicks
+	selKey nodeKey
 
 	held        heldClick // a click inside a selectable node, held back
 	heldSeq     int       // counts clicks held back, for the tick of one to know it
@@ -254,7 +251,7 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 		t := f.target(i)
 		cmds = run(cmds, t.handlers, kindsOf(on.KindMouse), t.event(msg, p, true))
 	}
-	return tea.Batch(r.hover(cmds, f, msg, chain)...)
+	return tea.Batch(append(r.hover(cmds, f, msg, chain), r.takeHeldCmds())...)
 }
 
 // pressLeft handles the left button going down at p, where the entries of
@@ -262,8 +259,12 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 func (r *Root) pressLeft(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, p image.Point, chain []int) []tea.Cmd {
 	s := &r.mouse
 	// A click anywhere ends the selection, and the flash of the last copy,
-	// and may start another.
-	r.ClearSelection()
+	// and may start another. The range of an Editable is kept until another
+	// selection starts.
+	r.checkHeld()
+	if !r.sel.held {
+		r.sel = selection{}
+	}
 	r.flash = selection{}
 	if i := f.innermost(chain, kindsOf(on.KindDoubleClick)); i >= 0 {
 		s.press.double, s.press.doubleOK = f.entries[i].key, true
@@ -285,7 +286,7 @@ func (r *Root) pressLeft(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, p image.Poi
 	if i >= 0 && r.startSelect(f, i, p, msg.Mouse().Mod) && r.clickDelay {
 		// A click here may be the first of a double click, which selects a
 		// word rather than clicks.
-		if r.sel.unit == unitCell {
+		if r.sel.unit == textsel.UnitCell {
 			s.press.hold = true
 		} else {
 			s.press.ok = false
@@ -331,7 +332,7 @@ func (r *Root) holdClick(t mouseTarget, e on.Event) tea.Cmd {
 	m.heldSeq++
 	m.held = heldClick{ok: true, key: t.key, handlers: t.handlers, event: e}
 	seq := m.heldSeq
-	wait := max(doubleClick-r.now().Sub(m.selTime), 0)
+	wait := max(doubleClick-r.now().Sub(m.clicks.Time()), 0)
 	return r.after(wait, func(time.Time) tea.Msg { return clickMsg{root: r, seq: seq} })
 }
 

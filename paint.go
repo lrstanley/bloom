@@ -49,6 +49,9 @@ type op struct {
 	t        float64
 	from     image.Rectangle // for opPop of a slot moving with effects: where it was
 	sel      selRange        // for opSelect, with t the copy flash's, or -1
+	held     int             // for opSelect of a range kept outside the Root: its index in helds, plus one
+	rev      uint64          // for opSelect: the revisions of the buffers its positions are in
+	buf      *Buffer         // and for a range kept outside the Root, the buffer
 
 	// For opPop: the index of its opPush, the frame entries drawn since it,
 	// and how far its effects moved what was drawn, known once executed.
@@ -60,7 +63,7 @@ type op struct {
 
 func (o *op) equal(p *op) bool {
 	if o.kind != p.kind || o.kind == opDraw || o.src != p.src || o.rect != p.rect ||
-		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.t != p.t || o.from != p.from || o.sel != p.sel || len(o.effects) != len(p.effects) {
+		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.t != p.t || o.from != p.from || o.sel != p.sel || o.held != p.held || o.rev != p.rev || o.buf != p.buf || len(o.effects) != len(p.effects) {
 		return false
 	}
 	for i := range o.effects {
@@ -83,7 +86,7 @@ type renderer struct {
 	vpMarks  []linebuf.Overlay      // scratch for the marks of a viewport's line, in cells
 	vpSpans  []linebuf.Overlay      // and as they were given, in bytes
 	vpPens   linebuf.SGRs           // the styles of viewports' text, kept from frame to frame
-	vpCell   vpCellMemo             // the viewport row whose cells selection last asked for
+	vpCell   linebuf.RowMemo        // the viewport row whose cells selection last asked for
 	style    lipgloss.Style         // scratch for comparing styles without allocating
 	fxs      []fx.Effect            // effects of this frame's ops, copied from the tree
 	prevFxs  []fx.Effect
@@ -110,16 +113,36 @@ type renderer struct {
 	frame    *Frame
 
 	// sel is the Root's selection, found in the text leaves of the node it
-	// is in as rng, and drawn over them with selStyle, or as the copy flash
+	// is in as rng, and drawn over them with selPaint, or as the copy flash
 	// at flashT when that is not negative.
 	sel      selection
 	leaves   []selLeaf
+	outline  textsel.Outline // the order of the leaves, and the lists among them
 	rng      selRange
-	rngSeq   int // the seq of the selection rng is for, or -1
-	selStyle selStyle
+	ends     [2]selEnd             // the ends of rng, in order
+	rngSeq   int                   // the seq of the selection rng is for, or -1
+	selMemo  textsel.Memo[textKey] // the text of the selection read last
+	selLost  bool                  // the selection's positions could not be followed through the edits to its text
+	selPaint textsel.Painter
 	flashT   float64
 
-	words textsel.Words // finds words, for a double click
+	// helds are the selections kept outside the Root in this frame, such as
+	// by an Editable, and prevHelds those of the last, which the copy flash
+	// is drawn over, for heldFlash at heldFlashT, when that is not negative.
+	helds      []heldLeaf
+	prevHelds  []heldLeaf
+	heldFlash  nodeKey
+	heldFlashT float64
+	vpScratch  []int // for the wrapped rows of a viewport the mouse is selecting in
+
+	words  textsel.Words // finds words, for a double click
+	rooted bool          // a Root's renderer, whose word characters the buffers it shows take
+
+	// aside builds the items of lists that a frame did not build, to read
+	// the text selected in them, apart from the frame; see
+	// [renderer.buildAside]. It is made when wanted, and dropped once the
+	// text is read.
+	aside *renderer
 }
 
 func newRenderer(method ansi.Method) *renderer {
@@ -167,7 +190,12 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
 	r.floats, r.open = r.floats[:0], 0
 	clear(r.leaves)
+	clear(r.ends[:])
 	r.leaves, r.rngSeq = r.leaves[:0], -1
+	r.outline.Reset()
+	r.selMemo.Reset()
+	clear(r.prevHelds)
+	r.helds, r.prevHelds = r.prevHelds[:0], r.helds
 	root := r.layout(w, h, c)
 	if root >= 0 {
 		r.paint(root, r.area, -1)
@@ -381,6 +409,9 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		r.ops = append(r.ops, op{kind: opDraw, draw: n.d, rect: b.rect, clip: vis})
 	case ViewportNode:
 		r.paintViewport(i, n, vis)
+		if n.caret != nil {
+			r.paintCaret(i, n, vis)
+		}
 	case ScrollbarNode:
 		r.paintScrollbar(i, b, n, clip, parent)
 	case LayerNode:
@@ -388,7 +419,16 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 	case Layouter:
 		r.paint(b.expanded, vis, parent)
 	default:
-		r.blit(r.viewOf(i), b.rect, vis)
+		r.paintComponent(i, vis)
+	}
+}
+
+// paintComponent adds the op for box i, a component, drawn at vis, and for
+// an [Editable], the op that draws its range over it.
+func (r *renderer) paintComponent(i int, vis image.Rectangle) {
+	r.blit(r.viewOf(i), r.boxes[i].rect, vis)
+	if ed, ok := r.boxes[i].child.(Editable); ok && r.parse {
+		r.paintHeld(i, ed, vis)
 	}
 }
 

@@ -8,7 +8,9 @@ import (
 	"image"
 	"image/color"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
@@ -42,6 +44,138 @@ func TestWordsAt(t *testing.T) {
 		x0, x1, ok := ws.At(w, tc.at, cell)
 		if ok != tc.ok || ok && (x0 != tc.x0 || x1 != tc.x1) {
 			t.Errorf("%q at %d: %d-%d %v, want %d-%d %v", tc.s, tc.at, x0, x1, ok, tc.x0, tc.x1, tc.ok)
+		}
+	}
+}
+
+// wholeWords returns the words of s, segmenting all of it, as a reference
+// for those found around a byte.
+func wholeWords(s, chars string) [][2]int {
+	var out [][2]int
+	eachWord(s, 0, chars, func(from, to int) bool {
+		out = append(out, [2]int{from, to})
+		return true
+	})
+	return out
+}
+
+func TestWord(t *testing.T) {
+	t.Parallel()
+
+	const chars = "@-./_~?&=%+#"
+	for _, tc := range []struct {
+		s        string
+		chars    string
+		i        int
+		from, to int
+		ok       bool
+	}{
+		{"open ~/src/main.go now", chars, 8, 5, 18, true},
+		{"open ~/src/main.go now", chars, 4, 0, 0, false},
+		{"open ~/src/main.go now", "", 8, 7, 10, true},
+		{"open ~/src/main.go now", "", 6, 0, 0, false},
+		{"say 日本語 ok", chars, 7, 4, 13, true}, // ideographs, each a segment, are one word
+		{"a, b", chars, 1, 0, 0, false},
+		{"emoji 🎉 here", chars, 6, 6, 10, true},
+		{"don't 3.14", "", 2, 0, 5, true},
+		{"don't 3.14", "", 7, 6, 10, true},
+		{"x -- y", chars, 3, 2, 4, true}, // only word characters, a word of them
+		{"x -- y", "", 3, 0, 0, false},
+		{"tab\tsep", chars, 3, 0, 0, false},
+		{"short", chars, 9, 0, 0, false},
+		{"short", chars, -1, 0, 0, false},
+	} {
+		from, to, ok := Word(tc.s, tc.i, tc.chars)
+		if ok != tc.ok || ok && (from != tc.from || to != tc.to) {
+			t.Errorf("Word(%q, %d, %q) = %d-%d %v, want %d-%d %v", tc.s, tc.i, tc.chars, from, to, ok, tc.from, tc.to, tc.ok)
+		}
+	}
+}
+
+func TestWordAgreesWithWholeText(t *testing.T) {
+	t.Parallel()
+
+	// Words found around a byte, from the whitespace either side, are those
+	// found segmenting all of the text, whatever is around them, including
+	// a mark on a space, which joins it to the word before.
+	texts := []string{
+		"hello, world!  foo.bar don't\t3.14 snake_case ~/a/b.go e-mail@x.org",
+		"  -- Привет мир; γειά σου مرحبا 日本語 カタカナ... 🎉🎉 a\u200db",
+		"a \u0301b c\u0301 d \u0301\u0301 e",
+		"x  \t  y,,z  ",
+		"",
+		" ",
+	}
+	for _, s := range texts {
+		for _, chars := range []string{"", "_", "@-./_~?&=%+#"} {
+			all := wholeWords(s, chars)
+			for i := range len(s) + 1 {
+				// Word: the one whose bytes hold i.
+				var want [2]int
+				found := false
+				for _, w := range all {
+					if w[0] <= i && i < w[1] {
+						want, found = w, true
+					}
+				}
+				from, to, ok := Word(s, i, chars)
+				if ok != found || ok && (from != want[0] || to != want[1]) {
+					t.Errorf("Word(%q, %d, %q) = %d-%d %v, want %v %v", s, i, chars, from, to, ok, want, found)
+				}
+				// WordEnd: the end of the first that ends after i.
+				wantEnd, foundEnd := 0, false
+				for _, w := range all {
+					if w[1] > i {
+						wantEnd, foundEnd = w[1], true
+						break
+					}
+				}
+				if end, endOK := WordEnd(s, i, chars); endOK != foundEnd || endOK && end != wantEnd {
+					t.Errorf("WordEnd(%q, %d, %q) = %d %v, want %d %v", s, i, chars, end, endOK, wantEnd, foundEnd)
+				}
+				// WordStart: the start of the last that starts before i.
+				wantStart, foundStart := 0, false
+				for _, w := range all {
+					if w[0] < i {
+						wantStart, foundStart = w[0], true
+					}
+				}
+				if start, startOK := WordStart(s, i, chars); startOK != foundStart || startOK && start != wantStart {
+					t.Errorf("WordStart(%q, %d, %q) = %d %v, want %d %v", s, i, chars, start, startOK, wantStart, foundStart)
+				}
+			}
+		}
+	}
+}
+
+func TestWordLongLine(t *testing.T) {
+	t.Parallel()
+
+	// A line of megabytes, of words, and of spaces: finding a word in the
+	// middle segments the text around it, rather than the line, and so
+	// costs far less than segmenting all of it does.
+	const chars = "_"
+	for _, s := range []string{
+		strings.Repeat("some words_and more ", 1<<18),
+		"start " + strings.Repeat(" ", 1<<22) + "mid" + strings.Repeat(" ", 1<<22) + " end",
+	} {
+		start := time.Now()
+		n := len(wholeWords(s, chars))
+		whole := time.Since(start)
+
+		mid := len(s) / 2
+		for s[mid] == ' ' {
+			mid++
+		}
+		start = time.Now()
+		for range 10 {
+			Word(s, mid, chars)
+			WordEnd(s, mid, chars)
+			WordStart(s, mid+1, chars)
+		}
+		around := time.Since(start) / 10
+		if around > whole/4 {
+			t.Errorf("finding a word in a line of %d bytes and %d words took %s, and segmenting all of it %s", len(s), n, around, whole)
 		}
 	}
 }

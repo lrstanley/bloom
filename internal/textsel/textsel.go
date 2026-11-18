@@ -4,7 +4,9 @@
 
 // Package textsel works out the text of cells selected with the mouse: the
 // words of a row, the text of rows of cells, and how the rows of wrapped
-// text join again once copied.
+// text join again once copied; where the ends of a selection are among the
+// leaves of text it runs through and the lists between them, how many
+// clicks a press is, and how selected cells are drawn.
 package textsel
 
 import (
@@ -13,6 +15,7 @@ import (
 	"math"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
@@ -21,7 +24,8 @@ import (
 )
 
 // Words finds the words of rows of cells, for selecting a word with a
-// double click. Its scratch is kept from one call to the next.
+// double click, as [Word] finds them in the text of the row. Its scratch is
+// kept from one call to the next.
 type Words struct {
 	// Chars are the characters, besides letters, digits, and symbols, that
 	// are part of a word, so that a path is one.
@@ -29,7 +33,6 @@ type Words struct {
 
 	row  []byte
 	offs []int
-	segs []wordSeg
 }
 
 // At returns the columns of the word at column p of a row w cells wide,
@@ -54,28 +57,13 @@ func (ws *Words) At(w, p int, cell func(x int) *uv.Cell) (x0, x1 int, ok bool) {
 	}
 	ws.row, ws.offs = row, offs
 
-	segs := ws.segs[:0]
-	at, hit := offs[p], -1
-	for it := words.FromBytes(row); it.Next(); {
-		if at >= it.Start() && at < it.End() {
-			hit = len(segs)
-		}
-		segs = append(segs, wordSeg{start: it.Start(), end: it.End(), word: ws.wordish(it.Value())})
-	}
-	ws.segs = segs
-	if hit < 0 || !segs[hit].word {
+	from, to, ok := Word(string(row), offs[p], ws.Chars)
+	if !ok {
 		return 0, 0, false
-	}
-	lo, hi := hit, hit
-	for lo > 0 && segs[lo-1].word {
-		lo--
-	}
-	for hi < len(segs)-1 && segs[hi+1].word {
-		hi++
 	}
 	x0 = -1
 	for x, off := range offs {
-		if off >= segs[lo].start && off < segs[hi].end {
+		if off >= from && off < to {
 			if x0 < 0 {
 				x0 = x
 			}
@@ -85,28 +73,167 @@ func (ws *Words) At(w, p int, cell func(x int) *uv.Cell) (x0, x1 int, ok bool) {
 	return x0, x1, x0 >= 0
 }
 
-// wordSeg is a segment of a row that Unicode text segmentation found, and
-// whether it is part of a word.
-type wordSeg struct {
-	start, end int
-	word       bool
+// Word returns the word of s that byte i is in, from byte from up to to,
+// and whether i is in one. Words are found as Unicode text segmentation
+// (UAX #29) finds them, and a segment is part of a word when it holds a
+// letter, digit, mark, or symbol, such as an emoji, or is made only of
+// chars, such as "_" or "/"; segments that are part of a word next to each
+// other are one word, so that chars join the words either side of them.
+//
+// Since a word never runs across whitespace, only the text from the
+// nearest whitespace before i to the nearest after it is segmented, the
+// whitespace included so that it is segmented as it is in s, which keeps
+// finding a word in a long line cheap.
+func Word(s string, i int, chars string) (from, to int, ok bool) {
+	if i < 0 || i >= len(s) {
+		return 0, 0, false
+	}
+	from, to, ok = wordAfter(s, i, chars, false)
+	return from, to, ok && from <= i
+}
+
+// WordEnd returns the end of the word of s that byte i is in, or of the
+// first word after it, as [Word] finds words, and whether there is one.
+// Only the text from the nearest whitespace before i to the whitespace
+// after that word is segmented.
+func WordEnd(s string, i int, chars string) (int, bool) {
+	_, to, ok := wordAfter(s, min(max(i, 0), len(s)), chars, true)
+	return to, ok
+}
+
+// WordStart returns the start of the last word of s that starts before
+// byte i, as [Word] finds words, and whether there is one. Only the text
+// from the whitespace before that word to the nearest whitespace after i
+// is segmented.
+func WordStart(s string, i int, chars string) (int, bool) {
+	limit := min(max(i, 0), len(s))
+	lo, hi := spaceBefore(s, limit), spaceAfter(s, limit)
+	for {
+		at := -1
+		eachWord(s[:hi], lo, chars, func(from, _ int) bool {
+			if from >= limit {
+				return false
+			}
+			at = from
+			return true
+		})
+		switch {
+		case at >= 0 && (at > lo || lo == 0):
+			return at, true
+		case at >= 0:
+			// The word starts the text segmented, as one joined to a space
+			// by a mark on it does, and may start before it.
+			lo = spaceBefore(s, lo)
+			continue
+		case lo == 0:
+			return 0, false
+		}
+		// No word starts between the whitespace and limit: on to the text
+		// before the whitespace.
+		j := strings.LastIndexFunc(s[:lo], func(r rune) bool { return !unicode.IsSpace(r) })
+		if j < 0 {
+			return 0, false
+		}
+		limit, lo, hi = lo, spaceBefore(s, j+1), spaceAfter(s, j)
+	}
+}
+
+// wordAfter returns the first word of s that ends after byte i, from byte
+// from up to to, and whether there is one: among the text around i, up to
+// the whitespace either side, or with further, the text after it too.
+func wordAfter(s string, i int, chars string, further bool) (from, to int, ok bool) {
+	lo, hi := spaceBefore(s, i), spaceAfter(s, i)
+	for {
+		from, to, ok = 0, 0, false
+		eachWord(s[:hi], lo, chars, func(f, t int) bool {
+			if t > i {
+				from, to, ok = f, t, true
+				return false
+			}
+			return true
+		})
+		switch {
+		case ok && from == lo && lo > 0:
+			// The word starts the text segmented, as one joined to a space by
+			// a mark on it does, and may start before it.
+			lo = spaceBefore(s, lo)
+			continue
+		case ok || !further || hi >= len(s):
+			return from, to, ok
+		}
+		// No word ends after i before the whitespace: on to the text after
+		// it.
+		j := strings.IndexFunc(s[hi:], func(r rune) bool { return !unicode.IsSpace(r) })
+		if j < 0 {
+			return 0, 0, false
+		}
+		lo, hi = spaceBefore(s, hi+j), spaceAfter(s, hi+j)
+	}
+}
+
+// spaceBefore returns the byte of s that the last whitespace before byte i
+// starts at, or 0 when there is none, where segmenting s for a word at i
+// can start.
+func spaceBefore(s string, i int) int {
+	return max(strings.LastIndexFunc(s[:min(i, len(s))], unicode.IsSpace), 0)
+}
+
+// spaceAfter returns the byte of s just past the first whitespace at or
+// after byte i, or the end of s when there is none, where segmenting s for
+// a word at i can stop: a word never runs on past it. A space that a mark
+// or a joiner follows is part of a segment with them, which may be part of
+// a word, and is passed over.
+func spaceAfter(s string, i int) int {
+	for j := max(i, 0); j < len(s); {
+		r, n := utf8.DecodeRuneInString(s[j:])
+		j += n
+		if !unicode.IsSpace(r) {
+			continue
+		}
+		if next, _ := utf8.DecodeRuneInString(s[j:]); j >= len(s) || !unicode.IsMark(next) && !unicode.Is(unicode.Cf, next) {
+			return j
+		}
+	}
+	return len(s)
+}
+
+// eachWord calls fn with the start and the end of each word of s from byte
+// lo on, in turn, until it returns false. Segments are found only as far
+// as they are wanted.
+func eachWord(s string, lo int, chars string, fn func(from, to int) bool) {
+	from, to := -1, 0
+	for it := words.FromString(s[lo:]); it.Next(); {
+		if wordish(it.Value(), chars) {
+			if from < 0 {
+				from = lo + it.Start()
+			}
+			to = lo + it.End()
+			continue
+		}
+		if from >= 0 && !fn(from, to) {
+			return
+		}
+		from = -1
+	}
+	if from >= 0 {
+		fn(from, to)
+	}
 }
 
 // wordish reports whether seg, a segment Unicode text segmentation found, is
-// part of a word: one with a letter, digit, or symbol such as an emoji, or
-// one of only the word characters, which join the words around them.
-func (ws *Words) wordish(seg []byte) bool {
-	s := string(seg)
-	if strings.TrimSpace(s) == "" {
+// part of a word: one with a letter, digit, mark, or symbol such as an
+// emoji, or one of only chars, which join the words around them.
+func wordish(seg, chars string) bool {
+	if strings.TrimSpace(seg) == "" {
 		return false
 	}
-	for _, c := range s {
+	for _, c := range seg {
 		if unicode.IsLetter(c) || unicode.IsDigit(c) || unicode.IsMark(c) || unicode.Is(unicode.So, c) {
 			return true
 		}
 	}
-	for _, c := range s {
-		if !strings.ContainsRune(ws.Chars, c) {
+	for _, c := range seg {
+		if !strings.ContainsRune(chars, c) {
 			return false
 		}
 	}

@@ -13,6 +13,7 @@ import (
 
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/internal/motion"
+	"bloomfx.dev/bloom/internal/textsel"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -38,6 +39,8 @@ type Root struct {
 	selSeq     int
 	flash      selection
 	flashAt    time.Time
+	flashRange Range     // the range of the Editable flash is over, which ends it when it changes
+	heldCmds   []tea.Cmd // the commands of ranges kept outside the Root set since Update returned
 	copyFlash  bool
 	clickDelay bool
 	clipboard  func(text string) error
@@ -122,7 +125,8 @@ func New(opts ...Option) *Root {
 	}
 	r.r.motion = motion.New(c.now)
 	r.r.screen = r.handlerFrame
-	r.r.selStyle = newSelStyle(c.selStyle, c.selStyled)
+	r.r.selPaint.Style = textsel.NewStyle(cellStyle(c.selStyle), c.selStyled)
+	r.r.rooted = true
 	r.r.words.Chars = defaultWordChars
 	if c.wordChars != nil {
 		r.r.words.Chars = *c.wordChars
@@ -160,9 +164,11 @@ func (r *Root) Update(msg tea.Msg) tea.Cmd {
 	case tea.BlurMsg:
 		r.blurred = true
 	}
+	r.checkHeld()
 	return tea.Batch(
 		r.input(msg), r.tick(msg),
 		r.scrollSelection(msg), r.selectionDone(msg), r.runHeldClick(msg), r.flashFrame(msg),
+		r.takeHeldCmds(),
 	)
 }
 
@@ -198,22 +204,38 @@ func (r *Root) Render(w, h int, c Child) string {
 	if w <= 0 {
 		c = nil
 	}
+	// A range an Editable made since the last frame is the selection.
+	r.checkHeld()
 	// The text copied last is drawn as selected, with the band sweeping
-	// across it, until the band has crossed it.
+	// across it, until the band has crossed it, or over the range of an
+	// Editable, until that changes.
 	shown := &r.sel
-	r.r.flashT = -1
-	if !r.sel.ok && r.flash.ok {
-		if t := float64(r.now().Sub(r.flashAt)) / float64(flashFor); t < 1 {
-			shown, r.r.flashT = &r.flash, t
-		} else {
+	r.r.flashT, r.r.heldFlashT = -1, -1
+	if r.flash.ok {
+		t := float64(r.now().Sub(r.flashAt)) / float64(flashFor)
+		switch {
+		case t >= 1:
 			r.flash = selection{}
+		case r.flash.held:
+			if h := r.heldAt(r.flash.key); h != nil && h.get() == r.flashRange {
+				r.r.heldFlash, r.r.heldFlashT = r.flash.key, t
+			} else {
+				r.flash = selection{}
+			}
+		case !r.sel.ok:
+			shown, r.r.flashT = &r.flash, t
 		}
 	}
-	r.r.sel, r.r.dragged = *shown, r.mouse.drag
+	r.r.sel, r.r.dragged, r.r.selLost = *shown, r.mouse.drag, false
 	out := r.r.render(w, h, c)
 	// Where the selection starts and ends is found in the frame, and
-	// followed from frame to frame by the text it is in.
-	shown.anchor, shown.head = r.r.sel.anchor, r.r.sel.head
+	// followed from frame to frame by the text it is in, unless the text it
+	// was in was set again.
+	if r.r.selLost {
+		*shown = selection{}
+	} else {
+		shown.anchor, shown.head, shown.headFirst = r.r.sel.anchor, r.r.sel.head, r.r.sel.headFirst
+	}
 	r.r.updateFrame()
 	return out
 }
