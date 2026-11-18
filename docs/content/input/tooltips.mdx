@@ -1,0 +1,289 @@
+---
+title: Tooltips
+description: Turn on built-in tooltips, give nodes tooltips of their own, unfold text that was cut short, send tooltips to a status line, and reach them from the keyboard.
+---
+
+A tooltip is a little text about one node, drawn over everything else while the pointer rests on it. bloom draws
+them for you: give a node a tooltip with `Tooltip(...)`, and text cut short with `Truncate()` shows its full text
+under the pointer with no code at all. Tooltips take no space in the layout and no mouse events, so a click on one
+reaches what's beneath it.
+
+The [tooltips example](https://github.com/lrstanley/bloom/tree/master/_examples/tooltips) is a deployments view
+with a toolbar of icon buttons, a table whose long images unfold in place, a status line the tooltips can go to
+instead, a selected row pinned open, and a focus that moves along the toolbar:
+
+![The tooltips example: a tooltip appearing over a toolbar icon after a pause, the next icons' tooltips appearing at once along the toolbar, a cut image unfolding in place and closing as the pointer moves on along the row onto the status cell, whose note shows at once, a status note going below the last row where there's room, tooltips shown in the status line, the selected row's full image following the selection, and tab moving the focus along the toolbar, showing each button's tooltip](/demos/tooltips.webp)
+
+## Turn tooltips on
+
+Tooltips are off until you pass [`WithTooltips`](https://pkg.go.dev/bloomfx.dev/bloom#WithTooltips) to
+`bloom.New`. A zero `bloom.Tooltips` takes every default:
+
+```go
+m.ui = bloom.New(bloom.WithTooltips(bloom.Tooltips{}))
+```
+
+While they're off, `Tooltip(...)` does nothing and drawing a frame costs nothing more. Pass every message to
+`m.ui.Update` and return its command, as you already do for the mouse: the wait before a tooltip shows is a
+command.
+
+To show the tooltips of focused nodes as well, give the root your focus with
+[`WithFocus`](/input/focus#move-focus-with-tab-and-clicks) too.
+
+## Give a node a tooltip
+
+Every node has a `Tooltip(text, opts...)` method. It suits icon buttons, abbreviations, and anything else whose
+meaning isn't on screen:
+
+```go
+bloom.Text("⟳").Style(button).ID(actionRefresh).Focusable().
+	On(on.Press(m.refresh)).
+	Tooltip("Refresh")
+```
+
+The tooltip goes beside the node, in a chip: a row of text on a background a little lighter or darker than the
+terminal's. On its own, it goes wherever it hides the least of what's on screen, preferring above, then below,
+right, and left. It never covers the cell under the pointer or the cursor, and never covers its node, unless it
+fits nowhere else. The exception is a node taller than a row: there it goes beside the node's cells on the row the
+pointer is on, so it stays near the pointer, and it may sit over the node's other rows.
+
+To ask for a side, pass [`TipSide`](https://pkg.go.dev/bloomfx.dev/bloom#TipSide):
+
+```go
+bloom.Text("⚙").Style(button).Tooltip("Settings", bloom.TipSide(bloom.Right))
+```
+
+It goes on that side, with a blank cell between it and a node beside it, and shifts along the side to stay on
+screen. When it doesn't fit there, or would cover the pointer, it goes on the opposite side, and when it fits on
+neither, wherever it would without `TipSide`.
+
+A node without a tooltip of its own shows the tooltip of the nearest node it's inside that has one, so a tooltip
+on a whole row covers each of its cells. Empty text gives a node no tooltip, which lets you pass a field that's
+only sometimes set:
+
+```go
+bloom.Text(icon + " " + d.status).Style(st).Tooltip(d.note) // no tooltip while d.note is ""
+```
+
+## Show cut text in full
+
+A `Text(...).Truncate()` node that was cut short with "…" has a tooltip already: its full text. Under the pointer,
+the full text unfolds in place, on the same row, starting in the very cell where the cut text starts, so it reads
+as the rest of the text being revealed:
+
+```go
+bloom.Fill(bloom.Text(d.image).Truncate())
+```
+
+Text that fits shows nothing. An unfolded line is shifted left only as far as it must be to stay on screen, and a
+line wider than the screen is shown as a bubble beside the node instead. A `Tooltip(...)` on a truncated node
+shows in place of its full text.
+
+The unfolded line covers whatever is to the right of the cut text, such as the next cells of a table's row, so it
+stays open only while the pointer is over the cut text itself. Moving on along the row onto a covered cell closes
+it, as leaving any node does, and that cell's own tooltip shows at once.
+
+To keep a node's full text to itself, such as a token or a password, mark it `NoTooltip()`. It covers everything
+inside the node too, so it can go on a whole column:
+
+```go
+bloom.Text(d.secret).Truncate().NoTooltip()
+```
+
+`NoTooltip` only stops the full text of cut text. A `Tooltip(...)` inside the node still shows, and so does a
+node [pinned open](#pin-the-selected-rows-tooltip).
+
+To know in `Update` whether a node was cut, without tooltips, give it an ID and ask the frame. This works whether
+tooltips are on or off, and on a frame from `Solve`:
+
+```go
+if m.ui.Frame().Truncated(cellImage) {
+	// ...
+}
+```
+
+## Choose where tooltips are drawn
+
+The [`Tooltips`](https://pkg.go.dev/bloomfx.dev/bloom#Tooltips) mode of each kind of tooltip says how it's shown:
+`Truncated` for the full text of cut text, and `Explicit` for text given with `Tooltip(...)`.
+
+| Mode | Shows | Default for |
+| --- | --- | --- |
+| `TipDefault` | the zero value: the kind's default, `TipUnfold` or `TipBubble` | |
+| `TipUnfold` | the full text over the cut text, in place | `Truncated` |
+| `TipBubble` | a chip beside the node | `Explicit` |
+| `TipSink` | the text in a `TooltipSink` node you place, such as in a status line | |
+| `TipHidden` | nothing, but the tooltip still opens and closes, for you to draw from `m.ui.Tooltip()` | |
+| `TipOff` | nothing, and nothing opens; for `Truncated` only, as `Explicit` takes it as `TipBubble` | |
+
+Unfold suits a table or a list, where the rest of the text belongs where the text is. A bubble suits text about a
+node rather than more of it. A sink keeps the screen still, for a dense layout where anything floating would
+cover something you need. Hidden is for an app that already has a place to show help text.
+
+### Show tooltips in a status line
+
+[`TooltipSink()`](https://pkg.go.dev/bloomfx.dev/bloom#TooltipSink) is a node that shows the text of the
+tooltip showing, and is blank while there's none. Place it like any other node, and set the modes that should go
+to it to `TipSink`:
+
+```go
+m.ui = bloom.New(bloom.WithTooltips(bloom.Tooltips{Explicit: bloom.TipSink, Truncated: bloom.TipSink}))
+```
+
+```go
+status := bloom.Row(
+	bloom.Fill(bloom.TooltipSink().Style(statusBar)),
+	bloom.Text("? help · q quit").Style(hint),
+)
+```
+
+The sink is a row tall and as wide as the space it's given, and cuts text that doesn't fit with "…". Its style's
+background fills it, also while it's blank. It shows the tooltip in the same frame the tooltip opens in.
+
+While a sink has a cell on screen, tooltips of the kinds sent to it aren't drawn beside their nodes. When no sink
+is on screen, because it isn't in the layout or is scrolled or clipped out of sight, they fall back to unfolding
+and bubbles. So a sink in a panel that collapses on a small screen loses nothing.
+
+### Draw the tooltip yourself
+
+With `TipHidden`, the root draws nothing for that kind, but its tooltips still open after the delay and close as
+they would otherwise. [`m.ui.Tooltip()`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Tooltip) returns the text of
+the one showing, and whether one is. Read it in `View`:
+
+```go
+func (m *model) View() tea.View {
+	help := m.defaultHelp
+	if tip, ok := m.ui.Tooltip(); ok {
+		help = tip
+	}
+	return m.ui.View(m.width, m.height, m.layout(help))
+}
+```
+
+It returns the tooltip of the pointer or the focus, however it's shown, and not those pinned open.
+
+## Reach tooltips from the keyboard
+
+Tooltips that only the pointer can open leave keyboard users out. bloom has two ways in.
+
+### Show the focused node's tooltip
+
+With `WithFocus`, a key press that moves the focus onto a node shows its tooltip after the same delay as the
+pointer. Moving the focus along a toolbar with <kbd>tab</kbd> reads out each button in turn. It doesn't show again
+while the focus stays where it is, so typing in a focused field never brings its tooltip back, and a click that
+focuses a node doesn't show it either.
+
+### Pin the selected row's tooltip
+
+bloom can't see which row of your list is selected, since that's your model's state.
+`TooltipOpen(open)` shows a node's tooltip at once, for as long as `open` is true, and keys and the pointer don't
+close it. Pin the selected row's cut text open, and its full text follows the selection:
+
+```go
+image := bloom.Text(d.image).Truncate().TooltipOpen(i == m.selected)
+```
+
+It shows the node's `Tooltip(...)` or, for cut text, its full text, unfolded in place, even inside a `NoTooltip`
+node, since you asked for it. Text that fits shows nothing. Several nodes can be pinned at once: each bubble goes
+where it covers none of the others or their nodes, and one that fits nowhere is left out.
+
+## Style and timing
+
+Set the chip's style, and how long to wait, on `bloom.Tooltips`. A field left at zero keeps its default:
+
+```go
+m.ui = bloom.New(bloom.WithTooltips(bloom.Tooltips{
+	Style:    lipgloss.NewStyle().Foreground(theme.Fg).Background(theme.BrightBlack).Padding(0, 1),
+	Delay:    300 * time.Millisecond,
+	Warm:     500 * time.Millisecond,
+	MaxWidth: 40,
+}))
+```
+
+| Field | Default | Sets |
+| --- | --- | --- |
+| `Style` | a cell of padding on each side, on a background between the terminal's background and foreground | the chip's style |
+| `Delay` | 500ms | how long the pointer rests, or the focus stays, before a tooltip shows; negative shows it at once |
+| `Warm` | 300ms | how long after a tooltip closes the next one shows without waiting; negative turns it off |
+| `MaxWidth` | 60 | the widest a bubble gets, padding and border included, before its text wraps; never wider than the screen |
+| `Truncated`, `Explicit` | `TipDefault`: `TipUnfold`, `TipBubble` | [where each kind is drawn](#choose-where-tooltips-are-drawn) |
+
+The default background is worked out from the terminal's colors, which it reports when you return `m.ui.Init()`
+from `Init`, or from those given with `WithColors`, so it suits dark and light terminals alike.
+
+One tooltip can have a style and a delay of its own, for a warning that should stand out, or a control whose
+tooltip should show at once:
+
+```go
+bloom.Text("✕ failed").Style(failed).Tooltip(d.note, bloom.TipStyle(failedTip))
+bloom.Text("?").Style(help).Tooltip("Press ? for every shortcut", bloom.TipDelay(0))
+```
+
+Tooltip text is drawn without the escape sequences that `Trusted()` keeps, so it's safe to show text that came
+from outside the program.
+
+## Change tooltips while the program runs
+
+[`m.ui.SetTooltips(t)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.SetTooltips) replaces the configuration, such as
+for a new theme or a key that moves tooltips to the status line, without turning them on or off. Keep the
+`Tooltips` in your model and change it there:
+
+```go
+	case "t":
+		m.sink = !m.sink
+		mode := bloom.TipDefault
+		if m.sink {
+			mode = bloom.TipSink
+		}
+		m.tips.Explicit, m.tips.Truncated = mode, mode
+		m.ui.SetTooltips(m.tips)
+```
+
+[`m.ui.EnableTooltips(on)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.EnableTooltips) turns them on and off, such
+as for a setting of the user's. Turning them off closes the one showing, and turning them on
+needs no `WithTooltips` to start with.
+
+## What makes them unobtrusive
+
+You can rely on these, without code of your own:
+
+- **A tooltip waits for the pointer to rest.** It shows after `Delay`, and only once the pointer has moved onto
+  the node. A frame drawn under a still pointer never opens one, even if something new is now under it. Moving
+  within the node doesn't start the wait again.
+- **Moving along shows the next at once.** For `Warm` after a tooltip closes because the pointer left it, the next
+  node the pointer moves onto shows its tooltip with no wait, so you can sweep along a toolbar.
+- **It stays while you read it.** A bubble stays open while the pointer is over its node or over the bubble
+  itself, and an unfold while the pointer is over the cut text. Neither closes on a timer.
+- **Anything you do puts it away.** Any key press, click, or wheel event closes it, as does the pointer leaving
+  the node (other than onto its bubble), the terminal losing focus, or the node moving or leaving the screen. After a key,
+  click, or wheel event, the same node's tooltip doesn't come back until the pointer has left it, and the next
+  tooltip waits its full delay.
+- **It stays out of the way of input.** Nothing opens while a mouse button is down, during a drag or a text
+  selection, or while the terminal isn't focused. A tooltip takes no mouse events, so a click on it reaches
+  what's beneath.
+- **One at a time.** At most one tooltip from the pointer or the focus shows, whichever came last. Pinned
+  tooltips are separate.
+- **It doesn't jump.** A bubble is placed once, when it shows, and moves only if its node moves or the screen is
+  resized, not as what's beneath it changes.
+- **Layers hide it.** A modal layer hides the tooltips of what's beneath it, as it does their mouse handlers.
+
+To close tooltips when the terminal loses focus, bloom needs to hear about it: set `v.ReportFocus = true` on the
+view.
+
+## Tooltips and mouse reporting
+
+`m.ui.View` asks the terminal for all mouse motion while the frame has a tooltip the pointer could open, since
+terminals report a pointer moving with no button down only in that mode. In a frame whose only tooltips are pinned
+open, it asks for no more than the frame's other nodes need. See [Mouse reporting](/input/mouse#mouse-reporting).
+
+If you set `v.MouseMode` to `tea.MouseModeCellMotion` yourself, the terminal reports the pointer only while a
+button is held, so tooltips never open under the pointer. Focus and pinned tooltips still work, since
+they don't need the pointer.
+
+## Related
+
+- [Mouse events](/input/mouse)
+- [Focus and keyboard navigation](/input/focus)
+- [Dropdowns and popovers](/layers/dropdowns), for popovers you can click into
+- [Options reference](/reference/options#tooltips)
+- The [`tooltips` example](https://github.com/lrstanley/bloom/tree/master/_examples/tooltips)

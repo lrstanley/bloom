@@ -47,8 +47,8 @@ case tea.WindowSizeMsg:
 
 Check each of these:
 
-- The view turns on mouse reporting: `v.MouseMode = tea.MouseModeCellMotion` (or `tea.MouseModeAllMotion` for
-  hover).
+- Mouse reporting is on. The view from `m.ui.View` turns it on for the handlers in its frame; if you set
+  `v.MouseMode` yourself, it needs at least `tea.MouseModeCellMotion` (or `tea.MouseModeAllMotion` for hover).
 - The handler is on the node, or on something it's inside, with `On(...)`.
 - A node inside it doesn't have a handler of the same kind. The innermost one takes the event; see
   [which node gets the event](/input/mouse#which-node-gets-the-event).
@@ -56,6 +56,27 @@ Check each of these:
 - A modal layer isn't open, taking the events.
 - The view comes from `m.ui.View(...)`, which installs the `OnMouse` handler that runs your handlers. If you build
   the `tea.View` yourself or replace its `OnMouse`, pass every message to `m.ui.Update`, which then runs them.
+
+## Tooltips never show
+
+Check each of these:
+
+- The root has [`WithTooltips`](/input/tooltips#turn-tooltips-on), or `m.ui.EnableTooltips(true)` was called.
+  Without either, `Tooltip(...)` does nothing.
+- Every message reaches `m.ui.Update`, and its command is returned. The wait before a tooltip shows is a command,
+  and a tooltip opens when its message comes back through `Update`.
+- The view reports all mouse motion. `m.ui.View` asks for it while the frame has a tooltip; if you set
+  `v.MouseMode` yourself, set it to `tea.MouseModeAllMotion`. Under `tea.MouseModeCellMotion`, terminals report the
+  pointer only while a button is held, so only [keyboard tooltips](/input/tooltips#reach-tooltips-from-the-keyboard)
+  show.
+- The pointer moved onto the node. A tooltip opens only on motion, not when a new frame puts the node under a still
+  pointer, and not again after a key, click, or wheel event closed it until the pointer has left the node.
+- For cut text: it was actually cut, with "…", and it isn't inside a `NoTooltip()` node, and `Truncated` isn't
+  `TipOff`. `m.ui.Frame().Truncated(id)` tells you whether it was cut.
+- A modal layer isn't open over the node.
+- The mode for that kind isn't `TipHidden`, or `TipSink` with a `TooltipSink` on screen you aren't looking at.
+- For the focus: the root has `WithFocus`, and the focus moved onto the node with a key press. A click that focuses a
+  node doesn't show its tooltip.
 
 ## A handler runs, but nothing changes
 

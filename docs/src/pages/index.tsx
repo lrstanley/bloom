@@ -81,6 +81,12 @@ const chores = [
         href: "/input/mouse",
     },
     {
+        title: "Explaining an icon button",
+        without: "Follow the pointer, wait for it to rest, find room beside the button, and clear it on the next key.",
+        code: 'bloom.Text("⟳").Tooltip("Refresh")',
+        href: "/input/tooltips",
+    },
+    {
         title: "Scrolling a huge log",
         without: "Slice out the lines in sight, wrap them again on every resize, and keep the same line at the top.",
         code: "bloom.Viewport(m.log).At(m.pos).Follow()",

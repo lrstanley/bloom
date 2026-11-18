@@ -16,8 +16,9 @@ its own selection, and a list of ten thousand requests:
 
 ## Make text selectable
 
-`Selectable()` lets the left button select text in a node. Text, boxes, rows, columns, grids, slots, layers,
-[viewports](/layout/viewports), and [lists](/layout/lists) all have it:
+`Selectable()` lets the left button select text in a node. Every node has it, from text and boxes to
+[viewports](/layout/viewports) and [lists](/layout/lists), except a `Drawable`, a `Scrollbar`, and a `TooltipSink`,
+which have no text of their own:
 
 ```go
 bloom.Box(panel, bloom.Column(fields...).Selectable())
@@ -27,11 +28,8 @@ A selection can run across every node inside the selectable one, such as from a 
 but not out of it. On a box, only what's inside its frame is selected. When selectable nodes are inside each other,
 the innermost one under the pointer takes the drag.
 
-Selecting needs the mouse turned on, and drags need only the motion reported while a button is down:
-
-```go
-v.MouseMode = tea.MouseModeCellMotion
-```
+Selecting needs drags, which need only the motion reported while a button is down. The view from `m.ui.View` turns
+that on while a node is selectable.
 
 The root keeps the selection, and sends itself ticks while selecting, so pass every message to `m.ui.Update`, as
 you do for the rest of bloom.

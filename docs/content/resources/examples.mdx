@@ -137,6 +137,18 @@ on from `Context.Side` to draw its edges.
 See also: [Dropdowns](/layers/dropdowns), [Dialogs and modals](/layers/dialogs).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/dropdowns), or `go run ./dropdowns`.
 
+## tooltips
+
+![The tooltips example: a tooltip appearing over a toolbar icon after a pause, the next icons' tooltips appearing at once along the toolbar, a cut image unfolding in place, a status note going below the last row where there's room, tooltips shown in the status line, the selected row's full image following the selection, and tab moving the focus along the toolbar, showing each button's tooltip](/demos/tooltips.webp)
+
+A deployments view with built-in tooltips: icon buttons with `Tooltip`, one asking for a side with `TipSide`, cut
+images that unfold in place, a secret column marked `NoTooltip`, status notes placed where they hide the least, one
+drawn with `TipStyle`, a key that sends tooltips to a `TooltipSink` in the status line, the selected row pinned with
+`TooltipOpen`, and focus moving along the toolbar.
+
+See also: [Tooltips](/input/tooltips), [Focus](/input/focus).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/tooltips), or `go run ./tooltips`.
+
 ## borders
 
 ![The borders example: a list with a title, clickable filter tabs, its position, and icon buttons on its border, its scrollbar lighting up under the pointer, then dragged and clicked, a log scrolled sideways with a horizontal scrollbar and its name down its side, next to boxes looping each border effect](/demos/borders.webp)

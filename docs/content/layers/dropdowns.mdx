@@ -1,6 +1,6 @@
 ---
 title: Dropdowns and popovers
-description: Attach a layer to another node with AnchorTo, for autocomplete suggestions, menus, tooltips, and popovers that follow what they belong to.
+description: Attach a layer to another node with AnchorTo, for autocomplete suggestions, menus, hover cards, and popovers that follow what they belong to.
 ---
 
 A dropdown is a layer placed against another node, rather than against the screen.
@@ -40,9 +40,7 @@ func (m *model) View() tea.View {
 			AnchorTo(fieldLanguage, bloom.Bottom))
 	}
 
-	v := m.ui.View(m.width, m.height, bloom.Overlay(form, layers...))
-	v.MouseMode = tea.MouseModeCellMotion
-	return v
+	return m.ui.View(m.width, m.height, bloom.Overlay(form, layers...))
 }
 ```
 
@@ -151,38 +149,45 @@ bloom.Layer(marker).AnchorTo(selectedRow, bloom.Right).ID("marker").Animate()
 While the anchor node isn't on screen, because it's scrolled away, collapsed, or not in the tree, the layer is
 hidden too.
 
-## Tooltips
+## Hover cards
 
-A tooltip is the same thing, shown while the pointer is over a node. Following the pointer needs
-`v.MouseMode = tea.MouseModeAllMotion`.
+For a line of text about a node, use the [built-in tooltips](/input/tooltips): `Tooltip("Deploy")` on the node does
+it, with no state in the model. Build a popover yourself when it's more than that, such as a card with a heading
+and a link you can click, which must stay open while the pointer moves into it. Tooltips take no mouse events, so
+they can't hold anything to click.
 
 [`on.Hover`](https://pkg.go.dev/bloomfx.dev/bloom/on#Hover) runs when the pointer moves onto a node and
-off it. Note which button it's over:
+off it. Note when it's over the button, and when it's over the card:
 
 ```go
-bloom.Text("deploy").Style(button).ID(buttonDeploy).On(on.Hover(func(over bool) tea.Cmd {
-	if over {
-		m.hovered = buttonDeploy
-	} else if m.hovered == buttonDeploy {
-		m.hovered = ""
-	}
-	return nil
-}))
+bloom.Text("deploy").Style(button).ID(buttonDeploy).On(
+	on.Press(m.deploy),
+	on.Hover(func(over bool) tea.Cmd { m.overButton = over; return nil }),
+)
 ```
 
-Then anchor a small layer to the hovered button:
+Then anchor the card to the button while the pointer is over either. The card sits on the row below the button,
+so the pointer moves straight from one to the other without the card closing:
 
 ```go
-if m.hovered != "" {
-	layers = append(layers, bloom.Layer(bloom.Text(tooltips[m.hovered]).Style(tipStyle)).
-		AnchorTo(m.hovered, bloom.Top))
+if m.overButton || m.overCard {
+	card := bloom.Box(cardStyle, bloom.Column(
+		bloom.Text("Deploy api to prod-eu-1").Style(heading),
+		bloom.Text("Last deployed 2h ago").Style(muted),
+		bloom.Text("view history").Style(link).On(on.Click(m.openHistory)),
+	)).On(on.Hover(func(over bool) tea.Cmd { m.overCard = over; return nil }))
+	layers = append(layers, bloom.Layer(card).AnchorTo(buttonDeploy, bloom.Bottom))
 }
 ```
+
+The view from `m.ui.View` reports all mouse motion while a node has a hover handler, which following the pointer
+needs.
 
 ## Related
 
 - [Dialogs and modals](/layers/dialogs)
 - [Mouse events](/input/mouse)
+- [Tooltips](/input/tooltips), for text about a node, shown under the pointer
 - The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with an autocomplete dropdown
 - The [`dropdowns` example](https://github.com/lrstanley/bloom/tree/master/_examples/dropdowns), with selects that
   keep their dropdowns, in a dialog and on a bar at the bottom of the screen

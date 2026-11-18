@@ -82,6 +82,9 @@ over.
   nodes they belong to, like `bloom.Text(name).On(on.Click(m.open))`. Hover styles and drag capture are built in.
 - :heavy_check_mark: **Focus**: tab order from the layout, focused styles, the real terminal cursor, and focus
   scopes that keep <kbd>tab</kbd> inside a dialog until it closes.
+- :heavy_check_mark: **Tooltips**: `Tooltip("Deploy")` on any node, and text cut short with "…" unfolds in place
+  under the pointer, with placement that hides the least of the screen, a status line sink, and keyboard access
+  through focus and pinning.
 - :heavy_check_mark: **Animation kept in your model**: eased and spring values, presences for showing and hiding
   (with `ShowFor` for toasts that hide themselves), sequences of steps, and automatic layout animation with
   `Animate()`.
@@ -131,7 +134,6 @@ func (m *model) View() tea.View {
 			Presence(m.toastAnim, fx.Slide{From: bloom.Right}),
 	))
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 ```

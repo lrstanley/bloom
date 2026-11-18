@@ -182,10 +182,11 @@ func (m *model) View() tea.View {
 
 	v := m.ui.View(m.width, m.height, bloom.Column(rows...))
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 ```
+
+The `v.MouseMode` line is gone too: `m.ui.View` turns on the mouse reporting the frame's handlers need.
 
 The handler is a closure made in `View`, so it can only change the model through a pointer receiver. With a value
 receiver it changes a copy, and the click does nothing. When a handler can't reach the state, such as in a

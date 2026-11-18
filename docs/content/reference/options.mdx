@@ -1,6 +1,6 @@
 ---
 title: Nodes and options
-description: A compact reference of bloom's nodes, slot and layer options, Root options, and anim options, with links to the full API documentation.
+description: A compact reference of bloom's nodes, slot and layer options, Root options, tooltip options, and anim options, with links to the full API documentation.
 ---
 
 This page lists what's available, grouped by what it's for. The full documentation, with every method's details,
@@ -30,6 +30,7 @@ is on [pkg.go.dev](https://pkg.go.dev/bloomfx.dev/bloom).
 | [`Transition(t, child, effects...)`](https://pkg.go.dev/bloomfx.dev/bloom#Transition) | a child drawn with effects at progress `t` |
 | [`Present(p, child, effects...)`](https://pkg.go.dev/bloomfx.dev/bloom#Present) | a child shown only while a presence is visible |
 | [`Drawable(d)`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable) | an Ultraviolet `Drawable`, painting cells directly |
+| [`TooltipSink()`](https://pkg.go.dev/bloomfx.dev/bloom#TooltipSink) | a row showing the text of the [tooltip](/input/tooltips#show-tooltips-in-a-status-line) showing, for the kinds sent to it; `.Style(style)` |
 
 Any value with a `View() string` method can also be a child.
 
@@ -110,20 +111,38 @@ See [Viewports](/layout/viewports).
 | Method | Does |
 | --- | --- |
 | `Style(style)` | render with a Lip Gloss style at the node's size, wrapping long lines |
-| `Truncate()` | one line, cut short with "…" |
+| `Truncate()` | one line, cut short with "…", whose full text is its [tooltip](/input/tooltips#show-cut-text-in-full) |
 | `Cursor(c)` | show the terminal cursor at `c`, relative to the node |
 | `HoverStyle(style)` | render with `style` while the pointer is over the node |
 | `Trusted()` | keep the commands in the text meant for the terminal, such as images, which are dropped otherwise |
-| `ID(id)`, `Focusable()`, `On(handlers...)` | as for slots |
-
-Boxes, rows, columns, grids, and wraps have `ID(id)` and `On(handlers...)` too, and boxes have `HoverStyle(style)`
-for their frame.
-
-Text, boxes, rows, columns, grids, slots, layers, lists, and viewports have `Selectable()`, which lets the mouse
-[select their text](/input/selection).
+| `ID(id)`, `Focusable()`, `On(handlers...)`, `Selectable()` | as for [every node](#every-node) |
 
 `Marquee` has `Style(style)` and `Gap(s)`, the text shown between loops. `Skeleton` has `Style(style)`, which
 colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
+
+## Every node
+
+Every node, from `Text` and `Row` to `Overlay`, `Scrollbar`, and `Transition`, has these:
+
+| Method | Does |
+| --- | --- |
+| `ID(id)` | the ID for focus, `Frame.Rect`, and what else refers to the node, such as anchoring a layer or a `ScrollbarOf` a list |
+| `On(handlers...)` | [mouse handlers](/input/mouse) from the `on` package |
+| `Focusable()` | a stop in the focus order |
+| `Selectable()` | lets the mouse [select its text](/input/selection); not on `Drawable`, `Scrollbar`, or `TooltipSink`, which have none |
+| `Tooltip(text, opts...)` | a [tooltip](/input/tooltips), shown while the pointer rests on the node or a key press focuses it; empty text is none |
+| `NoTooltip()` | no full-text tooltips for the cut text in the node or inside it; tooltips given with `Tooltip` still show |
+| `TooltipOpen(open)` | show the node's tooltip, or the full text it was cut from, at once while `open` is true |
+
+Only some nodes have these:
+
+| Method | On | Does |
+| --- | --- | --- |
+| `HoverStyle(style)` | `Text`, `Box` | render the text, or draw the box's frame, with `style` while the pointer is over it |
+| `Cursor(c)` | `Text`, `Viewport` | show the terminal cursor at `c`, relative to the node; on a viewport with a `Caret`, at the caret, in `c`'s shape and color |
+| `Scope()` | slots | a focus scope, for `Focus.Within` and `Focus.Push`; a modal layer is one too |
+
+A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 
 ## Layers
 
@@ -157,6 +176,8 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | `ui.Click(id)`, `ui.ClickAt(x, y)` | run the handlers for a click, for tests |
 | `ui.Selection()`, `ui.SelectAll(id)`, `ui.ClearSelection()` | read, select all of a node, or clear the [text selected with the mouse](/input/selection) |
 | `ui.CopySelection()` | copy the selection with OSC 52 and `WithClipboard`; `nil` when nothing is selected |
+| `ui.SetTooltips(t)`, `ui.EnableTooltips(on)` | replace the [tooltip](/input/tooltips) configuration, or turn tooltips on and off |
+| `ui.Tooltip()` | the text of the tooltip of the pointer or the focus showing, for drawing it yourself |
 
 ### Root options
 
@@ -173,6 +194,38 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`WithClipboard(write)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClipboard) | none | a system clipboard `CopySelection` writes to, besides OSC 52 |
 | [`WithCopyFlash(on)`](https://pkg.go.dev/bloomfx.dev/bloom#WithCopyFlash) | on | whether a copy sweeps a band across the text copied |
 | [`WithClickDelay(on)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClickDelay) | on | whether clicks in selectable nodes wait to tell them from a double click |
+| [`WithTooltips(t)`](https://pkg.go.dev/bloomfx.dev/bloom#WithTooltips) | off | turns [tooltips](/input/tooltips) on, configured with a [`Tooltips`](#tooltips) |
+
+## Tooltips
+
+[`Tooltips`](https://pkg.go.dev/bloomfx.dev/bloom#Tooltips), for `WithTooltips` and `SetTooltips`. A field left at
+zero takes its default:
+
+| Field | Default | Sets |
+| --- | --- | --- |
+| `Style` | padding of a cell on each side, on a background between the terminal's colors | the chip a tooltip is drawn in |
+| `Delay` | 500ms | how long the pointer rests, or the focus stays, before a tooltip shows; negative shows it at once |
+| `Warm` | 300ms | how long after a tooltip closes because the pointer left that the next shows at once; negative never |
+| `MaxWidth` | 60 | the widest a bubble gets, padding and border included, before its text wraps |
+| `Truncated` | `TipDefault`, which is `TipUnfold` | how the full text of cut text is shown: `TipUnfold`, `TipBubble`, `TipSink`, `TipHidden`, or `TipOff` |
+| `Explicit` | `TipDefault`, which is `TipBubble` | how text given with `Tooltip` is shown: `TipBubble`, `TipSink`, or `TipHidden` |
+
+| Mode | Shows |
+| --- | --- |
+| `TipDefault` | the zero value: the kind's default, `TipUnfold` for `Truncated` and `TipBubble` for `Explicit` |
+| `TipUnfold` | the full text over the cut text, in place, while the pointer is over the cut text; a bubble when it's wider than the screen |
+| `TipBubble` | a chip beside the node |
+| `TipSink` | the text in a `TooltipSink` on screen, and nothing beside the node; as by default while no sink is on screen |
+| `TipHidden` | nothing, though tooltips open and close as usual, for the app to draw from `ui.Tooltip()` |
+| `TipOff` | nothing, and none opens |
+
+Options for one tooltip, for `Tooltip(text, opts...)`:
+
+| Option | Does |
+| --- | --- |
+| [`TipSide(side)`](https://pkg.go.dev/bloomfx.dev/bloom#TipSide) | put it on `side` of the node, or the opposite side when it doesn't fit; without it, it goes where it hides the least |
+| [`TipStyle(style)`](https://pkg.go.dev/bloomfx.dev/bloom#TipStyle) | draw it with `style` in place of the `Tooltips` style |
+| [`TipDelay(d)`](https://pkg.go.dev/bloomfx.dev/bloom#TipDelay) | wait `d` in place of the `Tooltips` delay; zero shows it at once |
 
 ## Geometry and input
 
@@ -182,6 +235,7 @@ colors the bars, and `Shimmer(phase)`, which sweeps a band of light across them.
 | [`Render(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Render) | lay out and draw to a string, without a root |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
+| `frame.Truncated(id)` | whether a `Truncate()` text node was cut short, with or without tooltips |
 | `frame.Viewport(id)`, `frame.List(id)` | where a [viewport](/layout/viewports) or [list](/layout/lists) was scrolled to, and how much it showed |
 | [`ThrottleMouse(every)`](https://pkg.go.dev/bloomfx.dev/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
 | `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |

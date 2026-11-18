@@ -49,8 +49,6 @@ reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
 The handler runs just before `Update` gets the wheel event, so clamp the offset in `Update` as you do for
 [keys](/layout/sizes-in-update#find-a-nodes-size-in-update).
 
-Remember to turn on mouse reporting in `View` with `v.MouseMode = tea.MouseModeCellMotion`.
-
 ## Scroll sideways
 
 `X(offset)` scrolls a `Scroll` sideways too: its child gets as much width as it wants, so long lines don't wrap,
@@ -153,11 +151,8 @@ bloom.ScrollbarOf(paneArticle).OnScroll(scroll).
 ```
 
 The hover style is used whole, so repeat any glyph or style of `Style` you want kept. It needs no more than the
-`OnScroll` (or the viewport's, for `ScrollbarOf` a viewport), and mouse motion reported with no button down:
-
-```go
-v.MouseMode = tea.MouseModeAllMotion
-```
+`OnScroll` (or the viewport's, for `ScrollbarOf` a viewport): the view from `m.ui.View` then reports mouse motion with
+no button down, to follow the pointer.
 
 A scrollbar with no `OnScroll` takes no mouse, so it doesn't change.
 

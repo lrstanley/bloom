@@ -11,17 +11,30 @@ can drag:
 
 ![The mouse example: a hover style following the pointer down a list, a click and a double click opening a file, the wheel scrolling it, and the divider dragged wider and narrower](/demos/mouse.webp)
 
-## Turn on mouse reporting
+## Mouse reporting
 
-Set a mouse mode on the view you return:
+The view `m.ui.View` returns sets `MouseMode` to the least its frame needs, so you don't set it yourself:
+
+- `tea.MouseModeAllMotion`, to get motion while no button is pressed, while a node has a [hover](#hover) style or an
+  `on.Hover` handler, or a [tooltip](/input/tooltips) the pointer could open.
+- `tea.MouseModeCellMotion`, which reports clicks, the wheel, and drags, while a node has other handlers, is
+  [selectable](/input/selection), or can be focused with a click under [`WithFocus`](/input/focus).
+- `tea.MouseModeNone` otherwise, which leaves the terminal's own selection working.
+
+It's worked out again for every frame, so opening a dialog full of buttons turns reporting on, and closing it turns
+it off. To ask for something else, such as to follow the pointer in `Update` yourself, set the mode on the view
+before returning it:
 
 ```go
 v := m.ui.View(m.width, m.height, layout)
-v.MouseMode = tea.MouseModeCellMotion // clicks, the wheel, and drags
+v.MouseMode = tea.MouseModeAllMotion
 return v
 ```
 
-Use `tea.MouseModeAllMotion` to also get motion while no button is pressed, for [hover](#hover).
+Asking for less than the frame needs takes away what needs it. Under `tea.MouseModeCellMotion` the terminal reports
+the pointer only while a button is held, so hover styles and `on.Hover` don't follow it, and tooltips don't open
+under it. Clicks, the wheel, drags, and keyboard [tooltips](/input/tooltips#reach-tooltips-from-the-keyboard) still
+work.
 
 ## Attach handlers
 
@@ -42,8 +55,8 @@ for i, s := range services {
 }
 ```
 
-No IDs are needed: the handler is already on the node it's about. Text, slots, boxes, rows, columns, grids, wraps,
-and layers all have `On`.
+No IDs are needed: the handler is already on the node it's about. Every kind of node has `On`, from text and
+slots to boxes, rows, columns, layers, lists, and viewports.
 
 | Handler | Runs on |
 | --- | --- |
@@ -148,13 +161,14 @@ bloom.Text("save").Style(button).HoverStyle(buttonHover).On(on.Press(m.save))
 
 Give it a style that takes the same space as the node's own, changing only its colors and attributes.
 
-For anything more, such as showing a tooltip, `on.Hover` runs when the pointer moves onto the node and off it:
+For a tooltip, use the [built-in ones](/input/tooltips): `Tooltip("Deploy")` on the node, with no state in the
+model. For anything more, `on.Hover` runs when the pointer moves onto the node and off it:
 
 ```go
-bloom.Text("deploy").On(on.Hover(func(over bool) tea.Cmd { m.tip = over; return nil }))
+bloom.Text("deploy").On(on.Hover(func(over bool) tea.Cmd { m.preview = over; return nil }))
 ```
 
-Both need `tea.MouseModeAllMotion` to follow the pointer while no button is down. A node stops being hovered when
+For either, the view reports all motion, to follow the pointer while no button is down. A node stops being hovered when
 something covers it, such as a dialog opening over it, even without the pointer moving. bloom notices with the next
 message `m.ui.Update` gets after the new frame is drawn, such as an animation frame, a key, or the pointer moving. Terminals don't report the
 pointer leaving the window, so the hover also ends when the window loses focus, which needs `v.ReportFocus = true`.
@@ -259,6 +273,7 @@ if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
 
 - [Focus and keyboard navigation](/input/focus), which can focus the node you click
 - [Selecting and copying text](/input/selection), with the mouse
+- [Tooltips](/input/tooltips), shown when the pointer rests on a node
 - [Scrolling](/layout/scrolling)
 - [`on` API reference](https://pkg.go.dev/bloomfx.dev/bloom/on)
 - The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double

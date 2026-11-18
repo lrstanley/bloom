@@ -42,8 +42,9 @@ bloom.Text(m.values[fieldName]).Style(input).ID(fieldName).Focusable()
 bloom.Text(m.values[fieldEmail]).Style(input).ID(fieldEmail).Focusable()
 ```
 
-Focus moves between focusable nodes with IDs of its type, and passes over the rest. Slots can be focusable too,
-such as `bloom.Fill(m.editor).ID(paneEditor).Focusable()`, which makes a whole pane a stop in the tab order.
+Focus moves between focusable nodes with IDs of its type, and passes over the rest. Any node can be focusable,
+such as a slot: `bloom.Fill(m.editor).ID(paneEditor).Focusable()` makes a whole pane a stop in the tab
+order.
 
 ## Move focus with tab and clicks
 

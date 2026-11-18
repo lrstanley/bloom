@@ -576,7 +576,6 @@ func (m *model) View() tea.View {
 
 	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog, toast))
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
