@@ -23,7 +23,7 @@ is on [pkg.go.dev](https://pkg.go.dev/bloomfx.dev/bloom).
 | [`Scroll(child, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scroll) | a child shown from row `offset`; `.X(offset)` scrolls it sideways too |
 | [`Scrollbar(total, visible, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scrollbar) | a vertical scrollbar, drawn while there's more to scroll to |
 | [`ScrollbarOf(id)`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollbarOf) | a scrollbar following the `Scroll` the node with ID `id` is in, or the `List` or `Viewport` with ID `id` |
-| [`List(count, item)`](https://pkg.go.dev/bloomfx.dev/bloom#List) | the items of a list that fit, built by `item(i)` only for those; `.Offset(i)`, `.Keep(i)`, `.Gap(n)` |
+| [`List(count, item)`](https://pkg.go.dev/bloomfx.dev/bloom#List) | the items of a list that fit, built by `item(i)` only for those; `.Offset(i)`, `.Keep(i)`, `.Gap(n)`, and `.ItemText(text)`, the text [a selection](/input/selection#selections-in-a-list) takes from items not built |
 | [`Viewport(buf)`](https://pkg.go.dev/bloomfx.dev/bloom#Viewport) | the lines of a [`Buffer`](https://pkg.go.dev/bloomfx.dev/bloom#Buffer) in sight, from a position kept in the model, drawing only those |
 | [`Overlay(base, layers...)`](https://pkg.go.dev/bloomfx.dev/bloom#Overlay) | layers drawn over a base |
 | [`Layer(child)`](https://pkg.go.dev/bloomfx.dev/bloom#Layer) | a layer for an overlay, centered at its natural size |

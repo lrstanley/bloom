@@ -1,0 +1,319 @@
+---
+title: Editing text
+description: Make a Viewport an editing surface, with a caret kept in the model, moved by wrapped rows, pages, and words, typing with Replace, selecting from the keyboard and the mouse, copying, and undo with snapshots, at any length.
+---
+
+A [viewport](/layout/viewports) given a caret is an editing surface. The caret and what's selected are a
+`bloom.Range` in your model, and bloom draws it, puts the terminal cursor at it, and sets it from the mouse. What's
+left for you is a keymap and your own policy: what each key does to the buffer, and what to keep for undo.
+
+Edits cost the same in a buffer of a million lines as in one of ten, so an editor built this way stays instant at
+any length. The [editor example](https://github.com/lrstanley/bloom/tree/master/_examples/editor) is all of this
+page in a few hundred lines, editing a million generated lines:
+
+![The editor example: typing at a click, selecting words with the keyboard and cutting them, pasting, a word double clicked and copied, a drag across wrapped rows, undo and redo, wrapping turned off and on, and typing at the end of a million lines](/demos/editor.webp)
+
+## Make a viewport editable
+
+Keep the buffer, the range, and where the viewport is scrolled to in the model, and give the viewport a pointer to
+the range with `Caret`:
+
+```go
+type model struct {
+	ui     *bloom.Root
+	buf    *bloom.Buffer
+	sel    bloom.Range
+	pos    bloom.ViewportPos
+	cursor *tea.Cursor
+}
+
+func newModel() *model {
+	return &model{ui: bloom.New(), buf: bloom.NewBuffer(text), cursor: tea.NewCursor(0, 0)}
+}
+
+// In the layout:
+bloom.Viewport(m.buf).ID(paneText).At(m.pos).Wrap(bloom.WrapWords).LineNumbers(muted).
+	Caret(&m.sel).Cursor(m.cursor).
+	OnScroll(func(p bloom.ViewportPos) tea.Cmd { m.pos = p; return nil })
+```
+
+The caret is the range's `Head`, and its `Anchor` is where the selection started; they're the same while nothing is
+selected. `Cursor` puts the terminal cursor at the caret while it's in sight, in the shape and color of the
+`tea.Cursor` you give it, and its position is ignored. Give it only while the viewport has focus.
+
+The range is a pointer so that bloom reads it whenever it's asked, including in the same `Update` that changed it
+from the keyboard, and writes it from the mouse. A viewport with a caret is selectable without `Selectable()`.
+
+So that the caret has a cell at the end of a line as wide as the viewport, the lines are laid out one column
+narrower than it, the last column kept for the caret. An empty buffer shows the caret at its top-left, and takes
+edits as one empty line.
+
+## Type with Replace
+
+Typing replaces what's selected, which is nothing at a caret, and puts the caret after what was typed, which the
+`Change` that `Replace` returns tells you:
+
+```go
+func (m *model) replace(text string) {
+	c := m.buf.Replace(m.sel.From(), m.sel.To(), text)
+	m.sel = bloom.Range{Anchor: c.End(), Head: c.End()}
+}
+
+// In the keymap:
+case "enter":
+	m.replace("\n")
+case "backspace":
+	if m.sel.Empty() {
+		m.sel.Anchor = m.buf.Prev(m.sel.Head)
+	}
+	m.replace("")
+default:
+	if msg.Text != "" {
+		m.replace(msg.Text)
+	}
+```
+
+Following the range through edits is yours to do, with the `Change`. bloom follows only the ranges it holds itself.
+If you change the buffer some other way, such as with `SetContent`, set the range again: one that's past the end of
+the buffer is clamped where it's drawn and read, so it's never out of the text, but it may not be where you meant.
+
+## Move the caret
+
+The buffer moves positions through its text, and the viewport moves the caret through the rows it lays the text
+out in:
+
+| `Buffer` | Gives |
+| --- | --- |
+| `Next(p)`, `Prev(p)` | one character on or back, a whole grapheme cluster such as a letter and its accent, across line ends |
+| `NextWord(p)`, `PrevWord(p)` | the end of the word at or after `p`, or the start of the one at or before it, skipping spaces and punctuation, across line ends |
+| `WordAt(p)` | the start and end of the word at `p` |
+| `End()`, `Clamp(p)` | the end of the text, and the nearest place in it |
+| `TextIn(from, to)` | the text between, without styles, the lines joined with newlines |
+
+| `ViewportView` | Gives |
+| --- | --- |
+| `MoveRows(sel, n, column)` | the caret `n` rows down, or up, at a column, by the rows lines wrap to |
+| `ScrollRows(sel, n, column)` | the same, and the viewport scrolled by as many rows, for a page |
+| `RowStart(sel)`, `RowEnd(sel)` | the caret at the ends of the row it's on |
+| `Column(sel)` | the column of its row the caret is drawn at |
+| `Show(sel)` | the position scrolled as little as it takes for the caret to be in sight |
+| `CaretAt(cell)`, `CaretCell(sel)` | the caret at a cell, as a click puts it, and the cell a caret is drawn at |
+| `PosAt(cell)`, `CellOf(p)` | the same for a position alone |
+
+The buffer's methods take and give positions. The viewport's take the range and give it back with its `Head`
+moved and its `Anchor` kept, because where a line wraps the caret has two places on screen, and the range tells
+which: see [where a line wraps](#where-a-line-wraps). The rows are those of the buffer as it is when you call the
+methods, so a view read from the last frame works on text you changed since.
+
+Each key moves the `Head`, and then, unless <kbd>shift</kbd> is held, collapses the range to it. `WithHead` moves
+the `Head` to a position from the buffer, and `Collapse` sets the `Anchor` to the `Head`:
+
+```go
+case tea.KeyPressMsg:
+	v, _ := m.ui.Frame().Viewport(paneText)
+	// With shift, the keys that move the caret select as they move.
+	key := msg.String()
+	extend := strings.Contains(key, "shift+")
+	sel := m.sel
+	switch strings.Replace(key, "shift+", "", 1) {
+	case "left":
+		sel = sel.WithHead(m.buf.Prev(sel.Head))
+	case "ctrl+right":
+		sel = sel.WithHead(m.buf.NextWord(sel.Head))
+	case "home":
+		sel = v.RowStart(sel)
+	case "end":
+		sel = v.RowEnd(sel)
+	case "ctrl+end":
+		sel = sel.WithHead(m.buf.End())
+	}
+	if !extend {
+		sel = sel.Collapse()
+	}
+	m.sel = sel
+```
+
+### Words
+
+Words are found as Unicode text segmentation finds them, so `don't` and `3.14` are one word each, and are joined
+across a buffer's word characters, which keep a path or a URL one word by default. The same words are found by
+`NextWord`, `PrevWord`, `WordAt`, and a double click in the viewport, so <kbd>ctrl</kbd> and the arrows stop where a
+double click selects. For words as an editor of code has them, set the characters for the buffer:
+
+```go
+m.buf.SetWordChars("_")
+```
+
+With `""`, words are as Unicode finds them. A buffer never given any takes the Root's
+[`WithWordChars`](/input/selection#how-the-mouse-selects) from the first frame its viewport is drawn in, for its own
+methods as for a double click, and bloom's default set until then.
+Finding a word reads only the text around it, up to the whitespace either side, however long its line is.
+
+### Keep the column while moving up and down
+
+Moving down through a short row and on to a long one should come back to the column it started at. Keep the
+column from before the first move, and forget it when anything else moves the caret:
+
+```go
+func (m *model) column(v bloom.ViewportView) int {
+	if m.goal < 0 {
+		m.goal = v.Column(m.sel)
+	}
+	return m.goal
+}
+
+// In the keymap, with m.goal = -1 for every other key:
+case "up":
+	sel = v.MoveRows(sel, -1, m.column(v))
+case "down":
+	sel = v.MoveRows(sel, 1, m.column(v))
+```
+
+`MoveRows` lands on the character boundary nearest the column, never inside a wide character or a tab, and at the
+end of a row too short for it. Up from the first row goes to the start of the text, and down from the last row to
+its end, as in most editors.
+
+The mouse moves the caret too. `OnCaret` tells you when it does, after it writes the range, so you can forget the
+column there:
+
+```go
+bloom.Viewport(m.buf).Caret(&m.sel).OnCaret(func(bloom.Range) tea.Cmd { m.goal = -1; return nil })
+```
+
+### Page up and down
+
+A page should move the caret and scroll the text under it by as much, so that the caret stays on its row of the
+screen. `ScrollRows` moves the caret as `MoveRows` does and gives the position to scroll to as well:
+
+```go
+case "pgdown":
+	m.sel, m.pos = v.ScrollRows(m.sel, v.Rows-1, m.column(v))
+```
+
+Near the top or the bottom, it scrolls as far as it can and the caret still moves, and the position it gives
+always has the caret in sight, so there's no need to `Show` it after. Collapse the range, or not, as for any other
+key.
+
+### Where a line wraps
+
+The place a line wraps is one position in its text, but two places on screen: the end of one row and the start of
+the next. A range's `EndOfRow` tells which: set, the caret is drawn at the end of the row before the wrap; unset,
+at the start of the row after. It means nothing anywhere else, and the text selected and copied doesn't depend on
+it.
+
+`RowEnd` on a row the line wraps after goes to the place it wraps, after any spaces that hang off a row wrapped at
+words, with `EndOfRow` set, so <kbd>end</kbd> reaches the true end of the row and the caret stays on it.
+`MoveRows` sets it when it lands at the end of such a row, and a click past the end of one sets it too, so the
+caret stays on the row clicked. `WithHead` clears it, since a position from the buffer is drawn at the start of a
+row, and `Collapse` and `Change.MapRange` keep it. When you set a range yourself from a position, leave it unset.
+
+## Keep the caret in sight
+
+After each key, scroll as little as it takes to show the caret. `Show` scrolls down or up, and sideways while lines
+don't wrap:
+
+```go
+if v, ok := m.ui.Frame().Viewport(paneText); ok {
+	m.pos = v.Show(m.sel)
+}
+```
+
+## Select from the keyboard and the mouse
+
+<kbd>shift</kbd> with a key that moves the caret moves the `Head` and keeps the `Anchor`, which is the range left
+as the move gave it, not collapsed. A range you make becomes the selection as soon as bloom sees it, and clears any
+other on the screen, so `m.ui.Selection()` returns its text in the same `Update`. The mouse writes the range as an
+editor does:
+
+| Gesture | Does |
+| --- | --- |
+| click | puts the caret before the character under the pointer, or past the end of a row, at its end |
+| <kbd>shift</kbd> held with a click | moves the caret there, and keeps the anchor |
+| drag | selects from the caret at the press to the caret under the pointer, scrolling past an edge through `OnScroll` |
+| double click, triple click | selects the [word](#words), even one wrapped across rows, or the line |
+
+A range that holds text is drawn in the [selection's style](/input/selection#change-how-it-looks), and a caret alone
+is not. `m.ui.SelectAll(paneText)` selects all of the buffer, and `m.ui.ClearSelection()` collapses the range to its
+caret. Starting a selection anywhere else on the screen collapses it too.
+
+## Copy, cut, and paste
+
+`CopySelection` copies the range, leaves it selected, and sweeps the copy flash across it. To cut, copy and then
+take the text out, which ends the flash at once:
+
+```go
+case "ctrl+c":
+	if cmd := m.ui.CopySelection(); cmd != nil {
+		return m, cmd
+	}
+	return m, tea.Quit
+case "ctrl+x":
+	if cmd := m.ui.CopySelection(); cmd != nil {
+		m.replace("")
+		return m, cmd
+	}
+```
+
+What the terminal pastes, such as with <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>v</kbd>, comes as a `tea.PasteMsg`:
+
+```go
+case tea.PasteMsg:
+	m.replace(msg.Content)
+```
+
+## Undo with snapshots
+
+A [snapshot](/layout/viewports#undo-with-snapshots) costs a step to take and to restore, however long the text is.
+Keep the range with it, so that undo puts the caret back too, and keep where you are on the other stack before
+going back, so that redo can return:
+
+```go
+type step struct {
+	text bloom.Snapshot
+	sel  bloom.Range
+}
+
+func (m *model) replace(text string) {
+	m.undo = append(m.undo, step{text: m.buf.Snapshot(), sel: m.sel})
+	m.redo = m.redo[:0]
+	c := m.buf.Replace(m.sel.From(), m.sel.To(), text)
+	m.sel = bloom.Range{Anchor: c.End(), Head: c.End()}
+}
+
+func (m *model) undoStep() {
+	if len(m.undo) == 0 {
+		return
+	}
+	m.redo = append(m.redo, step{text: m.buf.Snapshot(), sel: m.sel})
+	s := m.undo[len(m.undo)-1]
+	m.undo = m.undo[:len(m.undo)-1]
+	m.buf.Restore(s.text)
+	m.sel = s.sel
+}
+```
+
+To undo typing in a row as one step, skip the snapshot while the edit before was typing too, and note that
+anything else, such as moving the caret, ends the run.
+
+## What it costs
+
+Each key is an edit, a few moves of the caret, and a frame, and none of them grows with the buffer:
+
+- An edit costs a step a level of the buffer's tree, a few microseconds in a million lines, and measures again
+  only the lines it changes.
+- `Snapshot` and `Restore` cost a step, and a restored buffer keeps what was worked out about its lines.
+- The helpers that move by rows look up where a line's rows start, a step for a line that doesn't wrap and one
+  pass over the line for one that does.
+- The frame lays out and draws only the rows in sight.
+
+A key typed into a million lines and drawn costs about as much as scrolling them a few rows. Positions count bytes
+of a line, so moving through a line of many kilobytes that holds styles or characters beyond ASCII reads it from
+its start, and costs more for each key than a short one does.
+
+## Related
+
+- [Viewports](/layout/viewports), for buffers, edits, and `Change`
+- [Selecting and copying text](/input/selection)
+- [Focus](/input/focus), for giving the cursor only to the focused viewport
+- The [`editor` example](https://github.com/lrstanley/bloom/tree/master/_examples/editor)
+- [`ViewportNode.Caret` API reference](https://pkg.go.dev/bloomfx.dev/bloom#ViewportNode.Caret)

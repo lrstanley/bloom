@@ -59,6 +59,71 @@ highlighted wherever the viewport starts. Tabs are drawn as spaces to the next s
 
 The buffer is a pointer, so keep it in the model and change it in `Update`, not in `View`.
 
+### Edit the text
+
+A `bloom.Pos` is a place in the text: a line, and a byte of that line's `Text(i)`, without styles, the unit
+`Mark` and `Match` count in. Edits change the text anywhere, and cost the same in a buffer of a million lines as
+in one of ten, measuring again only the lines they change:
+
+| Method | Does |
+| --- | --- |
+| `Replace(from, to, text)` | replace the text from `from` up to `to` |
+| `Insert(at, text)`, `Delete(from, to)` | put text in, or take it out |
+| `Edit(edits...)` | make several at once, such as at several carets, with positions from before any of them |
+| `Clamp(p)`, `End()` | the nearest place in the text, and the end of it |
+| `Offset(p)`, `PosOf(offset)` | a position as a byte of `String()`, and back |
+
+A newline in the text starts a line, and taking one out joins two. Positions are clamped to the text, so a line
+past the last is the end. Text put in may hold escape sequences, as appended lines may. Taking text out keeps
+the style of what comes after it, even when the sequence that set it was in the text taken out.
+
+### Follow positions through a change
+
+Each edit returns a `Change`, which moves positions from before it to where they are after it, such as a
+caret, a bookmark, or a `Range` that's selected:
+
+```go
+c := m.buf.Insert(m.caret, msg.Text)
+m.caret = c.End()
+m.mark = c.Map(m.mark)
+```
+
+`Map` leaves a position where text was put in before that text, and `MapAfter` puts it after. Appending lines
+moves no position, so a log needs no `Change` for them.
+
+To edit the text with a caret, the keyboard, and the mouse, as an editor does, give the viewport a caret: see
+[Editing text](/layout/editing).
+
+### Cap a log
+
+To keep a log from growing without end, take out its oldest lines once there are too many. The lines taken out
+are dropped together, however many there are:
+
+```go
+m.buf.Append(lines...)
+if over := m.buf.Len() - maxLines; over > 0 {
+	m.buf.Delete(bloom.Pos{}, bloom.Pos{Line: over})
+}
+```
+
+### Undo with snapshots
+
+`Snapshot()` takes the text as it is, at once, however long it is, and it stays as it was as the buffer changes.
+Keep one from before each change, and `Restore(s)` puts the buffer back, keeping what was worked out about the
+lines, so nothing is measured again:
+
+```go
+m.undo = append(m.undo, m.buf.Snapshot())
+m.buf.Replace(from, to, text)
+
+// later
+m.buf.Restore(m.undo[len(m.undo)-1])
+m.undo = m.undo[:len(m.undo)-1]
+```
+
+A snapshot's `Len`, `Line`, `Text`, `String`, and `Lines` are safe to call from another goroutine, so a `tea.Cmd`
+can save or search the text while the buffer goes on changing.
+
 ### Text from outside your program
 
 A viewport drops the commands in its lines that a terminal acts on rather than draws, such as images, so a log
@@ -201,12 +266,18 @@ Both are drawn under the lines' own colors, and marks over them. For padding or 
 
 `Selectable()` lets the mouse select text in a viewport. The selection takes the lines scrolled out of sight as
 well, joins the rows of a wrapped line back into the line it is, and leaves out the line numbers and gutters.
-Dragging past its top or bottom scrolls it, through its `OnScroll`.
+Dragging past its top or bottom scrolls it, through its `OnScroll`. A triple click selects the whole line, on all
+the rows it wraps to.
+
+The selection is kept on the buffer's text rather than on the rows drawn, so it stays on the same text as the
+viewport scrolls, is resized or re-wrapped, and as lines are appended, edited, or taken out from the top of a
+capped log. Setting the buffer's content again clears it.
 
 See [Selecting and copying text](/input/selection) for copying it, and everything else selection does.
 
 ## Related
 
+- [Editing text](/layout/editing), for a caret, and moving it by rows, pages, and words
 - [Scrolling](/layout/scrolling), for `Scroll` and scrollbars
 - [Long lists](/layout/lists), for rows of components
 - [Selecting and copying text](/input/selection)

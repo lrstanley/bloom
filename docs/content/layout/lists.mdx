@@ -107,8 +107,10 @@ func (p *picker) Layout(ctx bloom.Context) bloom.Child {
 
 ## Select text
 
-`Selectable()` lets the mouse select text in the list. A list lays out only the items in view, so a selection takes
-only those, and ends when they scroll away. See [Selecting and copying text](/input/selection).
+`Selectable()` lets the mouse select text in the list. A selection keeps the items it starts and ends in, so it stays
+as they scroll away and back, and its text is that of every item it covers: those out of view are built when the text
+is read, or give their text with `ItemText`. Dragging past the list's edge scrolls it through its `on.Scroll`
+handler. See [Selections in a list](/input/selection#selections-in-a-list).
 
 ## Related
 

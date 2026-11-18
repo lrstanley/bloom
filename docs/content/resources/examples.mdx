@@ -73,19 +73,38 @@ See also: [Viewports](/layout/viewports).
 
 ## selection
 
-![The selection example: lines of a log dragged over and copied, a rectangle of timestamps selected with alt held, a selection across a request's fields, words selected with a double click, all of the log selected and copied, and a token selected inside a dialog over the log](/demos/selection.webp)
+![The selection example: lines of a log dragged over and copied, a rectangle of timestamps selected with alt held, a selection across a request's fields, words selected with a double click, all of the log selected and copied, a token selected inside a dialog over the log, a selection in the notes kept as the wheel scrolls them, the note's own selection made with shift and the arrows and typed over, and a selection in a list of ten thousand requests kept as the wheel scrolls it away, copied whole, then all of the list selected and copied](/demos/selection.webp)
 
 Selecting text with the mouse and copying it. A drag selects a run of text, a drag with alt held selects a rectangle,
-and a double or triple click selects a word or a line. It covers four kinds of node:
+and a double or triple click selects a word or a line. It covers six kinds of node:
 
 - A `Selectable()` viewport, whose selection takes lines scrolled out of sight and scrolls it when dragged past an edge.
 - A column of fields, selected across a value and its label without the border.
 - Styled text wrapped across rows, which is copied as one line.
 - A dialog layer, whose selection stays inside it, holding a masked token that implements `TextSource` so the real
   token is copied.
+- Notes that wrap and scroll their own text beside line numbers, a `TextMap`, whose selection stays on its text as
+  the wheel scrolls it and leaves the numbers out.
+- A one-line note that keeps its own selection, an `Editable`, made with the mouse or with shift and the arrows, and
+  typed over.
+- A `Selectable()` list of ten thousand requests, shown with <kbd>l</kbd> in the log's place, which builds only the
+  rows in view. Its selection keeps the rows it starts and ends in as they scroll away, and copies every row it
+  covers, the cells of a row joined with a space.
 
-See also: [Selecting and copying text](/input/selection), [Viewports](/layout/viewports).
+See also: [Selecting and copying text](/input/selection), [Viewports](/layout/viewports), [Lists](/layout/lists).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/selection), or `go run ./selection`.
+
+## editor
+
+![The editor example: typing at a click, selecting words with the keyboard and cutting them, pasting, a word double clicked and copied, a drag across wrapped rows, undo and redo, wrapping turned off and on, and typing at the end of a million lines](/demos/editor.webp)
+
+A small text editor built from a `Viewport` given a caret and the `Buffer` it shows, on a million lines: typing,
+moving by wrapped rows and words with the column kept, selecting with shift and the mouse, copy, cut and paste,
+undo and redo from snapshots with the caret restored, wrapping toggled, and a status line with what each edit cost.
+Run it with a file to edit, or `-lines 1000000` for a million generated lines.
+
+See also: [Editing text](/layout/editing), [Viewports](/layout/viewports).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/editor), or `go run ./editor -lines 1000000`.
 
 ## contextmenu
 
