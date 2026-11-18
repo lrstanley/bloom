@@ -97,8 +97,6 @@ func (m *model) View() tea.View {
 	v.BackgroundColor = m.st.t.Bg
 	// The bars slow down while the terminal is not focused.
 	v.ReportFocus = true
-	// All motion, not only while a button is held, for the hover styles.
-	v.MouseMode = tea.MouseModeAllMotion
 	return v
 }
 

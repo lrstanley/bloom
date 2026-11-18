@@ -516,7 +516,6 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
 	v.BackgroundColor = theme.Bg
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

@@ -136,7 +136,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeAllMotion
 	v.BackgroundColor = bg
 	return v
 }

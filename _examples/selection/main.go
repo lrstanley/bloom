@@ -559,9 +559,6 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
 	v.BackgroundColor = theme.Bg
-	// Motion is only reported while a button is down, which is all a drag
-	// needs.
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

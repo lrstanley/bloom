@@ -170,9 +170,6 @@ func (m *model) setFilter(i int) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
-	// All motion, not only while a button is held, for the hover styles of
-	// the tabs, the icons, and the scrollbars.
-	v.MouseMode = tea.MouseModeAllMotion
 	v.BackgroundColor = theme.Bg
 	// The loop slows down while the terminal is not focused.
 	v.ReportFocus = true

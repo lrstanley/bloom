@@ -116,7 +116,6 @@ func (m *model) View() tea.View {
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
 	v.BackgroundColor = theme.Bg
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

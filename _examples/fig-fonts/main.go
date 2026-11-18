@@ -141,7 +141,6 @@ func (m *model) pickFont(i int) tea.Cmd {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	v.BackgroundColor = bg
 	return v
 }

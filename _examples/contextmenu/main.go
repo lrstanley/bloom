@@ -171,8 +171,6 @@ func (m *model) View() tea.View {
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
 	v.BackgroundColor = theme.Bg
-	// All motion, not only while a button is held, for the hover styles.
-	v.MouseMode = tea.MouseModeAllMotion
 	return v
 }
 

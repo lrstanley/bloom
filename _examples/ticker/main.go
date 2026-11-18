@@ -190,7 +190,6 @@ func (m *model) phase(s *anim.Sequence) float64 {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	v.BackgroundColor = bg
 	// The loops slow down while the terminal is not focused.
 	v.ReportFocus = true

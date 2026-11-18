@@ -203,7 +203,6 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	m.drawn = time.Since(start)
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	v.BackgroundColor = bg
 	return v
 }

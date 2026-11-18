@@ -322,9 +322,6 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
 	v.BackgroundColor = theme.Bg
-	// All motion, not only while a button is held, so the scrollbars light
-	// up under the pointer.
-	v.MouseMode = tea.MouseModeAllMotion
 	return v
 }
 
