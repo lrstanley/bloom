@@ -22,7 +22,7 @@ func init() { clip.Native = false }
 func TestSelection(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("selection", 100, 20, effects.Mouse())...)
+	h := steep.NewHarness(t, newModel(), demo.Options("selection", 100, 30, effects.Mouse())...)
 	h.Wait("drag over any text").Sleep(600 * time.Millisecond)
 	slow := reel.Delay(30 * time.Millisecond)
 
@@ -67,11 +67,12 @@ func TestSelection(t *testing.T) {
 	h.Key("ctrl+a").Wait("selected all 36 lines of the log").Sleep(demo.Hold(600 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "14:02:00.000 INFO  listening on :8080⏎`).Sleep(demo.Hold(800 * time.Millisecond))
 
-	// Held below the log, a drag scrolls it to its end.
+	// Held below the log, on the note's border, a drag scrolls it to its
+	// end.
 	at = h.Locate(reel.Contains("listening on"))
 	h.Mouse(vt.MousePress, vt.MouseLeft, at.X, at.Y).Sleep(100 * time.Millisecond)
-	h.Mouse(vt.MouseMotion, vt.MouseLeft, at.X+10, 18).Wait("14:02:59.500")
-	h.Mouse(vt.MouseRelease, vt.MouseLeft, at.X+10, 18).Wait(`selected "listening on :8080`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Mouse(vt.MouseMotion, vt.MouseLeft, at.X+10, 25).Wait("14:02:59.500")
+	h.Mouse(vt.MouseRelease, vt.MouseLeft, at.X+10, 25).Wait(`selected "listening on :8080`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("esc").Wait("selection cleared").Sleep(demo.Hold(300 * time.Millisecond))
 
 	// Inside the dialog, over the log it covers.
@@ -80,6 +81,54 @@ func TestSelection(t *testing.T) {
 	h.LeftDrag(at.X, at.Y, at.X+34, at.Y, slow).Wait(`selected "blm_live_9Qk2Xv7rLp4TzW8nB3sHc6Yd" in dialog`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "blm_live_`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("esc").WaitNot("API token created").Sleep(demo.Hold(500 * time.Millisecond))
+
+	// The notes wrap and scroll their own text: a selection there leaves
+	// their line numbers out, and stays on its text as the wheel scrolls
+	// it away.
+	at = h.Locate(reel.Contains("Refunds that"))
+	end = h.Locate(reel.Contains("retried three"))
+	h.LeftDrag(at.X, at.Y, end.X+12, end.Y, slow).Wait(`selected "Refunds that time out upstream`).Sleep(demo.Hold(800 * time.Millisecond))
+	for range 3 {
+		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X, at.Y).Sleep(200 * time.Millisecond)
+	}
+	h.Wait("its retries were").Key("ctrl+c").Wait(`copied "Refunds that time out upstream`).Sleep(demo.Hold(800 * time.Millisecond))
+
+	// The note keeps its own selection. Shift and the arrows make one,
+	// which is the selection at once, and typing replaces it.
+	h.Key("i").Wait("typing in the note").Key("end").Sleep(300 * time.Millisecond)
+	for range 4 {
+		h.Key("shift+left").Sleep(120 * time.Millisecond)
+	}
+	h.Wait(`selected "hand" in the note`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Type("phone", slow).Wait("retried by phone").Sleep(demo.Hold(500 * time.Millisecond))
+	// The mouse selects in it as well, and ctrl+c copies what it selected,
+	// leaving it selected.
+	at = h.Locate(reel.Contains("retried by phone"))
+	h.LeftClick(at.X+2, at.Y, reel.Repeat(2)).Wait(`selected "retried" in note`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Key("ctrl+c").Wait(`copied "retried"`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Key("esc").Wait("stopped typing").Key("esc").Wait("selection cleared").Sleep(demo.Hold(500 * time.Millisecond))
+
+	// The requests are a list of ten thousand rows, which builds only those
+	// in sight. A selection there keeps the row it starts in as the wheel,
+	// turned with the button held, scrolls it away, and copies every row it
+	// covers, with a space between the cells of a row: from the path of
+	// order 1002 to that of 1015, twelve rows below where it was.
+	h.Key("l").Wait("showing 10000 requests").Sleep(demo.Hold(500 * time.Millisecond))
+	at = h.Locate(reel.Contains("/api/v1/orders/1002/items"))
+	h.Mouse(vt.MousePress, vt.MouseLeft, at.X, at.Y).Sleep(100 * time.Millisecond)
+	h.Mouse(vt.MouseMotion, vt.MouseLeft, at.X+8, at.Y+1).Sleep(150 * time.Millisecond)
+	for range 4 {
+		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X+8, at.Y+1).Sleep(200 * time.Millisecond)
+	}
+	h.Wait("/api/v1/orders/1015/items").WaitNot("/api/v1/orders/1002/items")
+	h.Mouse(vt.MouseRelease, vt.MouseLeft, at.X+8, at.Y+1).
+		Wait(`selected "/api/v1/orders/1002/items 201⏎14:02:01.`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Key("ctrl+c").Wait(`copied "/api/v1/orders/1002/items 201⏎14:02:01.`).Wait(`, 14 lines`).Sleep(demo.Hold(800 * time.Millisecond))
+
+	// ctrl+a selects all of them at once, and copies every one.
+	h.Key("ctrl+a").Wait("selected all 10000 requests").Sleep(demo.Hold(600 * time.Millisecond))
+	h.Key("ctrl+c").Wait(`copied "14:02:00.000 GET /api/v1/orders/1000/`).Wait(`, 10000 lines`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Key("l").Wait("showing the log").Sleep(demo.Hold(300 * time.Millisecond))
 
 	// Nothing is selected, so ctrl+c quits.
 	h.Key("ctrl+c")
