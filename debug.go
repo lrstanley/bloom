@@ -151,9 +151,9 @@ func debugNode(c Child) (kind string, attrs []string) {
 		return "Wrap", debugGap(n.gapX, n.gapY)
 	case BoxNode:
 		return "Box", nil
-	case transitionNode:
+	case TransitionNode:
 		return "Transition", []string{fmt.Sprintf("t=%.2f", n.t), debugEffects(n.effects)}
-	case centerNode:
+	case CenterNode:
 		return "Centered", nil
 	case ScrollNode:
 		attrs = []string{fmt.Sprintf("offset=%d", n.y)}
@@ -165,10 +165,12 @@ func debugNode(c Child) (kind string, attrs []string) {
 		return "Overlay", nil
 	case LayerNode:
 		return "Layer", debugLayer(n)
-	case drawableNode:
+	case DrawableNode:
 		return fmt.Sprintf("Drawable(%T)", n.d), nil
 	case ScrollbarNode:
 		return "Scrollbar", nil
+	case TooltipSinkNode:
+		return "TooltipSink", nil
 	case ViewportNode:
 		lines := 0
 		if n.buf != nil {

@@ -7,8 +7,6 @@ package bloom
 import (
 	"fmt"
 	"image"
-
-	"bloomfx.dev/bloom/on"
 )
 
 // ListNode shows as many items of a list as fit in the space it is given,
@@ -61,34 +59,6 @@ func (n ListNode) Keep(i int) ListNode { n.keep = i; return n }
 
 // Gap puts n cells between items.
 func (n ListNode) Gap(cells int) ListNode { n.gap = max(cells, 0); return n }
-
-// ID sets the ID that [Frame.Rect], [Frame.List], and [ScrollbarOf] refer to
-// the list by.
-func (n ListNode) ID[K comparable](id K) ListNode { n.id = id; return n }
-
-// On adds mouse handlers to the list, made by package [on]. They take events
-// on the gaps between items too, such as the wheel.
-func (n ListNode) On(handlers ...on.Handler) ListNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// Selectable lets the left button select text in the list by dragging over
-// it, as a terminal selects text, but kept inside the list. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-//
-// A selection is kept in the items it starts and ends in, by their index, so
-// it stays as they scroll out of sight and back, and reaches the items
-// between them, which the list does not build: dragging past the list's
-// edge, when its [on.Scroll] handler moves its offset, takes the items that
-// scroll into sight. The text selected is that of every item it covers,
-// built or not. When the list's items change, the selection keeps to the
-// same indexes, and ends when an index it is in is past the count, or the
-// list leaves the frame. A rectangle selected with alt held is of the cells
-// in sight: nothing is selected while a corner of it is scrolled away.
-func (n ListNode) Selectable() ListNode { n.selectable = true; return n }
 
 // ItemText sets the text a selection takes from item i of the list when the
 // item is selected whole and the list did not build it, such as when it is

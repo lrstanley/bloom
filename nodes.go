@@ -4,6 +4,8 @@
 
 package bloom
 
+//go:generate go run ./internal/gen
+
 import (
 	"image"
 	"slices"
@@ -11,7 +13,6 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/flex"
 	"bloomfx.dev/bloom/fx"
-	"bloomfx.dev/bloom/on"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
 )
@@ -89,16 +90,6 @@ func (n SlotNode) Collapsible(priority int) SlotNode { n.collapse = max(priority
 // Align overrides the container's cross-axis alignment for this slot.
 func (n SlotNode) Align(a Align) SlotNode { n.align, n.aligned = a, true; return n }
 
-// ID sets the ID that focus, layout animation, and [Frame.Rect] refer to
-// the slot by.
-func (n SlotNode) ID[K comparable](id K) SlotNode { n.id = id; return n }
-
-// On adds mouse handlers to the slot, made by package [on].
-func (n SlotNode) On(handlers ...on.Handler) SlotNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
 // Animate smoothly moves and resizes the slot when layout changes, reflowing
 // its child at each intermediate size. It needs an ID and a retained [Root];
 // without either it does nothing. Zero-size slots animate closed; collapsed
@@ -121,21 +112,6 @@ func (n SlotNode) MoveWith(effects ...fx.Effect) SlotNode {
 	n.moves = effects
 	return n
 }
-
-// Selectable lets the left button select text in the slot by dragging over
-// it, as a terminal selects text, but kept inside the slot. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-func (n SlotNode) Selectable() SlotNode { n.selectable = true; return n }
-
-// Focusable makes the slot one that [Focus] can move to.
-func (n SlotNode) Focusable() SlotNode { n.focusable = true; return n }
-
-// Scope makes the slot a focus scope: [Focus.Within] reports whether focus
-// is inside it, and [Focus.Push] confines focus to it. A slot needs an ID to
-// be a scope.
-func (n SlotNode) Scope() SlotNode { n.scope = true; return n }
 
 // View implements [Child], drawing the slot at its natural size.
 func (n SlotNode) View() string { return Render(0, 0, n) }
@@ -198,23 +174,6 @@ func (n FlexNode) Justify(j flex.Justify) FlexNode { n.justify = j; return n }
 // [Stretch].
 func (n FlexNode) Align(a Align) FlexNode { n.align = a; return n }
 
-// ID sets the ID that [Frame.Rect] refers to the node by.
-func (n FlexNode) ID[K comparable](id K) FlexNode { n.id = id; return n }
-
-// On adds mouse handlers to the node, made by package [on]. They take
-// events on the gaps between children too.
-func (n FlexNode) On(handlers ...on.Handler) FlexNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// Selectable lets the left button select text in the row or column by dragging over
-// it, as a terminal selects text, but kept inside the row or column. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-func (n FlexNode) Selectable() FlexNode { n.selectable = true; return n }
-
 // View implements [Child], drawing the node at its natural size.
 func (n FlexNode) View() string { return Render(0, 0, n) }
 
@@ -244,26 +203,6 @@ type boxEdge struct {
 // given less space than its frame takes is not drawn, rather than drawn
 // broken.
 func Box(style lipgloss.Style, child Child) BoxNode { return BoxNode{style: style, child: child} }
-
-// ID sets the ID that [Frame.Rect] refers to the box by.
-func (n BoxNode) ID[K comparable](id K) BoxNode { n.id = id; return n }
-
-// On adds mouse handlers to the box, made by package [on]. The box takes
-// events on its frame as well as inside it, and the positions handlers are
-// given are relative to its outer corner.
-func (n BoxNode) On(handlers ...on.Handler) BoxNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// HoverStyle draws the box's frame with style instead of its own while the
-// pointer is over it. It should take the same space as the box's style,
-// changing only how it looks. See [on.Hover] for when the pointer is
-// followed.
-func (n BoxNode) HoverStyle(style lipgloss.Style) BoxNode {
-	n.hover = &style
-	return n
-}
 
 // Edge draws child over side of the box's border, such as a title or a
 // counter on the top border, or a [Scrollbar] on the right one, without
@@ -318,14 +257,6 @@ func (n BoxNode) BorderFx(t float64, effects ...fx.Effect) BoxNode {
 	return n
 }
 
-// Selectable lets the left button select text in the box by dragging over
-// it, as a terminal selects text, but kept inside the box. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-// Only what is inside the box's frame is selected.
-func (n BoxNode) Selectable() BoxNode { n.selectable = true; return n }
-
 // View implements [Child], drawing the node at its natural size.
 func (n BoxNode) View() string { return Render(0, 0, n) }
 
@@ -362,17 +293,23 @@ func frameOf(s lipgloss.Style) frame {
 
 // Centered places child at its natural size in the middle of the space it is
 // given.
-func Centered(child Child) Child { return centerNode{child: child} }
+func Centered(child Child) CenterNode { return CenterNode{child: child} }
 
-// centerNode places its child in its middle; see [Centered].
-type centerNode struct{ child Child }
+// CenterNode places a child in its middle. Build one with [Centered].
+type CenterNode struct {
+	meta
+
+	child Child
+}
 
 // View implements [Child], drawing the node at its natural size.
-func (n centerNode) View() string { return Render(0, 0, n) }
+func (n CenterNode) View() string { return Render(0, 0, n) }
 
 // ScrollNode shows part of a child bigger than the space it is given. Build
 // one with [Scroll].
 type ScrollNode struct {
+	meta
+
 	child      Child
 	x, y       int
 	horizontal bool
@@ -409,25 +346,28 @@ func (n ScrollNode) content(w int) Size {
 // Transition draws child with effects applied to its cells for progress t,
 // from 0, as it starts to enter, to 1, when it is fully shown. See
 // [fx.Effect].
-func Transition(t float64, child Child, effects ...fx.Effect) Child {
-	return transitionNode{child: child, t: t, effects: effects}
+func Transition(t float64, child Child, effects ...fx.Effect) TransitionNode {
+	return TransitionNode{child: child, t: t, effects: effects}
 }
 
-// transitionNode draws its child with effects; see [Transition].
-type transitionNode struct {
+// TransitionNode draws a child with effects. Build one with [Transition] or
+// [Present].
+type TransitionNode struct {
+	meta
+
 	child   Child
 	t       float64
 	effects []fx.Effect
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n transitionNode) View() string { return Render(0, 0, n) }
+func (n TransitionNode) View() string { return Render(0, 0, n) }
 
 // Present draws child with p's progress while visible. When hidden, child
 // is absent, taking neither space nor a gap in its container.
-func Present(p anim.Presence, child Child, effects ...fx.Effect) Child {
+func Present(p anim.Presence, child Child, effects ...fx.Effect) TransitionNode {
 	if !p.Visible() {
-		return absentNode{}
+		return TransitionNode{child: absentNode{}}
 	}
 	return Transition(p.Progress(), child, effects...)
 }
@@ -444,9 +384,9 @@ func absent(c Child) bool {
 		return true
 	case SlotNode:
 		return absent(n.child)
-	case transitionNode:
+	case TransitionNode:
 		return absent(n.child)
-	case centerNode:
+	case CenterNode:
 		return absent(n.child)
 	case ScrollNode:
 		return absent(n.child)
@@ -456,20 +396,25 @@ func absent(c Child) bool {
 	return false
 }
 
-// drawableNode draws a [uv.Drawable] onto the cells it is given.
-type drawableNode struct {
+// DrawableNode draws a [uv.Drawable] onto the cells it is given. Build one
+// with [Drawable].
+type DrawableNode struct {
+	meta
+
 	d uv.Drawable
 }
 
 // View implements [Child], drawing the node at its natural size.
-func (n drawableNode) View() string { return Render(0, 0, n) }
+func (n DrawableNode) View() string { return Render(0, 0, n) }
 
 // Drawable returns a node that draws d directly onto the cells it is given,
 // clipped to them. Its natural size is zero unless d implements [Measurer].
-func Drawable(d uv.Drawable) Child { return drawableNode{d: d} }
+func Drawable(d uv.Drawable) DrawableNode { return DrawableNode{d: d} }
 
 // OverlayNode puts layers over a base. Build one with [Overlay].
 type OverlayNode struct {
+	meta
+
 	base   Child
 	layers []LayerNode
 }
@@ -630,16 +575,6 @@ func (n LayerNode) Presence(p anim.Presence, effects ...fx.Effect) LayerNode {
 	return n.Transition(p.Progress(), effects...)
 }
 
-// ID sets the ID that focus, layout animation, anchoring, and [Frame.Rect]
-// refer to the layer by.
-func (n LayerNode) ID[K comparable](id K) LayerNode { n.id = id; return n }
-
-// On adds mouse handlers to the layer, made by package [on].
-func (n LayerNode) On(handlers ...on.Handler) LayerNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
 // Animate smoothly moves and resizes the layer when layout changes. It needs
 // an ID and a retained [Root]; without either it does nothing. Options default
 // to [anim.NewValue] and are captured when the ID first appears. Root controls
@@ -657,13 +592,6 @@ func (n LayerNode) MoveWith(effects ...fx.Effect) LayerNode {
 	n.moves = effects
 	return n
 }
-
-// Selectable lets the left button select text in the layer by dragging over
-// it, as a terminal selects text, but kept inside the layer. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-func (n LayerNode) Selectable() LayerNode { n.selectable = true; return n }
 
 // View implements [Child], drawing the layer's child at its natural size.
 func (n LayerNode) View() string { return Render(0, 0, n.child) }

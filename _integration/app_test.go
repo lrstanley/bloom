@@ -105,7 +105,6 @@ func (m *app) View() tea.View {
 
 	v := m.ui.View(m.w, m.h, bloom.Overlay(base, layers...))
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

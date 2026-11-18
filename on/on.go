@@ -148,8 +148,9 @@ func Scroll(fn func(dx, dy int) tea.Cmd) Handler {
 // Hover runs fn with true when the pointer moves onto the node, and false
 // when it leaves, or something drawn on top of the node covers it, which
 // is noticed with the next message after the frame is drawn. The
-// pointer only moves while no button is down when the view sets
-// [tea.MouseModeAllMotion]. Terminals do not report the pointer leaving the
+// pointer only moves while no button is down with [tea.MouseModeAllMotion],
+// which the view from [bloomfx.dev/bloom.Root.View] asks for while a node
+// has a Hover handler. Terminals do not report the pointer leaving the
 // window, so the hover ends when the window loses focus, which takes
 // [tea.View.ReportFocus].
 func Hover(fn func(over bool) tea.Cmd) Handler {

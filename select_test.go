@@ -1561,3 +1561,44 @@ func TestViewportCaretRedrawnForItsText(t *testing.T) {
 	b = NewBuffer("a   z")
 	wantHighlighted(t, r.Render(8, 1, tree()), 8, "a ......")
 }
+
+// TestSelectEveryNode checks that text is selected in node types that could
+// not be selectable before every node type was given Selectable.
+func TestSelectEveryNode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		node Child
+		want string
+	}{
+		{"wrap", Wrap(Text("alpha"), Text("beta")).Gap(1, 0), "alpha beta"},
+		{"scroll", Scroll(Text("hidden\nalpha beta"), 1), "alpha beta"},
+		{"center", Centered(Text("alpha beta")), "alpha beta"},
+		{"marquee", Marquee("alpha beta", 0), "alpha beta"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var node Child
+			switch n := tt.node.(type) {
+			case WrapNode:
+				node = n.ID("node").Selectable()
+			case ScrollNode:
+				node = n.ID("node").Selectable()
+			case CenterNode:
+				node = n.ID("node").Selectable()
+			case MarqueeNode:
+				node = n.ID("node").Selectable()
+			}
+			tree := func() Child { return Column(Fixed(1, node), Text("other")) }
+			msg, ok := selectDrag(New(), 12, 2, tree, 0, [2]int{0, 0}, [2]int{11, 1})
+			if !ok {
+				t.Fatal("no SelectionMsg sent")
+			}
+			if msg.Text != tt.want || msg.ID != "node" {
+				t.Fatalf("SelectionMsg = %+v, want %q in node", msg, tt.want)
+			}
+		})
+	}
+}

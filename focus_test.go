@@ -9,6 +9,7 @@ import (
 
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func focusTree(dialog bool) Child {
@@ -180,5 +181,35 @@ func TestFocusUpdate(t *testing.T) {
 	r.Render(10, 2, Text("b").ID("b").On(on.Press(func() tea.Cmd { pressed++; return nil })))
 	if _, ok := f.Update(tea.KeyPressMsg{Code: tea.KeyEnter}, r.Frame()); ok || pressed != 2 {
 		t.Fatal("enter pressed a node that can't be focused")
+	}
+}
+
+// TestFocusEveryNode checks that focus moves to node types that could not
+// be focused before every node type was given Focusable.
+func TestFocusEveryNode(t *testing.T) {
+	t.Parallel()
+
+	buf := NewBuffer("v")
+	tree := Column(
+		Row(Text("r")).ID("row").Focusable(),
+		Box(lipgloss.NewStyle(), Text("b")).ID("box").Focusable(),
+		List(1, func(int) Child { return Text("l") }).ID("list").Focusable(),
+		Fixed(1, Viewport(buf)).ID("slot"),
+		Viewport(buf).ID("viewport").Focusable(),
+		Centered(Text("c")).ID("center").Focusable(),
+		Marquee("m", 0).ID("marquee").Focusable(),
+	)
+	var f Focus[string]
+	r := New(WithFocus(&f))
+	r.Render(10, 7, tree)
+	for _, want := range []string{"row", "box", "list", "viewport", "center", "marquee", "row"} {
+		f.Next(r.Frame())
+		if !f.Is(want) {
+			t.Fatalf("Next focused %v, want %v", focused(&f), want)
+		}
+	}
+	r.ClickAt(0, 5)
+	if !f.Is("center") {
+		t.Fatalf("a click on the centered node focused %v", focused(&f))
 	}
 }

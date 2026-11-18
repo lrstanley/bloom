@@ -4,7 +4,8 @@
 
 // Package anchor places a box against a side or corner of another, as a
 // layer anchored to a node is, flipping it to the opposite side when it does
-// not fit on the one asked for.
+// not fit on the one asked for, or, with [Scene.Fit], on whichever side
+// hides the least of what is drawn on screen.
 package anchor
 
 import (
@@ -69,6 +70,12 @@ func axis(lo, hi, start, end, n, d, offset int, flip bool) (at int, flipped bool
 		return other, true
 	}
 	return min(max(at, start), end-n), false
+}
+
+// Opposite returns the side or corner across from d.
+func Opposite(d fx.Direction) fx.Direction {
+	dx, dy := d.Vector()
+	return sideOf(-dx, -dy)
 }
 
 // sideOf returns the side or corner whose vector is dx, dy.

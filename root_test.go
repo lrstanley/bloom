@@ -17,6 +17,7 @@ import (
 
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func TestSolveMatchesRoot(t *testing.T) {
@@ -54,6 +55,41 @@ func TestUnchangedFrame(t *testing.T) {
 	}
 	if changed := r.Render(80, 24, benchTree(3, 0, -1)); changed == first {
 		t.Fatal("a changed frame was not drawn")
+	}
+}
+
+func TestMouseMode(t *testing.T) {
+	t.Parallel()
+
+	var f Focus[string]
+	nothing := func() tea.Cmd { return nil }
+	tests := []struct {
+		name string
+		opts []Option
+		tree Child
+		want tea.MouseMode
+	}{
+		{"nothing", nil, Text("x").ID("x"), tea.MouseModeNone},
+		{"click handler", nil, Text("x").On(on.Click(nothing)), tea.MouseModeCellMotion},
+		{"wheel handler", nil, Text("x").On(on.Scroll(func(_, _ int) tea.Cmd { return nil })), tea.MouseModeCellMotion},
+		{"scrolled viewport", nil, Viewport(NewBuffer("a\nb\nc")).OnScroll(func(ViewportPos) tea.Cmd { return nil }), tea.MouseModeCellMotion},
+		{"selectable", nil, Text("x").Selectable(), tea.MouseModeCellMotion},
+		{"hover style", nil, Text("x").HoverStyle(lipgloss.NewStyle().Bold(true)), tea.MouseModeAllMotion},
+		{"hover handler", nil, Column(Text("x").On(on.Click(nothing)), Text("y").On(on.Hover(func(bool) tea.Cmd { return nil }))), tea.MouseModeAllMotion},
+		{"focusable without focus", nil, Text("x").ID("x").Focusable(), tea.MouseModeNone},
+		{"click to focus", []Option{WithFocus(&f)}, Text("x").ID("x").Focusable(), tea.MouseModeCellMotion},
+		{"tooltip with tooltips off", nil, Text("x").Tooltip("tip"), tea.MouseModeNone},
+		{"tooltip", []Option{WithTooltips(Tooltips{})}, Text("x").Tooltip("tip"), tea.MouseModeAllMotion},
+		{"tooltips on without any", []Option{WithTooltips(Tooltips{})}, Text("x").On(on.Click(nothing)), tea.MouseModeCellMotion},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := New(tt.opts...).View(10, 2, tt.tree).MouseMode; got != tt.want {
+				t.Fatalf("mouse mode %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -147,7 +183,6 @@ func (m *loopModel) View() tea.View {
 			return doneMsg{}
 		}
 	})))
-	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

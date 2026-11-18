@@ -463,7 +463,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 		kid(r.boxContent(i, n), inner)
 	case ListNode:
 		r.noteList(i, n, path, inner, kid)
-	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, OverlayNode, LayerNode, centerNode, transitionNode:
+	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, OverlayNode, LayerNode, CenterNode, TransitionNode:
 		for _, k := range r.kidsOf(i) {
 			kid(k, inner)
 		}
@@ -481,7 +481,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 			r.leaves = append(r.leaves, leaf)
 			r.outline.AddLeaf(textsel.Leaf{Rect: rect, Clip: shown})
 		}
-	case drawableNode, ScrollbarNode:
+	case DrawableNode, ScrollbarNode, TooltipSinkNode:
 	case Layouter:
 		_, src := b.child.(TextSource)
 		if src && !inner {
@@ -530,7 +530,7 @@ func (r *renderer) leafCanvas(i int) *canvas.Canvas {
 	if n.hover != nil && r.isHovered(b) {
 		n.style, n.styled = *n.hover, true
 	}
-	text := r.textAt(i, n, b.rect.Dx(), b.rect.Dy())
+	text, _ := r.textAt(i, n, b.rect.Dx(), b.rect.Dy())
 	if n.trusted {
 		return r.cache.Get(text)
 	}

@@ -10,8 +10,6 @@ import (
 
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
-	"bloomfx.dev/bloom/on"
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -51,43 +49,13 @@ func (n TextNode) Style(style lipgloss.Style) TextNode {
 
 // Truncate shows one line, replacing newlines with spaces and cutting text
 // that does not fit with "…". Padding and borders count against its width.
+// With tooltips on (see [WithTooltips]), text that was cut shows the rest of
+// it as its tooltip, unless it has NoTooltip, and [Frame.Truncated] reports
+// whether it was cut.
 func (n TextNode) Truncate() TextNode {
 	n.s, n.truncate = lineBreaks.Replace(n.s), true
 	return n
 }
-
-// ID sets the ID that focus and [Frame.Rect] refer to the node by.
-func (n TextNode) ID[K comparable](id K) TextNode { n.id = id; return n }
-
-// On adds mouse handlers to the node, made by package [on].
-func (n TextNode) On(handlers ...on.Handler) TextNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// HoverStyle renders the text with style instead of its own while the
-// pointer is over it, which needs no state in the model. It should take the
-// same space as the node's style, changing only how it looks. See
-// [on.Hover] for when the pointer is followed.
-func (n TextNode) HoverStyle(style lipgloss.Style) TextNode {
-	n.hover = &style
-	return n
-}
-
-// Selectable lets the left button select text in the node by dragging over
-// it, as a terminal selects text, but kept inside the node. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-// Text scrolled out of sight is selected as well.
-func (n TextNode) Selectable() TextNode { n.selectable = true; return n }
-
-// Focusable makes the node one that [Focus] can move to.
-func (n TextNode) Focusable() TextNode { n.focusable = true; return n }
-
-// Cursor shows the terminal cursor at c, relative to the node's top-left
-// cell, while that cell is on screen and not covered by a later layer.
-func (n TextNode) Cursor(c *tea.Cursor) TextNode { n.cursor = c; return n }
 
 // View implements [Child], drawing the node at its natural size.
 func (n TextNode) View() string { return Render(0, 0, n) }
@@ -95,6 +63,8 @@ func (n TextNode) View() string { return Render(0, 0, n) }
 // MarqueeNode is a line of text that scrolls when it does not fit. Build one
 // with [Marquee].
 type MarqueeNode struct {
+	meta
+
 	s, gap string
 	phase  float64
 	style  lipgloss.Style
@@ -180,6 +150,8 @@ func (n MarqueeNode) text(s string) TextNode {
 // SkeletonNode is a placeholder for content that is still loading. Build one
 // with [Skeleton].
 type SkeletonNode struct {
+	meta
+
 	lines  []int
 	style  lipgloss.Style
 	styled bool

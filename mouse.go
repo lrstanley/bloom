@@ -128,10 +128,13 @@ type press struct {
 	hold          bool // the click is held back, as it may become a double click
 }
 
-// focusTarget is a [Focus] of any type that clicks can move, for
-// [WithFocus].
+// focusTarget is a [Focus] of any type that clicks can move, and that
+// tooltips read, for [WithFocus].
 type focusTarget interface {
 	click(f *Frame, chain []int)
+	// focusedID returns the ID of the focused node, and whether a node is
+	// focused.
+	focusedID() (any, bool)
 }
 
 // mouseEvent is the OnMouse handler of the view [Root.View] made for frame
@@ -246,6 +249,9 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 			cmds = r.dragEvent(cmds, f, msg, p, chain, false)
 			cmds = append(cmds, r.moveSelect(f, p))
 		}
+	}
+	if cmd := r.tipMouse(f, msg, p, chain); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 	if i := f.innermost(chain, kindsOf(on.KindMouse)); i >= 0 {
 		t := f.target(i)
@@ -460,9 +466,13 @@ func (r *Root) checkDrag(cmds []tea.Cmd, f *Frame) []tea.Cmd {
 
 // covered reports whether a modal layer drawn after entry i takes events
 // from some of it.
-func (f *Frame) covered(i int) bool {
-	for j := i + 1; j < len(f.entries); j++ {
-		if e := &f.entries[j]; e.modal && e.block.Overlaps(f.entries[i].vis) {
+func (f *Frame) covered(i int) bool { return covered(f.entries, i) }
+
+// covered reports whether a modal layer drawn after entry i takes events
+// from some of it.
+func covered(entries []entry, i int) bool {
+	for j := i + 1; j < len(entries); j++ {
+		if e := &entries[j]; e.modal && e.block.Overlaps(entries[i].vis) {
 			return true
 		}
 	}

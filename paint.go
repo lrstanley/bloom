@@ -104,7 +104,8 @@ type renderer struct {
 	entries  []entry
 	handlers [][]on.Handler // by entry
 	hovered  []mouseTarget  // the hoverable nodes under the pointer, kept by Root
-	dragged  *mouseTarget   // the node being dragged, if any, kept by Root
+
+	dragged  *mouseTarget // the node being dragged, if any, kept by Root
 	cursor   *tea.Cursor
 	cursorAt int // index of the op drawn after the cursor was placed
 	out      string
@@ -143,6 +144,28 @@ type renderer struct {
 	// [renderer.buildAside]. It is made when wanted, and dropped once the
 	// text is read.
 	aside *renderer
+
+	// With tipsOn, the tooltips of the nodes of the frame are kept in tips,
+	// by entry, for Root, whose top draws what it wants over the frame into
+	// topOps, once the frame's entries are where they were drawn. With
+	// autoTips too, text cut to fit has its full text as its tooltip.
+	// topOnCanvas is set while what the top drew is on the canvas, over the
+	// frame's own cells, and topRedrawn once the top had the canvas drawn
+	// again without it, to read the frame's own cells.
+	tipsOn      bool
+	autoTips    bool
+	tips        []tipAt
+	top         func(w, h int)
+	topOps      []op
+	prevTop     []op
+	topOnCanvas bool
+	topRedrawn  bool
+
+	// The tooltip sinks of the frame with cells on screen, whose ops are
+	// given the text sinkText returns once the tree is painted, before the
+	// frame is compared with the last one; see fillSinks.
+	sinks    []sinkAt
+	sinkText func() string
 }
 
 func newRenderer(method ansi.Method) *renderer {
@@ -159,20 +182,29 @@ func newRenderer(method ansi.Method) *renderer {
 func (r *renderer) render(w, h int, c Child) string {
 	root := r.paintTree(w, h, c)
 	w, h = r.size(root, w, h)
+	if len(r.sinks) > 0 {
+		r.fillSinks()
+	}
 
-	if r.drawn != image.Pt(w, h) || !r.drawnEnv.Equal(r.env) || !r.sameOps() {
-		r.canvas.Resize(w, h)
-		r.execute()
-		r.out = r.canvas.Render()
-		r.drawn, r.drawnEnv = image.Pt(w, h), r.env
-	} else {
+	kept := r.drawn == image.Pt(w, h) && r.drawnEnv.Equal(r.env) && r.sameOps()
+	if kept {
 		// The same ops have the same effects, which moved and hid things the
 		// same way.
 		for i := range r.ops {
 			r.ops[i].offset, r.ops[i].cursorHidden = r.prevOps[i].offset, r.prevOps[i].cursorHidden
 		}
+	} else {
+		r.canvas.Resize(w, h)
+		r.execute(false)
 	}
 	r.placeEntries()
+	if r.top != nil || len(r.topOps) > 0 {
+		kept = r.paintTop(w, h, kept)
+	}
+	if !kept {
+		r.out = r.canvas.Render()
+		r.drawn, r.drawnEnv = image.Pt(w, h), r.env
+	}
 	r.cache.EndFrame(w * h)
 
 	clear(r.prevOps)
@@ -182,12 +214,67 @@ func (r *renderer) render(w, h int, c Child) string {
 	return r.out
 }
 
+// paintTop has the renderer's top draw over the frame of w×h, whose own ops
+// were the last frame's if kept, and draws it, reporting whether the frame
+// is the last one drawn. What the top draws is like a layer drawn last: it
+// takes part in telling whether the frame changed, so what it drew last
+// goes away when it no longer draws it, and it hides the cursor beneath.
+// It adds no entries, so the mouse goes through it.
+func (r *renderer) paintTop(w, h int, kept bool) bool {
+	clear(r.prevTop)
+	r.topOps, r.prevTop = r.prevTop[:0], r.topOps
+	r.topRedrawn = false
+	if r.top != nil {
+		r.top(w, h)
+	}
+	r.hideCursorUnder(r.topOps)
+	if r.topRedrawn {
+		// The canvas was drawn again for the top to read, without what it
+		// drew last, so what it draws now is drawn whatever it is.
+		kept = false
+	}
+	if kept && slices.EqualFunc(r.topOps, r.prevTop, func(a, b op) bool { return a.equal(&b) }) {
+		return true
+	}
+	if kept && r.topOnCanvas {
+		// The canvas holds what the top drew last.
+		r.redraw()
+	}
+	for i := range r.topOps {
+		if o := &r.topOps[i]; o.kind == opBlit {
+			r.canvas.Blit(o.src, o.rect, o.clip)
+		}
+	}
+	r.topOnCanvas = len(r.topOps) > 0
+	return false
+}
+
+// contentCanvas returns the canvas with only the frame's own cells on it,
+// for the top to read what it would cover: what the top drew over them last
+// is taken off by drawing them again.
+func (r *renderer) contentCanvas() *canvas.Canvas {
+	if r.topOnCanvas {
+		r.redraw()
+		r.topRedrawn = true
+	}
+	return r.canvas
+}
+
+// redraw draws the frame's ops onto the canvas again, without what the top
+// drew over them.
+func (r *renderer) redraw() {
+	r.canvas.Clear()
+	r.execute(true)
+}
+
 // paintTree lays out c and builds the frame's ops and entries, returning the
 // root box.
 func (r *renderer) paintTree(w, h int, c Child) int {
 	clear(r.entries)
 	clear(r.handlers)
+	clear(r.tips)
 	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
+	r.tips, r.sinks = r.tips[:0], r.sinks[:0]
 	r.floats, r.open = r.floats[:0], 0
 	clear(r.leaves)
 	clear(r.ends[:])
@@ -220,6 +307,11 @@ func (r *renderer) placeEntries() {
 			e := &r.entries[j]
 			e.rect = e.rect.Add(o.offset)
 			e.vis = e.vis.Add(o.offset).Intersect(o.clip)
+		}
+		for j := range r.sinks {
+			if s := &r.sinks[j]; s.op > o.push && s.op < i {
+				s.vis = s.vis.Add(o.offset).Intersect(o.clip)
+			}
 		}
 		if r.cursor != nil && r.cursorAt > o.push && r.cursorAt <= i {
 			at := image.Pt(r.cursor.X, r.cursor.Y).Add(o.offset)
@@ -263,23 +355,26 @@ type styledMemo struct {
 	truncate bool
 	w, h     int
 	out      string
+	full     string // the line a truncated node was cut from, if it was
 }
 
-// textAt returns text node n as drawn at w×h for box i.
-func (r *renderer) textAt(i int, n TextNode, w, h int) string {
+// textAt returns text node n as drawn at w×h for box i, and for a
+// truncated node that was cut to fit, the line it was cut from, as
+// [textOf] does.
+func (r *renderer) textAt(i int, n TextNode, w, h int) (out, full string) {
 	if !n.styled && !n.truncate {
-		return n.s
+		return n.s, ""
 	}
 	m := r.styled.At(i)
 	// Comparing through pointers to storage that outlives the call keeps
 	// the styles from being copied to the heap.
 	r.style = n.style
 	if v := &m.V; m.OK && v.w == w && v.h == h && v.truncate == n.truncate && v.s == n.s && same.Style(&v.style, &r.style) {
-		return v.out
+		return v.out, v.full
 	}
-	out := textOf(n, w, h, r.method)
-	m.OK, m.V = true, styledMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out}
-	return out
+	out, full = textOf(n, w, h, r.method)
+	m.OK, m.V = true, styledMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out, full: full}
+	return out, full
 }
 
 func (r *renderer) blit(s string, rect, clip image.Rectangle) {
@@ -332,8 +427,10 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 	if b.hidden || (vis.Empty() && !travels) {
 		return
 	}
-	if hasEntry(b) && !vis.Empty() {
+	from, own := len(r.entries), -1
+	if r.hasEntry(b) && !vis.Empty() && !isScrollbar(b) {
 		parent = r.addEntry(i, vis, clip, parent)
+		own = parent
 	}
 	if b.moving {
 		r.moves = append(r.moves, deferredMove{box: i, clip: clip, parent: parent})
@@ -342,18 +439,8 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 
 	switch n := b.child.(type) {
 	case TextNode:
-		if n.hover != nil && r.isHovered(b) {
-			n.style, n.styled = *n.hover, true
-		}
-		var text string
-		if r.parse {
-			text = r.textAt(i, n, b.rect.Dx(), b.rect.Dy())
-		}
-		r.blitText(text, n.trusted, b.rect, vis)
-		if n.cursor != nil {
-			r.placeCursor(n.cursor, b.rect.Min, vis)
-		}
-	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, ListNode, centerNode:
+		r.paintText(i, &n, vis, clip, parent, own)
+	case SlotNode, FlexNode, GridNode, WrapNode, ScrollNode, ListNode, CenterNode:
 		for _, k := range r.kidsOf(i) {
 			r.paint(k, vis, parent)
 		}
@@ -367,7 +454,7 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		}
 		var frame string
 		if r.parse {
-			frame = r.textAt(i, TextNode{style: style, styled: true}, b.rect.Dx(), b.rect.Dy())
+			frame, _ = r.textAt(i, TextNode{style: style, styled: true}, b.rect.Dx(), b.rect.Dy())
 		}
 		if border := n.bordered(b.rect); len(n.borderFx) > 0 && !border.Empty() {
 			// Drawn on its own, so the effects see only the frame, with the
@@ -386,9 +473,10 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		for _, k := range r.kidsOf(i) {
 			r.paint(k, vis, parent)
 		}
-	case transitionNode:
+	case TransitionNode:
 		if len(n.effects) > 0 {
-			r.paintEffects(r.firstKid(i), b.rect, clip, n.t, n.effects, parent, len(r.entries))
+			// Its own entry, if it has one, moves with its cells.
+			r.paintEffects(r.firstKid(i), b.rect, clip, n.t, n.effects, parent, from)
 			return
 		}
 		r.paint(r.firstKid(i), vis, parent)
@@ -405,8 +493,10 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 				r.paintLayer(k, vis, parent)
 			}
 		}
-	case drawableNode:
+	case DrawableNode:
 		r.ops = append(r.ops, op{kind: opDraw, draw: n.d, rect: b.rect, clip: vis})
+	case TooltipSinkNode:
+		r.paintSink(i, vis)
 	case ViewportNode:
 		r.paintViewport(i, n, vis)
 		if n.caret != nil {
@@ -429,6 +519,53 @@ func (r *renderer) paintComponent(i int, vis image.Rectangle) {
 	r.blit(r.viewOf(i), r.boxes[i].rect, vis)
 	if ed, ok := r.boxes[i].child.(Editable); ok && r.parse {
 		r.paintHeld(i, ed, vis)
+	}
+}
+
+// paintText adds the ops for text node n, box i, visible at vis inside
+// clip, whose own entry is own, or -1 for none, with parent the nearest
+// entry it is inside otherwise. A truncated node cut to fit is noted in its
+// entry, which a node with an automatic tooltip is given if it has none.
+func (r *renderer) paintText(i int, n *TextNode, vis, clip image.Rectangle, parent, own int) {
+	b := &r.boxes[i]
+	if n.hover != nil && r.isHovered(b) {
+		n.style, n.styled = *n.hover, true
+	}
+	var text, full string
+	switch {
+	case r.parse:
+		text, full = r.textAt(i, *n, b.rect.Dx(), b.rect.Dy())
+	case n.truncate && (own >= 0 || r.autoTips):
+		// Not drawn, as for Solve, but where it was cut is still known.
+		full = cutFrom(*n, b.rect.Dx(), r.method)
+	}
+	if full != "" {
+		r.noteCut(i, full, vis, clip, parent, own)
+	}
+	r.blitText(text, n.trusted, b.rect, vis)
+	if n.cursor != nil {
+		r.placeCursor(n.cursor, b.rect.Min, vis)
+	}
+}
+
+// noteCut notes that text node box i was cut from the line full, in its
+// entry own, and gives it the line as its tooltip while the renderer has
+// autoTips, unless it has one of its own or is inside a node that shows
+// none, and is not pinned open, which shows it all the same. Without an
+// entry, it is given one for its tooltip, visible at vis inside clip,
+// inside entry parent.
+func (r *renderer) noteCut(i int, full string, vis, clip image.Rectangle, parent, own int) {
+	b := &r.boxes[i]
+	auto := r.autoTips && (!b.meta.noTip || b.meta.tipOpen) && b.meta.tip == nil
+	if own < 0 {
+		if !auto || vis.Empty() {
+			return
+		}
+		own = r.addEntry(i, vis, clip, parent)
+	}
+	r.entries[own].cut = true
+	if auto {
+		r.tips = append(r.tips, tipAt{entry: own, full: full, box: i, pinned: b.meta.tipOpen, pinOnly: b.meta.noTip})
 	}
 }
 
@@ -518,7 +655,7 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 		r.ops = append(r.ops, op{kind: opEffects, rect: shadow, viewport: clip, t: n.t, effects: r.snapshot(n.shadow)})
 	}
 	from := len(r.entries)
-	if hasEntry(b) {
+	if r.hasEntry(b) {
 		// A layer with effects may move; placeEntries clips it once moved.
 		vis := b.rect.Intersect(clip)
 		if len(n.effects) > 0 {
@@ -643,10 +780,18 @@ func (r *renderer) placeCursor(c *tea.Cursor, origin image.Point, clip image.Rec
 // hideCoveredCursor hides the cursor when something drawn after it, such as
 // a dialog, covers its cell.
 func (r *renderer) hideCoveredCursor() {
+	if r.cursor != nil {
+		r.hideCursorUnder(r.ops[r.cursorAt:])
+	}
+}
+
+// hideCursorUnder hides the cursor when one of ops, drawn after it, covers
+// its cell.
+func (r *renderer) hideCursorUnder(ops []op) {
 	if r.cursor == nil {
 		return
 	}
-	for _, o := range r.ops[r.cursorAt:] {
+	for _, o := range ops {
 		if o.kind != opPop && o.kind != opEffects && o.kind != opSelect && image.Pt(r.cursor.X, r.cursor.Y).In(o.rect.Intersect(o.clip)) {
 			r.cursor = nil
 			return
@@ -660,8 +805,11 @@ type target struct {
 	origin image.Point // frame position of the target's top-left cell
 }
 
-// execute draws the frame's ops onto the canvas.
-func (r *renderer) execute() {
+// execute draws the frame's ops onto the canvas. Drawing them again, once
+// [renderer.placeEntries] has moved the cursor to where it is on screen,
+// leaves whether an effect hid it as it was found.
+func (r *renderer) execute(again bool) {
+	r.topOnCanvas = false
 	r.targets = append(r.targets[:0], target{c: r.canvas})
 	for i := range r.ops {
 		o := &r.ops[i]
@@ -709,7 +857,7 @@ func (r *renderer) execute() {
 			}
 			parent.c.Composite(s, o.clip.Sub(parent.origin))
 			o.offset = s.Offset
-			if r.cursor != nil && r.cursorAt > o.push && r.cursorAt <= i {
+			if !again && r.cursor != nil && r.cursorAt > o.push && r.cursorAt <= i {
 				at := image.Pt(r.cursor.X, r.cursor.Y).Sub(o.rect.Min)
 				o.cursorHidden = !s.Visible(at.X, at.Y)
 			}

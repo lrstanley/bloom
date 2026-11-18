@@ -13,7 +13,7 @@ import (
 )
 
 // entry is a node of a frame that input refers to: one with an ID, mouse
-// handlers, or a hover style, or a modal layer.
+// handlers, a hover style, or a tooltip, or a modal layer.
 type entry struct {
 	id                      any
 	key                     nodeKey
@@ -24,6 +24,7 @@ type entry struct {
 	focusable, scope, modal bool
 	hoverable               bool // the node has a hover style
 	selectable              bool
+	cut                     bool // a truncated text node cut to fit
 	list                    ListView
 	isList                  bool
 	vp                      ViewportView
@@ -62,12 +63,26 @@ func (r *renderer) addEntry(i int, vis, clip image.Rectangle, parent int) int {
 	}
 	r.entries = append(r.entries, e)
 	r.handlers = append(r.handlers, b.meta.handlers)
+	if r.tipsOn && b.meta.tip != nil {
+		r.tips = append(r.tips, tipAt{entry: len(r.entries) - 1, tip: b.meta.tip, pinned: b.meta.tipOpen})
+	}
 	return len(r.entries) - 1
 }
 
-// hasEntry reports whether box b needs an entry in the frame.
-func hasEntry(b *box) bool {
-	return b.meta.id != nil || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable
+// hasEntry reports whether box b needs an entry in the frame. A node with a
+// tooltip has one only while tooltips are on. Text cut to fit, whose full
+// text is its tooltip, is given one as it is painted, once it is known to
+// be cut; see [renderer.noteCut].
+func (r *renderer) hasEntry(b *box) bool {
+	return b.meta.id != nil || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable ||
+		(r.tipsOn && b.meta.tip != nil)
+}
+
+// isScrollbar reports whether box b is a [ScrollbarNode], whose entry covers
+// only the cells it draws, and is added as it is painted.
+func isScrollbar(b *box) bool {
+	_, ok := b.child.(ScrollbarNode)
+	return ok
 }
 
 // Frame is the geometry of a laid-out frame: where each node with an ID
@@ -77,7 +92,53 @@ func hasEntry(b *box) bool {
 type Frame struct {
 	entries  []entry
 	handlers [][]on.Handler // by entry
+	tips     []tipAt        // of the entries with tooltips, in order
 	cursor   *tea.Cursor
+	needs    mouseNeeds
+}
+
+// mouseNeeds is what the nodes of a frame need the terminal to report of
+// the mouse.
+type mouseNeeds uint8
+
+const (
+	needsClicks mouseNeeds = 1 << iota // clicks, the wheel, and drags
+	needsMotion                        // the pointer moving with no button down, such as to open tooltips
+	needsFocus                         // a click to focus a node, with WithFocus
+)
+
+// needsOf returns what the nodes of a frame need of the mouse. A tooltip
+// pinned open needs nothing: it shows already.
+func needsOf(entries []entry, handlers [][]on.Handler, tips []tipAt) mouseNeeds {
+	var n mouseNeeds
+	if slices.ContainsFunc(tips, func(t tipAt) bool { return !t.pinned && !t.pinOnly }) {
+		n |= needsMotion
+	}
+	for i := range entries {
+		e := &entries[i]
+		switch {
+		case e.hoverable || has(handlers[i], hovers):
+			n |= needsMotion
+		case len(handlers[i]) > 0 || e.selectable:
+			n |= needsClicks
+		}
+		if e.focusable {
+			n |= needsFocus
+		}
+	}
+	return n
+}
+
+// mouseMode returns the least the terminal must report of the mouse for
+// the frame, which clicks focus nodes in when clickFocus.
+func (f *Frame) mouseMode(clickFocus bool) tea.MouseMode {
+	switch {
+	case f.needs&needsMotion != 0:
+		return tea.MouseModeAllMotion
+	case f.needs&needsClicks != 0, clickFocus && f.needs&needsFocus != 0:
+		return tea.MouseModeCellMotion
+	}
+	return tea.MouseModeNone
 }
 
 // Rect returns where the node with ID id was laid out, which may be partly
@@ -90,6 +151,15 @@ func (f *Frame) Rect[K comparable](id K) (image.Rectangle, bool) {
 		return f.entries[i].rect, true
 	}
 	return image.Rectangle{}, false
+}
+
+// Truncated reports whether the [TextNode.Truncate] node with ID id was cut
+// to fit in the frame, so it shows "…" in place of the rest of its text. It
+// is false for a node that fits, that is not in the frame, or that is not
+// truncated. A frame from [Solve] reports it too, as the node would be drawn.
+func (f *Frame) Truncated[K comparable](id K) bool {
+	i := f.index(id)
+	return i >= 0 && f.entries[i].cut
 }
 
 // List returns which items the [List] with ID id showed, and whether it is
@@ -170,9 +240,12 @@ func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
 }
 
 // find returns the entry of the node with key k, or -1.
-func (f *Frame) find(k nodeKey) int {
-	for i := range f.entries {
-		if f.entries[i].key == k {
+func (f *Frame) find(k nodeKey) int { return findKey(f.entries, k) }
+
+// findKey returns the entry of the node with key k, or -1.
+func findKey(entries []entry, k nodeKey) int {
+	for i := range entries {
+		if entries[i].key == k {
 			return i
 		}
 	}

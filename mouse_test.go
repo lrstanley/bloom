@@ -13,10 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	uv "github.com/charmbracelet/ultraviolet"
 )
 
 func down(x, y int) tea.MouseMsg { return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft} }
@@ -726,4 +728,85 @@ func TestContextFrame(t *testing.T) {
 	if inLayout != nil {
 		t.Fatalf("Layout outside a Root got frame %p, want none", inLayout)
 	}
+}
+
+// TestEveryNodeTakesHandlers checks the node types that had no ID or
+// handlers of their own before every node type was given them.
+func TestEveryNodeTakesHandlers(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	click := func(name string) on.Handler { return on.Click(l.add(name)) }
+	nodes := []struct {
+		name string
+		node Child
+	}{
+		{"center", Centered(Text("c")).ID("center").On(click("center"))},
+		{"scroll", Scroll(Text("s"), 0).ID("scroll").On(click("scroll"))},
+		{"transition", Transition(1, Text("t")).ID("transition").On(click("transition"))},
+		{"drawable", Drawable(uv.NewStyledString("d")).ID("drawable").On(click("drawable"))},
+		{"overlay", Overlay(Text("o")).ID("overlay").On(click("overlay"))},
+		{"marquee", Marquee("m", 0).ID("marquee").On(click("marquee"))},
+		{"skeleton", Skeleton(3).ID("skeleton").On(click("skeleton"))},
+		{"minsize", MinSize(1, 1, Text("n")).ID("minsize").On(click("minsize"))},
+		{"scrollbar", Scrollbar(10, 2, 0).ID("scrollbar").On(click("scrollbar"))},
+	}
+	slots := make([]Child, len(nodes))
+	names := make([]string, len(nodes))
+	for i, n := range nodes {
+		slots[i], names[i] = Fixed(1, n.node), n.name
+	}
+	r := New()
+	r.Render(10, len(nodes), Column(slots...))
+	for y, n := range nodes {
+		expectRect(t, r.Frame(), n.name, image.Rect(0, y, 10, y+1))
+		r.ClickAt(0, y)
+	}
+	expect(t, &l, names...)
+	for _, n := range nodes {
+		if _, ok := r.Click(n.name); !ok {
+			t.Fatalf("Click(%q) found no node", n.name)
+		}
+	}
+	expect(t, &l, names...)
+}
+
+// TestTransitionEntryMoves checks that a transition's own entry moves with
+// its cells, as the entries of what is in it do.
+func TestTransitionEntryMoves(t *testing.T) {
+	t.Parallel()
+
+	r := New()
+	r.Render(10, 1, Transition(0.5, Text("abc").ID("text"), fx.Slide{From: Right}).ID("transition"))
+	text, _ := r.Frame().Rect("text")
+	tr, _ := r.Frame().Rect("transition")
+	if text.Min.X == 0 {
+		t.Fatalf("the transition's child did not move: %v", text)
+	}
+	if tr.Min != text.Min {
+		t.Fatalf("the transition is at %v, but what is in it is at %v", tr, text)
+	}
+}
+
+// TestPresentTakesHandlers checks that a hidden presence given an ID and
+// handlers is still absent.
+func TestPresentTakesHandlers(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	p := anim.NewPresence()
+	tree := func() Child {
+		return Column(Present(p, Text("p")).ID("present").On(on.Click(l.add("present"))), Text("b").ID("b"))
+	}
+	f := Solve(5, 2, tree())
+	if _, ok := f.Rect("present"); ok {
+		t.Fatal("a hidden presence has an entry")
+	}
+	expectRect(t, f, "b", image.Rect(0, 0, 5, 1))
+
+	p.Show()
+	r := New()
+	r.Render(5, 2, tree())
+	r.ClickAt(0, 0)
+	expect(t, &l, "present")
 }

@@ -32,6 +32,7 @@ type Root struct {
 	now       func() time.Time
 	focus     focusTarget
 	mouse     mouse
+	tip       tipState
 
 	// What text is selected with the mouse, and what was copied last,
 	// while the band sweeping across it is drawn.
@@ -68,6 +69,8 @@ type config struct {
 	clipboard    func(text string) error
 	noFlash      bool
 	noClickDelay bool
+	tips         Tooltips
+	tipsOn       bool
 }
 
 // WithWidthMethod sets how the width of graphemes is measured. It must match
@@ -101,8 +104,9 @@ func WithClock(now func() time.Time) Option { return func(c *config) { c.now = n
 // WithFocus lets clicks move the model's focus: a click focuses the
 // innermost node under the pointer that f can focus, as [Focus.Next]
 // would, before any handler for the click runs, so a handler can move the
-// focus on from there. f must stay where it is, as a field of a model used
-// by pointer does.
+// focus on from there. With tooltips on (see [WithTooltips]), a key press
+// that moves the focus onto a node shows the node's tooltip. f must stay
+// where it is, as a field of a model used by pointer does.
 func WithFocus[K comparable](f *Focus[K]) Option { return func(c *config) { c.focus = f } }
 
 // New returns a Root.
@@ -133,6 +137,10 @@ func New(opts ...Option) *Root {
 	}
 	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
 	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)
+	r.tip.configure(c.tips)
+	if c.tipsOn {
+		r.EnableTooltips(true)
+	}
 	return r
 }
 
@@ -169,6 +177,7 @@ func (r *Root) Update(msg tea.Msg) tea.Cmd {
 		r.input(msg), r.tick(msg),
 		r.scrollSelection(msg), r.selectionDone(msg), r.runHeldClick(msg), r.flashFrame(msg),
 		r.takeHeldCmds(),
+		r.tipUpdate(msg),
 	)
 }
 
@@ -227,6 +236,7 @@ func (r *Root) Render(w, h int, c Child) string {
 		}
 	}
 	r.r.sel, r.r.dragged, r.r.selLost = *shown, r.mouse.drag, false
+	r.noteFocus()
 	out := r.r.render(w, h, c)
 	// Where the selection starts and ends is found in the frame, and
 	// followed from frame to frame by the text it is in, unless the text it
@@ -246,11 +256,19 @@ func (r *Root) Render(w, h int, c Child) string {
 // frame, which is the one on screen when Bubble Tea calls it. It runs them
 // on the event loop, before Update gets the event, so they can change the
 // model, and returns their commands to run in the background.
+//
+// The view's MouseMode is the least the frame needs: all motion while a
+// node follows the pointer with a hover style or [on.Hover], or has a
+// tooltip that the pointer can open, and otherwise cell motion while a
+// node takes clicks, the wheel, or drags, is selectable, or can be focused
+// with a click (see [WithFocus]). Tooltips pinned open need nothing. Set the
+// field on the view returned to ask for something else.
 func (r *Root) View(w, h int, c Child) tea.View {
 	v := tea.NewView(r.Render(w, h, c))
 	f := r.r.frame
 	v.OnMouse = func(msg tea.MouseMsg) tea.Cmd { return r.mouseEvent(f, msg) }
 	v.Cursor = f.cursor
+	v.MouseMode = f.mouseMode(r.focus != nil)
 	return v
 }
 
@@ -274,17 +292,18 @@ func (r *Root) handlerFrame() *Frame {
 // View, so a frame with any is made again, sharing what did not change.
 func (r *renderer) updateFrame() {
 	f := r.frame
-	same := f != nil && slices.Equal(f.entries, r.entries) && sameCursor(f.cursor, r.cursor)
+	same := f != nil && slices.Equal(f.entries, r.entries) && sameCursor(f.cursor, r.cursor) && sameTips(f.tips, r.tips)
 	if same && !hasHandlers(f.handlers) && !hasHandlers(r.handlers) {
 		return
 	}
-	entries, cursor := r.entries, r.cursor
+	entries, tips, cursor := r.entries, r.tips, r.cursor
 	if same {
-		entries, cursor = f.entries, f.cursor
+		entries, tips, cursor = f.entries, f.tips, f.cursor
 	} else {
-		entries = slices.Clone(entries)
+		entries, tips = slices.Clone(entries), slices.Clone(tips)
 	}
-	r.frame = &Frame{entries: entries, handlers: slices.Clone(r.handlers), cursor: cursor}
+	handlers := slices.Clone(r.handlers)
+	r.frame = &Frame{entries: entries, handlers: handlers, tips: tips, cursor: cursor, needs: needsOf(entries, handlers, tips)}
 }
 
 func hasHandlers(handlers [][]on.Handler) bool {

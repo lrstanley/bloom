@@ -163,22 +163,21 @@ func (e *engine) build(c Child, parent, slot int) int {
 
 	var kids []Child
 	b := &e.boxes[i]
+	builtin := nodeMeta(c, &b.meta)
 	switch n := c.(type) {
-	case TextNode:
-		b.meta = n.meta
 	case SlotNode:
-		b.meta, kids = n.meta, []Child{n.child}
-	case FlexNode:
-		b.meta, kids = n.meta, n.children
-	case GridNode:
-		b.meta, kids = n.meta, n.children
-	case WrapNode:
-		b.meta, kids = n.meta, n.children
-	case BoxNode:
-		b.meta, kids = n.meta, []Child{n.child}
-	case transitionNode:
 		kids = []Child{n.child}
-	case centerNode:
+	case FlexNode:
+		kids = n.children
+	case GridNode:
+		kids = n.children
+	case WrapNode:
+		kids = n.children
+	case BoxNode:
+		kids = []Child{n.child}
+	case TransitionNode:
+		kids = []Child{n.child}
+	case CenterNode:
 		kids = []Child{n.child}
 	case ScrollNode:
 		kids = []Child{n.child}
@@ -193,12 +192,8 @@ func (e *engine) build(c Child, parent, slot int) int {
 			kids = append(kids, l)
 		}
 	case LayerNode:
-		b.meta, b.modal, b.float, kids = n.meta, n.modal, n.float, []Child{n.child}
-	case ListNode:
-		// Its items are built once it knows how much space it has.
-		b.meta = n.meta
+		b.modal, b.float, kids = n.modal, n.float, []Child{n.child}
 	case ViewportNode:
-		b.meta = n.meta
 		if n.caret != nil {
 			// Its caret is set from the mouse, as the range of an Editable is.
 			b.meta.selectable = true
@@ -206,11 +201,13 @@ func (e *engine) build(c Child, parent, slot int) int {
 		if n.onScroll != nil {
 			b.meta.handlers = with(n.handlers, []on.Handler{e.viewportScroll(n, b.key())})
 		}
-	default:
-		switch c.(type) {
-		case TextSource, TextMap:
+	case TextSource, TextMap:
+		if !builtin {
 			b.meta.selectable = true
 		}
+	}
+	if parent >= 0 && e.boxes[parent].meta.noTip {
+		b.meta.noTip = true
 	}
 
 	_, grid := c.(GridNode)
@@ -287,23 +284,18 @@ func (e *engine) viewOf(i int) string {
 
 // textOf returns what a text node shows at w×h, or at its natural size for
 // a w or h of zero, measuring with method. A width or height the style sets
-// itself is kept.
-func textOf(n TextNode, w, h int, method ansi.Method) string {
+// itself is kept. For a truncated node cut to fit, full is the line it was
+// cut from, as its style's transform made it; it is empty otherwise.
+func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 	if n.truncate {
-		if tf := n.style.GetTransform(); tf != nil {
-			// The transform goes first, so what it makes is kept to one line.
-			n.s, n.style = lineBreaks.Replace(tf(n.s)), n.style.UnsetTransform()
-		}
-		room := w
-		if room <= 0 {
-			room = unbounded
-		}
-		if inner := lineWidth(n.style, room); method.StringWidth(n.s) > inner {
-			n.s = truncateLine(n.s, inner, method)
+		var inner int
+		n, inner = truncLine(n, w)
+		if method.StringWidth(n.s) > inner {
+			full, n.s = n.s, truncateLine(n.s, inner, method)
 		}
 	}
 	if !n.styled {
-		return n.s
+		return n.s, full
 	}
 	st := n.style
 	if w > 0 && st.GetWidth() == 0 {
@@ -312,7 +304,31 @@ func textOf(n TextNode, w, h int, method ansi.Method) string {
 	if h > 0 && st.GetHeight() == 0 {
 		st = st.Height(max(h-st.GetVerticalMargins(), 0))
 	}
-	return st.Render(n.s)
+	return st.Render(n.s), full
+}
+
+// truncLine returns truncated node n as its line is cut, w cells wide or at
+// its natural width for a w of zero: with its style's transform applied
+// first, so what the transform makes is kept to one line, and the room the
+// line has.
+func truncLine(n TextNode, w int) (_ TextNode, room int) {
+	if tf := n.style.GetTransform(); tf != nil {
+		n.s, n.style = lineBreaks.Replace(tf(n.s)), n.style.UnsetTransform()
+	}
+	if w <= 0 {
+		w = unbounded
+	}
+	return n, lineWidth(n.style, w)
+}
+
+// cutFrom returns the line truncated node n is cut from when w cells wide,
+// or "" when it fits, as [textOf] decides without drawing it.
+func cutFrom(n TextNode, w int, method ansi.Method) string {
+	n, room := truncLine(n, w)
+	if method.StringWidth(n.s) > room {
+		return n.s
+	}
+	return ""
 }
 
 // measure returns the natural size of box i within avail. Every
@@ -362,7 +378,7 @@ func (e *engine) measureChild(i int, avail Size) Size {
 		return Size{W: 1}
 	case ScrollNode:
 		return e.measure(e.firstKid(i), n.content(avail.W))
-	case SlotNode, transitionNode, centerNode, OverlayNode, LayerNode:
+	case SlotNode, TransitionNode, CenterNode, OverlayNode, LayerNode:
 		// A slot outside a row or column, a transition, a centered node, an
 		// overlay, and a layer are as big as their first child: the slot's
 		// child, or the base.
@@ -372,11 +388,13 @@ func (e *engine) measureChild(i int, avail Size) Size {
 		return e.boxes[i].listSize
 	case ViewportNode:
 		return e.measureViewport(n, avail)
-	case drawableNode:
+	case DrawableNode:
 		if m, ok := n.d.(Measurer); ok {
 			return m.Measure(avail)
 		}
 		return Size{}
+	case TooltipSinkNode:
+		return e.measureSink(i, n, avail)
 	case Measurer:
 		return n.Measure(avail)
 	case MinSizeNode:
@@ -462,7 +480,8 @@ func (e *engine) renderedSize(i int, n TextNode, w int) Size {
 	if v := &m.V; m.OK && v.w == w && v.truncate == n.truncate && v.s == n.s && same.Style(&v.style, &e.scratch) {
 		return v.size
 	}
-	sw, sh := e.cache.Size(textOf(n, w, 0, e.method))
+	out, _ := textOf(n, w, 0, e.method)
+	sw, sh := e.cache.Size(out)
 	m.OK, m.V = true, textMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, size: Size{W: sw, H: sh}}
 	return m.V.size
 }
@@ -586,7 +605,7 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 	}
 	e.boxes[i].rect = r
 	switch n := e.boxes[i].child.(type) {
-	case SlotNode, transitionNode:
+	case SlotNode, TransitionNode:
 		e.arrange(e.firstKid(i), r)
 	case FlexNode:
 		e.arrangeFlex(i, n, r)
@@ -594,7 +613,7 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 		e.arrangeGrid(i, n, r)
 	case WrapNode:
 		e.flow(i, n, r.Dx(), r.Min, true)
-	case centerNode:
+	case CenterNode:
 		kid := e.firstKid(i)
 		s := e.measure(kid, Size{W: r.Dx(), H: r.Dy()})
 		at := r.Min.Add(image.Pt(Center.offset(s.W, r.Dx()), Center.offset(s.H, r.Dy())))

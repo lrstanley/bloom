@@ -61,6 +61,15 @@ type focusScope[K comparable] struct {
 // Current returns the ID of the focused node, and whether a node is focused.
 func (f *Focus[K]) Current() (K, bool) { return f.current, f.focused }
 
+// focusedID returns the ID of the focused node, and whether a node is
+// focused, for the Root of [WithFocus].
+func (f *Focus[K]) focusedID() (any, bool) {
+	if !f.focused {
+		return nil, false
+	}
+	return f.current, true
+}
+
 // Is reports whether the node with ID id is focused.
 func (f *Focus[K]) Is(id K) bool { return f.focused && f.current == id }
 

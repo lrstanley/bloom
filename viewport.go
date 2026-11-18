@@ -240,31 +240,6 @@ func (n ViewportNode) OnScroll(fn func(pos ViewportPos) tea.Cmd) ViewportNode {
 	return n
 }
 
-// ID sets the ID that [Frame.Rect], [Frame.Viewport], and [ScrollbarOf]
-// refer to the viewport by.
-func (n ViewportNode) ID[K comparable](id K) ViewportNode { n.id = id; return n }
-
-// On adds mouse handlers to the viewport, made by package [on].
-func (n ViewportNode) On(handlers ...on.Handler) ViewportNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// Selectable lets the left button select text in the viewport by dragging
-// over it, as a terminal selects text, but kept inside the viewport.
-// Holding alt as the drag starts selects a rectangle of cells instead, and a
-// triple click selects the whole line, on all the rows it wraps to. See
-// [Root.Selection] for the text selected, which takes the lines scrolled out
-// of sight as well, with the rows of a wrapped line joined again, and
-// without the gutters.
-//
-// The selection is kept on the buffer's text, rather than on the rows
-// drawn, so that it stays on the same text as the viewport scrolls and
-// wraps its lines differently, and as lines are appended, and the buffer is
-// edited, such as to take out the first lines of a capped log. Setting the
-// buffer's content again, as [Buffer.SetContent] does, clears it.
-func (n ViewportNode) Selectable() ViewportNode { n.selectable = true; return n }
-
 // Caret makes the viewport an editing surface: sel is what is selected in
 // its buffer, the caret at its Head, kept in the model. The viewport reads
 // it whenever it is drawn, and [Root.Selection] whenever it is asked, so a

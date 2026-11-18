@@ -9,7 +9,6 @@ import (
 	"slices"
 
 	"bloomfx.dev/bloom/flex"
-	"bloomfx.dev/bloom/on"
 )
 
 // GridNode lays children out in equal-width columns. Build one with [Grid].
@@ -35,22 +34,6 @@ func (n GridNode) Gap(x, y int) GridNode {
 	return n
 }
 
-// ID sets the ID that [Frame.Rect] refers to the grid by.
-func (n GridNode) ID[K comparable](id K) GridNode { n.id = id; return n }
-
-// On adds mouse handlers to the grid, made by package [on].
-func (n GridNode) On(handlers ...on.Handler) GridNode {
-	n.handlers = with(n.handlers, handlers)
-	return n
-}
-
-// Selectable lets the left button select text in the grid by dragging over
-// it, as a terminal selects text, but kept inside the grid. Holding alt as
-// the drag starts selects a rectangle of cells instead. The innermost
-// selectable node under the pointer takes the drag, unless a node inside it
-// has an [on.Drag] handler. See [Root.Selection] for the text selected.
-func (n GridNode) Selectable() GridNode { n.selectable = true; return n }
-
 // View implements [Child], drawing the grid at its natural size.
 func (n GridNode) View() string { return Render(0, 0, n) }
 
@@ -72,15 +55,6 @@ func Wrap(children ...Child) WrapNode { return WrapNode{children: children} }
 // Gap sets the horizontal space between children and vertical space between lines.
 func (n WrapNode) Gap(x, y int) WrapNode {
 	n.gapX, n.gapY = max(x, 0), max(y, 0)
-	return n
-}
-
-// ID sets the ID that [Frame.Rect] refers to the flow by.
-func (n WrapNode) ID[K comparable](id K) WrapNode { n.id = id; return n }
-
-// On adds mouse handlers to the flow, made by package [on].
-func (n WrapNode) On(handlers ...on.Handler) WrapNode {
-	n.handlers = with(n.handlers, handlers)
 	return n
 }
 

@@ -6,6 +6,7 @@ package bloom
 
 import (
 	"image"
+	"slices"
 	"strings"
 
 	"bloomfx.dev/bloom/internal/same"
@@ -24,13 +25,15 @@ import (
 // with [Stretch] there, or in a [Row], or a [Column] when horizontal, which
 // stretches it across.
 type ScrollbarNode struct {
+	meta
+
 	total, visible, offset int
 	of                     any
 	horizontal             bool
 	onScroll               func(offset int) tea.Cmd
 
-	style ScrollbarStyle
-	hover *ScrollbarStyle
+	style     ScrollbarStyle
+	hoverLook *ScrollbarStyle
 }
 
 // ScrollbarStyle is how a scrollbar looks: its thumb, the part for what is
@@ -96,9 +99,9 @@ func (n ScrollbarNode) Style(style ScrollbarStyle) ScrollbarNode {
 //
 // Only a scrollbar that takes the mouse, with [ScrollbarNode.OnScroll] or
 // from the viewport it follows, is hovered, which needs mouse motion
-// reported with no button down, as with [tea.MouseModeAllMotion].
+// reported with no button down, as [Root.View] then asks for.
 func (n ScrollbarNode) HoverStyle(style ScrollbarStyle) ScrollbarNode {
-	n.hover = &style
+	n.hoverLook = &style
 	return n
 }
 
@@ -106,8 +109,8 @@ func (n ScrollbarNode) HoverStyle(style ScrollbarStyle) ScrollbarNode {
 // glyph filled in.
 func (n ScrollbarNode) look(hovered bool) ScrollbarStyle {
 	s := n.style
-	if hovered && n.hover != nil {
-		s = *n.hover
+	if hovered && n.hoverLook != nil {
+		s = *n.hoverLook
 	}
 	switch {
 	case s.Thumb != "":
@@ -256,10 +259,15 @@ func (r *renderer) paintScrollbar(i int, b *box, n ScrollbarNode, clip image.Rec
 	// tells it does.
 	hovered := false
 	if n.onScroll != nil {
-		b.meta.handlers = append(b.meta.handlers[:0:0], r.scrollbarDrag(n, length, start, end))
+		b.meta.handlers = append(slices.Clip(b.meta.handlers), r.scrollbarDrag(n, length, start, end))
+	}
+	if n.onScroll != nil || r.hasEntry(b) {
+		// Its entry is the cells it draws, which paintBox does not know.
 		e := r.addEntry(i, rect.Intersect(clip), clip, parent)
-		r.entries[e].hoverable = true
-		hovered = r.isHovered(b) || r.isDragged(b)
+		if n.onScroll != nil && n.hoverLook != nil {
+			r.entries[e].hoverable = true
+			hovered = r.isHovered(b) || r.isDragged(b)
+		}
 	}
 
 	thumb := image.Rect(rect.Min.X, rect.Min.Y+start, rect.Max.X, rect.Min.Y+end)

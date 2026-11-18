@@ -580,3 +580,54 @@ func BenchmarkBufferWordAt(b *testing.B) {
 		buf.PrevWord(mid)
 	}
 }
+
+// benchCells are the cells of a table of 60 rows of 5 columns, each too
+// long for its column.
+var benchCells = func() [][]string {
+	rows := make([][]string, 60)
+	for y := range rows {
+		for x := range 5 {
+			rows[y] = append(rows[y], fmt.Sprintf("row %02d column %d: %s", y, x, strings.Repeat("value ", 2+(x+y)%5)))
+		}
+	}
+	return rows
+}()
+
+// benchTable is a table of benchCells, every one of which is cut to fit, with
+// row selected highlighted.
+func benchTable(selected int) Child {
+	rows := make([]Child, len(benchCells))
+	for y, cells := range benchCells {
+		cols := make([]Child, len(cells))
+		for x, s := range cells {
+			cell := Text(s).Truncate()
+			if y == selected {
+				cell = cell.Style(benchSelected)
+			}
+			cols[x] = Fixed(16, cell)
+		}
+		rows[y] = Row(cols...)
+	}
+	return Column(rows...)
+}
+
+// BenchmarkRenderTruncated draws a table of 300 cells cut to fit, with the
+// selection moving every frame, with tooltips off, and on, where each cell
+// cut has a tooltip of its full text.
+func BenchmarkRenderTruncated(b *testing.B) {
+	for _, tt := range []struct {
+		name string
+		opts []Option
+	}{
+		{"off", nil},
+		{"on", []Option{WithTooltips(Tooltips{})}},
+	} {
+		b.Run(tt.name, func(b *testing.B) {
+			r := New(append([]Option{WithColors(color.White, color.Black)}, tt.opts...)...)
+			b.ReportAllocs()
+			for i := 0; b.Loop(); i++ {
+				r.View(80, benchH, benchTable(i%len(benchCells)))
+			}
+		})
+	}
+}

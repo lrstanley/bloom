@@ -314,3 +314,37 @@ func TestScrollbarHover(t *testing.T) {
 		t.Fatalf("hovered without OnScroll: %q", got)
 	}
 }
+
+// TestScrollbarOn checks that a scrollbar's own handlers run beside the
+// drag of OnScroll, and only on the cells it draws.
+func TestScrollbarOn(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	offset := 0
+	lines := strings.TrimSuffix(strings.Repeat("line\n", 20), "\n")
+	tree := func() Child {
+		return Row(
+			Fill(Scroll(Text(lines).ID("body"), offset)),
+			Fixed(2, ScrollbarOf("body").ID("bar").On(on.Click(l.add("bar"))).OnScroll(func(o int) tea.Cmd {
+				offset = o
+				return nil
+			})),
+		)
+	}
+	r := New()
+	r.Render(8, 4, tree())
+	r.ClickAt(6, 3) // on the track: jumps there, and runs the click
+	if offset == 0 {
+		t.Fatal("a click on the track did not scroll")
+	}
+	expect(t, &l, "bar")
+	r.Render(8, 4, tree())
+	r.ClickAt(7, 3) // beside the scrollbar's column, in its slot
+	expect(t, &l)
+
+	// Without OnScroll, the handlers run on their own.
+	r.Render(8, 4, Row(Fill(Scroll(Text(lines).ID("body"), 0)), Fixed(1, ScrollbarOf("body").On(on.Click(l.add("bar"))))))
+	r.ClickAt(7, 0)
+	expect(t, &l, "bar")
+}

@@ -156,16 +156,20 @@ func (a Align) offset(n, avail int) int {
 }
 
 // meta is what any node can be given for input: an ID for focus and lookups,
-// whether it can be focused, the cursor it shows, its mouse handlers, and
-// the style it has while hovered.
+// whether it can be focused, the cursor it shows, its mouse handlers, the
+// style it has while hovered, its tooltip, whether its tooltip is pinned
+// open, and whether the text cut to fit inside it shows none.
 type meta struct {
 	id         any
 	focusable  bool
 	scope      bool
 	selectable bool
+	noTip      bool // set on every box inside one as it is built
+	tipOpen    bool // its tooltip is pinned open
 	cursor     *tea.Cursor
 	handlers   []on.Handler
 	hover      *lipgloss.Style
+	tip        *tooltip
 }
 
 // with returns handlers with more added, without changing a slice that a

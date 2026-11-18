@@ -14,6 +14,8 @@ import (
 // and a note saying the space is too small otherwise. Build one with
 // [MinSize].
 type MinSizeNode struct {
+	meta
+
 	child Child
 	min   Size
 }

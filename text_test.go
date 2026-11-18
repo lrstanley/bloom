@@ -99,7 +99,7 @@ func TestTruncateMeasuresAsDrawn(t *testing.T) {
 				n := Text(s).Style(st).Truncate()
 				f := Solve(avail, 0, Row(Auto(n).ID("n")))
 				r, _ := f.Rect("n")
-				got := textOf(n, r.Dx(), 0, ansi.GraphemeWidth)
+				got, _ := textOf(n, r.Dx(), 0, ansi.GraphemeWidth)
 				if w, h := lipgloss.Size(got); w != r.Dx() || h != r.Dy() {
 					t.Errorf("%s, %q in %d: measured %dx%d, drawn %dx%d:\n%s", name, s, avail, r.Dx(), r.Dy(), w, h, got)
 				}
