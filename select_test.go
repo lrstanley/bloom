@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
@@ -686,6 +687,48 @@ func TestCopySelection(t *testing.T) {
 	}
 	if copied != "alpha" || msg.Text != "alpha" || msg.ID != "text" || msg.Err != nil {
 		t.Fatalf("copied %q, sent %+v, want alpha from text", copied, msg)
+	}
+}
+
+func TestCopySelectionMotionOff(t *testing.T) {
+	setMotion(t, false)
+
+	now := time.Unix(1, 0)
+	tree := func() Child { return Text("alpha beta").ID("text").Selectable() }
+	r := New(
+		WithClock(func() time.Time { return now }),
+		WithClipboard(func(string) error { return nil }),
+	)
+	selected := "48;2;66;66;66m"
+	copyHalfWay := func() string {
+		t.Helper()
+		selectDrag(r, 10, 1, tree, 0, [2]int{0, 0}, [2]int{4, 0})
+		if r.CopySelection() == nil {
+			t.Fatal("nothing copied")
+		}
+		now = now.Add(flashFor / 2)
+		return r.Render(10, 1, tree())
+	}
+
+	// With motion off, copying sweeps no band.
+	if out := copyHalfWay(); strings.Contains(out, selected) {
+		t.Fatalf("band swept with motion off: %q", out)
+	}
+
+	// Back on, it sweeps again.
+	anim.SetMotion(true)
+	if out := copyHalfWay(); !strings.Contains(out, selected) {
+		t.Fatalf("no band with motion back on: %q", out)
+	}
+
+	// Turned off part way, the band is gone from the next render, before
+	// its next tick, which then stops.
+	anim.SetMotion(false)
+	if out := r.Render(10, 1, tree()); strings.Contains(out, selected) {
+		t.Fatalf("band still drawn after motion was turned off: %q", out)
+	}
+	if r.Update(flashMsg{root: r}) != nil {
+		t.Fatal("the flash kept ticking with motion off")
 	}
 }
 

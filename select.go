@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/internal/linebuf"
 	"bloomfx.dev/bloom/internal/textsel"
@@ -209,7 +210,7 @@ func WithClipboard(write func(text string) error) Option {
 
 // WithCopyFlash sets whether [Root.CopySelection] sweeps a band of the
 // selection's color across the text it copied, to show what went. It is on
-// by default.
+// by default, and the band only sweeps while [anim.Motion] is on.
 func WithCopyFlash(enabled bool) Option {
 	return func(c *config) { c.noFlash = !enabled }
 }
@@ -1778,7 +1779,7 @@ func (r *Root) CopySelection() tea.Cmd {
 		return nil
 	}
 	var flash tea.Cmd
-	if r.copyFlash {
+	if r.copyFlash && anim.Motion() {
 		r.flash, r.flashAt = r.sel, r.now()
 		r.flash.dragging = false
 		if r.sel.held {
@@ -1806,12 +1807,12 @@ func (r *Root) CopySelection() tea.Cmd {
 }
 
 // flashFrame keeps the copy flash drawing, for a tick of msg, until it is
-// over.
+// over, or motion is turned off.
 func (r *Root) flashFrame(msg tea.Msg) tea.Cmd {
 	if f, ok := msg.(flashMsg); !ok || f.root != r || !r.flash.ok {
 		return nil
 	}
-	if r.now().Sub(r.flashAt) >= flashFor {
+	if r.now().Sub(r.flashAt) >= flashFor || !anim.Motion() {
 		r.flash = selection{}
 		return nil
 	}

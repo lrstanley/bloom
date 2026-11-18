@@ -194,7 +194,7 @@ change. The full rate comes back from the frame after focus returns.
 Some terminals can't keep up with animation, such as over a slow SSH connection, and some people would rather not
 see it. Terminals don't report a preference for this, so it's yours to offer, such as a setting or a flag.
 [`anim.SetMotion`](https://pkg.go.dev/bloomfx.dev/bloom/anim#SetMotion) turns animation off for the whole
-program, including layout animation, and applies from each running animation's next frame:
+program, including layout animation and the copy flash, and applies from each running animation's next frame:
 
 ```go
 anim.SetMotion(false)

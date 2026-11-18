@@ -216,14 +216,14 @@ func (r *Root) Render(w, h int, c Child) string {
 	// A range an Editable made since the last frame is the selection.
 	r.checkHeld()
 	// The text copied last is drawn as selected, with the band sweeping
-	// across it, until the band has crossed it, or over the range of an
-	// Editable, until that changes.
+	// across it, until the band has crossed it or motion is turned off, or
+	// over the range of an Editable, until that changes.
 	shown := &r.sel
 	r.r.flashT, r.r.heldFlashT = -1, -1
 	if r.flash.ok {
 		t := float64(r.now().Sub(r.flashAt)) / float64(flashFor)
 		switch {
-		case t >= 1:
+		case t >= 1 || !anim.Motion():
 			r.flash = selection{}
 		case r.flash.held:
 			if h := r.heldAt(r.flash.key); h != nil && h.get() == r.flashRange {
