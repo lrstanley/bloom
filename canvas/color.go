@@ -92,25 +92,23 @@ type Mixer struct {
 // A nil color is no color to move from or toward, so with one nil, Mix
 // returns the other, and with both nil, nil.
 func (m *Mixer) Mix(a, b color.Color, t float64) color.Color {
-	switch {
-	case a == nil:
-		return b
-	case b == nil:
-		return a
-	}
 	return m.blend(opMix, a, b, t)
 }
 
 // Gray returns c moved t of the way toward its own luminance, or nil for a
 // nil c.
 func (m *Mixer) Gray(c color.Color, t float64) color.Color {
-	if c == nil {
-		return nil
-	}
 	return m.blend(opGray, c, c, t)
 }
 
 func (m *Mixer) blend(op mixOp, a, b color.Color, t float64) color.Color {
+	// Checked here, not in Mix and Gray, so that they can be inlined.
+	switch {
+	case a == nil:
+		return b
+	case b == nil:
+		return a
+	}
 	t = min(max(t, 0), 1)
 	k := mixKey{op: op, a: toRGBA(a), b: toRGBA(b), t: uint16(t * mixSteps)}
 	if k.t == 0 && op == opMix {

@@ -178,7 +178,7 @@ func TestLayerPresence(t *testing.T) {
 			t.Fatalf("hidden %s has entry", id)
 		}
 	}
-	if hit, _ := r.Frame().hit(image.Pt(1, 1)); hit < 0 || r.Frame().entries[hit].id != "base" {
+	if hit, _ := r.Frame().hit(image.Pt(1, 1), -1); hit < 0 || r.Frame().entries[hit].id != "base" {
 		t.Fatal("hidden layer took hit")
 	}
 	p.Show()

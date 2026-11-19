@@ -62,9 +62,16 @@ func (r *renderer) addEntry(i int, vis, clip image.Rectangle, parent int) int {
 	if b.modal {
 		e.block = clip
 	}
+	handlers := b.meta.handlers
+	if b.inert {
+		// Something animating out keeps its ID and place, and a modal layer
+		// the events it blocks (see [Frame.hit]), but takes no input.
+		e.focusable, e.hoverable, e.selectable, e.leaving = false, false, false, true
+		handlers = nil
+	}
 	r.entries = append(r.entries, e)
-	r.handlers = append(r.handlers, b.meta.handlers)
-	if r.tipsOn && b.meta.tip != nil {
+	r.handlers = append(r.handlers, handlers)
+	if r.tipsOn && b.meta.tip != nil && !b.inert {
 		r.tips = append(r.tips, tipAt{entry: len(r.entries) - 1, tip: b.meta.tip, pinned: b.meta.tipOpen})
 	}
 	return len(r.entries) - 1
@@ -202,26 +209,19 @@ func (f *Frame) Hit(x, y int) []any {
 	return path
 }
 
-// hit returns the entry the point p is on, the topmost one drawn, or -1.
-// When a modal layer takes the point although it is outside the layer,
-// outside is set and the entry is the layer's.
-//
-// Entries animating out take no point. A modal layer animating out still
-// takes p from what is beneath it, as if p were outside it, unless another
-// modal layer beneath it takes p, which then gets it, so that a click right
-// after closing the top dialog of a stack reaches the next.
-func (f *Frame) hit(p image.Point) (entry int, outside bool) {
-	block := -1
+// hit returns the entry the point p is on, the topmost one drawn, or -1,
+// given modal, the entry of the modal layer that takes p (see
+// [Frame.modalAt]), or -1. When a modal layer takes the point although it
+// is outside the layer, outside is set and the entry is the layer's.
+// Entries animating out take no point, besides modal.
+func (f *Frame) hit(p image.Point, modal int) (entry int, outside bool) {
 	for i := len(f.entries) - 1; i >= 0; i-- {
 		e := &f.entries[i]
 		if e.leaving {
-			if block < 0 && e.modal && p.In(e.block) && f.modalUnder(i, p) < 0 {
-				block = i
+			if i == modal {
+				return i, true
 			}
 			continue
-		}
-		if block >= 0 {
-			return block, true
 		}
 		if p.In(e.vis) {
 			return i, false
@@ -230,46 +230,37 @@ func (f *Frame) hit(p image.Point) (entry int, outside bool) {
 			return i, true
 		}
 	}
-	if block >= 0 {
-		return block, true
-	}
 	return -1, false
 }
 
-// modalUnder returns the topmost modal layer drawn before entry i that
-// takes p and isn't animating out, or -1.
-func (f *Frame) modalUnder(i int, p image.Point) int {
-	for j := i - 1; j >= 0; j-- {
-		if e := &f.entries[j]; e.modal && !e.leaving && p.In(e.block) {
-			return j
-		}
-	}
-	return -1
-}
-
-// under appends to chain the entries that events at p reach, innermost
-// first: the entry hit and those it is inside, stopping at the topmost
-// modal layer that takes p, whose index is floor, or 0 when there is none.
-// Nothing before floor takes events at p, besides the entries inside the
-// modal layer itself.
-func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
-	// A modal layer animating out is the floor only when no other modal
-	// layer beneath it takes p; see [Frame.hit].
+// modalAt returns the entry of the topmost modal layer that takes p, or -1.
+// One animating out takes p only when no other does: it keeps p from what
+// is beneath it until it is gone, but a click right after closing the top
+// dialog of a stack reaches the next.
+func (f *Frame) modalAt(p image.Point) int {
+	leaving := -1
 	for i := len(f.entries) - 1; i >= 0; i-- {
 		if e := &f.entries[i]; e.modal && p.In(e.block) {
 			if !e.leaving {
-				floor = i
-				break
+				return i
 			}
-			if j := f.modalUnder(i, p); j >= 0 {
-				floor = j
-			} else {
-				floor = i
+			if leaving < 0 {
+				leaving = i
 			}
-			break
 		}
 	}
-	i, outside := f.hit(p)
+	return leaving
+}
+
+// under appends to chain the entries that events at p reach, innermost
+// first: the entry hit and those it is inside, stopping at the modal layer
+// that takes p, whose index is floor, or 0 when there is none. Nothing
+// before floor takes events at p, besides the entries inside the modal
+// layer itself.
+func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
+	modal := f.modalAt(p)
+	floor = max(modal, 0)
+	i, outside := f.hit(p, modal)
 	if outside {
 		return chain, floor
 	}

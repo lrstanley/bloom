@@ -31,6 +31,7 @@ type box struct {
 	meta     meta
 	modal    bool
 	float    bool // a layer placed and drawn against the screen; see LayerNode.Float
+	inert    bool // inside something a presence is animating out; see renderer.addEntry
 	parent   int
 	kidsOff  int
 	kidsLen  int
@@ -176,7 +177,7 @@ func (e *engine) build(c Child, parent, slot int) int {
 	case BoxNode:
 		kids = []Child{n.child}
 	case TransitionNode:
-		kids = []Child{n.child}
+		b.inert, kids = n.leaving, []Child{n.child}
 	case CenterNode:
 		kids = []Child{n.child}
 	case ScrollNode:
@@ -192,7 +193,7 @@ func (e *engine) build(c Child, parent, slot int) int {
 			kids = append(kids, l)
 		}
 	case LayerNode:
-		b.modal, b.float, kids = n.modal, n.float, []Child{n.child}
+		b.modal, b.float, b.inert, kids = n.modal, n.float, n.leaving, []Child{n.child}
 	case ViewportNode:
 		if n.caret != nil {
 			// Its caret is set from the mouse, as the range of an Editable is.
@@ -208,6 +209,9 @@ func (e *engine) build(c Child, parent, slot int) int {
 	}
 	if parent >= 0 && e.boxes[parent].meta.noTip {
 		b.meta.noTip = true
+	}
+	if parent >= 0 && e.boxes[parent].inert {
+		b.inert = true
 	}
 
 	_, grid := c.(GridNode)

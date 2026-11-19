@@ -744,7 +744,7 @@ func (r *Root) activeTip() (int, *tipAt) {
 	}
 	i := findKey(rr.entries, s.shownKey)
 	t := tipIn(rr.tips, i)
-	if t == nil || t.pinOnly || covered(rr.entries, i) || (s.shownSrc == tipFocus && !r.focusIs(s.shownID)) {
+	if t == nil || t.pinOnly || covered(rr.entries, i, true) || (s.shownSrc == tipFocus && !r.focusIs(s.shownID)) {
 		return -1, nil
 	}
 	return i, t
@@ -1023,7 +1023,7 @@ func (r *Root) paintPins(screen image.Rectangle, sinkOn bool) {
 // open and drawn over the frame, as [Root.paintPins] has it. One whose
 // node an effect moved off screen is not.
 func (r *Root) pinShown(t *tipAt, sinkOn bool) bool {
-	return t.pinned && r.tip.floats(t, sinkOn) && !r.r.entries[t.entry].vis.Empty() && !covered(r.r.entries, t.entry)
+	return t.pinned && r.tip.floats(t, sinkOn) && !r.r.entries[t.entry].vis.Empty() && !covered(r.r.entries, t.entry, true)
 }
 
 // pinOf returns what is kept of the tooltip pinned open of the node with
@@ -1053,7 +1053,7 @@ func (r *Root) sinkText() string {
 		return t.text()
 	}
 	for j := range rr.tips {
-		if t := &rr.tips[j]; t.pinned && s.modeOf(t) == TipSink && !covered(rr.entries, t.entry) {
+		if t := &rr.tips[j]; t.pinned && s.modeOf(t) == TipSink && !covered(rr.entries, t.entry, true) {
 			return t.text()
 		}
 	}

@@ -76,11 +76,11 @@ func TestLayoutAnimationTween(t *testing.T) {
 	expectRect(t, r.Frame(), "pane", image.Rect(10, 0, 40, 10))
 	expectRect(t, r.Frame(), "a", image.Rect(10, 0, 25, 10))
 	expectRect(t, r.Frame(), "b", image.Rect(25, 0, 40, 10))
-	i, _ := r.Frame().hit(image.Pt(11, 1))
+	i, _ := r.Frame().hit(image.Pt(11, 1), -1)
 	if i < 0 || r.Frame().entries[i].id != "a" {
 		t.Fatal("hit test did not use visual position")
 	}
-	if old, _ := r.Frame().hit(image.Pt(1, 1)); old >= 0 {
+	if old, _ := r.Frame().hit(image.Pt(1, 1), -1); old >= 0 {
 		t.Fatal("hit test used old position")
 	}
 	// Retarget from the last drawn rectangle without a discontinuity.

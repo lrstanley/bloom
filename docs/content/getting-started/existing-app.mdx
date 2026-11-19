@@ -107,7 +107,9 @@ func (m *model) View() tea.View {
 ```
 
 `m.ui.View` returns a `tea.View`, so the fields you set on it before, such as `AltScreen`, are set the same way. It
-sets `MouseMode` for you, to the least the frame's handlers need, so drop yours unless you want more.
+sets `MouseMode` for you, to the least the frame's handlers need. This frame has none yet, so if `Update` still
+handles the mouse itself, keep setting yours after the call until you
+[move that handling onto nodes](#move-mouse-handling-onto-the-nodes).
 
 </Step>
 <Step>
@@ -193,7 +195,8 @@ for i, name := range m.names {
 ```
 
 The `tea.MouseClickMsg` and other mouse messages still reach `Update`, so remove the old handling as you go, or an
-event is acted on twice. See [Mouse events](/input/mouse).
+event is acted on twice. Once it's all gone, stop setting `MouseMode` and let bloom choose it. See
+[Mouse events](/input/mouse).
 
 </Step>
 </Steps>

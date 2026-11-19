@@ -474,9 +474,6 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 			r.paint(k, vis, parent)
 		}
 	case TransitionNode:
-		if n.leaving {
-			defer r.makeInert(from)
-		}
 		if len(n.effects) > 0 {
 			// Its own entry, if it has one, moves with its cells.
 			r.paintEffects(r.firstKid(i), b.rect, clip, n.t, n.effects, parent, from)
@@ -514,20 +511,6 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 	default:
 		r.paintComponent(i, vis)
 	}
-}
-
-// makeInert takes input away from the entries added since from, those of
-// something animating out: they keep their IDs and places, and a modal
-// layer keeps the events it blocks unless a modal layer beneath it takes
-// them (see [Frame.hit]), but they have no handlers, take no events, cannot
-// be focused, hovered, or selected, and show no tooltips.
-func (r *renderer) makeInert(from int) {
-	for k := from; k < len(r.entries); k++ {
-		e := &r.entries[k]
-		e.focusable, e.hoverable, e.selectable, e.leaving = false, false, false, true
-		r.handlers[k] = nil
-	}
-	r.tips = slices.DeleteFunc(r.tips, func(t tipAt) bool { return t.entry >= from })
 }
 
 // paintComponent adds the op for box i, a component, drawn at vis, and for
@@ -573,7 +556,7 @@ func (r *renderer) paintText(i int, n *TextNode, vis, clip image.Rectangle, pare
 // inside entry parent.
 func (r *renderer) noteCut(i int, full string, vis, clip image.Rectangle, parent, own int) {
 	b := &r.boxes[i]
-	auto := r.autoTips && (!b.meta.noTip || b.meta.tipOpen) && b.meta.tip == nil
+	auto := r.autoTips && (!b.meta.noTip || b.meta.tipOpen) && b.meta.tip == nil && !b.inert
 	if own < 0 {
 		if !auto || vis.Empty() {
 			return
@@ -662,12 +645,8 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	if b.hidden || b.rect.Empty() {
 		return
 	}
-	n, _ := b.child.(LayerNode)
-	if n.leaving {
-		// Deferred first, so it runs after the floats, which are the layer's.
-		defer r.makeInert(len(r.entries))
-	}
 	defer r.paintFloats(len(r.floats))
+	n, _ := b.child.(LayerNode)
 	if len(n.backdrop) > 0 {
 		r.ops = append(r.ops, op{kind: opEffects, rect: clip, viewport: clip, t: n.t, effects: r.snapshot(n.backdrop)})
 	}
@@ -779,7 +758,7 @@ func (r *renderer) beginTravel(b *box, clip image.Rectangle) int {
 // isHovered reports whether the pointer was over box b when the mouse was
 // last routed.
 func (r *renderer) isHovered(b *box) bool {
-	return len(r.hovered) > 0 && containsKey(r.hovered, b.key())
+	return len(r.hovered) > 0 && !b.inert && containsKey(r.hovered, b.key())
 }
 
 // isDragged reports whether box b is being dragged with the mouse.

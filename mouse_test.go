@@ -934,3 +934,88 @@ func TestLeavingLayerPassesToDialogBeneath(t *testing.T) {
 	r.ClickAt(15, 4)
 	expect(t, &l, "outside first")
 }
+
+// TestLeavingPresentTakesFloatsInput checks that a layer floating inside a
+// node shown with Present takes no input while the node animates out, though
+// it is painted after the node.
+func TestLeavingPresentTakesFloatsInput(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	p, _ := leavingPresence()
+	r := New()
+	r.Render(20, 5, Column(Present(p, Overlay(
+		Text("in"),
+		Layer(Text("float").ID("float").On(on.Click(l.add("float")))).Float(),
+	))))
+	if _, ok := r.Frame().Rect("float"); !ok {
+		t.Fatal("the float isn't in the frame")
+	}
+	r.Click("float")
+	expect(t, &l)
+}
+
+// TestLeavingLayerEndsDrag checks that a drag in a layer that starts
+// animating out ends, telling the handler that began it.
+func TestLeavingLayerEndsDrag(t *testing.T) {
+	t.Parallel()
+
+	var moves, done int
+	handle := on.Drag(func(e on.Event) tea.Cmd {
+		if e.Done {
+			done++
+		} else {
+			moves++
+		}
+		return nil
+	})
+	shown := anim.NewPresence()
+	shown.Show()
+	leaving, _ := leavingPresence()
+	tree := func(p anim.Presence) Child {
+		return Overlay(Text("base"), Layer(Text("handle").On(handle)).Anchor(Start, Start).Presence(p))
+	}
+	r := New()
+	r.Render(20, 3, tree(shown))
+	r.Update(down(0, 0))
+	r.Update(dragTo(1, 0))
+	before := moves
+	r.Render(20, 3, tree(leaving))
+	r.Update(dragTo(2, 0))
+	if done != 1 || moves != before {
+		t.Fatalf("drag ended %d times and moved %d more, want once and none", done, moves-before)
+	}
+	r.Update(release(2, 0))
+	if done != 1 {
+		t.Fatalf("drag ended %d times after the release, want once", done)
+	}
+}
+
+// TestLeavingLayerEndsSelection checks that text being selected in a layer
+// that starts animating out is no longer selected, from the first mouse
+// event on the frame it starts in.
+func TestLeavingLayerEndsSelection(t *testing.T) {
+	t.Parallel()
+
+	shown := anim.NewPresence()
+	shown.Show()
+	leaving, _ := leavingPresence()
+	tree := func(p anim.Presence) Child {
+		return Overlay(Text("base"), Layer(Text("hello world").Selectable()).Anchor(Start, Start).Presence(p))
+	}
+	r := New()
+	r.after = immediate
+	r.Render(20, 3, tree(shown))
+	r.Update(down(0, 0))
+	r.Render(20, 3, tree(shown))
+	r.Update(dragTo(4, 0))
+	r.Render(20, 3, tree(shown))
+	if _, ok := r.Selection(); !ok {
+		t.Fatal("nothing selected while the layer is shown")
+	}
+	r.Render(20, 3, tree(leaving))
+	r.Update(dragTo(8, 0))
+	if text, ok := r.Selection(); ok || r.sel.ok || r.sel.dragging {
+		t.Fatalf("selected %q in a layer animating out", text)
+	}
+}

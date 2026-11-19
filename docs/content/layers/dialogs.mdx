@@ -60,6 +60,10 @@ focused, selected, or show tooltips. A modal layer still keeps clicks from what'
 quick second click doesn't land on the screen behind. If another modal dialog is open beneath it, as in a
 [stack](#stack-dialogs), that dialog gets the click instead.
 
+This starts with the first frame drawn after you hide it. A click that comes before then lands on the frame on
+screen, where the dialog is still open, so a handler that mustn't run twice, such as one that deletes, should check
+`Shown()` first.
+
 ## Make it modal
 
 `Modal()` makes a layer take every mouse event from what's beneath it. Clicks inside it go to its nodes as usual.

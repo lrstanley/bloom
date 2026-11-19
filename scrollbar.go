@@ -264,7 +264,7 @@ func (r *renderer) paintScrollbar(i int, b *box, n ScrollbarNode, clip image.Rec
 	if n.onScroll != nil || r.hasEntry(b) {
 		// Its entry is the cells it draws, which paintBox does not know.
 		e := r.addEntry(i, rect.Intersect(clip), clip, parent)
-		if n.onScroll != nil && n.hoverLook != nil {
+		if n.onScroll != nil && n.hoverLook != nil && !b.inert {
 			r.entries[e].hoverable = true
 			hovered = r.isHovered(b) || r.isDragged(b)
 		}

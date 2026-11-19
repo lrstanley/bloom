@@ -175,6 +175,9 @@ func (r *Root) input(msg tea.Msg) tea.Cmd {
 	}
 	s.checked = f
 	r.checkSelect(f)
+	// The Head of an Editable's range being dragged moves to the text that
+	// moved under the pointer.
+	r.dragHeld()
 	cmds := r.checkDrag(nil, f)
 	if s.atOK {
 		s.chain, _ = f.under(s.at, s.chain[:0])
@@ -196,6 +199,9 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 	defer func() { s.routing = outer }()
 	m := msg.Mouse()
 	p := image.Pt(m.X, m.Y)
+	if s.checked != f {
+		r.checkSelect(f)
+	}
 	s.at, s.atOK, s.checked = p, true, f
 	chain, floor := f.under(p, s.chain[:0])
 	s.chain = chain
@@ -454,25 +460,24 @@ func (r *Root) checkDrag(cmds []tea.Cmd, f *Frame) []tea.Cmd {
 	if s.drag == nil {
 		return cmds
 	}
+	// One animating out keeps its last handlers, to be told the drag ended.
 	i := f.find(s.drag.key)
-	if i >= 0 {
+	if i >= 0 && !f.entries[i].leaving {
 		*s.drag = f.target(i)
 	}
-	if i < 0 || f.covered(i) {
+	if i < 0 || f.entries[i].leaving || covered(f.entries, i, false) {
 		return r.endDrag(cmds, f, nil, s.at, nil)
 	}
 	return cmds
 }
 
 // covered reports whether a modal layer drawn after entry i takes events
-// from some of it.
-func (f *Frame) covered(i int) bool { return covered(f.entries, i) }
-
-// covered reports whether a modal layer drawn after entry i takes events
-// from some of it.
-func covered(entries []entry, i int) bool {
+// from some of it, counting those animating out if leaving. A drag beneath
+// one animating out began in a modal layer it hands events to; see
+// [Frame.hit].
+func covered(entries []entry, i int, leaving bool) bool {
 	for j := i + 1; j < len(entries); j++ {
-		if e := &entries[j]; e.modal && e.block.Overlaps(entries[i].vis) {
+		if e := &entries[j]; e.modal && (leaving || !e.leaving) && e.block.Overlaps(entries[i].vis) {
 			return true
 		}
 	}
@@ -500,7 +505,7 @@ func (r *Root) hover(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, chain []int) []
 		// as does one that took input away, such as a layer animating out,
 		// so an on.Hover that was told the pointer came is told it left.
 		if f != nil {
-			if i := f.find(t.key); i >= 0 && f.handlers[i] != nil {
+			if i := f.find(t.key); i >= 0 && !f.entries[i].leaving {
 				t = f.target(i)
 			}
 		}

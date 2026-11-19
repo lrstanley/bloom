@@ -385,7 +385,7 @@ func colorOf(c color.Color) color.Color {
 
 // selected reports whether box b is the node the Root is selecting in.
 func (r *renderer) selected(b *box) bool {
-	return r.sel.ok && !r.sel.held && b.meta.selectable && b.key() == r.sel.key
+	return r.sel.ok && !r.sel.held && b.meta.selectable && !b.inert && b.key() == r.sel.key
 }
 
 // noteLeaves notes the text leaves of box i, the node selected in, at path,
@@ -1936,14 +1936,12 @@ func (r *Root) selectionDone(msg tea.Msg) tea.Cmd {
 	return func() tea.Msg { return out }
 }
 
-// checkSelect drops the selection when its node left frame f, and moves
-// the Head of an [Editable]'s range being dragged to the text that moved
-// under the pointer.
+// checkSelect drops the selection when its node left frame f or is
+// animating out in it.
 func (r *Root) checkSelect(f *Frame) {
-	if r.sel.ok && f.find(r.sel.key) < 0 {
+	if i := f.find(r.sel.key); r.sel.ok && (i < 0 || f.entries[i].leaving) {
 		r.sel = selection{}
 	}
-	r.dragHeld()
 }
 
 // autoScroll returns the command for the next tick scrolling the node text
