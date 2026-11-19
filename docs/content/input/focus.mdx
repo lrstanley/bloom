@@ -44,7 +44,8 @@ bloom.Text(m.values[fieldEmail]).Style(input).ID(fieldEmail).Focusable()
 
 Focus moves between focusable nodes with IDs of its type, and passes over the rest. Any node can be focusable,
 such as a slot: `bloom.Fill(m.editor).ID(paneEditor).Focusable()` makes a whole pane a stop in the tab
-order.
+order. A component that places children it was given can make them focusable the same way; see
+[Place components you're given](/bubble-tea/writing-components#place-components-youre-given).
 
 ## Move focus with tab and clicks
 

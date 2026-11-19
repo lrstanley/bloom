@@ -172,6 +172,49 @@ The ID must be comparable, like any ID. The unexported `tabID` type keeps the pa
 else's, and the parent can still find one, such as with `m.ui.Frame().Rect(...)`, if the component exports a way
 to make it.
 
+## Place components you're given
+
+A container, such as a stack of panels, places children it didn't build. It can still make some of them focusable,
+and keep that apart from the code that decides how each is placed: wrap a child that should take focus in an
+[`Auto`](https://pkg.go.dev/bloomfx.dev/bloom#Auto) slot with its ID before placing it. Here the children say
+whether they take focus by implementing an interface of the container's:
+
+```go
+// Focuser is a child of a Stack that takes focus, by the ID it returns.
+type Focuser interface {
+	bloom.Child
+	FocusID() any
+}
+
+// focusable makes c a stop in the tab order if it's a Focuser.
+func focusable(c bloom.Child) bloom.Child {
+	if f, ok := c.(Focuser); ok {
+		return bloom.Auto(c).ID(f.FocusID()).Focusable()
+	}
+	return c
+}
+```
+
+Outside a row, column, or grid, a slot's sizing does nothing: it takes the space its parent gives it and passes it
+on, so the wrapped child is laid out as it would be without the slot. In a row or column, the container places it in
+a slot of its own, which decides the size. A grid sizes a slot in its cell as a row would, so in a grid, place it in
+a `Fill` to fill the cell:
+
+```go
+// in a column, the outer slot decides the size
+bloom.Column(bloom.Fixed(3, focusable(s.header)), bloom.Fill(focusable(s.body)))
+
+// in a list, each item is whatever item returns
+bloom.List(len(s.items), func(i int) bloom.Child { return focusable(s.items[i]) })
+
+// in a grid, a Fill fills the cell
+bloom.Grid(2, bloom.Fill(focusable(s.left)), bloom.Fill(focusable(s.right)))
+```
+
+Wrap the child, rather than adding the ID to the slot it's placed in. A [list](/content/lists) has no slot for each
+item, and the code that picks `Fixed` or `Fill` stays the same whether or not a child takes focus. A child that marks
+its own nodes focusable, as `Tabs` does, needs no wrapping.
+
 ## Take keys from the parent
 
 Keys aren't routed to nodes; they go to the parent's `Update`. Give the component an `Update` method of its own, and

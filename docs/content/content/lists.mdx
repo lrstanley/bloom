@@ -75,6 +75,25 @@ Or let the wheel move only the cursor, `m.cursor += dy * 3`, and the list follow
 Items are followed from frame to frame by their index, so mouse handlers and hover styles stay with an item as
 the list scrolls.
 
+## Focus items
+
+An ID of your `Focus`'s type and `Focusable()` on the list make the whole list one stop in the
+[tab order](/input/focus). To make items focusable instead, give each its own ID, such as from its index, and mark it
+`Focusable`. Wrap an item in `bloom.Auto` to add these to a component that isn't a node; see
+[Place components you're given](/bubble-tea/writing-components#place-components-youre-given):
+
+```go
+type rowID int // the ID of item i, for a Focus[rowID]
+
+bloom.List(len(m.items), func(i int) bloom.Child {
+	return bloom.Auto(m.items[i]).ID(rowID(i)).Focusable()
+})
+```
+
+Only the items on screen are in the frame, so only those are in the tab order, and moving focus doesn't scroll the
+list. To move through every item, make the list one stop and move a cursor with the arrow keys, which `Keep`
+[keeps in view](#keep-the-cursor-in-view).
+
 ## Show a scrollbar
 
 `ScrollbarOf` the list's own ID follows it in items, and its `OnScroll` gets the first item to show, for `Offset`:

@@ -35,6 +35,12 @@ type layoutAnimation struct{ opts []anim.Option }
 // SlotNode places a child in a [Row] or [Column] with a sizing rule. Build
 // one with [Fixed], [Fill], [Grow], [Percent], or [Auto]. A child given to
 // a row or column directly is placed as with [Auto].
+//
+// Outside a row, column, or [Grid], such as in a [List] item or a [Box], a
+// slot's sizing rule does nothing: it takes the space its parent gives it and
+// passes it to its child. That makes Auto(child) a way to give any child an
+// ID, focus, mouse handlers, or a tooltip without changing how it is laid
+// out.
 type SlotNode struct {
 	meta
 
