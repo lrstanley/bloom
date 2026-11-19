@@ -156,7 +156,9 @@ func logLine(i int) string {
 
 func tick() tea.Cmd { return tea.Tick(every, func(time.Time) tea.Msg { return tickMsg{} }) }
 
-func (m *model) Init() tea.Cmd { return tea.Batch(m.ui.Init(), tick()) }
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
+func (m *model) Init() tea.Cmd { return tick() }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmd := m.ui.Update(msg)
@@ -321,6 +323,8 @@ func preview(s string) string {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
 	v.BackgroundColor = theme.Bg
 	return v
 }

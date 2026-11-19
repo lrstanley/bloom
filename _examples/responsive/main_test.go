@@ -21,7 +21,7 @@ func TestResponsive(t *testing.T) {
 	demo.ResizeInBand(t, h)
 	h.Wait("showing nav, reader, details").Sleep(demo.Hold(600 * time.Millisecond))
 
-	// Paging moves by the height of the reader, which Update gets from Solve.
+	// Paging moves by the height of the reader on screen.
 	h.Key("pgdown").Wait("row 23 of").Sleep(demo.Hold(500 * time.Millisecond))
 	h.Key("pgup").Wait("row 1 of").Sleep(demo.Hold(300 * time.Millisecond))
 

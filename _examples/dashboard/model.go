@@ -203,6 +203,8 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	m.drawn = time.Since(start)
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
 	v.BackgroundColor = bg
 	return v
 }

@@ -134,7 +134,7 @@ func progress(start float64, paused bool) anim.Sequence {
 func (m *model) Init() tea.Cmd { return m.t.Loop() }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{m.ui.Update(msg)}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -164,7 +164,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	cmds = append(cmds, m.ui.Update(msg), anim.Update(msg, &m.t, &m.iris, &m.unfold))
+	cmds = append(cmds, anim.Update(msg, &m.t, &m.iris, &m.unfold))
 	return m, tea.Batch(cmds...)
 }
 

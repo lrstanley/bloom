@@ -5,9 +5,10 @@
 // Command responsive is a reader that adapts to the terminal's size. The
 // details panel collapses first and the article list second as the terminal
 // narrows; the toolbar is a Layouter that rebuilds itself for the space it
-// gets; the tags wrap onto as many lines as they need; the status bar is a
-// Measurer; paging uses bloom.Solve in Update to know how tall the reader
-// is; and below the size the reader needs, bloom.MinSize shows a note
+// gets; the tags wrap onto as many lines as they need; the reader is a
+// Viewport, which pages by its height on screen; the status bar is a
+// Measurer, which says what bloom.Solve finds in the frame about to be
+// drawn; and below the size the reader needs, bloom.MinSize shows a note
 // saying the window is too small in place of the layout.
 //
 // Keys: up/down pick an article, pgup/pgdown or j/k scroll, q quits. The
@@ -44,20 +45,20 @@ var (
 	action   = bar.Foreground(text).Padding(0, 1)
 	item     = lipgloss.NewStyle().Foreground(text).Padding(0, 1)
 	selected = item.Foreground(dark).Background(accent).Bold(true)
-	prose    = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
+	prose    = lipgloss.NewStyle().Foreground(fg)
 	chip     = lipgloss.NewStyle().Foreground(dark).Background(purple).Padding(0, 1)
 	bold     = lipgloss.NewStyle().Bold(true)
 	note     = lipgloss.NewStyle().Foreground(muted)
 )
 
-// paneID is the ID of a pane, for finding its size with bloom.Solve.
+// paneID is the ID of a pane, for finding it in a frame.
 type paneID string
 
 const (
 	paneNav     paneID = "nav"
 	paneReader  paneID = "reader"
 	paneDetails paneID = "details"
-	paneContent paneID = "content" // the scrolled text, to know its height
+	paneText    paneID = "text" // the reader's viewport, to scroll it
 )
 
 // minWidth and minHeight are the smallest window the reader can be used in:
@@ -149,11 +150,19 @@ type model struct {
 	ui       *bloom.Root
 	w, h     int
 	selected int
-	offset   int // the reader's scroll position, in rows
+	text     *bloom.Buffer // the selected article's body
+	at       bloom.ViewportPos
 }
 
-func newModel() *model { return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg))} }
+func newModel() *model {
+	return &model{
+		ui:   bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
+		text: bloom.NewBuffer(articles[0].body),
+	}
+}
 
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd { return nil }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -166,8 +175,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
-		if m.tooSmall() {
-			// The layout isn't on screen, so keys that would change it wait.
+		// The reader scrolls from where it was on screen, by its height there
+		// for a page. While it isn't on screen, as when the window is too
+		// small for it, keys that would change the layout wait.
+		v, ok := m.ui.Frame().Viewport(paneText)
+		if !ok {
 			break
 		}
 		switch msg.String() {
@@ -176,53 +188,23 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down":
 			m.pick(m.selected + 1)
 		case "j":
-			m.offset++
+			m.at = v.Down(1)
 		case "k":
-			m.offset--
+			m.at = v.Up(1)
 		case "pgdown", "space":
-			m.offset += m.geometry().page
+			m.at = v.PageDown()
 		case "pgup":
-			m.offset -= m.geometry().page
+			m.at = v.PageUp()
 		}
 	}
-	// The wheel's handler scrolled before Update, which clamps it here too.
-	m.offset = min(max(m.offset, 0), m.geometry().maxOffset)
 	return m, cmd
 }
 
-// tooSmall reports whether the window is too small for the reader, when
-// the note saying so is shown in its place.
-func (m *model) tooSmall() bool { return m.w < minWidth || m.h < minHeight }
-
+// pick opens article i, from its top.
 func (m *model) pick(i int) {
 	m.selected = min(max(i, 0), len(articles)-1)
-	m.offset = 0
-}
-
-// geometry is what Update needs to know about the layout: how many rows the
-// reader shows, how far it can scroll, and which panels fit.
-type geometry struct {
-	page, maxOffset int
-	panes           []string
-}
-
-func (m *model) geometry() geometry {
-	// The status bar reports the geometry, so it is solved with an empty one,
-	// which as a Measurer is the same size.
-	frame := bloom.Solve(m.w, m.h, m.layout(statusbar{}))
-	var g geometry
-	if r, ok := frame.Rect(paneReader); ok {
-		g.page = max(r.Dy()-panel.GetVerticalFrameSize(), 1)
-	}
-	if r, ok := frame.Rect(paneContent); ok {
-		g.maxOffset = max(r.Dy()-g.page, 0)
-	}
-	for _, p := range []paneID{paneNav, paneReader, paneDetails} {
-		if _, ok := frame.Rect(p); ok {
-			g.panes = append(g.panes, string(p))
-		}
-	}
-	return g
+	m.text.SetContent(articles[m.selected].body)
+	m.at = bloom.ViewportPos{}
 }
 
 func (m *model) layout(status statusbar) bloom.Child {
@@ -233,11 +215,18 @@ func (m *model) layout(status statusbar) bloom.Child {
 		ID(paneNav).
 		Collapsible(2)
 
-	content := bloom.Text(art.body).Style(prose).ID(paneContent)
-	reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
+	// The text wraps to the reader's width. The wheel scrolls it from
+	// anywhere over the reader, its border included, three rows a notch.
+	text := bloom.Viewport(m.text).ID(paneText).At(m.at).Wrap(bloom.WrapWords).Style(prose)
+	reader := bloom.Fill(bloom.Box(panel.Padding(0, 1), text)).
 		ID(paneReader).
 		Min(40).
-		On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; return nil }))
+		On(on.Scroll(func(_, dy int) tea.Cmd {
+			if v, ok := m.ui.Frame().Viewport(paneText); ok {
+				m.at = v.Down(dy * 3)
+			}
+			return nil
+		}))
 
 	paragraphs := fmt.Sprintf("%d paragraphs", strings.Count(art.body, "§"))
 	info := bloom.Column(
@@ -273,11 +262,22 @@ func (m *model) articleList() bloom.Child {
 	return bloom.Column(items...)
 }
 
+// status is the status bar, which says which panes fit and where the reader
+// is. They are found with bloom.Solve, which lays out the frame about to be
+// drawn without drawing it. The status bar is solved empty: as a Measurer,
+// it is the same size whatever it says.
 func (m *model) status() statusbar {
-	g := m.geometry()
+	frame := bloom.Solve(m.w, m.h, m.layout(statusbar{}))
+	var panes []string
+	for _, p := range []paneID{paneNav, paneReader, paneDetails} {
+		if _, ok := frame.Rect(p); ok {
+			panes = append(panes, string(p))
+		}
+	}
+	v, _ := frame.Viewport(paneText)
 	text := fmt.Sprintf(
 		"%d×%d · showing %s · row %d of %d · page %d",
-		m.w, m.h, strings.Join(g.panes, ", "), m.offset+1, g.maxOffset+1, g.page,
+		m.w, m.h, strings.Join(panes, ", "), v.Row+1, max(v.TotalRows-v.Rows, 0)+1, v.Rows,
 	)
 	return statusbar{text: text}
 }

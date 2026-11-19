@@ -189,7 +189,7 @@ func (m *model) schedule() tea.Cmd {
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{m.ui.Update(msg)}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -213,11 +213,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, cmd)
 	}
-	cmds = append(
-		cmds,
-		m.ui.Update(msg),
-		anim.Update(msg, &m.shimmer, &m.roll, &m.shake, &m.burst, &m.badge, &m.tourOn, &m.tourText),
-	)
+	cmds = append(cmds, anim.Update(msg, &m.shimmer, &m.roll, &m.shake, &m.burst, &m.badge, &m.tourOn, &m.tourText))
 	return m, tea.Batch(cmds...)
 }
 

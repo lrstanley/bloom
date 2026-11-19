@@ -168,10 +168,12 @@ func newModel() *model {
 	}
 }
 
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd { return tea.Batch(m.t.Loop(), m.phase.Loop()) }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{m.ui.Update(msg)}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height

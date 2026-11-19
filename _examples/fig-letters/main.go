@@ -91,13 +91,8 @@ func newModel() *model {
 	}
 }
 
-func main() {
-	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.intro.Play(0, 1), tick())
 }
@@ -121,7 +116,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case "space", " ":
+		case "space":
 			m.word = (m.word + 1) % len(anagrams)
 		case "i":
 			cmds = append(cmds, m.intro.Play(0, 1))
@@ -136,6 +131,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
 	v.BackgroundColor = bg
 	return v
 }
@@ -258,4 +255,11 @@ func (m *model) wordPaint() fig.Paint {
 		}
 		return st
 	})
+}
+
+func main() {
+	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

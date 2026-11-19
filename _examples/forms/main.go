@@ -181,31 +181,29 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// press presses the button with ID b.
-func (m *model) press(b control) tea.Cmd {
-	switch b {
-	case buttonSave:
-		m.focus.Push(scopeConfirm)
-		m.focus.Set(buttonConfirm)
-		return m.confirm.Show()
-	case buttonReset:
-		clear(m.values)
-		m.focus.Set(fieldName)
-	case buttonConfirm:
-		if m.saved == 0 {
-			return m.save()
-		}
-		m.focus.Push(scopeOverwrite)
-		m.focus.Set(buttonBack)
-		return tea.Batch(m.overwrite.Show(), m.drop.Show())
-	case buttonOverwrite:
-		return m.save()
-	case buttonCancel, buttonBack:
-		return m.closeTop()
-	case fieldName, fieldEmail, fieldLanguage:
-		// Inputs are typed into, not pressed.
-	}
+// reset empties the form.
+func (m *model) reset() tea.Cmd {
+	clear(m.values)
+	m.focus.Set(fieldName)
 	return nil
+}
+
+// askToSave opens the dialog that confirms saving.
+func (m *model) askToSave() tea.Cmd {
+	m.focus.Push(scopeConfirm)
+	m.focus.Set(buttonConfirm)
+	return m.confirm.Show()
+}
+
+// confirmSave saves the profile, or, when it was saved before, opens a
+// second dialog on top that asks to overwrite it.
+func (m *model) confirmSave() tea.Cmd {
+	if m.saved == 0 {
+		return m.save()
+	}
+	m.focus.Push(scopeOverwrite)
+	m.focus.Set(buttonBack)
+	return tea.Batch(m.overwrite.Show(), m.drop.Show())
 }
 
 // closeTop closes the topmost dialog, giving focus back to where it was.
@@ -266,36 +264,23 @@ func (m *model) field(id control) bloom.Child {
 	)
 }
 
-func (m *model) button(id control) bloom.Child {
+// button is a button labeled with its ID, which runs press when pressed.
+func (m *model) button(id control, press func() tea.Cmd) bloom.Child {
 	st := button
 	if m.focus.Is(id) {
 		st = buttonOn
 	}
-	return bloom.Text(string(id)).Style(st).ID(id).Focusable().
-		On(on.Press(func() tea.Cmd { return m.press(id) }))
-}
-
-// buttons is a row of buttons, at its end.
-func (m *model) buttons(ids ...control) bloom.Child {
-	row := []bloom.Child{bloom.Space()}
-	for _, id := range ids {
-		row = append(row, m.button(id))
-	}
-	return bloom.Row(row...).Gap(2)
+	return bloom.Text(string(id)).Style(st).ID(id).Focusable().On(on.Press(press))
 }
 
 func (m *model) layout() bloom.Child {
 	form := bloom.Box(panel, bloom.Column(
 		bloom.Text("Profile").Style(heading),
-		bloom.Fixed(1, nil),
 		m.field(fieldName),
-		bloom.Fixed(1, nil),
 		m.field(fieldEmail),
-		bloom.Fixed(1, nil),
 		m.field(fieldLanguage),
-		bloom.Fixed(1, nil),
-		m.buttons(buttonReset, buttonSave),
-	))
+		bloom.Row(bloom.Space(), m.button(buttonReset, m.reset), m.button(buttonSave, m.askToSave)).Gap(2),
+	).Gap(1))
 
 	focused, _ := m.focus.Current()
 	status := fmt.Sprintf(
@@ -344,7 +329,7 @@ func (m *model) layers() []bloom.LayerNode {
 		bloom.Text("Save profile?").Style(heading),
 		bloom.Text(profile),
 		bloom.Fixed(1, nil),
-		m.buttons(buttonCancel, buttonConfirm),
+		bloom.Row(bloom.Space(), m.button(buttonCancel, m.closeTop), m.button(buttonConfirm, m.confirmSave)).Gap(2),
 	)
 
 	confirm := bloom.Layer(bloom.Box(dialog, confirmBody)).
@@ -362,7 +347,7 @@ func (m *model) layers() []bloom.LayerNode {
 		bloom.Text("Overwrite the saved profile?").Style(heading.Foreground(warn)),
 		bloom.Text(fmt.Sprintf("It was saved %d time(s) before.", m.saved)),
 		bloom.Fixed(1, nil),
-		m.buttons(buttonBack, buttonOverwrite),
+		bloom.Row(bloom.Space(), m.button(buttonBack, m.closeTop), m.button(buttonOverwrite, m.save)).Gap(2),
 	)
 	overwrite := bloom.Layer(bloom.Box(danger, overwriteBody)).
 		ID(scopeOverwrite).

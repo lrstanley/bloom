@@ -192,7 +192,9 @@ func generatedLine(i int) string {
 	return s
 }
 
-func (m *model) Init() tea.Cmd { return m.ui.Init() }
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
+func (m *model) Init() tea.Cmd { return nil }
 
 // savedMsg reports that the text was saved, as it was at revision rev of
 // the buffer, or why not.
@@ -515,6 +517,8 @@ func preview(s string) string {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
 	v.BackgroundColor = theme.Bg
 	return v
 }

@@ -103,13 +103,6 @@ func newModel() *model {
 	return m
 }
 
-func main() {
-	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
 // Init does not return the root's Init, which asks the terminal for its
 // colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd { return m.phase.Loop() }
@@ -135,7 +128,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logAt = log.Right(4)
 		case "tab":
 			m.setFilter((m.filter + 1) % len(filters))
-		case "space", " ":
+		case "space":
 			m.paused = !m.paused
 			if m.paused {
 				m.phase.Stop()
@@ -170,6 +163,8 @@ func (m *model) setFilter(i int) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
 	v.BackgroundColor = theme.Bg
 	// The loop slows down while the terminal is not focused.
 	v.ReportFocus = true
@@ -251,4 +246,11 @@ func effectBox(name, code, about string, t float64, e fx.Effect) bloom.Child {
 		Edge(bloom.Top, bloom.Start, bloom.Text(name).Style(title)).
 		Edge(bloom.Bottom, bloom.End, bloom.Text(code).Style(label)).
 		BorderFx(t, e)
+}
+
+func main() {
+	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

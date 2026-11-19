@@ -220,21 +220,6 @@ func (m *model) pick(s *selectField, i int) {
 	m.status = fmt.Sprintf("%s: %s", s.label, s.options[i])
 }
 
-// press presses the button with ID b.
-func (m *model) press(b control) tea.Cmd {
-	switch b {
-	case buttonSettings:
-		return m.openSettings()
-	case buttonCancel:
-		return m.closeSettings(false)
-	case buttonSave:
-		return m.closeSettings(true)
-	case selectTheme, selectFont, selectLanguage, selectProfile:
-		// Selects are toggled, not pressed.
-	}
-	return nil
-}
-
 func (m *model) openSettings() tea.Cmd {
 	m.closeLists()
 	m.saved = [3]int{m.theme.value, m.font.value, m.language.value}
@@ -281,7 +266,7 @@ func (m *model) layout() bloom.Child {
 	))
 
 	bar := bloom.Row(
-		m.button(buttonSettings),
+		m.button(buttonSettings, m.openSettings),
 		bloom.Space(),
 		bloom.Text(m.profile.label).Style(label),
 		bloom.Fixed(selectWidth, m.selectNode(m.profile)),
@@ -295,15 +280,15 @@ func (m *model) layout() bloom.Child {
 
 	body := bloom.Column(
 		bloom.Text("Settings").Style(heading),
-		bloom.Fixed(1, nil),
 		m.row(m.theme),
-		bloom.Fixed(1, nil),
 		m.row(m.font),
-		bloom.Fixed(1, nil),
 		m.row(m.language),
-		bloom.Fixed(1, nil),
-		m.buttons(buttonCancel, buttonSave),
-	)
+		bloom.Row(
+			bloom.Space(),
+			m.button(buttonCancel, func() tea.Cmd { return m.closeSettings(false) }),
+			m.button(buttonSave, func() tea.Cmd { return m.closeSettings(true) }),
+		).Gap(2),
+	).Gap(1)
 	settings := bloom.Layer(bloom.Box(dialog, body)).
 		ID(scopeSettings).
 		Modal().
@@ -395,22 +380,13 @@ func (l optionList) Layout(ctx bloom.Context) bloom.Child {
 	return bloom.Row(bloom.Fixed(selectWidth, bloom.Box(box, bloom.Column(rows...))))
 }
 
-func (m *model) button(id control) bloom.Child {
+// button is a button labeled with its ID, which runs press when pressed.
+func (m *model) button(id control, press func() tea.Cmd) bloom.Child {
 	st := button
 	if m.focus.Is(id) {
 		st = buttonOn
 	}
-	return bloom.Text(string(id)).Style(st).ID(id).Focusable().
-		On(on.Press(func() tea.Cmd { return m.press(id) }))
-}
-
-// buttons is a row of buttons, at its end.
-func (m *model) buttons(ids ...control) bloom.Child {
-	row := []bloom.Child{bloom.Space()}
-	for _, id := range ids {
-		row = append(row, m.button(id))
-	}
-	return bloom.Row(row...).Gap(2)
+	return bloom.Text(string(id)).Style(st).ID(id).Focusable().On(on.Press(press))
 }
 
 func main() {

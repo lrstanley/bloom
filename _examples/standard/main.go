@@ -86,6 +86,8 @@ func newModel() *model {
 	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), status: statusbar{msg: "click a page, or q to quit"}}
 }
 
+// Init does not return the root's Init, which asks the terminal for its
+// colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd { return nil }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

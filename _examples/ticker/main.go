@@ -115,13 +115,6 @@ func newModel() *model {
 	}
 }
 
-func main() {
-	if _, err := tea.NewProgram(newModel(), tea.WithFPS(120)).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
 // Init does not return the root's Init, which asks the terminal for its
 // colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd {
@@ -156,7 +149,7 @@ func (m *model) key(k string) tea.Cmd {
 	case "b":
 		m.alerts++
 		return m.alert.ShowFor(2400 * time.Millisecond)
-	case "space", " ":
+	case "space":
 		m.paused = !m.paused
 		if m.paused {
 			m.headline.Stop()
@@ -190,6 +183,8 @@ func (m *model) phase(s *anim.Sequence) float64 {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
 	v.BackgroundColor = bg
 	// The loops slow down while the terminal is not focused.
 	v.ReportFocus = true
@@ -261,4 +256,11 @@ func blend(a, b color.Color, t float64) color.Color {
 	br, bg, bb, _ := b.RGBA()
 	mix := func(x, y uint32) uint8 { return uint8((float64(x) + (float64(y)-float64(x))*t) / 257) }
 	return color.RGBA{R: mix(ar, br), G: mix(ag, bg), B: mix(ab, bb), A: 255}
+}
+
+func main() {
+	if _, err := tea.NewProgram(newModel(), tea.WithFPS(120)).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
