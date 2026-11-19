@@ -8,7 +8,7 @@ the text, and the viewport only lays out and draws the lines in sight, so a log 
 to draw, or to append a line to, than one of a hundred.
 
 Use a viewport for anything that's lines of text: a log, a file, command output, a diff. For a short article or a
-help screen, [`Scroll`](/layout/scrolling) is simpler, and for rows of components, use a [list](/layout/lists).
+help screen, [`Scroll`](/content/scrolling) is simpler, and for rows of components, use a [list](/content/lists).
 
 The [logs example](https://github.com/lrstanley/bloom/tree/master/_examples/logs) tails a log of a quarter of a
 million lines with all of what's on this page:
@@ -39,7 +39,7 @@ bloom.Box(panel, bloom.Viewport(m.log).ID(paneLog).At(m.pos).
 	Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(paneLog))
 ```
 
-`OnScroll` scrolls it with the wheel, three rows a step, and the [`ScrollbarOf`](/layout/scrolling#show-a-scrollbar)
+`OnScroll` scrolls it with the wheel, three rows a step, and the [`ScrollbarOf`](/content/scrolling#show-a-scrollbar)
 its ID drags it with the same function. Selecting text in it with the mouse scrolls it too, when the pointer is
 held past its edge.
 
@@ -69,7 +69,7 @@ in one of ten, measuring again only the lines they change:
 | --- | --- |
 | `Replace(from, to, text)` | replace the text from `from` up to `to` |
 | `Insert(at, text)`, `Delete(from, to)` | put text in, or take it out |
-| `Edit(edits...)` | make several at once, such as at several carets, with positions from before any of them |
+| `Edit(edits...)` | make several `bloom.Edit{From, To, Text}` at once, such as at several carets. Positions are from before any of them. They mustn't overlap: of two that do, the later is dropped |
 | `Clamp(p)`, `End()` | the nearest place in the text, and the end of it |
 | `Offset(p)`, `PosOf(offset)` | a position as a byte of `String()`, and back |
 
@@ -92,7 +92,7 @@ m.mark = c.Map(m.mark)
 moves no position, so a log needs no `Change` for them.
 
 To edit the text with a caret, the keyboard, and the mouse, as an editor does, give the viewport a caret: see
-[Editing text](/layout/editing).
+[Editing text](/input/editing).
 
 ### Cap a log
 
@@ -106,30 +106,21 @@ if over := m.buf.Len() - maxLines; over > 0 {
 }
 ```
 
-### Undo with snapshots
+### Snapshots
 
-`Snapshot()` takes the text as it is, at once, however long it is, and it stays as it was as the buffer changes.
-Keep one from before each change, and `Restore(s)` puts the buffer back, keeping what was worked out about the
-lines, so nothing is measured again:
-
-```go
-m.undo = append(m.undo, m.buf.Snapshot())
-m.buf.Replace(from, to, text)
-
-// later
-m.buf.Restore(m.undo[len(m.undo)-1])
-m.undo = m.undo[:len(m.undo)-1]
-```
+[`Snapshot()`](https://pkg.go.dev/bloomfx.dev/bloom#Buffer.Snapshot) takes the buffer's text as it is, at once however long it is, and it stays as it
+was while the buffer changes. `Restore(s)` puts the buffer back, keeping what it worked out about the lines, so
+nothing is measured again. Positions can't be followed through a restore with a `Change`, so keep any caret or
+selection with the snapshot. To build undo and redo from snapshots, see
+[Undo with snapshots](/input/editing#undo-with-snapshots).
 
 A snapshot's `Len`, `Line`, `Text`, `String`, and `Lines` are safe to call from another goroutine, so a `tea.Cmd`
 can save or search the text while the buffer goes on changing.
 
 ### Text from outside your program
 
-A viewport drops the commands in its lines that a terminal acts on rather than draws, such as images, so a log
-or a file can't take over the terminal. Colors, styles, and hyperlinks are kept. When the program made all of
-what it shows and it holds images, `Trusted()` keeps them. See
-[text from outside your program](/layout/text-and-boxes#text-from-outside-your-program).
+A viewport drops terminal commands from its lines, as `Text` does, so a log or a file can't take over the
+terminal. `Trusted()` keeps them. See [text from outside your program](/content/text#text-from-outside-your-program).
 
 ## Where it's scrolled to
 
@@ -178,8 +169,9 @@ still scrolls through them.
 | `AtRow(row)` | the position with a row at the top, counting rows as a scrollbar does |
 | `Percent()`, `AtTop()`, `AtBottom()` | where it is, such as for a status line |
 
-Its fields say how big it was: `Rows` tall, `Width` wide besides the gutters, `TotalRows` for all of the lines
-wrapped, `Lines` in the buffer, and `First`, the line at the top.
+Its [fields](https://pkg.go.dev/bloomfx.dev/bloom#ViewportView) say how big it was: `Rows` tall, `Width` wide besides the gutters, `Widest` for the
+longest line, `TotalRows` for all of the lines wrapped, `Lines` in the buffer, `First` for the line at the top, and
+`Row` for the rows above the top.
 
 ### Follow the end
 
@@ -277,9 +269,10 @@ See [Selecting and copying text](/input/selection) for copying it, and everythin
 
 ## Related
 
-- [Editing text](/layout/editing), for a caret, and moving it by rows, pages, and words
-- [Scrolling](/layout/scrolling), for `Scroll` and scrollbars
-- [Long lists](/layout/lists), for rows of components
+- [Editing text](/input/editing), for a caret, and moving it by rows, pages, and words
+- [Scrolling](/content/scrolling), for `Scroll` and scrollbars
+- [Long lists](/content/lists), for rows of components
 - [Selecting and copying text](/input/selection)
 - The [`logs` example](https://github.com/lrstanley/bloom/tree/master/_examples/logs)
-- [`Viewport` API reference](https://pkg.go.dev/bloomfx.dev/bloom#Viewport)
+- [`Viewport`](https://pkg.go.dev/bloomfx.dev/bloom#Viewport), [`Buffer`](https://pkg.go.dev/bloomfx.dev/bloom#Buffer), [`ViewportView`](https://pkg.go.dev/bloomfx.dev/bloom#ViewportView), and
+  [`Snapshot`](https://pkg.go.dev/bloomfx.dev/bloom#Snapshot) API reference

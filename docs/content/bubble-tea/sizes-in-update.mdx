@@ -9,21 +9,23 @@ ask.
 
 ## Solve or Frame?
 
-- `bloom.Solve(w, h, layout)` lays out the tree you pass, for the state your model has now, without drawing it. Use
+- [`bloom.Solve(w, h, layout)`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) lays out the tree you pass, for the state your model has now, without drawing it. Use
   it in `Update` after changing state, when the answer has to reflect that change.
-- `m.ui.Frame()` returns the geometry of the frame last drawn on screen. It costs nothing, and it's what
+- [`m.ui.Frame()`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Frame) returns the geometry of the frame last drawn on screen. Before the first
+  `View`, it's empty, and `Rect` reports `false`. It costs nothing, and it's what
   [focus](/input/focus) and [mouse handlers](/input/mouse) work from, but it doesn't know about changes your model
   made since. With [layout animation](/motion/layout-animation), it has the rectangles currently on screen,
   mid-animation, while `Solve` returns where things are headed.
 
-Both return a `*bloom.Frame`, so everything below works with either.
+Both return a [`*bloom.Frame`](https://pkg.go.dev/bloomfx.dev/bloom#Frame), so everything below works with either.
 
 | `Frame` method | Gives |
 | --- | --- |
 | `Rect(id)` | where the node with an ID went, in screen cells, and whether it's in the frame |
 | `Hit(x, y)` | the IDs of the nodes at a point, outermost first |
-| `Viewport(id)` | where a [viewport](/layout/viewports#scroll-with-keys) was scrolled to, and the positions to scroll to from there |
-| `List(id)` | the items a [list](/layout/lists#read-where-it-ended-up) showed |
+| `Viewport(id)` | where a [viewport](/content/viewports#scroll-with-keys) was scrolled to, and the positions to scroll to from there |
+| `List(id)` | the items a [list](/content/lists#read-where-it-ended-up) showed |
+| `Truncated(id)` | whether a [truncated](/content/text#keep-text-on-one-line) text node was cut to fit |
 
 ## Find a node's size in Update
 
@@ -94,13 +96,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 [collapsed slot](/layout/responsive), or a layer that's hidden, isn't.
 
 This works best when the model has a method that returns the layout, separate from `View`, so `Update` and `View`
-lay out the same tree. It's also how [tests](/resources/testing#test-where-things-go) check where things go.
+lay out the same tree. It's also how [tests](/bubble-tea/testing#test-where-things-go) check where things go.
 
 ## Size a component before it draws
 
 Components that pick what to render from their size, such as a Bubbles viewport or table, need that size in
 `Update`. Solve the layout, read the rectangle of the slot the component is in, and give the component its size
-before it draws. [Using Bubbles components](/layout/bubbles-components) walks through it.
+before it draws. [Using Bubbles components](/bubble-tea/bubbles-components) walks through it.
 
 A component that builds its own layout can skip this by implementing
 [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given), which is given its size as it's laid out.
@@ -120,12 +122,13 @@ if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
 To find what's under a raw mouse event, `Hit` returns the IDs of the nodes there, outermost first. See
 [handle raw events yourself](/input/mouse#handle-raw-events-yourself).
 
-A [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given) has no root to ask, so its handlers
-read the frame from the `Context` its `Layout` was given, with `ctx.Frame()`.
+A [`Layouter`](/bubble-tea/writing-components) has no root to ask, so its handlers read the frame from the
+`Context` its `Layout` was given, with `ctx.Frame()`. See
+[Read the frame from a handler](/bubble-tea/writing-components#read-the-frame-from-a-handler).
 
 ## Related
 
 - [How layout works](/concepts/how-layout-works), for why `Solve` matches `View`
-- [Scrolling](/layout/scrolling)
-- [Using Bubbles components](/layout/bubbles-components)
-- [Testing](/resources/testing)
+- [Scrolling](/content/scrolling)
+- [Using Bubbles components](/bubble-tea/bubbles-components)
+- [Testing](/bubble-tea/testing)

@@ -74,7 +74,8 @@ func (t Track) clamp(n int) int {
 // neither collapsed nor empty (see [Place]),
 // whenever the tracks allow: leftover space goes to growing tracks and a
 // deficit is taken from shrinking ones, both in proportion to their weights,
-// with any rounding remainder going to earlier tracks. If the minimum sizes
+// rounded to whole cells, with the remainder going to the last of the growing
+// tracks or the first of the shrinking ones. If the minimum sizes
 // still do not fit, collapsible tracks are dropped and reported as
 // [Collapsed]; if that is not enough, the sizes overflow the budget.
 func Split(dst []int, budget, gap int, tracks []Track) []int {

@@ -18,7 +18,8 @@ your model:
 Animations follow the Bubble Tea pattern: starting one returns a `tea.Cmd`, which schedules a frame message, and
 passing that message back to the animation moves it forward and schedules the next. Two rules keep it working:
 
-1. **Return the command** from `Show`, `To`, `Play`, or `Loop`.
+1. **Return the command** from `Show`, `To`, `Play`, or `Loop`. Make each value with its constructor, such as
+   `anim.NewValue`: a zero `anim.Value` never moves.
 2. **Pass every message** to every animation. [`anim.Update`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Update)
    does that for any number of them and batches their commands:
 
@@ -102,6 +103,8 @@ help.Hide()               // animate out
 help.Toggle()             // whichever is the opposite
 help.ShowFor(time.Second) // in, then out again after a second
 ```
+
+Calling `Show`, `Hide`, or `ShowFor` again before the time is up replaces the timer.
 
 Each returns a command. To read it:
 
@@ -207,5 +210,6 @@ looks right at rest. It stays stopped if motion comes back, until you call `Loop
 ## Related
 
 - [Transitions](/motion/transitions), for using these values with effects
+- [Testing](/bubble-tea/testing), for driving animations with a clock of your own
 - [`anim` API reference](https://pkg.go.dev/bloomfx.dev/bloom/anim)
 - [Animation options reference](/reference/options#animation-options)

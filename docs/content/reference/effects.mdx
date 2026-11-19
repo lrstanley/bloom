@@ -36,7 +36,7 @@ The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/e
 | [`Scramble`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Scramble) | `Seed` | random glyphs settling into its own |
 | [`Decode`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Decode) | `From Direction` (default `Top`), `Seed` | columns falling into place like digital rain, or rows or diagonals from another side or corner |
 | [`Unfold`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Unfold) | | opening from its middle row outward, like a CRT turning on |
-| [`Iris`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Iris) | `At image.Point` | a circle growing from `At` (screen coordinates; zero is the node's center) |
+| [`Iris`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Iris) | `At image.Point` | a circle growing from `At` (frame coordinates; zero is the node's center) |
 | [`Shade`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Shade) | `Seed` | each cell stepping through ░ ▒ ▓ to its glyph |
 | [`Blinds`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Blinds) | `From Direction`, `Size int` (default 3) | opening slats, like window blinds; diagonal from a corner |
 | [`Wave`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Wave) | `From Direction` | a wobbling front sweeping across, with a bright crest |
@@ -48,7 +48,7 @@ The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/e
 | --- | --- | --- |
 | [`Dim`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Dim) | `Amount float64` | moving colors toward the terminal's background |
 | [`Desaturate`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Desaturate) | `Amount float64` | moving colors toward gray |
-| [`Recolor`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Recolor) | `Fg, Bg color.Color`, `Amount float64` (default 1) | moving colors toward `Fg` and `Bg`, keeping the glyphs: all the way draws every cell in the two colors, and the same color for both tints toward it |
+| [`Recolor`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Recolor) | `Fg, Bg color.Color`, `Amount float64` (default 1) | moving colors toward `Fg` and `Bg`, keeping the glyphs: all the way draws every cell in the two colors, and the same color for both tints toward it; a nil color is left as it is |
 | [`Spotlight`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Spotlight) | `Rect image.Rectangle`, `Amount float64` (default 0.7), `Soft int` | dimming everything outside `Rect`, with a soft edge `Soft` cells wide |
 | [`Braille`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Braille) | `Amount float64` (default 0.65), `Seed` | redrawing everything as braille dots in grays faded toward the terminal's background: each glyph becomes dots made from it, lines stay dotted lines, text keeps the outline of its words, backgrounds that stand out become even dithers, and the dots change as what's beneath does. Follow it with `Recolor` to tint the dots |
 
@@ -83,7 +83,7 @@ These draw a slot or layer on its way to a new place, given to
 
 These change only the cells around the edge of what they're given, which for `Box.BorderFx` is the border. They
 loop: `t` is the phase, such as from `anim.NewLoop`, and they look the same at 0 and 1. See
-[Animate a border](/layout/text-and-boxes#animate-a-border).
+[Animate a border](/content/borders#animate-a-border).
 
 | Effect | Fields | Does |
 | --- | --- | --- |
@@ -110,6 +110,7 @@ These wrap other effects.
 
 | Type | Does |
 | --- | --- |
+| [`Effect`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Effect) | the interface every effect implements: `Apply(*canvas.Surface, float64)` |
 | [`Func`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Func) | turns a `func(*canvas.Surface, float64)` into an effect |
 
 Any type with an `Apply(*canvas.Surface, float64)` method is an effect. See [Custom effects](/motion/custom-effects).
@@ -121,5 +122,6 @@ Any type with an `Apply(*canvas.Surface, float64)` method is an effect. See [Cus
   heard them: return `m.ui.Init()` from `Init` and pass messages to `m.ui.Update`.
 - Effects that replace glyphs (`Scramble`, `Decode`, `Shade`, `Glitch`) leave wide characters, such as emoji, alone or
   reveal them in one step, so they never draw half a character.
-- `Ease` and `Func` hold functions, which can't be compared, so frames using them are redrawn every time. Keep them
-  on nodes that are animating.
+- Effects are compared with `==` to skip frames that haven't changed, so use plain values, not pointers. `Ease` and
+  `Func` hold functions, which can't be compared, so frames using them are redrawn every time. Keep them on nodes
+  that are animating.

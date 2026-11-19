@@ -126,7 +126,7 @@ if m.burst.Animating() {
 		screen = bloom.Transition(m.burst.Float(), screen, fx.Burst{
 			At:    image.Pt((r.Min.X+r.Max.X)/2, r.Min.Y),
 			Count: 90,
-			Seed:  m.deploys,
+			Seed:  m.deploys, // a uint32 that changes each time, for a different burst
 		})
 	}
 }
@@ -193,7 +193,8 @@ bloom.Fill(bloom.Marquee(item.title, phase).Style(itemStyle))
 ```
 
 For a news ticker that always scrolls, use `anim.NewLoop(24 * time.Second)` as the phase, and `Gap` to set what's
-shown between the end of the text and its start: `bloom.Marquee(headlines, phase).Gap("  ◆  ")`.
+shown between the end of the text and its start, three spaces by default:
+`bloom.Marquee(headlines, phase).Gap("  ◆  ")`.
 
 The [ticker example](https://github.com/lrstanley/bloom/tree/master/_examples/ticker) does both:
 

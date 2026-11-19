@@ -3,8 +3,8 @@ title: Editing text
 description: Make a Viewport an editing surface, with a caret kept in the model, moved by wrapped rows, pages, and words, typing with Replace, selecting from the keyboard and the mouse, copying, and undo with snapshots, at any length.
 ---
 
-A [viewport](/layout/viewports) given a caret is an editing surface. The caret and what's selected are a
-`bloom.Range` in your model, and bloom draws it, puts the terminal cursor at it, and sets it from the mouse. What's
+A [viewport](/content/viewports) given a caret is an editing surface. The caret and what's selected are a
+[`bloom.Range`](https://pkg.go.dev/bloomfx.dev/bloom#Range) in your model, and bloom draws it, puts the terminal cursor at it, and sets it from the mouse. What's
 left for you is a keymap and your own policy: what each key does to the buffer, and what to keep for undo.
 
 Edits cost the same in a buffer of a million lines as in one of ten, so an editor built this way stays instant at
@@ -39,7 +39,9 @@ bloom.Viewport(m.buf).ID(paneText).At(m.pos).Wrap(bloom.WrapWords).LineNumbers(m
 
 The caret is the range's `Head`, and its `Anchor` is where the selection started; they're the same while nothing is
 selected. `Cursor` puts the terminal cursor at the caret while it's in sight, in the shape and color of the
-`tea.Cursor` you give it, and its position is ignored. Give it only while the viewport has focus.
+`tea.Cursor` you give it, and its position is ignored. Give it only while the viewport has
+[focus](/input/focus#make-nodes-focusable), such as `if m.focus.Is(paneText)`. Give the viewport an ID and
+`Focusable()` for a click to focus it.
 
 The range is a pointer so that bloom reads it whenever it's asked, including in the same `Update` that changed it
 from the keyboard, and writes it from the mouse. A viewport with a caret is selectable without `Selectable()`.
@@ -146,7 +148,7 @@ m.buf.SetWordChars("_")
 
 With `""`, words are as Unicode finds them. A buffer never given any takes the Root's
 [`WithWordChars`](/input/selection#how-the-mouse-selects) from the first frame its viewport is drawn in, for its own
-methods as for a double click, and bloom's default set until then.
+methods as for a double click, and bloom's [default set](/input/selection#how-the-mouse-selects) until then.
 Finding a word reads only the text around it, up to the whitespace either side, however long its line is.
 
 ### Keep the column while moving up and down
@@ -263,7 +265,7 @@ case tea.PasteMsg:
 
 ## Undo with snapshots
 
-A [snapshot](/layout/viewports#undo-with-snapshots) costs a step to take and to restore, however long the text is.
+A [snapshot](/content/viewports#snapshots) costs a step to take and to restore, however long the text is.
 Keep the range with it, so that undo puts the caret back too, and keep where you are on the other stack before
 going back, so that redo can return:
 
@@ -297,23 +299,19 @@ anything else, such as moving the caret, ends the run.
 
 ## What it costs
 
-Each key is an edit, a few moves of the caret, and a frame, and none of them grows with the buffer:
+Each key is an edit, a few moves of the caret, and a frame, and none of them grows with the buffer. An edit costs a
+step per level of the buffer's tree, a few microseconds in a million lines, and measures again only the lines it
+changes. The frame lays out and draws only the rows in sight.
 
-- An edit costs a step a level of the buffer's tree, a few microseconds in a million lines, and measures again
-  only the lines it changes.
-- `Snapshot` and `Restore` cost a step, and a restored buffer keeps what was worked out about its lines.
-- The helpers that move by rows look up where a line's rows start, a step for a line that doesn't wrap and one
-  pass over the line for one that does.
-- The frame lays out and draws only the rows in sight.
-
-A key typed into a million lines and drawn costs about as much as scrolling them a few rows. Positions count bytes
-of a line, so moving through a line of many kilobytes that holds styles or characters beyond ASCII reads it from
-its start, and costs more for each key than a short one does.
+The one exception is a very long line. Positions count bytes of a line, so moving through a line of many kilobytes
+that holds styles or characters beyond ASCII reads it from its start, and costs more for each key than a short one
+does.
 
 ## Related
 
-- [Viewports](/layout/viewports), for buffers, edits, and `Change`
+- [Viewports](/content/viewports), for buffers, edits, and `Change`
 - [Selecting and copying text](/input/selection)
 - [Focus](/input/focus), for giving the cursor only to the focused viewport
 - The [`editor` example](https://github.com/lrstanley/bloom/tree/master/_examples/editor)
-- [`ViewportNode.Caret` API reference](https://pkg.go.dev/bloomfx.dev/bloom#ViewportNode.Caret)
+- [`ViewportNode.Caret`](https://pkg.go.dev/bloomfx.dev/bloom#ViewportNode.Caret), [`Buffer`](https://pkg.go.dev/bloomfx.dev/bloom#Buffer), [`ViewportView`](https://pkg.go.dev/bloomfx.dev/bloom#ViewportView), and
+  [`Range`](https://pkg.go.dev/bloomfx.dev/bloom#Range) API reference

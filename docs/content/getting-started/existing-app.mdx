@@ -1,0 +1,239 @@
+---
+title: Add bloom to an existing program
+description: Move a working Bubble Tea v2 program onto bloom one step at a time, keeping its model and components, and replacing size math and Join calls with a layout.
+---
+
+You don't have to rewrite a Bubble Tea program to use bloom. Your model, your `Update`, and your components stay as
+they are. What changes is the root `View`: it returns a tree of nodes instead of one string, and bloom does the
+sizing, placing, and mouse routing you used to do by hand.
+
+This page moves a program over in small steps, each of which builds and runs. It assumes the program is already on
+Bubble Tea v2 and Lip Gloss v2; see [Installation](/getting-started/installation#requirements). If it uses
+bubblezone for the mouse, also read [Migrating from bubblezone](/bubble-tea/migrating-from-bubblezone).
+
+## Where you start
+
+A typical program keeps the window's size, splits it between panes with arithmetic, and joins the rendered panes
+into one string:
+
+```go title="main.go (before)"
+type model struct {
+	width, height int
+	list          list.Model
+	reader        viewport.Model
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = msg.Width, msg.Height
+		m.list.SetSize(24, m.height-1)
+		m.reader.SetWidth(m.width - 24 - 2)
+		m.reader.SetHeight(m.height - 1 - 2)
+	// ...
+	}
+	// ...
+}
+
+func (m model) View() tea.View {
+	sidebar := m.list.View()
+	reader := panel.Width(m.width - 24).Height(m.height - 1).Render(m.reader.View())
+	status := statusStyle.Width(m.width).Render(m.status())
+
+	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left,
+		lipgloss.JoinHorizontal(lipgloss.Top, sidebar, reader),
+		status,
+	))
+	v.AltScreen = true
+	return v
+}
+```
+
+Every number in there depends on every other: change the sidebar's width, or the panel's border, and the reader's
+size is wrong.
+
+<Steps>
+<Step>
+
+### Add a root
+
+A [`bloom.Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) renders the layout and keeps what it can between frames.
+Keep one in the model, return its `Init` from yours, and pass it every message:
+
+```go
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	list          list.Model
+	reader        viewport.Model
+}
+
+func (m *model) Init() tea.Cmd { return m.ui.Init() }
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	// ... your existing cases, appending to cmds ...
+	cmds = append(cmds, m.ui.Update(msg))
+	return m, tea.Batch(cmds...)
+}
+```
+
+```go
+m := &model{ui: bloom.New() /* ... */}
+```
+
+Options such as [`bloom.WithFocus`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus) go to `bloom.New`, and you
+can add them later.
+
+Switch the model's methods to pointer receivers while you're here. The mouse handlers you'll add later are closures
+made in `View`, and with a value receiver they'd change a copy of the model. See
+[Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+
+</Step>
+<Step>
+
+### Return the root's view
+
+Wrap the string you already build in a [`bloom.Text`](/content/text) and hand it to `m.ui.View`. bloom now draws
+the frame, and it should look the same as before, unless the view holds escape sequences other than styles and
+hyperlinks (see [Things to watch for](#things-to-watch-for)):
+
+```go
+func (m *model) View() tea.View {
+	v := m.ui.View(m.width, m.height, bloom.Text(m.oldView()))
+	v.AltScreen = true
+	return v
+}
+```
+
+`m.ui.View` returns a `tea.View`, so the fields you set on it before, such as `AltScreen`, are set the same way. It
+sets `MouseMode` for you, to the least the frame's handlers need, so drop yours unless you want more.
+
+</Step>
+<Step>
+
+### Replace Join calls with rows and columns
+
+Each `lipgloss.JoinHorizontal` becomes a `bloom.Row` and each `JoinVertical` a `bloom.Column`. A component goes in
+as it is: anything with a `View() string` method is a node. Wrap each child in a [slot](/layout/slots) that says
+how it shares the space, and a box for anything that had a border:
+
+```go
+func (m *model) layout() bloom.Child {
+	return bloom.Column(
+		bloom.Fill(bloom.Row(
+			bloom.Fixed(24, m.list),
+			bloom.Fill(bloom.Box(panel, m.reader)),
+		)),
+		bloom.Fixed(1, bloom.Text(m.status()).Style(statusStyle)),
+	)
+}
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.width, m.height, m.layout())
+	v.AltScreen = true
+	return v
+}
+```
+
+The widths and heights you passed to Lip Gloss styles are gone. bloom gives each child its space, and a `Box` draws
+the border around what's left inside, so a thicker border or more padding no longer breaks the math.
+
+You can do this a piece at a time. A pane you haven't converted yet can stay a `bloom.Text` of its old string inside
+the new row.
+
+</Step>
+<Step>
+
+### Give components their sizes
+
+bloom places a component's view, but it can't call `SetWidth` on it for you. Components that size themselves, such
+as Bubbles' viewport and list, still need to be told their size in `Update`. Rather than working it out with
+arithmetic, give the slot an ID and ask bloom where it went:
+
+```go
+type pane int
+
+const paneReader pane = iota
+
+// in layout
+bloom.Fill(bloom.Box(panel, m.reader)).ID(paneReader)
+```
+
+```go
+case tea.WindowSizeMsg:
+	m.width, m.height = msg.Width, msg.Height
+	if r, ok := bloom.Solve(m.width, m.height, m.layout()).Rect(paneReader); ok {
+		m.reader.SetWidth(r.Dx() - panel.GetHorizontalFrameSize())
+		m.reader.SetHeight(r.Dy() - panel.GetVerticalFrameSize())
+	}
+```
+
+The slot's rectangle includes the box's border, so subtract the style's frame size to get the space inside.
+
+[Using Bubbles components](/bubble-tea/bubbles-components#give-a-component-its-size) covers each common component,
+and [Sizes and positions in Update](/bubble-tea/sizes-in-update) explains when to use `Solve` and when to read the
+last frame.
+
+</Step>
+<Step>
+
+### Move mouse handling onto the nodes
+
+If `Update` checks mouse coordinates against where you think things were drawn, put a handler on the node instead.
+The handler runs only for events on that node:
+
+```go
+for i, name := range m.names {
+	rows[i] = bloom.Text(name).On(on.Click(func() tea.Cmd {
+		m.selected = i
+		return nil
+	}))
+}
+```
+
+The `tea.MouseClickMsg` and other mouse messages still reach `Update`, so remove the old handling as you go, or an
+event is acted on twice. See [Mouse events](/input/mouse).
+
+</Step>
+</Steps>
+
+From here, the rest of bloom is there when you want it: [dialogs](/layers/dialogs) and [toasts](/layers/toasts)
+drawn over the screen, keyboard [focus](/input/focus), panes that [collapse](/layout/responsive) on small terminals,
+and [animation](/motion/animating-values).
+
+## Use a layout inside a string view
+
+If you'd rather not change the root `View` yet, [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) lays
+out and draws a tree as a string, which you can join with the rest of your view as before:
+
+```go
+help := bloom.Render(m.width, 0, bloom.Row(
+	bloom.Fill(bloom.Text("↑/↓ move")),
+	bloom.Fill(bloom.Text("enter open")),
+	bloom.Fill(bloom.Text("q quit")),
+))
+```
+
+A height of zero draws the layout at its natural height. `Render` keeps nothing between calls, so a layout drawn
+this way has no mouse handlers, focus, hover styles, or layout animation. Use it as a stepping stone, or for parts
+of a view that only need placing.
+
+## Things to watch for
+
+- **Value receivers.** Handlers made in a `View` with a value receiver change a copy, in the root model or in a
+  child component. See [Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+- **Pre-rendered sizes.** A string you render at a fixed width with `style.Width(n).Render(...)` keeps that width.
+  Pass the style to `Box` or `Text(...).Style(...)` instead, so it's drawn at the size it's given.
+- **Escape sequences.** `Text` drops escape sequences other than styles and hyperlinks, such as inline images. A
+  component's view is drawn as it is. See
+  [Text from outside your program](/content/text#text-from-outside-your-program).
+
+## Related
+
+- [`bloom.Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) and [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) API reference
+- [Build your first layout](/getting-started/first-layout), the same pieces from an empty screen
+- [How a bloom program runs](/concepts/how-a-program-runs), for what the root does with each message and frame
+- [Using Bubbles components](/bubble-tea/bubbles-components)
+- [Writing components](/bubble-tea/writing-components), for components that lay themselves out
+- [Migrating from bubblezone](/bubble-tea/migrating-from-bubblezone)

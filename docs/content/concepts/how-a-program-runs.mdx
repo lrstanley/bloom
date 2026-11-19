@@ -1,0 +1,147 @@
+---
+title: How a bloom program runs
+description: What happens on each frame and each event, what the Root keeps between frames and what your model keeps, and how IDs tie a node in one frame to the next.
+---
+
+A bloom program is a Bubble Tea program. `Update` changes the model and `View` describes the screen, as always.
+bloom adds a [`Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) that turns the description into a frame and
+remembers a little about it. This page covers what that root does with each frame and each event, and what IDs are
+for.
+
+## The three calls
+
+[`bloom.New`](https://pkg.go.dev/bloomfx.dev/bloom#New) makes the root, and takes options such as
+[`WithFocus`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus). Every program then makes the same three calls on it:
+
+```go
+func (m *model) Init() tea.Cmd { return m.ui.Init() }
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// ... handle msg ...
+	return m, m.ui.Update(msg)
+}
+
+func (m *model) View() tea.View {
+	return m.ui.View(m.width, m.height, m.layout())
+}
+```
+
+- `Init` asks the terminal for its default colors, which effects that blend toward the background use.
+- `Update` notes what the terminal reports about itself, such as its colors and whether it has focus, schedules
+  frames while [layout animations](/motion/layout-animation) run, and runs mouse handlers that the view didn't get
+  to. Pass it every message.
+- `View` lays out the tree, draws it, and returns the `tea.View` to show.
+
+## A frame
+
+On every call to `View`, your code builds the tree from the model, and the root:
+
+1. lays it out at the window's size, [constraints down and sizes up](/concepts/how-layout-works);
+2. draws it into cells, reusing what it [cached](/concepts/rendering#whats-cached) from earlier frames;
+3. records the frame's geometry as a [`Frame`](https://pkg.go.dev/bloomfx.dev/bloom#Frame): where each node with
+   an ID went, which nodes can take focus, and which mouse handlers are where;
+4. returns a `tea.View` with the cells, the cursor, the mouse mode the frame needs, and an `OnMouse` handler for
+   that frame.
+
+The tree is thrown away once it's drawn. The `Frame` is kept, and `m.ui.Frame()` returns it until the next one.
+
+## An event
+
+Keys and other messages go to `Update`, as in any Bubble Tea program.
+
+Mouse events go somewhere first. Bubble Tea calls the view's `OnMouse` on its event loop, before `Update`. bloom
+finds the nodes under the pointer in the frame on screen and runs their handlers there. A handler can change the
+model directly, since nothing else is running, and its command runs in the background like any other. Then the
+event reaches `Update`, and `View` draws the result:
+
+<Mermaid chart={`sequenceDiagram
+    participant T as Terminal
+    participant B as Bubble Tea
+    participant R as Root
+    participant M as Model
+    T->>B: mouse click
+    B->>R: OnMouse (frame on screen)
+    R->>M: on.Click handler changes state
+    B->>M: Update(msg)
+    M->>R: m.ui.Update(msg)
+    B->>M: View()
+    M->>R: m.ui.View(w, h, tree)
+    R->>B: tea.View
+`} />
+
+Because the handler runs against the frame that was on screen, a click lands on what the user saw, even if the
+model has changed since. See [Change state, or send a message](/input/mouse#change-state-or-send-a-message) for why
+handlers need a pointer receiver.
+
+## What the root keeps, and what you keep
+
+Your model keeps everything about the application: its data, which item is selected, scroll offsets, whether a
+dialog is open, and the animations in it. The root keeps only what follows from drawing:
+
+| The root keeps | Your model keeps |
+| --- | --- |
+| Caches of rendered text and styles | Your data and what's selected |
+| The last `Frame` | Scroll offsets, open dialogs, toggles |
+| What's hovered and dragged, and the mouse selection | [`anim`](/motion/animating-values) values, presences, and sequences |
+| [Layout animations](/motion/layout-animation), by ID | A [`bloom.Focus`](/input/focus), given to the root with `WithFocus` |
+| The open tooltip, and the terminal's colors | |
+
+Keep one root for the life of the program, by pointer. A new root each frame would lose its caches and the hover,
+drag, and animation state that make the next frame right.
+
+A [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) or
+[`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) call keeps nothing. Each lays out a tree once, which
+makes them good for tests and for working out sizes in `Update`, and means layout animations jump to their targets.
+
+## What moves things along
+
+Nothing in bloom runs on a timer of its own. Each animation in your model schedules its next frame with the
+command it returns, and moves when you pass it the frame message with
+[`anim.Update`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Update). Layout animations, the flash of a copy, clicks
+waiting to see if they become double clicks, and tooltips waiting to open are scheduled by `m.ui.Update`, which is
+why it needs every message. When nothing is moving or waiting, no frames are drawn until the next event. See
+[Frame rate](/concepts/rendering#frame-rate).
+
+## IDs
+
+Most nodes need no ID. A handler on a node is found from where the node is in the frame, so a clickable row needs
+only `On`. Give a node an ID when something has to find it again, in a later frame or from outside the tree:
+
+- [focus](/input/focus) and focus scopes;
+- [`Frame.Rect`](/bubble-tea/sizes-in-update), `Frame.List`, and `Frame.Viewport`, to find a node's size or scroll
+  position from `Update`;
+- [layout animation](/motion/layout-animation), which follows a node by ID from frame to frame;
+- [anchored layers](/layers/dropdowns), which are placed against the node with an ID;
+- [`ScrollbarOf`](/content/scrolling#show-a-scrollbar), which follows the scroll or list with an ID;
+- `Click` and `SelectAll` on the root, for [tests](/bubble-tea/testing) and shortcuts;
+- a node that moves around in the tree while it's [dragged](/input/mouse#drag).
+
+`ID` takes any comparable value. A type of your own, with a constant for each node, keeps IDs from colliding and
+lets [`Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) move between only the nodes of that type:
+
+```go
+type control int
+
+const (
+	fieldName control = iota
+	fieldEmail
+	buttonSave
+)
+
+bloom.Text(m.name).ID(fieldName).Focusable()
+```
+
+IDs are compared as Go values, type included, so `control(0)` and `0` are different IDs, and so are a `string`
+`"save"` and a `control` `"save"`. Look a node up with the same type you gave it.
+
+An ID should be unique in the frame. If two nodes share one, lookups such as `Frame.Rect` find the first laid out,
+and focus and layout animation can't tell them apart.
+A component that can appear more than once needs a different ID for each instance, such as a struct with the
+instance's own key in it; see [Writing components](/bubble-tea/writing-components#give-each-instance-its-own-ids).
+
+## Related
+
+- [`Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) and [`Frame`](https://pkg.go.dev/bloomfx.dev/bloom#Frame) API reference
+- [How layout works](/concepts/how-layout-works)
+- [Rendering and performance](/concepts/rendering)
+- [Mouse events](/input/mouse#how-it-works)

@@ -7,9 +7,21 @@
 /bloom / 301
 /bloom/anim /motion/animating-values 301
 /bloom/canvas /motion/custom-effects 301
-/bloom/fig /layout/figlet-text 301
-/bloom/fig/fonts /layout/figlet-text 301
+/bloom/fig /content/figlet-text 301
+/bloom/fig/fonts /content/figlet-text 301
 /bloom/flex /concepts/how-layout-works 301
 /bloom/fx /reference/effects 301
 /bloom/on /input/mouse 301
+# Pages that moved when the docs were reorganized.
+/layout/text-and-boxes /content/text 301
+/layout/figlet-text /content/figlet-text 301
+/layout/scrolling /content/scrolling 301
+/layout/lists /content/lists 301
+/layout/viewports /content/viewports 301
+/layout/editing /input/editing 301
+/layout/sizes-in-update /bubble-tea/sizes-in-update 301
+/layout/bubbles-components /bubble-tea/bubbles-components 301
+/resources/testing /bubble-tea/testing 301
+/resources/migrating-from-bubblezone /bubble-tea/migrating-from-bubblezone 301
+
 /bloom/* / 301

@@ -3,7 +3,7 @@ title: Long lists
 description: Show thousands of rows of components with List, building only those in view, keep a cursor in view, page by what fit, and scroll with the wheel and a scrollbar.
 ---
 
-`bloom.List(count, item)` shows as many of `count` items as fit, top to bottom. It calls `item(i)` only for the
+[`bloom.List(count, item)`](https://pkg.go.dev/bloomfx.dev/bloom#List) shows as many of `count` items as fit, top to bottom. It calls `item(i)` only for the
 items it may show, so a list of a million rows costs no more to draw than the rows on screen. Each item is as wide
 as the list and as tall as it wants, and the last one that doesn't fit is cut off:
 
@@ -17,8 +17,10 @@ bloom.List(len(m.logs), func(i int) bloom.Child {
 rather than space below it. `Gap(n)` puts `n` cells between items.
 
 Use a list for rows of components, such as a file picker, a table, or a feed with items of different heights. For
-lines of text, a [viewport](/layout/viewports) does more, such as wrapping, search, and selecting text scrolled out
+lines of text, a [viewport](/content/viewports) does more, such as wrapping, search, and selecting text scrolled out
 of sight.
+
+Don't put a list inside a [`Scroll`](/content/scrolling): with no limit on its height, it lays out every item.
 
 ## Keep the cursor in view
 
@@ -50,8 +52,8 @@ case tea.KeyPressMsg:
 	m.cursor = min(max(m.cursor, 0), len(m.items)-1)
 ```
 
-Read the frame when the key arrives, as above, rather than keeping what it said when the last key was pressed: a
-resize, or the list keeping the cursor in view, moves it without a key.
+Read the frame each time a key arrives, rather than keeping what it said last time: a resize, or `Keep`, moves the
+list without a key.
 
 ## Scroll with the wheel
 
@@ -85,11 +87,11 @@ bloom.Box(panel, bloom.List(len(m.items), m.row).Offset(m.offset).ID(paneItems))
 	}))
 ```
 
-See [Show a scrollbar](/layout/scrolling#show-a-scrollbar) for how scrollbars look and work.
+See [Show a scrollbar](/content/scrolling#show-a-scrollbar) for how scrollbars look and work.
 
 ## Lists in components
 
-A component that implements [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given) has no root
+A component that implements [`Layouter`](/bubble-tea/writing-components) has no root
 to ask, so its handlers read the frame from the `Context` its `Layout` was given. `ctx.Frame()` returns the frame on
 screen when it's called, which is the one the handler's event landed in:
 
@@ -112,9 +114,12 @@ as they scroll away and back, and its text is that of every item it covers: thos
 is read, or give their text with `ItemText`. Dragging past the list's edge scrolls it through its `on.Scroll`
 handler. See [Selections in a list](/input/selection#selections-in-a-list).
 
+`item` is also called outside the frame, to read the text of a selection. Until the next frame, it must work for
+every index the list showed, even if you've since changed `m.items`.
+
 ## Related
 
-- [Viewports](/layout/viewports), for lines of text
-- [Scrolling](/layout/scrolling), for `Scroll` and scrollbars
+- [Viewports](/content/viewports), for lines of text
+- [Scrolling](/content/scrolling), for `Scroll` and scrollbars
 - [Focus and keyboard navigation](/input/focus)
-- [`List` API reference](https://pkg.go.dev/bloomfx.dev/bloom#List)
+- [`List`](https://pkg.go.dev/bloomfx.dev/bloom#List), [`ListNode`](https://pkg.go.dev/bloomfx.dev/bloom#ListNode), and [`ListView`](https://pkg.go.dev/bloomfx.dev/bloom#ListView) API reference

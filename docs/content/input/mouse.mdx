@@ -63,8 +63,8 @@ slots to boxes, rows, columns, layers, lists, and viewports.
 | `on.Click(fn)` | a left click: the button goes down and comes up over the node |
 | `on.RightClick(fn)`, `on.MiddleClick(fn)` | a click with those buttons |
 | `on.DoubleClick(fn)` | the second of two clicks within 400ms; both clicks still run `Click` |
-| `on.Press(fn)` | a left click, or <kbd>enter</kbd> or <kbd>space</kbd> while the node has [focus](/input/focus#press-buttons-with-the-keyboard) |
-| `on.ClickAt(fn)`, `on.RightClickAt(fn)` | a left or right click, with where it happened |
+| `on.Press(fn)` | a left click, or <kbd>enter</kbd> or <kbd>space</kbd> while the node has [focus](/input/focus#press-buttons-with-the-keyboard), through `m.focus.Update` |
+| `on.ClickAt(fn)`, `on.RightClickAt(fn)` | a left or right click, with where the button came up |
 | `on.Scroll(fn)` | the wheel, as `dx, dy` steps |
 | `on.Hover(fn)` | the pointer moving onto the node (`true`) or off it (`false`) |
 | `on.Drag(fn)` | the button going down on the node, the pointer moving while it's held, and it coming up |
@@ -74,6 +74,10 @@ slots to boxes, rows, columns, layers, lists, and viewports.
 Most take a `func() tea.Cmd`, so methods such as `m.save` can be passed as they are. Clicks run when the button
 comes up over the same node it went down on, like a real button: pressing a button and sliding off it before
 letting go doesn't click it.
+
+Inside a [selectable](/input/selection) node, a click waits 400ms to see whether it becomes a double click, and a
+double click selects a word instead of running `DoubleClick`. See
+[Clicks and drags in selectable nodes](/input/selection#clicks-and-drags-in-selectable-nodes).
 
 ## Change state, or send a message
 
@@ -140,6 +144,9 @@ bloom.Fixed(1, bar).On(on.ClickAt(func(e on.Event) tea.Cmd {
 
 The rectangle of a box includes its border and padding, so `X` and `Y` count from its outer corner.
 
+`e.Msg` is the original mouse message, for its modifier keys or button. It's nil when no mouse event caused the
+run, such as a key pressing an `on.Press` handler.
+
 ## Scroll with the wheel
 
 `on.Scroll` gets `dy` as `1` for each step down and `-1` for each step up, and `dx` the same for left and right.
@@ -153,7 +160,7 @@ Clamp the offset in `Update`, which gets the wheel event after the handler ran.
 
 ## Hover
 
-`HoverStyle` on text and boxes swaps in a style while the pointer is over the node, with no state in the model:
+[`HoverStyle`](https://pkg.go.dev/bloomfx.dev/bloom#TextNode.HoverStyle) on text and boxes swaps in a style while the pointer is over the node, with no state in the model:
 
 ```go
 bloom.Text("save").Style(button).HoverStyle(buttonHover).On(on.Press(m.save))
@@ -168,10 +175,12 @@ model. For anything more, `on.Hover` runs when the pointer moves onto the node a
 bloom.Text("deploy").On(on.Hover(func(over bool) tea.Cmd { m.preview = over; return nil }))
 ```
 
-For either, the view reports all motion, to follow the pointer while no button is down. A node stops being hovered when
-something covers it, such as a dialog opening over it, even without the pointer moving. bloom notices with the next
-message `m.ui.Update` gets after the new frame is drawn, such as an animation frame, a key, or the pointer moving. Terminals don't report the
-pointer leaving the window, so the hover also ends when the window loses focus, which needs `v.ReportFocus = true`.
+Hover styles and `on.Hover` make the view report all motion, to follow the pointer while no button is down.
+
+A node stops being hovered when something covers it, such as a dialog opening over it, even without the pointer
+moving. bloom notices on the next message `m.ui.Update` gets after the frame is drawn, such as an animation frame, a
+key, or the pointer moving. Terminals don't report the pointer leaving the window, so the hover also ends when the
+window loses focus, which needs `v.ReportFocus = true`.
 
 ## Drag
 
@@ -212,8 +221,8 @@ blocking clicks until it's gone.
 ## Handle raw events yourself
 
 The original `tea.MouseClickMsg` and the other mouse messages still reach `Update`. If you handle them as well as
-using handlers, don't act on the same event twice. To find what's under a point, `m.ui.Frame().Hit(x, y)` returns
-the IDs of the nodes there, outermost first:
+using handlers, don't act on the same event twice. To find what's under a point, [`m.ui.Frame().Hit(x, y)`](https://pkg.go.dev/bloomfx.dev/bloom#Frame.Hit) returns
+the IDs of the nodes there, outermost first. See [IDs](/concepts/how-a-program-runs#ids) for when a node needs one:
 
 ```go
 	case tea.MouseClickMsg:
@@ -224,7 +233,7 @@ the IDs of the nodes there, outermost first:
 
 For things other than events, such as drawing an effect from a button's position, `m.ui.Frame().Rect(id)` returns
 where a node was drawn in the last frame, in screen coordinates (see
-[Sizes and positions in Update](/layout/sizes-in-update)):
+[Sizes and positions in Update](/bubble-tea/sizes-in-update)):
 
 ```go
 if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
@@ -235,7 +244,7 @@ if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
 
 ## Fewer frames for the mouse
 
-Terminals can send wheel and motion events faster than they're worth drawing. `bloom.ThrottleMouse` makes a
+Terminals can send wheel and motion events faster than they're worth drawing. [`bloom.ThrottleMouse`](https://pkg.go.dev/bloomfx.dev/bloom#ThrottleMouse) makes a
 Bubble Tea filter that drops those that come too soon after the last:
 
 ```go
@@ -257,7 +266,7 @@ instead when it gets the event, so pass it every message. It skips events that `
 
 ## Test handlers
 
-`m.ui.Click(id)` clicks the middle of the node with an ID, and `m.ui.ClickAt(x, y)` clicks a point, running the
+[`m.ui.Click(id)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Click) clicks the middle of the node with an ID, and `m.ui.ClickAt(x, y)` clicks a point, running the
 handlers of the last frame drawn and returning their commands. `m.ui.Update` runs handlers for any other mouse
 message, so a test can drive hover, the wheel, and drags without a terminal:
 
@@ -274,7 +283,7 @@ if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
 - [Focus and keyboard navigation](/input/focus), which can focus the node you click
 - [Selecting and copying text](/input/selection), with the mouse
 - [Tooltips](/input/tooltips), shown when the pointer rests on a node
-- [Scrolling](/layout/scrolling)
+- [Scrolling](/content/scrolling)
 - [`on` API reference](https://pkg.go.dev/bloomfx.dev/bloom/on)
 - The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double
   clicks, the wheel, and a draggable divider

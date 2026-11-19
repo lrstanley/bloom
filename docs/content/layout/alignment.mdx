@@ -1,0 +1,85 @@
+---
+title: Alignment and spacing
+description: Center nodes, align children across a row or column, justify leftover space along it, and put gaps between children.
+---
+
+## Center a node
+
+[`bloom.Centered(child)`](https://pkg.go.dev/bloomfx.dev/bloom#Centered) places a child at its natural size in the middle of its space:
+
+```go
+bloom.Centered(bloom.Box(panel, bloom.Text("hi")))
+```
+
+```
+        ┌──┐
+        │hi│
+        └──┘
+```
+
+## Align children across a row or column
+
+In a row, children stretch to the row's full height by default, and in a column, to its full width. `Align`
+changes that, for every child of the row or column:
+
+```go
+bloom.Row(sidebar, content).Align(bloom.Start) // each child at its natural height, at the top
+```
+
+Or for one slot only:
+
+```go
+bloom.Row(
+	bloom.Fixed(10, tall),
+	bloom.Auto(badge).Align(bloom.Center), // vertically centered next to tall
+)
+```
+
+The values, of type [`bloom.Align`](https://pkg.go.dev/bloomfx.dev/bloom#Align), are `bloom.Stretch` (the default), `bloom.Start`, `bloom.Center`, and
+`bloom.End`. They aren't the same as the `flex` values that `Justify` takes below, though some share a name.
+
+## Justify children along a row or column
+
+When no child grows, there may be space left over along the row or column. `Justify` decides where it goes,
+using the values from the [`flex`](https://pkg.go.dev/bloomfx.dev/bloom/flex#Justify) package:
+
+```go
+import "bloomfx.dev/bloom/flex"
+
+bloom.Row(a, b).Justify(flex.SpaceBetween)
+```
+
+```
+┌─┐                        ┌─┐
+│a│                        │b│
+└─┘                        └─┘
+```
+
+| Value | Leftover space goes |
+| --- | --- |
+| `flex.Start` | after the children (the default) |
+| `flex.Center` | equally before and after them |
+| `flex.End` | before them |
+| `flex.SpaceBetween` | between the children, none at the edges |
+| `flex.SpaceAround` | around each child, so the edges get half as much as between children |
+| `flex.SpaceEvenly` | equally between children and at both edges |
+
+## Put a gap between children
+
+`Gap(n)` puts `n` cells between each pair of children:
+
+```go
+bloom.Row(cancel, save).Gap(2)
+bloom.Column(fields...).Gap(1)
+```
+
+A slot that can never have any cells, such as `Fixed(0, ...)` or one that has collapsed, doesn't get a gap, so
+hiding a child doesn't leave a double gap behind.
+
+A [grid or a wrap](/layout/grids-and-wrapping) takes two values, `Gap(x, y)`, for the space between columns and
+between rows.
+
+## Related
+
+- [`FlexNode`](https://pkg.go.dev/bloomfx.dev/bloom#FlexNode) and [`flex.Justify`](https://pkg.go.dev/bloomfx.dev/bloom/flex#Justify) API reference
+- [Sizing with slots](/layout/slots), for how space is shared before alignment applies

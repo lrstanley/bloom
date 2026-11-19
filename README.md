@@ -80,7 +80,7 @@ over.
   anchored to a corner or to another node, with backdrops, drop shadows, and modal input.
 - :heavy_check_mark: **Mouse handlers**: clicks, double clicks, the wheel, hover, and drags go to handlers on the
   nodes they belong to, like `bloom.Text(name).On(on.Click(m.open))`. Hover styles and drag capture are built in.
-- :heavy_check_mark: **Focus**: tab order from the layout, focused styles, the real terminal cursor, and focus
+- :heavy_check_mark: **Focus**: tab order from the layout, styles for the focused node, the real terminal cursor, and focus
   scopes that keep <kbd>tab</kbd> inside a dialog until it closes.
 - :heavy_check_mark: **Tooltips**: `Tooltip("Deploy")` on any node, and text cut short with "…" unfolds in place
   under the pointer, with placement that hides the least of the screen, a status line sink, and keyboard access
@@ -138,6 +138,11 @@ func (m *model) View() tea.View {
 }
 ```
 
+The model keeps a `*bloom.Root` from `bloom.New()`, returns `m.ui.Init()` from `Init`, and passes every message to
+`m.ui.Update`. [Build your first layout](https://bloomfx.dev/getting-started/first-layout) walks through a complete
+program, and [Add bloom to an existing program](https://bloomfx.dev/getting-started/existing-app) converts one you
+already have.
+
 Runnable programs, from a basic layout to a 120 FPS dashboard, are in [`_examples`](_examples). Run one with
 `go run ./forms` from that directory.
 
@@ -147,6 +152,10 @@ Runnable programs, from a basic layout to a 120 FPS dashboard, are in [`_example
 go get -u bloomfx.dev/bloom@latest
 ```
 <!-- template:end:goget -->
+
+bloom needs Go 1.27 or newer, [Bubble Tea v2](https://github.com/charmbracelet/bubbletea) (`charm.land/bubbletea/v2`),
+and [Lip Gloss v2](https://github.com/charmbracelet/lipgloss) (`charm.land/lipgloss/v2`). It isn't built for
+Bubble Tea v1; see [Installation](https://bloomfx.dev/getting-started/installation#requirements).
 
 ### Related libraries
 

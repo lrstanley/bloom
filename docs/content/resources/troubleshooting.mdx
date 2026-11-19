@@ -1,7 +1,11 @@
 ---
 title: Troubleshooting
-description: Fixes for common problems - a blank screen, clicks that don't arrive or arrive twice, text that can't be selected, animations that don't move, text that doesn't wrap, and more.
+description: Fixes for common problems, such as a blank screen, clicks that don't arrive or arrive twice, text that can't be selected, animations that don't move, text that doesn't wrap, and more.
 ---
+
+Most problems come down to one of three things: a message that never reaches `m.ui.Update`, a node without the ID
+or handler you thought it had, or a handler that changes a copy of your model. Start with `bloom.Debug` to see what
+the layout did, then find your symptom below.
 
 ## See what the layout did
 
@@ -104,12 +108,12 @@ the whole screen, or turn the wait off with `bloom.WithClickDelay(false)`.
 
 ## Text can't be selected or copied
 
-Once a program turns on mouse reporting, the terminal stops selecting text itself. Most terminals still select with
-<kbd>shift</kbd> held while dragging, or <kbd>option</kbd> in some on macOS. To select inside the program, mark the nodes `Selectable()`, and copy with
-`m.ui.CopySelection()`; see [Selecting and copying text](/input/selection).
+Once a program turns on mouse reporting, the terminal stops selecting text itself. Most terminals still select
+while <kbd>shift</kbd> is held, or <kbd>option</kbd> in some on macOS. To select inside the program, mark the nodes
+`Selectable()` and copy with `m.ui.CopySelection()`; see [Selecting and copying text](/input/selection).
 
 If a copy doesn't reach the clipboard, the terminal may not allow OSC 52, or may need it turned on in its settings.
-Give the root a system clipboard to write to with `bloom.WithClipboard`.
+Give the root a system clipboard to write to with [`bloom.WithClipboard`](https://pkg.go.dev/bloomfx.dev/bloom#WithClipboard).
 
 ## The screen freezes after a click
 
@@ -144,14 +148,27 @@ colors, bloom assumes white on black. Return `m.ui.Init()` from your model's `In
 ## A panel disappears
 
 A `Collapsible` slot is dropped when the minimum sizes in its row or column don't fit. Lower another slot's `Min`,
-raise the collapsible slot's priority, or make the terminal bigger. `frame.Rect(id)` reports `false` for a collapsed
-slot, which you can use to tell the user the panel is hidden.
+raise the collapsible slot's priority, or make the terminal bigger. `m.ui.Frame().Rect(id)` reports `false` for a
+collapsed slot, which you can use to tell the user the panel is hidden.
+
+## Rect, Click, or focus can't find a node
+
+IDs are compared by value and type. A node given `.ID(paneSidebar)`, where `paneSidebar` is a `pane`, isn't found
+with `Rect("sidebar")`, and a `Focus[control]` passes over nodes whose IDs aren't `control`s. Use the same typed
+constants in the layout and where you look the node up. A node in a [collapsed slot](#a-panel-disappears), or not in
+the last frame drawn, isn't found either. See [IDs](/concepts/how-a-program-runs#ids).
+
+## Tab doesn't move focus
+
+The node needs `Focusable()` and an ID of the type your `Focus` holds, and `Update` has to pass key presses to
+`m.focus.Update(msg, m.ui.Frame())`. While a dialog's scope is pushed, focus stays inside it. See
+[Focus and keyboard navigation](/input/focus).
 
 ## A component has the wrong size
 
 Components that size themselves internally, such as a Bubbles viewport, need to be told the size their slot has.
 Find it with `bloom.Solve` when the window size or layout changes; see
-[Using Bubbles components](/layout/bubbles-components#give-a-component-its-size). Remember that a slot's rectangle
+[Using Bubbles components](/bubble-tea/bubbles-components#give-a-component-its-size). Remember that a slot's rectangle
 includes the border of a `Box` inside it.
 
 ## Wide characters look misaligned

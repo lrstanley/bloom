@@ -1,1 +1,1 @@
-{ "title": "Reference", "pages": ["effects", "options"] }
+{ "title": "Reference", "pages": ["options", "effects", "external:[API reference](https://pkg.go.dev/bloomfx.dev/bloom)", "external:[Releases](https://github.com/lrstanley/bloom/releases)"] }

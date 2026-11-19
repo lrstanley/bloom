@@ -8,7 +8,7 @@ words in a paragraph, use `Grid` or `Wrap`.
 
 ## Lay out cards in a grid
 
-`bloom.Grid(cols, children...)` fills `cols` equal-width columns, row by row:
+[`bloom.Grid(cols, children...)`](https://pkg.go.dev/bloomfx.dev/bloom#Grid) fills `cols` equal-width columns, row by row:
 
 ```go
 bloom.Grid(3, cards...).Gap(1, 0)
@@ -24,14 +24,16 @@ bloom.Grid(3, cards...).Gap(1, 0)
 ```
 
 - `Gap(x, y)` sets the space between columns and between rows.
-- A short last row keeps the same column widths, so cards line up.
+- A short last row keeps the same column widths, so cards line up. When the width doesn't divide evenly, the first
+  columns get the extra cells.
+- Every column has the same width. For columns of different widths, use a `Row` of [slots](/layout/slots).
 - Each row is as tall as its tallest cell. Rows share any extra height equally, and give up height in proportion
   to their own size when there isn't enough.
 - A `cols` below one means a single column.
 
 ### Change the column count with the width
 
-Combine a grid with a [`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given) to pick the number
+Combine a grid with a [`Layouter`](/bubble-tea/writing-components) to pick the number
 of columns from the space available:
 
 ```go
@@ -39,6 +41,7 @@ type cards struct {
 	items []bloom.Child
 }
 
+// View is used when the cards are drawn on their own, outside a bloom layout.
 func (c cards) View() string {
 	return bloom.Render(0, 0, c.Layout(bloom.Context{}))
 }
@@ -63,7 +66,7 @@ bloom.Grid(2,
 
 ## Wrap children onto new lines
 
-`bloom.Wrap(children...)` places children left to right at their natural sizes, starting a new line when the
+[`bloom.Wrap(children...)`](https://pkg.go.dev/bloomfx.dev/bloom#Wrap) places children left to right at their natural sizes, starting a new line when the
 next one doesn't fit, like words in a paragraph. It suits tags, chips, and buttons:
 
 ```go
@@ -80,12 +83,9 @@ bloom.Wrap(tags...).Gap(1, 1)
 ```
 
 ```
-┌─────┐ ┌────┐ ┌─────┐
-│alpha│ │beta│ │gamma│
-└─────┘ └────┘ └─────┘
-┌─────┐
-│delta│
-└─────┘
+ #alpha   #beta   #gamma
+
+ #delta
 ```
 
 - `Gap(x, y)` sets the space between children and between lines.

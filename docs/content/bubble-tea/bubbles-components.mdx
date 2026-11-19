@@ -18,7 +18,7 @@ Many components also need to know their size, because they decide what to render
 many lines as its height, a list pages by its height, and a table truncates columns by its width. bloom decides
 those sizes during layout, so you have to pass them to the component.
 
-For scrolling text, bloom has a [viewport of its own](/layout/viewports), `bloom.Viewport`, which
+For scrolling text, bloom has a [viewport of its own](/content/viewports), [`bloom.Viewport`](https://pkg.go.dev/bloomfx.dev/bloom#Viewport), which
 is given its size by the layout, so it needs none of this. It also draws only the lines in sight, however long the
 text is, and keeps the same line at the top as lines wrap differently.
 
@@ -126,7 +126,9 @@ func newModel() *model {
 	input.Placeholder = "say something"
 	input.SetVirtualCursor(false)
 	input.Focus()
-	return &model{ui: bloom.New(), log: viewport.New(), input: input}
+	log := viewport.New()
+	log.KeyMap = viewport.KeyMap{} // keys are for the input; the log scrolls with the wheel
+	return &model{ui: bloom.New(), log: log, input: input}
 }
 
 func (m *model) Init() tea.Cmd {
@@ -170,7 +172,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.log.SetContent(strings.Join(m.lines, "\n"))
 			m.log.GotoBottom()
 			m.input.Reset()
-			return m, nil
+			return m, m.ui.Update(msg)
 		}
 	}
 
@@ -198,35 +200,16 @@ func main() {
 
 ## Write your own components the same way
 
-The components you write don't need anything bloom-specific either: a `View() string` method is enough. When a
-component would benefit from knowing more, it can opt in:
-
-- [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports its natural size, so bloom
-  doesn't have to render its view to measure it. A one-line status bar can say it's one row tall at any width.
-- [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a bloom layout for the space it's
-  given, which lets it [change shape with its size](/layout/responsive#build-a-layout-for-the-space-youre-given).
-
-```go
-type statusbar struct {
-	text string
-}
-
-func (s statusbar) View() string {
-	return " " + s.text
-}
-
-// Measure reports one row, as wide as the text. A column stretches it across its
-// full width anyway.
-func (s statusbar) Measure(bloom.Size) bloom.Size {
-	return bloom.Size{W: lipgloss.Width(s.View()), H: 1}
-}
-```
-
-Return the size the component needs, not the space it's offered: when a layout is drawn at its natural size, the
-space offered is unbounded.
+The components you write don't need anything bloom-specific either: a `View() string` method is enough. A
+component can opt in to more: implement [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) to report
+its natural size without being rendered, or [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) to
+build its own layout for the space it's given. [Writing components](/bubble-tea/writing-components) builds a
+complete component that lays itself out, handles its own clicks, and keeps its IDs apart from other instances.
 
 ## Related
 
-- [Sizes and positions in Update](/layout/sizes-in-update)
+- [Sizes and positions in Update](/bubble-tea/sizes-in-update)
+- [Writing components](/bubble-tea/writing-components)
+- [Viewports](/content/viewports), bloom's own scrolling text
 - [How layout works](/concepts/how-layout-works)
 - [Bubbles](https://github.com/charmbracelet/bubbles) on GitHub

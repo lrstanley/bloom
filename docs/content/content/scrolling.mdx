@@ -5,17 +5,17 @@ description: Scroll content that is taller or wider than its space with Scroll, 
 
 bloom has three ways to show more than fits:
 
-- [`Scroll`](#scroll-content) shows any child from an offset. It lays out all of the child, which is fine for an
-  article, a help screen, or a form.
-- A [viewport](/layout/viewports) shows the lines of a text buffer, laying out only those in sight, for logs, files,
+- [`Scroll`](#scroll-content) shows any child from an offset. It lays out and draws all of the child on every
+  frame, which is fine for an article, a help screen, or a form, but not for thousands of lines.
+- A [viewport](/content/viewports) shows the lines of a text buffer, laying out only those in sight, for logs, files,
   and other long text.
-- A [list](/layout/lists) shows rows of components, building only those in view, for thousands of items.
+- A [list](/content/lists) shows rows of components, building only those in view, for thousands of items.
 
 All three work with the same [scrollbars](#show-a-scrollbar).
 
 ## Scroll content
 
-`bloom.Scroll(child, offset)` gives a child as much height as it wants, and shows it starting `offset` rows down,
+[`bloom.Scroll(child, offset)`](https://pkg.go.dev/bloomfx.dev/bloom#Scroll) gives a child as much height as it wants, and shows it starting `offset` rows down,
 clipped to the space the scroll has. The offset is model state, so you decide how keys and the mouse wheel move
 it:
 
@@ -32,7 +32,7 @@ func (m *model) layout() bloom.Child {
 ```
 
 To move the offset with keys, and to clamp it so it doesn't scroll past the end, `Update` needs to know how tall
-the scroll and its content are. [Sizes and positions in Update](/layout/sizes-in-update) shows how, with paging by
+the scroll and its content are. [Sizes and positions in Update](/bubble-tea/sizes-in-update) shows how, with paging by
 a screen at a time.
 
 ## Scroll with the mouse wheel
@@ -47,7 +47,7 @@ reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
 ```
 
 The handler runs just before `Update` gets the wheel event, so clamp the offset in `Update` as you do for
-[keys](/layout/sizes-in-update#find-a-nodes-size-in-update).
+[keys](/bubble-tea/sizes-in-update#find-a-nodes-size-in-update).
 
 ## Scroll sideways
 
@@ -62,9 +62,10 @@ Without it, the child gets the scroll's width, as before.
 
 ## Show a scrollbar
 
-`bloom.ScrollbarOf(id)` is a scrollbar for the `Scroll` that the node with that ID is in. It follows the scroll
+[`bloom.ScrollbarOf(id)`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollbarOf) is a scrollbar for the `Scroll` that the node with that ID is in, or
+for the [list](/content/lists) or [viewport](/content/viewports) with that ID. It follows the scroll
 from the layout, so it needs no state of its own. Put it on the right side of the box's border with
-[`Edge`](/layout/text-and-boxes#put-titles-and-more-on-a-border), and it takes no space. It's only drawn while the
+[`Edge`](/content/borders#put-titles-and-more-on-a-border), and it takes no space. It's only drawn while the
 content is taller than its view, so when everything fits, the plain border shows:
 
 ```go
@@ -80,11 +81,11 @@ bloom.Box(panel, bloom.Scroll(bloom.Text(m.article).Style(prose).ID(paneArticle)
 ╰──────────────╯
 ```
 
-`ScrollbarOf` a [list](/layout/lists#show-a-scrollbar)'s own ID follows it in items, and its `OnScroll` gets the
-first item to show, for `Offset`. `ScrollbarOf` a [viewport](/layout/viewports)'s ID follows it in rows, and
+`ScrollbarOf` a [list](/content/lists#show-a-scrollbar)'s own ID follows it in items, and its `OnScroll` gets the
+first item to show, for `Offset`. `ScrollbarOf` a [viewport](/content/viewports)'s ID follows it in rows, and
 without an `OnScroll` of its own, scrolls it with the viewport's.
 
-For content that a component windows itself, such as the [Bubbles viewport](/layout/bubbles-components), give
+For content that a component windows itself, such as the [Bubbles viewport](/bubble-tea/bubbles-components), give
 `bloom.Scrollbar(total, visible, offset)` the numbers yourself:
 
 ```go
@@ -131,8 +132,8 @@ scrollbar takes clicks only while it's drawn, so with nothing to scroll, clicks 
 
 ### Change under the pointer
 
-`HoverStyle` sets how a scrollbar looks while the pointer is over it, or it's being dragged, in place of its `Style`.
-Without one, it looks the same. Setting the thumb glyph to `"█"` grows a vertical thumb, to show the scrollbar
+`HoverStyle` sets how a scrollbar looks while the pointer is over it or it's being dragged. Without one it looks the
+same. The hover style replaces `Style` whole, so repeat anything you want kept. Setting the thumb glyph to `"█"` grows a vertical thumb, to show the scrollbar
 works with the mouse:
 
 ```go
@@ -164,7 +165,9 @@ it scrolls. Dragging past the scroll's edge scrolls it, through the `on.Scroll` 
 
 ## Related
 
-- [Viewports](/layout/viewports), for long text
-- [Long lists](/layout/lists), for rows of components
-- [Sizes and positions in Update](/layout/sizes-in-update), for paging and clamping
+- [`ScrollNode`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollNode), [`ScrollbarNode`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollbarNode), and
+  [`ScrollbarStyle`](https://pkg.go.dev/bloomfx.dev/bloom#ScrollbarStyle) API reference
+- [Viewports](/content/viewports), for long text
+- [Long lists](/content/lists), for rows of components
+- [Sizes and positions in Update](/bubble-tea/sizes-in-update), for paging and clamping
 - [Mouse events](/input/mouse)

@@ -62,7 +62,7 @@ Any value with a `View() string` method can also be a child.
 
 ## Viewport options
 
-See [Viewports](/layout/viewports).
+See [Viewports](/content/viewports).
 
 | Method | Does |
 | --- | --- |
@@ -76,6 +76,7 @@ See [Viewports](/layout/viewports).
 | `LineStyle(fn)` | a style for each line in sight, across the whole row, under its own |
 | `Selectable()` | [select its text with the mouse](/input/selection), all of it, with wrapped rows joined |
 | `Trusted()` | keep the commands in its lines meant for the terminal, such as images, which are dropped otherwise |
+| `Caret(&sel)`, `OnCaret(fn)` | a caret and selection kept in the model as a `Range`, moved by the mouse; see [Editing text](/input/editing) |
 
 | `Buffer` method | Does |
 | --- | --- |
@@ -83,6 +84,9 @@ See [Viewports](/layout/viewports).
 | `Append(lines...)` | add lines, measuring only them |
 | `Len()`, `Line(i)`, `Text(i)`, `String()` | read lines back, with or without their styles |
 | `Find(re, line, at)`, `FindBefore(re, line, at)` | the next or previous match of a regular expression |
+| `Replace(from, to, text)`, `Insert(at, text)`, `Delete(from, to)`, `Edit(edits...)` | change the text, returning a `Change` that maps positions through it |
+| `Snapshot()`, `Restore(s)`, `Rev()` | take and restore the text for [undo](/input/editing#undo-with-snapshots), and count changes |
+| `Next`, `Prev`, `NextWord`, `PrevWord`, `WordAt`, `End`, `Clamp`, `TextIn` | move positions by characters and words, and read the text between two |
 
 ## Slots
 
@@ -105,6 +109,7 @@ See [Viewports](/layout/viewports).
 | `Focusable()` | a stop in the focus order |
 | `Scope()` | a focus scope, for `Focus.Within` and `Focus.Push` |
 | `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
+| `MoveWith(effects...)` | draw the move to a new place with effects, such as `fx.Fly`, timed by `Animate`; see [Move with effects](/motion/layout-animation#move-with-effects) |
 
 ## Text
 
@@ -154,6 +159,7 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 | `Size(w, h)` | set the size; zero uses the natural size |
 | `Margin(n)` | stay `n` cells from the overlay's edges |
 | `Float()` | place and draw against the whole screen, past the edges of its overlay and of a dialog it's in |
+| `Transparent()` | let the blank cells of its child show what's beneath, such as for a FIGlet banner over other content |
 | `Modal()` | take every mouse event from what's beneath, and be a focus scope |
 | `Backdrop(effects...)` | apply effects to everything beneath |
 | `Shadow(x, y, effects...)` | apply effects beneath, offset like a drop shadow |
@@ -162,6 +168,7 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 | `ID(id)` | the ID for focus, anchoring, layout animation, and `Frame.Rect` |
 | `On(handlers...)` | mouse handlers; `on.ClickOutside` runs for a modal layer's backdrop |
 | `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
+| `MoveWith(effects...)` | draw the move to a new place with effects, such as `fx.Fly`, timed by `Animate`; see [Move with effects](/motion/layout-animation#move-with-effects) |
 
 ## Root
 
@@ -171,7 +178,7 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 | `ui.Init()` | ask the terminal for its colors; return from `Init` |
 | `ui.Update(msg)` | hear the terminal, run layout animation, and keep hover up to date; pass every message, return the command |
 | `ui.View(w, h, tree)` | lay out, draw, and return a `tea.View` that runs mouse handlers |
-| `ui.Render(w, h, tree)` | lay out and draw to a string; a height of zero uses the natural height |
+| `ui.Render(w, h, tree)` | lay out and draw to a string; a width or height of zero or less uses the natural size on that axis |
 | `ui.Frame()` | the geometry of the last frame drawn |
 | `ui.Click(id)`, `ui.ClickAt(x, y)` | run the handlers for a click, for tests |
 | `ui.Selection()`, `ui.SelectAll(id)`, `ui.ClearSelection()` | read, select all of a node, or clear the [text selected with the mouse](/input/selection) |
@@ -183,9 +190,9 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 
 | Option | Default | Sets |
 | --- | --- | --- |
-| [`WithColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) | white on black | the terminal colors effects blend with, until the terminal reports its own |
+| [`WithColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) | light gray (`#dddddd`) on black | the terminal colors effects blend with, until the terminal reports its own |
 | [`WithFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFPS) | 60 | the frame rate of layout animation |
-| [`WithUnfocusedFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithUnfocusedFPS) | 20 | the frame rate of layout animation while the terminal isn't focused |
+| [`WithUnfocusedFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithUnfocusedFPS) | 20 | the frame rate of layout animation while the terminal isn't focused; never above `WithFPS` |
 | [`WithWidthMethod(m)`](https://pkg.go.dev/bloomfx.dev/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |
 | [`WithClock(now)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock) | `time.Now` | the clock for layout animation and double clicks, for tests |
 | [`WithFocus(&m.focus)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus) | none | the focus that clicks move, before handlers run |
@@ -233,10 +240,11 @@ Options for one tooltip, for `Tooltip(text, opts...)`:
 | --- | --- |
 | [`Solve(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) | lay out without drawing, and return the `*Frame` |
 | [`Render(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Render) | lay out and draw to a string, without a root |
+| [`Debug(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Debug) | the laid-out tree as text, with each node's ID, rectangle, and whether it's hidden |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
 | `frame.Truncated(id)` | whether a `Truncate()` text node was cut short, with or without tooltips |
-| `frame.Viewport(id)`, `frame.List(id)` | where a [viewport](/layout/viewports) or [list](/layout/lists) was scrolled to, and how much it showed |
+| `frame.Viewport(id)`, `frame.List(id)` | where a [viewport](/content/viewports) or [list](/content/lists) was scrolled to, and how much it showed |
 | [`ThrottleMouse(every)`](https://pkg.go.dev/bloomfx.dev/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
 | `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
 
@@ -259,7 +267,10 @@ From [`bloomfx.dev/bloom/on`](https://pkg.go.dev/bloomfx.dev/bloom/on), for `On(
 
 Component interfaces: [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports a natural size,
 and [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a layout for the space given. The
-handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen.
+handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen, and `ctx.Side()`
+tells which side a layer it's in opened on. See [Writing components](/bubble-tea/writing-components).
+[`TextSource`](https://pkg.go.dev/bloomfx.dev/bloom#TextSource), [`TextMap`](https://pkg.go.dev/bloomfx.dev/bloom#TextMap), and [`Editable`](https://pkg.go.dev/bloomfx.dev/bloom#Editable) change what
+[selection](/input/selection) reads from a component.
 
 ## Animation options
 

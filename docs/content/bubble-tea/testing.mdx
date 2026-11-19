@@ -1,0 +1,206 @@
+---
+title: Testing
+description: Test bloom layouts with Render, Solve, and Debug in plain unit tests, click nodes by ID, keep golden files, make animations deterministic, and test whole programs end to end with steep.
+---
+
+Because a bloom view is a function of your model, most of it can be tested without running a terminal. The
+examples on this page assume the model has a method that returns its layout, separate from `View`, which only adds
+the `tea.View` settings:
+
+```go
+func (m *model) layout() bloom.Child { /* ... */ }
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.width, m.height, m.layout())
+	v.AltScreen = true
+	return v
+}
+```
+
+## Test what a layout draws
+
+[`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) draws a tree at a size and returns a string. Check
+it for the text you expect:
+
+```go
+func TestSidebarCollapses(t *testing.T) {
+	m := newModel()
+
+	wide := ansi.Strip(bloom.Render(120, 10, m.layout()))
+	narrow := ansi.Strip(bloom.Render(50, 10, m.layout()))
+	if !strings.Contains(wide, "Groceries") || strings.Contains(narrow, "Groceries") {
+		t.Errorf("sidebar should show at 120 columns and collapse at 50:\n%s\n%s", wide, narrow)
+	}
+}
+```
+
+`Render` returns styled text; `ansi.Strip` from `github.com/charmbracelet/x/ansi` removes the styles when you only
+care about the text. `Render` keeps no animation state, so it draws every layout animation at its target, and
+transitions at whatever progress you give them.
+
+### Keep golden files
+
+To catch any change to what's drawn, compare the output with a file kept in `testdata`. steep's
+[`snapshot`](https://pkg.go.dev/getsteep.dev/steep/snapshot) package does the bookkeeping, with no program running:
+
+```go
+import "getsteep.dev/steep/snapshot"
+
+func TestLayoutGolden(t *testing.T) {
+	snapshot.RequireEqual(t, bloom.Render(60, 12, newModel().layout()), snapshot.WithANSI(false))
+}
+```
+
+Run `UPDATE_SNAPSHOTS=true go test ./...` to write or update the files. Leave out `WithANSI(false)` to compare the
+styles too.
+
+## Test where things go
+
+[`bloom.Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) returns the geometry without drawing. Use it to check
+sizes and positions, which is less brittle than comparing drawn output:
+
+```go
+func TestReaderMinimum(t *testing.T) {
+	frame := bloom.Solve(60, 20, newModel().layout())
+
+	r, ok := frame.Rect(paneReader)
+	if !ok {
+		t.Fatal("reader not in the frame")
+	}
+	if r.Dx() < 40 {
+		t.Errorf("reader is %d columns wide, want at least 40", r.Dx())
+	}
+}
+```
+
+## See the tree when a test fails
+
+[`bloom.Debug`](https://pkg.go.dev/bloomfx.dev/bloom#Debug) lays out a tree as `Solve` does and returns it as text,
+a node to a line, with each node's ID, where it went, and whether it was collapsed or cut off. Log it when a test
+fails. IDs show as their type and value, so this layout's `pane` is a string type:
+
+```go
+if r.Dx() < 40 {
+	t.Errorf("reader is %d columns wide, want at least 40\n%s", r.Dx(), bloom.Debug(60, 20, m.layout()))
+}
+```
+
+```
+Column 0,0 60x20
+├─ Fill 0,0 60x19
+│  └─ Row 0,0 60x19
+│     ├─ Fixed(24) id=main.pane(sidebar) hidden collapsible=1
+│     │  └─ Text "Groceries" hidden
+│     └─ Fill id=main.pane(reader) 0,0 60x19 min=40
+│        └─ Text "reader" 0,0 60x19
+└─ Text "save" id=main.pane(save) 0,19 60x1
+```
+
+Its format may change between versions, so read it rather than asserting on it. Use `Solve` for anything a test
+depends on. See [Troubleshooting](/resources/troubleshooting#see-what-the-layout-did).
+
+## Test mouse handlers
+
+[`m.ui.Click(id)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Click) clicks the middle of the node with an ID, and
+[`m.ui.ClickAt(x, y)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.ClickAt) clicks a cell. Both run the handlers of
+the last frame drawn and return their commands, so draw a frame first:
+
+```go
+func TestSaveClick(t *testing.T) {
+	m := newModel()
+	m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
+	m.View()
+
+	if _, ok := m.ui.Click(buttonSave); !ok {
+		t.Fatal("save is not on screen")
+	}
+	if m.saves != 1 {
+		t.Errorf("saves = %d, want 1", m.saves)
+	}
+}
+```
+
+A handler that sends a message with `on.Msg` returns it from the command instead: call `cmd()` and check its type.
+For hover, drags, and the wheel, pass any `tea.MouseMsg` to `m.ui.Update`. See
+[Test handlers](/input/mouse#test-handlers).
+
+## Make animations deterministic
+
+Animations follow the clock, not the number of frames, so give them a clock you control.
+[`anim.Clock`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Clock) does it for a value. `SetTarget` and `Advance`
+move a value with that clock without scheduling frame messages:
+
+```go
+type clock struct{ now time.Time }
+
+func (c *clock) Now() time.Time { return c.now }
+
+func TestFade(t *testing.T) {
+	c := &clock{now: time.Unix(1, 0)}
+	v := anim.NewValue(0, anim.Duration(time.Second), anim.Ease(anim.Linear), anim.Clock(c.Now))
+
+	v.SetTarget(1, c.now)
+	c.now = c.now.Add(500 * time.Millisecond)
+	v.Advance(c.now)
+	if v.Float() != 0.5 {
+		t.Errorf("halfway = %v, want 0.5", v.Float())
+	}
+}
+```
+
+[`bloom.WithClock`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock) does the same for the root, for
+[layout animation](/motion/layout-animation) and the timing of double clicks. Move the clock and draw again:
+
+```go
+func TestSidebarSlides(t *testing.T) {
+	c := &clock{now: time.Unix(1, 0)}
+	ui := bloom.New(bloom.WithClock(c.Now))
+	tree := func(w int) bloom.Child {
+		side := bloom.Fixed(w, bloom.Text("side")).ID(paneSidebar).
+			Animate(anim.Duration(time.Second), anim.Ease(anim.Linear))
+		return bloom.Row(side, bloom.Fill(bloom.Text("main")))
+	}
+
+	ui.Render(40, 3, tree(10))
+	ui.Render(40, 3, tree(20)) // the sidebar starts to widen
+	c.now = c.now.Add(500 * time.Millisecond)
+	ui.Render(40, 3, tree(20))
+
+	if r, _ := ui.Frame().Rect(paneSidebar); r.Dx() != 15 {
+		t.Errorf("sidebar is %d wide halfway, want 15", r.Dx())
+	}
+}
+```
+
+Most tests don't need the middle of an animation. Assert on the end state instead: that a dialog opened, not how
+it looked halfway.
+
+## Test a whole program
+
+For behavior that depends on the event loop, such as focus moving, timing, and several messages in a row, run the
+program in an emulated terminal. [steep](/resources/related-libraries#steep) drives it with keys, text, mouse
+events, and resizes, waits for what it draws, and compares snapshots, written to `testdata` when you run the tests
+with `UPDATE_SNAPSHOTS=true`. bloom's own examples are tested this way, in `_examples/*/main_test.go`:
+
+```go
+func TestNotes(t *testing.T) {
+	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(80, 12))
+	h.Wait("Groceries")
+	h.LeftClick(3, 2).Wait("A terminal garden")
+	h.Key("d").Wait("Delete \"Ideas\"?")
+	h.AssertSnapshot()
+	h.Key("ctrl+c")
+	h.WaitFinished()
+}
+```
+
+Clicks go through the same path as a real terminal's, so this tests your IDs and mouse handling too.
+
+## Related
+
+- [`Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render), [`Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve),
+  [`Debug`](https://pkg.go.dev/bloomfx.dev/bloom#Debug), and [`Root.Click`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Click)
+  API reference
+- [steep](https://pkg.go.dev/getsteep.dev/steep), for testing whole programs
+- [Mouse events](/input/mouse#test-handlers)
+- [Troubleshooting](/resources/troubleshooting)

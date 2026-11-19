@@ -3,7 +3,7 @@ title: Toast notifications
 description: Show a notification in a corner of the screen that animates in and hides itself after a while, and stack several of them.
 ---
 
-A toast is a [layer](/layers/dialogs) anchored to a corner of the screen, shown with an
+A toast is a [layer](/layers/dialogs) [anchored](/layers/dialogs#size-and-place-a-dialog) to a corner of the screen, shown with an
 [`anim.Presence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence) that hides itself.
 
 ## Show one toast
@@ -81,7 +81,7 @@ func (m *model) notify(text string) tea.Cmd {
 }
 ```
 
-Every presence needs every message. Once a toast has finished animating out, drop it from the list:
+Every presence needs every message. Once a toast has finished animating out, drop it from the list. In `Update`:
 
 ```go
 	for _, t := range m.toasts {
@@ -90,7 +90,7 @@ Every presence needs every message. Once a toast has finished animating out, dro
 	m.toasts = slices.DeleteFunc(m.toasts, func(t *toast) bool { return !t.presence.Visible() })
 ```
 
-```
+```text
 press n for a notification, q to quit
 
 
@@ -204,5 +204,6 @@ messages, even as the slice changes.
 
 ## Related
 
+- [`LayerNode`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode) and [`Present`](https://pkg.go.dev/bloomfx.dev/bloom#Present) API reference
 - [Animating values](/motion/animating-values), for more on presences
 - [Dialogs and modals](/layers/dialogs)

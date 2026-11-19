@@ -93,7 +93,8 @@ bloom.Text(d.secret).Truncate().NoTooltip()
 `NoTooltip` only stops the full text of cut text. A `Tooltip(...)` inside the node still shows, and so does a
 node [pinned open](#pin-the-selected-rows-tooltip).
 
-To know in `Update` whether a node was cut, without tooltips, give it an ID and ask the frame. This works whether
+To know in `Update` whether a node was cut, without tooltips, give it an ID and ask the frame with
+[`Frame.Truncated`](https://pkg.go.dev/bloomfx.dev/bloom#Frame.Truncated). This works whether
 tooltips are on or off, and on a frame from `Solve`:
 
 ```go
@@ -282,6 +283,7 @@ they don't need the pointer.
 
 ## Related
 
+- [`Tooltips`](https://pkg.go.dev/bloomfx.dev/bloom#Tooltips), [`TipMode`](https://pkg.go.dev/bloomfx.dev/bloom#TipMode), and [`TooltipSink`](https://pkg.go.dev/bloomfx.dev/bloom#TooltipSink) API reference
 - [Mouse events](/input/mouse)
 - [Focus and keyboard navigation](/input/focus)
 - [Dropdowns and popovers](/layers/dropdowns), for popovers you can click into

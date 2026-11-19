@@ -4,7 +4,7 @@ description: Show dialogs over the rest of the screen with Overlay and Layer, ma
 ---
 
 A dialog is a **layer**: a node drawn over the rest of the screen without taking space from it.
-`bloom.Overlay(base, layers...)` draws a base layout and then each layer over it, in order.
+[`bloom.Overlay(base, layers...)`](https://pkg.go.dev/bloomfx.dev/bloom#Overlay) draws a base layout and then each layer over it, in order.
 
 ```go
 bloom.Overlay(
@@ -13,9 +13,9 @@ bloom.Overlay(
 )
 ```
 
-A layer made with `bloom.Layer(child)` is centered on the screen at its natural size. For a step-by-step version
-of this page, see the [dialogs and toasts tutorial](/getting-started/dialogs-and-toasts).
+A layer made with [`bloom.Layer(child)`](https://pkg.go.dev/bloomfx.dev/bloom#Layer) is centered on the screen at its natural size.
 
+For a step-by-step version of this page, see the [dialogs and toasts tutorial](/getting-started/dialogs-and-toasts).
 The [forms example](https://github.com/lrstanley/bloom/tree/master/_examples/forms) confirms a save with a modal
 dialog, stacks a second one on top, and closes them with <kbd>esc</kbd> and a click outside:
 
@@ -123,7 +123,7 @@ Terminal cells are about twice as tall as they are wide, so an offset of two col
 
 A layer covers everything beneath it, blank cells too. `Transparent()` shows what's beneath its blank cells
 instead: those with no background color, underline, or reversed colors. Use it for text drawn over the screen
-without a box around it, such as [FIGlet text](/layout/figlet-text#draw-it-over-other-things):
+without a box around it, such as [FIGlet text](/content/figlet-text#draw-it-over-other-things):
 
 ```go
 bloom.Layer(fig.Text("Deployed!")).Transparent()
@@ -157,7 +157,21 @@ bloom.Overlay(screen,
 ```
 
 Mouse events go to the topmost modal layer. For focus, push each dialog's scope as it opens and pop it as it
-closes, and focus returns to the right place each time.
+closes, and focus returns to the right place each time:
+
+```go
+func (m *model) openSettings() tea.Cmd {
+	m.focus.Push(dialogSettings) // the ID of the settings dialog's layer
+	return m.settings.Show()
+}
+
+func (m *model) closeSettings() tea.Cmd {
+	m.focus.Pop() // back to where focus was before the dialog opened
+	return m.settings.Hide()
+}
+```
+
+See [Keep focus inside a dialog](/input/focus#keep-focus-inside-a-dialog).
 
 A backdrop applies to everything beneath its layer, including other dialogs. To dim the screen once, rather than
 once per dialog, only give the top dialog a backdrop:
@@ -174,8 +188,9 @@ second := bloom.Layer(overwrite).ID(overwriteDialog).Modal().
 
 ## Dropdowns in a dialog
 
-A dialog's content can have overlays of its own, such as a select with its dropdown. Give the dropdown's layer
-`Float()`, so it's drawn whole past the dialog's edge rather than cut off by it. See
+A dialog's content can have overlays of its own, such as a select whose list opens in a layer anchored to the
+field with `AnchorTo`. A layer is cut off at the edges of the overlay it's in, so give the list's layer
+[`Float()`](https://pkg.go.dev/bloomfx.dev/bloom#LayerNode.Float), and it's drawn whole past the dialog's edge. See
 [Keep the dropdown with its component](/layers/dropdowns#keep-the-dropdown-with-its-component).
 
 ## Animate without a presence

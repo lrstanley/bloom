@@ -76,7 +76,7 @@ A [`Paint`](https://pkg.go.dev/bloomfx.dev/bloom/fig#Paint) gives each character
 | Paint | Colors |
 | --- | --- |
 | `fig.Solid(c)` | everything one color |
-| `fig.Gradient(a, b, ...)` | a gradient across the text's columns. `.By(fig.ByRow)`, `ByDiagonal`, or `ByGlyph` (a color per letter) changes the direction |
+| `fig.Gradient(a, b, ...)` | a gradient across the text's columns. `.By(fig.ByRow)`, `ByDiagonal`, or `ByGlyph` (a color per letter) changes the direction from the default, `ByColumn` |
 | `fig.Palette(a, b, ...)` | each letter the next color, in turn |
 | `fig.Rainbow()` | bright colors in diagonal bands, as TOIlet's rainbow filter |
 | `fig.Metal()` | shades of blue and gray in slanted bands, as TOIlet's metal filter |
@@ -89,6 +89,7 @@ the whole figure and each cell: where it is, what kind of cell it is, and which 
 lights up the letter under the pointer:
 
 ```go
+// base is another fig.Paint, and uv is github.com/charmbracelet/ultraviolet.
 fig.PaintFunc(func(f *fig.Figure, c fig.Cell) uv.Style {
 	st := base.Shade(f, c)
 	if c.Glyph == m.hover {
@@ -117,15 +118,18 @@ fig.Text(msg).Options(fig.Options{
 
 - `Horizontal` and `Vertical` are `fig.Full` (letters side by side, at full width), `Fitted` (pushed together until
   they touch), `Smushed` (pushed one column further, merging the characters that meet by the font's rules), or
-  `Universal` (merged whatever the characters are). The zero value is the font's own layout. Lines can be smushed
-  vertically too, which figlet doesn't do.
+  `Universal` (merged whatever the characters are). The zero value of `Horizontal` is the font's own layout. The
+  zero value of `Vertical` stacks lines at full height, as figlet does, unless `Strict` is set. Lines can be
+  smushed vertically too, which figlet doesn't do.
 - `Rules` replaces the font's smushing rules, as `figlet -m` does.
 - `Direction` prints right to left, or left to right, whatever the font says.
 - `Width`, `Justify`, and `Paragraph` wrap and place lines of text, as figlet's `-w`, `-c`/`-r`, and `-p` do.
+  `Justify` does nothing without a `Width`.
 - `Tracking` adds columns between letters. A negative `Tracking` pushes letters into each other, past what the
   font's rules allow, so their strokes overlap. `Stacking` says which is drawn on top: the later letter, the
   default, or the earlier.
-- `Strict` follows the FIGfont standard in the two places figlet doesn't.
+- `Strict` follows the FIGfont standard where figlet doesn't: glyphs narrower than two columns may smush, and the
+  zero `Vertical` is the font's own layout.
 
 ## Animate it letter by letter
 
@@ -138,10 +142,11 @@ characters are only shown while both letters are still. Letters moving apart don
 
 ### Reveal letters one after another
 
-`Each(t, effects...)` applies effects to each letter for its own progress, as
+[`Each(t, effects...)`](https://pkg.go.dev/bloomfx.dev/bloom/fig#TextNode.Each) applies effects to each letter for its own progress, as
 [`Transition`](/motion/transitions) does a node, the letters starting one after another as `t` goes from 0 to 1.
 `Spread` sets how much of `t` is spent starting them, and in what order: `fig.Forward`, `Backward`, `Outward`
-from the middle, `Inward`, or `fig.Random(seed)`:
+from the middle, `Inward`, or `fig.Random(seed)`. The default is `Spread(0.5, fig.Forward)`, and at a `t` of 1 the
+text is drawn whole:
 
 ```go
 fig.Text("letters").
@@ -152,7 +157,7 @@ fig.Text("letters").
 
 ### Move letters to their new places
 
-`Animate()` glides each letter to where it is in the new text when the text changes, with bloom's
+[`Animate()`](https://pkg.go.dev/bloomfx.dev/bloom/fig#TextNode.Animate) glides each letter to where it is in the new text when the text changes, with bloom's
 [layout animation](/motion/layout-animation). It needs an ID and a retained [`bloom.Root`](/concepts/rendering).
 `MoveWith` moves them with effects instead, such as `fx.Fly`:
 
@@ -184,6 +189,8 @@ cmds = append(cmds, anim.Update(msg, &m.clock))
 m.clock.Text().
 	Font(fonts.Big()).
 	Key(fig.ByPosition).
+	ID("clock").
+	Animate(). // letters that stay glide to their new places
 	Enter(fx.Slide{From: bloom.Top}, fx.Fade{}).
 	Leave(fx.Slide{From: bloom.Bottom}, fx.Fade{})
 ```

@@ -3,6 +3,10 @@ title: Rendering and performance
 description: How bloom turns a tree into a frame - caching, compositing, effects, and mouse routing - and what to keep in mind for smooth animation.
 ---
 
+This page follows a frame from the tree your `View` builds to what the terminal shows, and covers what bloom
+caches along the way, so you know which choices keep frames cheap. For when frames happen and what the root keeps
+between them, see [How a bloom program runs](/concepts/how-a-program-runs).
+
 ## From tree to frame
 
 Each time `m.ui.View` runs, bloom:
@@ -14,7 +18,7 @@ Each time `m.ui.View` runs, bloom:
 4. **Runs effects**: a transition's effects run on a node's own cells before they're composited, and a backdrop's
    effects run on the frame beneath its layer.
 5. **Records geometry**: where each node with an ID went, which nodes can take focus, and what the mouse can hit,
-   with the nodes' mouse handlers. That's the `Frame` returned by `m.ui.Frame()`.
+   with the nodes' mouse handlers. That's the [`Frame`](https://pkg.go.dev/bloomfx.dev/bloom#Frame) returned by `m.ui.Frame()`.
 6. **Returns a `tea.View`** with the content, the terminal cursor if a node placed one, and an `OnMouse` handler that
    runs the handlers of the nodes under the pointer, using the recorded geometry.
 
@@ -24,11 +28,14 @@ Most frames change little, so bloom avoids repeating work:
 
 - A string is parsed into cells and measured once, and reused for as long as the same string is drawn.
 - A Lip Gloss render is reused while the node's style, content, and size don't change.
-- A frame that would be identical to the last one isn't composited again at all.
+- A frame that would be identical to the last one is laid out, but isn't composited again.
 
-On a 200×60 dashboard, an unchanged frame takes about 0.016ms, a frame where most of the content changed about
-0.29ms, and a dialog animating in over a dimmed backdrop about 0.44ms. At 120 frames a second, each frame has
-8.3ms. You can run the benchmarks yourself with `go test -bench . ./...` in the repository.
+Strings that change on every frame are parsed on every frame, so for large or fast-changing text, such as a log,
+use a [`Viewport`](/content/viewports), which only parses the lines in sight.
+
+On a 200×60 dashboard, on a recent desktop CPU, an unchanged frame takes roughly 0.02ms, a frame where most of the
+content changed about 0.3ms, and a dialog animating in over a dimmed backdrop about 0.4ms. At 120 frames a second,
+each frame has 8.3ms. You can run the benchmarks yourself with `go test -bench . ./...` in the repository.
 
 ## Keep frames cheap to compare
 
@@ -36,7 +43,7 @@ To know that a frame is unchanged, bloom compares what it's about to draw with t
 which are compared with `==`. Effects that are plain structs, like all of the [`fx`](/reference/effects) effects, compare by
 value. A few things can't be compared, so bloom assumes they change every frame:
 
-- Effects that are functions, such as `fx.Func` or `fx.Ease` (which holds an easing function).
+- Effects that are functions, such as [`fx.Func`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Func) or [`fx.Ease`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Ease) (which holds an easing function).
 - Effects behind pointers, which could be changed in place.
 
 That only costs anything while they're on screen. Wrapping a node in a transition only while it animates, as in
@@ -44,8 +51,8 @@ That only costs anything while they're on screen. Wrapping a node in a transitio
 
 ## Colors and the terminal
 
-Some effects blend toward the terminal's own colors: `Dim` toward its background, and `Shimmer` and `Wave` toward
-its foreground. `m.ui.Init()` asks the terminal for those colors, and `m.ui.Update` hears the reply, along with the
+Some effects blend toward the terminal's own colors: `Dim` toward its background, and `Wave`, and `Shimmer` by
+default, toward its foreground. `m.ui.Init()` asks the terminal for those colors, and `m.ui.Update` hears the reply, along with the
 terminal's color profile. Until the reply arrives, or if the terminal never answers, bloom uses defaults that you can
 set with [`bloom.WithColors`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors).
 
@@ -56,10 +63,10 @@ terminal about where each cell is.
 
 ## Frame rate
 
-Bubble Tea draws at most 60 frames a second by default. Animations in `anim` ask for 60 too. For smoother motion on
-fast terminals, raise both: `tea.WithFPS(120)` on the program, and `anim.FPS(120)` on your values or
-`bloom.WithFPS(120)` on the root for layout animation. Nothing is scheduled while nothing moves, so an idle program
-stays idle.
+Bubble Tea draws at most 60 frames a second by default, and animations in `anim` ask for 60 too. Nothing is
+scheduled while nothing moves, so an idle program stays idle. For smoother motion on fast terminals, raise both, up
+to Bubble Tea's limit of 120: `tea.WithFPS(120)` on the program, and [`anim.FPS(120)`](https://pkg.go.dev/bloomfx.dev/bloom/anim#FPS) on your values
+or [`bloom.WithFPS(120)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFPS) on the root for layout animation.
 
 The [dashboard example](https://github.com/lrstanley/bloom/tree/master/_examples/dashboard) runs at 120 frames a second and shows the time each frame takes:
 
@@ -76,10 +83,12 @@ a string. It doesn't keep anything between calls and shows animations at their t
 string is wanted: printing to stdout, inside a Lip Gloss layout, a component's `View` method, or tests. A width or
 height of zero uses the tree's natural size on that axis.
 
-`m.ui.Render(w, h, tree)` does the same with the root's caches, for programs that draw inline rather than in the
+[`m.ui.Render(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Render) does the same with the root's caches, for programs that draw inline rather than in the
 alternate screen, where a height of zero means "as tall as the content".
 
 ## Related
 
-- [Testing](/resources/testing)
+- [`Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root), [`Frame`](https://pkg.go.dev/bloomfx.dev/bloom#Frame), and [`Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) API reference
+- [How a bloom program runs](/concepts/how-a-program-runs)
+- [Testing](/bubble-tea/testing)
 - [Root options reference](/reference/options#root-options)

@@ -17,9 +17,9 @@ Every example except `basics` and `standard` has a recording of its tour below, 
 ## basics
 
 Layouts printed with `Render`, without a program: every slot, `Min` and `Max`, `Collapsible`, gaps, `Justify`,
-`Align`, `Space`, `Box`, wrapping text, `Centered`, and a layout inside Lip Gloss.
+`Align`, `Space`, `Box`, `Grid`, `Wrap`, wrapping and truncated text, `Centered`, and a layout inside Lip Gloss.
 
-See also: [Sizing with slots](/layout/slots), [Text, boxes, and alignment](/layout/text-and-boxes).
+See also: [Sizing with slots](/layout/slots), [Text](/content/text), [Boxes and borders](/content/borders).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/basics), or `go run ./basics`.
 
 ## standard
@@ -37,7 +37,7 @@ See also: [Build your first layout](/getting-started/first-layout).
 A gallery of the FIGlet fonts bundled with `fig`, and each of its paints: gradients by column, row, diagonal, and
 letter, a palette, a rainbow, metal, and letters filled in.
 
-See also: [FIGlet text](/layout/figlet-text).
+See also: [FIGlet text](/content/figlet-text).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/fig-fonts), or `go run ./fig-fonts`.
 
 ## responsive
@@ -47,15 +47,15 @@ See also: [FIGlet text](/layout/figlet-text).
 Panels collapsing by priority, `Percent`, a toolbar that rebuilds for its width, wrapping tags, paging with `Solve`
 in `Update`, wheel scrolling, and a "window too small" note from `MinSize`.
 
-See also: [Responsive layouts](/layout/responsive), [Sizes and positions in Update](/layout/sizes-in-update).
+See also: [Responsive layouts](/layout/responsive), [Sizes and positions in Update](/bubble-tea/sizes-in-update).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/responsive), or `go run ./responsive`.
 
 ## mouse
 
 ![The mouse example: a hover style following the pointer down a list, a click and a double click opening a file, the wheel scrolling it, and the divider dragged wider and narrower](/demos/mouse.webp)
 
-Mouse handlers with no IDs: hover styles, click and double click, wheel scrolling, a divider that keeps its drag, and
-`ThrottleMouse`.
+Mouse handlers with no IDs: hover styles, click and double click, wheel scrolling, a divider that keeps its drag,
+`ThrottleMouse`, and file text that can be selected and copied with <kbd>ctrl+c</kbd>.
 
 See also: [Mouse events](/input/mouse). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), or
 `go run ./mouse`.
@@ -68,7 +68,7 @@ A `Viewport` tailing a log of a quarter of a million lines that grows as it's sh
 words or scrolling sideways, line numbers, a search that marks its matches and moves between them, scrollbars on the
 border, and selecting text across the rows of a wrapped line.
 
-See also: [Viewports](/layout/viewports).
+See also: [Viewports](/content/viewports).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/logs), or `go run ./logs`.
 
 ## selection
@@ -91,7 +91,7 @@ and a double or triple click selects a word or a line. It covers six kinds of no
   rows in view. Its selection keeps the rows it starts and ends in as they scroll away, and copies every row it
   covers, the cells of a row joined with a space.
 
-See also: [Selecting and copying text](/input/selection), [Viewports](/layout/viewports), [Lists](/layout/lists).
+See also: [Selecting and copying text](/input/selection), [Viewports](/content/viewports), [Lists](/content/lists).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/selection), or `go run ./selection`.
 
 ## editor
@@ -103,7 +103,7 @@ moving by wrapped rows and words with the column kept, selecting with shift and 
 undo and redo from snapshots with the caret restored, wrapping toggled, and a status line with what each edit cost.
 Run it with a file to edit, or `-lines 1000000` for a million generated lines.
 
-See also: [Editing text](/layout/editing), [Viewports](/layout/viewports).
+See also: [Editing text](/input/editing), [Viewports](/content/viewports).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/editor), or `go run ./editor -lines 1000000`.
 
 ## contextmenu
@@ -157,13 +157,13 @@ A list with a title, clickable filter tabs, icon buttons, and its position on it
 with `ScrollbarOf` that can be dragged, a log in a `Viewport` scrolled sideways, text down a side, and each looping
 border effect.
 
-See also: [Text, boxes, and alignment](/layout/text-and-boxes#put-titles-and-more-on-a-border),
-[Scrolling](/layout/scrolling#show-a-scrollbar), [Effects reference](/reference/effects#borders).
+See also: [Boxes and borders](/content/borders#put-titles-and-more-on-a-border),
+[Scrolling](/content/scrolling#show-a-scrollbar), [Effects reference](/reference/effects#borders).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/borders), or `go run ./borders`.
 
 ## effects
 
-![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, and two Recolor backdrops in turn](/demos/effects.webp)
+![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, two Recolor, and two Braille backdrops in turn](/demos/effects.webp)
 
 Every effect as a looping transition, two custom effects, a `Drawable`, and each backdrop.
 
@@ -193,7 +193,8 @@ See also: [Feedback effects](/motion/feedback-effects).
 
 ![The ticker example: a scrolling news ticker above a list whose selected name scrolls when it doesn't fit, and a banner sliding in and out](/demos/ticker.webp)
 
-`Marquee` headlines and list items, and `anim.Sequence` for a banner and a pulse.
+`Marquee` headlines and list items, `anim.Sequence` loops for the headline bar and a pulse, and an `anim.Presence`
+for the banner.
 
 See also: [Feedback effects](/motion/feedback-effects#scroll-text-that-doesnt-fit), [Animating
 values](/motion/animating-values). [Source](https://github.com/lrstanley/bloom/tree/master/_examples/ticker), or `go
@@ -206,7 +207,7 @@ run ./ticker`.
 A FIGlet header that steps down to smaller fonts as the terminal narrows, with a shine swept across it by a
 `PaintFunc`, and a FIGlet toast on a transparent layer, so the panels show through it.
 
-See also: [FIGlet text](/layout/figlet-text#step-down-to-smaller-fonts), [Dialogs and
+See also: [FIGlet text](/content/figlet-text#step-down-to-smaller-fonts), [Dialogs and
 modals](/layers/dialogs#show-whats-beneath-a-layers-blank-cells).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/fig-mission), or `go run ./fig-mission`.
 
@@ -227,7 +228,7 @@ See also: [Layout animation](/motion/layout-animation).
 FIGlet text animated letter by letter: a title revealed with `Each`, a clock that's a `fig.Morph`, and an anagram
 whose letters fly to their places with `Animate` and `fx.Fly`, and light up under the pointer with `OnGlyph`.
 
-See also: [FIGlet text](/layout/figlet-text#animate-it-letter-by-letter).
+See also: [FIGlet text](/content/figlet-text#animate-it-letter-by-letter).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/fig-letters), or `go run ./fig-letters`.
 
 ## dashboard
@@ -260,7 +261,7 @@ camera that scrolls with the selection. The code view opens from the selected fu
 code with chroma in the theme's colors from bubbletint's `chromatint`, and marks each call of the selected callee. Pass it a directory, and optionally package patterns, as with `go run ./golens ..`
 to explore bloom itself.
 
-See also: [Layout animation](/motion/layout-animation), [Scrolling](/layout/scrolling), [Dialogs](/layers/dialogs).
+See also: [Layout animation](/motion/layout-animation), [Scrolling](/content/scrolling), [Dialogs](/layers/dialogs).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/golens), or `go run ./golens [dir]`.
 
 ## Run and record them

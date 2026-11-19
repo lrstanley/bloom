@@ -33,7 +33,7 @@ Browse the themes at [lrstanley.github.io/bubbletint](https://lrstanley.github.i
 [steep](https://github.com/lrstanley/steep) is a test harness for terminal programs, including Bubble Tea programs
 and components. It runs your program in an emulated terminal, drives it with keys, text, mouse events, and resizes,
 waits for output, and compares snapshots. It can also record what happened as a GIF, WebP, video, or `.cast` file.
-bloom's examples are tested with it; see [Testing](/resources/testing).
+bloom's examples are tested with it; see [Testing](/bubble-tea/testing).
 
 ```console
 go get getsteep.dev/steep@latest
@@ -46,7 +46,7 @@ Read the docs at [getsteep.dev](https://getsteep.dev/).
 [bubblezone](https://github.com/lrstanley/bubblezone) tracks where parts of a view string were drawn, so you can
 tell which one a mouse event landed on. It's the choice for Bubble Tea v1 programs, which bloom doesn't support.
 On Bubble Tea v2, bloom does the same job with handlers on the nodes themselves; see
-[Migrating from bubblezone](/resources/migrating-from-bubblezone).
+[Migrating from bubblezone](/bubble-tea/migrating-from-bubblezone).
 
 ## The Charm ecosystem
 
@@ -56,7 +56,7 @@ bloom builds on [Charm](https://charm.land)'s libraries, and works alongside the
 | --- | --- |
 | [Bubble Tea](https://github.com/charmbracelet/bubbletea) | The framework: models, messages, commands, and the program loop. |
 | [Lip Gloss](https://github.com/charmbracelet/lipgloss) | Styles: colors, borders, padding. bloom's `Box` and `Text.Style` take Lip Gloss styles. |
-| [Bubbles](https://github.com/charmbracelet/bubbles) | Components: text inputs, viewports, lists, tables, spinners. See [Using Bubbles components](/layout/bubbles-components). |
+| [Bubbles](https://github.com/charmbracelet/bubbles) | Components: text inputs, viewports, lists, tables, spinners. See [Using Bubbles components](/bubble-tea/bubbles-components). |
 | [Ultraviolet](https://github.com/charmbracelet/ultraviolet) | The cell-based screen library under Bubble Tea v2. bloom's cells, and `Drawable`, come from it. |
 | [Glamour](https://github.com/charmbracelet/glamour) | Markdown rendered for the terminal, which you can place in a layout as text. |
 | [Huh](https://github.com/charmbracelet/huh) | Forms and prompts. |

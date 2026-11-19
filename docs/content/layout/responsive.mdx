@@ -13,8 +13,10 @@ The [responsive example](https://github.com/lrstanley/bloom/tree/master/_example
 
 ## Collapse panels when space runs out
 
-Mark slots `Collapsible(priority)` and set the `Min` of the slots that must stay usable. When the minimum sizes
-don't all fit, bloom drops collapsible slots, lowest priority first, along with the gap beside each.
+Mark slots [`Collapsible(priority)`](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.Collapsible) and set the `Min` of the slots that must stay
+usable. When the minimum sizes don't all fit, bloom drops collapsible slots, lowest priority first, along with the
+gap beside each. Slots with the same priority are dropped from the end first. A `Fixed` slot counts at its full
+size, and a `Fill` or `Auto` slot at its `Min`.
 
 ```go
 bloom.Row(
@@ -24,15 +26,16 @@ bloom.Row(
 )
 ```
 
-As the terminal narrows below 94 columns, the details panel goes first because its priority is lowest. Below
+As the terminal narrows below 94 columns (24 + 40 + 30), the details panel goes first because its priority is
+lowest. Below
 64 columns, the navigation goes too, and the reader has the whole width. Widen the terminal and they come back.
 
-A collapsed slot isn't drawn and has no rectangle, so `frame.Rect(id)` reports `false` for it. You can use that to
+A collapsed slot isn't drawn and has no rectangle, so [`m.ui.Frame().Rect(id)`](https://pkg.go.dev/bloomfx.dev/bloom#Frame.Rect) reports `false` for it. You can use that to
 show a hint, such as a key to open the missing panel.
 
 ## Size by percentage
 
-`Percent(p, c)` gives a child `p` percent of its container, which keeps proportions as the terminal resizes:
+[`Percent(p, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Percent) gives a child `p` percent of its container, which keeps proportions as the terminal resizes:
 
 ```go
 bloom.Row(
@@ -76,7 +79,8 @@ func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 ```
 
 `Layout` may be called more than once a frame, while bloom measures as well as for the final layout, so it must
-not change the component. Treat it like `View`: read state, return nodes.
+not change the component. Treat it like `View`: read state, return nodes. [Writing components](/bubble-tea/writing-components)
+covers the rest of what a component like this can do, such as handling its own clicks.
 
 ## Switch between a row and a column
 
@@ -106,8 +110,8 @@ func (e editor) Layout(ctx bloom.Context) bloom.Child {
 ## Show a note when the window is too small
 
 Some layouts can't be used below a certain size, however much collapses. Wrap the root of the layout in
-`MinSize(w, h, child)`, and in a smaller window bloom draws one line in its place, centered, and faded toward the
-terminal's background:
+[`MinSize(w, h, child)`](https://pkg.go.dev/bloomfx.dev/bloom#MinSize), and in a smaller window bloom draws
+one line in its place, centered, and faded toward the terminal's background:
 
 ```go
 func (m *model) View() tea.View {
@@ -133,15 +137,16 @@ case tea.KeyPressMsg:
 	}
 ```
 
-Because the minimum is part of the tree, it can change from frame to frame, such as by page, and `MinSize` can
-wrap a single panel as well as the whole screen. Where it fits, its natural size is at least its minimum, so in
-an `Auto` slot, or drawn at its natural height, it's given that much.
+`MinSize` can also wrap a single panel, and its limits can change from frame to frame, such as by page. In an
+`Auto` slot, or when drawn at its natural size, it's given at least its minimum.
 
 For a note of your own, check the size yourself and return it from your layout in place of the rest.
 
 ## Related
 
+- [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) and [`MinSize`](https://pkg.go.dev/bloomfx.dev/bloom#MinSize) API reference
 - [Sizing with slots](/layout/slots)
-- [Sizes and positions in Update](/layout/sizes-in-update)
+- [Writing components](/bubble-tea/writing-components)
+- [Sizes and positions in Update](/bubble-tea/sizes-in-update)
 - The [`responsive` example](https://github.com/lrstanley/bloom/tree/master/_examples/responsive), which combines
   all of these

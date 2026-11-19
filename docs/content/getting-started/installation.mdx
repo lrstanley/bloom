@@ -10,8 +10,7 @@ description: Add bloom to a Go module, and the versions of Go, Bubble Tea, and L
 - **[Lip Gloss v2](https://github.com/charmbracelet/lipgloss)**, imported as `charm.land/lipgloss/v2`, for
   styling text and boxes.
 
-bloom isn't built for Bubble Tea v1. Its views are `tea.View` values, and its mouse routing uses the `OnMouse`
-handler that v2 views have.
+bloom isn't built for Bubble Tea v1. Its views are `tea.View` values, which only v2 has.
 
 ## Install
 
@@ -26,19 +25,20 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim" // animated values, for transitions
 	"bloomfx.dev/bloom/fx"   // effects, for transitions and backdrops
+	"bloomfx.dev/bloom/on"   // mouse handlers
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 ```
 
 <Callout type="warn" title="Expect breaking changes">
-  bloom is pre-1.0, and its API may still change significantly before v1.0.0. Pin the version in your
-  `go.mod` and read the release notes before upgrading.
+  bloom is pre-1.0. Pin the version in your `go.mod` and read the
+  [release notes](https://github.com/lrstanley/bloom/releases) before upgrading.
 </Callout>
 
 ## Check that it works
 
-This program prints a two-column layout and exits. It uses `bloom.Render`, which turns a layout into a string
+This program prints a two-column layout and exits. It uses [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render), which turns a layout into a string
 without running a Bubble Tea program, so it's an easy way to try layouts out.
 
 ```go

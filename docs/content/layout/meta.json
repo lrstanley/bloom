@@ -1,1 +1,1 @@
-{ "title": "Layout", "pages": ["slots", "responsive", "text-and-boxes", "figlet-text", "grids-and-wrapping", "scrolling", "viewports", "editing", "lists", "sizes-in-update", "bubbles-components"] }
+{ "title": "Layout", "pages": ["slots", "alignment", "grids-and-wrapping", "responsive"] }

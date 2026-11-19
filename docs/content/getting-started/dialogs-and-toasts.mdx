@@ -16,7 +16,7 @@ a notification in the corner that hides itself after two seconds.
 │                    │  Delete "Groceries"?       │                    │
 │                    │  This can't be undone.     │                    │
 │                    │                            │                    │
-│                    │    Cancel      Delete      │                    │
+│                    │      Cancel      Delete    │                    │
 │                    │                            │                    │
 │                    ╰────────────────────────────╯                    │
 ╰──────────────────────╯╰──────────────────────────────────────────────╯
@@ -74,11 +74,12 @@ Add a color, and styles for the dialog and its buttons, to the `var` block:
 	surface = lipgloss.Color("#393552")
 
 	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(rose).Padding(1, 2)
-	button    = lipgloss.NewStyle().Padding(0, 2).Background(surface)
-	buttonOn  = button.Foreground(dark).Background(rose).Bold(true)
+	btn       = lipgloss.NewStyle().Padding(0, 2).Background(surface)
+	btnOn     = btn.Foreground(dark).Background(rose).Bold(true)
 ```
 
-Then, in `View`, keep the column you already have as `base`, build the dialog, and render both:
+Then, in `View`, rename the `layout` column from the last tutorial to `base`, and change its hint text to
+`" ↑/↓ choose, d delete, q quit"`. Build the dialog, and render both:
 
 ```go
 	title := ""
@@ -91,8 +92,8 @@ Then, in `View`, keep the column you already have as `base`, build the dialog, a
 		bloom.Fixed(1, nil),
 		bloom.Row(
 			bloom.Space(),
-			bloom.Text("Cancel").Style(button),
-			bloom.Text("Delete").Style(button),
+			bloom.Text("Cancel").Style(btn),
+			bloom.Text("Delete").Style(btn),
 		).Gap(2),
 	)
 	dialog := bloom.Layer(bloom.Box(dialogBox, content))
@@ -100,7 +101,7 @@ Then, in `View`, keep the column you already have as `base`, build the dialog, a
 	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog))
 ```
 
-`title` is the selected note's title, or empty once every note is deleted. `bloom.Fixed(1, nil)` is a blank
+`title` is the selected note's title, or empty once every note is deleted, which the last step makes possible. `bloom.Fixed(1, nil)` is a blank
 row, and `bloom.Space()` is empty space that grows, pushing the buttons to the right. `Gap(2)` puts two columns
 between the children of the row.
 
@@ -179,8 +180,7 @@ type buttonID string
 const confirmDialog = "confirm"
 ```
 
-And a `bloom.Focus` to the model. Its type parameter is the type of the IDs it moves between, so this one moves
-between buttons:
+And a [`bloom.Focus`](/input/focus) to the model. It moves between nodes whose IDs are `buttonID`:
 
 ```go
 	focus bloom.Focus[buttonID]
@@ -192,9 +192,9 @@ pressed while it has focus:
 
 ```go
 func (m *model) button(id buttonID, label string) bloom.Child {
-	style := button
+	style := btn
 	if m.focus.Is(id) {
-		style = buttonOn
+		style = btnOn
 	}
 	return bloom.Text(label).Style(style).ID(id).Focusable().
 		On(on.Press(func() tea.Cmd { return m.press(id) }))
@@ -261,9 +261,8 @@ in a `cmd` variable, declared with `var cmd tea.Cmd` at the top of `Update`, and
 	return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
 ```
 
-The rest of the keys move out of `Update` into a `key` method. While the dialog is open, <kbd>esc</kbd> closes
-it and the keys for the notes behind it do nothing. Otherwise the keys work as before, except that
-<kbd>d</kbd> now calls `openDialog`:
+The other keys move into a `key` method, which ignores all but <kbd>esc</kbd> while the dialog is open, so the
+notes behind it can't change. <kbd>d</kbd> now calls `openDialog`:
 
 ```go
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
@@ -325,15 +324,18 @@ the layer goes on each axis: `bloom.Start`, `bloom.Center`, or `bloom.End`.
 	v := m.ui.View(m.width, m.height, bloom.Overlay(base, dialog, toast))
 ```
 
-Give it its own presence, `toast anim.Presence`, and a `deleted string` field for the message, with the presence
-created with `anim.NewPresence()`, and add it to
-`anim.Update(msg, &m.confirm, &m.toast)`.
+Add two fields to the model, `toast anim.Presence` and `deleted string`, and create the presence in `newModel`
+with `toast: anim.NewPresence()`. Pass it to `anim.Update` too: `anim.Update(msg, &m.confirm, &m.toast)`.
 
 Now make **Delete** delete. Import `slices`, and replace `press` with one that removes the selected note and
-shows the toast. `ShowFor` shows it and hides it again after a duration, with no timer messages of your own:
+shows the toast. `ShowFor` shows it and hides it again after a duration, with no timer messages of your own. A
+layer still takes clicks while it animates out, so `press` ignores them once the dialog is no longer shown:
 
 ```go
 func (m *model) press(id buttonID) tea.Cmd {
+	if !m.confirm.Shown() {
+		return nil // the dialog is animating out
+	}
 	if id == "delete" {
 		m.deleted = m.notes[m.selected].title
 		m.notes = slices.Delete(m.notes, m.selected, m.selected+1)
@@ -407,8 +409,8 @@ var (
 	prose     = lipgloss.NewStyle().Padding(0, 1)
 	status    = lipgloss.NewStyle().Foreground(subtle)
 	dialogBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(rose).Padding(1, 2)
-	button    = lipgloss.NewStyle().Padding(0, 2).Background(surface)
-	buttonOn  = button.Foreground(dark).Background(rose).Bold(true)
+	btn       = lipgloss.NewStyle().Padding(0, 2).Background(surface)
+	btnOn     = btn.Foreground(dark).Background(rose).Bold(true)
 	toastBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(teal).Padding(0, 1)
 )
 
@@ -497,6 +499,9 @@ func (m *model) closeDialog() tea.Cmd {
 }
 
 func (m *model) press(id buttonID) tea.Cmd {
+	if !m.confirm.Shown() {
+		return nil // the dialog is animating out
+	}
 	if id == "delete" {
 		m.deleted = m.notes[m.selected].title
 		m.notes = slices.Delete(m.notes, m.selected, m.selected+1)
@@ -507,9 +512,9 @@ func (m *model) press(id buttonID) tea.Cmd {
 }
 
 func (m *model) button(id buttonID, label string) bloom.Child {
-	style := button
+	style := btn
 	if m.focus.Is(id) {
-		style = buttonOn
+		style = btnOn
 	}
 	return bloom.Text(label).Style(style).ID(id).Focusable().
 		On(on.Press(func() tea.Cmd { return m.press(id) }))
@@ -589,12 +594,12 @@ func main() {
 
 ## What you learned
 
-- `Overlay` draws `Layer`s over a base layout, and `Anchor` and `Margin` place them.
-- `Modal` keeps every mouse event from what's beneath a layer, `on.ClickOutside` runs for a click on its
+- [`Overlay`](https://pkg.go.dev/bloomfx.dev/bloom#Overlay) draws [`Layer`](https://pkg.go.dev/bloomfx.dev/bloom#Layer)s over a base layout, and `Anchor` and `Margin` place them.
+- `Modal` keeps every mouse event from what's beneath a layer, [`on.ClickOutside`](https://pkg.go.dev/bloomfx.dev/bloom/on#ClickOutside) runs for a click on its
   backdrop, and `Backdrop` applies an effect to everything beneath it.
-- An `anim.Presence` animates showing and hiding; `Layer(...).Presence(p, effects...)` uses it as a transition.
-  Pass every message to `anim.Update` so animations keep moving.
-- `bloom.Focus` tracks keyboard focus, and `Push` and `Pop` confine it to a dialog while it's open.
+- An [`anim.Presence`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Presence) animates showing and hiding; `Layer(...).Presence(p, effects...)` uses it as a transition.
+  Pass every message to [`anim.Update`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Update) so animations keep moving.
+- [`bloom.Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) tracks keyboard focus, and `Push` and `Pop` confine it to a dialog while it's open.
 - `ShowFor` shows something for a while, then hides it.
 
 ## Next steps

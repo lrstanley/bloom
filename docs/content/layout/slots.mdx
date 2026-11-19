@@ -29,8 +29,8 @@ bloom.Row(
 | --- | --- | --- | --- |
 | [`Fixed(n, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fixed) | exactly `n` cells | no | no |
 | [`Auto(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Auto), or `c` with no slot | the child's natural size | no | yes, down to its `Min` |
-| [`Fill(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fill) | an equal share of the space left over | yes | yes, down to its `Min` |
-| [`Grow(w, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Grow) | `w` shares of the space left over | yes, by weight | yes, down to its `Min` |
+| [`Fill(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fill) | an equal share of the space left over | yes | gets only what's left, down to its `Min` |
+| [`Grow(w, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Grow) | `w` shares of the space left over | yes, by weight | gets only what's left, down to its `Min` |
 | [`Percent(p, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Percent) | `p`% of the row or column | no | yes, down to its `Min` |
 
 "Space left over" is what remains after the `Fixed`, `Auto`, and `Percent` slots, and the gaps, are placed. `Fill`
@@ -51,7 +51,8 @@ bloom.Row(
 )
 ```
 
-The minimum is zero unless you set one, so without `Min` a slot can be squeezed to nothing. When the minimums
+The minimum is zero unless you set one, so without `Min` a `Fill`, `Auto`, or `Percent` slot can be squeezed to
+nothing. A `Fixed` slot's minimum is its size. When the minimums
 don't all fit, see [Responsive layouts](/layout/responsive) for dropping slots with `Collapsible`.
 
 ## Leave empty space
@@ -68,7 +69,7 @@ left                     right
 ```
 
 To put the same space between every pair of children, use `Gap`, described in
-[Text, boxes, and alignment](/layout/text-and-boxes#space-children-evenly).
+[Alignment and spacing](/layout/alignment#put-a-gap-between-children).
 
 ## Slots in a column
 
@@ -92,7 +93,8 @@ bloom.Column(
 
 Slots are where the other per-child options live: `ID` for focus and lookups, `On` for
 [mouse handlers](/input/mouse), `Focusable` and `Scope` for [focus](/input/focus), `Align` for the cross axis, and
-`Animate` for [layout animation](/motion/layout-animation).
+`Animate` for [layout animation](/motion/layout-animation). [IDs](/concepts/how-a-program-runs#ids) explains when a
+node needs one.
 
 ```go
 bloom.Fixed(24, sidebar).ID(paneSidebar).Collapsible(1)
@@ -101,5 +103,7 @@ bloom.Fixed(24, sidebar).ID(paneSidebar).Collapsible(1)
 ## Related
 
 - [`SlotNode` API reference](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode)
-- [Responsive layouts](/layout/responsive)
+- [Alignment and spacing](/layout/alignment)
+- [Grids and wrapping](/layout/grids-and-wrapping)
+- [Responsive layouts](/layout/responsive), for `Collapsible`
 - [How layout works](/concepts/how-layout-works)

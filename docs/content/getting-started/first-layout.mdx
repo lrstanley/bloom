@@ -172,7 +172,17 @@ var (
 )
 ```
 
-Add a `selected int` field to the model, then build the sidebar from the notes in `View`:
+Add a `selected` field to the model, the index of the note being shown:
+
+```go
+type model struct {
+	ui            *bloom.Root
+	width, height int
+	selected      int
+}
+```
+
+Then build the sidebar from the notes in `View`:
 
 ```go
 func (m *model) View() tea.View {
@@ -210,7 +220,7 @@ func (m *model) View() tea.View {
 `Truncate` keeps the status bar on one line and cuts it short with "…" when the terminal is narrow, rather than
 letting it wrap onto a second row.
 
-Then handle the arrow keys in `Update`, next to the quit keys:
+Then replace the quit check in `Update` with a `switch` that also handles the arrow keys:
 
 ```go
 	case tea.KeyPressMsg:
@@ -246,9 +256,9 @@ Give each sidebar item a click handler in `View`:
 
 The view `m.ui.View` returns turns on mouse reporting by itself, now that a node in the layout takes clicks.
 
-A click on a note now runs its handler. bloom works out which node the pointer is over, and runs the handler on
-the Bubble Tea event loop just before `Update`, so it can change the model directly, as `Update` does. That works
-because `View` has a pointer receiver: the handler captures `m`, the model itself, not a copy.
+bloom works out which node the pointer is over and runs its handler on the Bubble Tea event loop, just before
+`Update`, so the handler can change the model directly. This works because `View` has a pointer receiver: the
+handler captures `m` itself, not a copy.
 
 </Step>
 <Step>
@@ -386,11 +396,11 @@ func main() {
 
 ## What you learned
 
-- A `*bloom.Root` renders your layout from `View`, and gets every message in `Update`.
-- `Row` and `Column` share space between children, and the slot a child is in decides its share: `Fixed`,
+- A [`*bloom.Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) renders your layout from `View`, and gets every message in `Update`.
+- [`Row`](https://pkg.go.dev/bloomfx.dev/bloom#Row) and [`Column`](https://pkg.go.dev/bloomfx.dev/bloom#Column) share space between children, and the slot a child is in decides its share: `Fixed`,
   `Fill`, or its natural size.
-- `Box` draws a Lip Gloss border around a child, and `Text(...).Style(...)` styles and wraps text.
-- `On` attaches mouse handlers from the `on` package to the node they're about, and they can change the model
+- [`Box`](https://pkg.go.dev/bloomfx.dev/bloom#Box) draws a Lip Gloss border around a child, and `Text(...).Style(...)` styles and wraps text.
+- `On` attaches mouse handlers from the [`on`](https://pkg.go.dev/bloomfx.dev/bloom/on) package to the node they're about, and they can change the model
   directly.
 - `Min` and `Collapsible` decide what gives way when space runs out.
 

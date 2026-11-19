@@ -1,0 +1,319 @@
+---
+title: Writing components
+description: Build reusable components that lay themselves out for their space, report their size, handle their own mouse events, keep their IDs apart from other instances, and take keys from their parent.
+---
+
+Any type with a `View() string` method can go in a bloom layout, so a component you already have needs nothing
+bloom-specific. This page is about components that go further: ones that change shape with their size, handle their
+own clicks, and can appear more than once on a screen.
+
+It builds a row of tabs as the example. The [complete component](#the-complete-component) is at the end.
+
+## Lay out for the space you're given
+
+A component that implements [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) returns a bloom
+layout instead of a string. bloom calls its `Layout` method with a
+[`bloom.Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context), whose `Width` and `Height` are the space it has:
+
+```go
+type Tabs struct {
+	Labels []string
+	Active int
+}
+
+func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
+	// Not room for every label in full. A width of zero is its natural size, such as from View.
+	short := ctx.Width > 0 && ctx.Width < t.width()
+	tabs := make([]bloom.Child, len(t.Labels))
+	for i, label := range t.Labels {
+		if short {
+			label = ansi.Truncate(label, 1, "")
+		}
+		style := tabStyle
+		if i == t.Active {
+			style = activeStyle
+		}
+		tabs[i] = bloom.Text(label).Style(style)
+	}
+	return bloom.Row(tabs...)
+}
+```
+
+```
+ inbox  sent  drafts     wide enough
+ i  s  d                 narrow
+```
+
+`Layout` may be called more than once a frame, while bloom measures as well as for the final layout, so it must not
+change the component. Treat it like `View`: read state, return nodes. [Responsive layouts](/layout/responsive) has
+more on changing shape with size.
+
+A `Layouter` still needs a `View` method, for when it's used outside a bloom layout, such as by a program that
+doesn't use bloom. [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) with a size of zero draws the
+layout at its natural size:
+
+```go
+func (t *Tabs) View() string {
+	return bloom.Render(0, 0, t.Layout(bloom.Context{}))
+}
+```
+
+## Report a natural size
+
+A component that isn't a `Layouter` is measured by rendering its view. When it knows its size without that, it can
+say so by implementing [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer). A status bar is one row
+tall at any width:
+
+```go
+type statusbar struct{ text string }
+
+func (s statusbar) View() string { return " " + s.text }
+
+func (s statusbar) Measure(bloom.Size) bloom.Size {
+	return bloom.Size{W: lipgloss.Width(s.View()), H: 1}
+}
+```
+
+Return the size the component needs, not the space it's offered: when a layout is drawn at its natural size, the
+space offered is unbounded. The result is clamped to the space there is.
+
+## Handle the mouse inside the component
+
+A component can put [mouse handlers](/input/mouse) on the nodes it returns, so the parent doesn't need to know
+where its parts are. A handler can change the component, as long as it reaches the real one rather than a copy:
+give the component pointer receivers, and put a pointer to it in the tree.
+
+```go
+tabs[i] = bloom.Text(label).Style(style).
+	On(on.Click(func() tea.Cmd { return t.pick(i) }))
+```
+
+```go
+func (t *Tabs) pick(i int) tea.Cmd {
+	t.Active = i
+	id := t.ID
+	return func() tea.Msg { return TabMsg{ID: id, Active: i} }
+}
+```
+
+The handler changes the tabs, then returns a command that tells the parent, which handles `TabMsg` in its `Update`
+like any other message. The parent keeps the tabs by value and places a pointer to them:
+
+```go
+type model struct {
+	ui   *bloom.Root
+	main Tabs
+	// ...
+}
+
+// in View
+bloom.Column(bloom.Auto(&m.main), bloom.Fill(body))
+```
+
+With value receivers, or `m.main` in place of `&m.main`, the click changes a copy and does nothing. If a component
+must be kept by value, such as one written for Bubble Tea's usual `m.c, cmd = m.c.Update(msg)` pattern, have its
+handlers send a message with `on.Msg` and change state in its own `Update` instead. See
+[Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+
+### Read the frame from a handler
+
+A component has no root to ask where things went, so its handlers read the frame from the `Context` that `Layout`
+was given. `ctx.Frame()` returns the frame on screen when it's called, which in a handler is the frame the event
+landed in. Called from `Layout` itself, it's the frame before, and outside a root, such as with `Render`, it's nil.
+A [list in a component](/content/lists#lists-in-components) uses it to scroll from where the list actually was.
+
+### Know which side a layer opened on
+
+A component drawn in a layer [anchored](/layers/dropdowns) to a node can ask `ctx.Side()` which side of the node the
+layer was placed against, which flips when it doesn't fit. A dropdown uses it to draw its open edge facing its
+field.
+
+## Give each instance its own IDs
+
+[IDs](/concepts/how-a-program-runs#ids) must be unique in a frame, and two instances of `Tabs` on one screen would
+otherwise give their nodes the same ones. Have the parent give each instance an ID, and build the IDs of its parts
+from it:
+
+```go
+type Tabs struct {
+	ID     any // set by the parent, unique to this instance
+	Labels []string
+	Active int
+}
+
+// tabID is the ID of one tab of a Tabs.
+type tabID struct {
+	tabs any
+	i    int
+}
+
+// in Layout
+tabs[i] = bloom.Text(label).Style(style).ID(tabID{t.ID, i})
+// ...
+return bloom.Row(tabs...).ID(t.ID).Focusable()
+```
+
+Taking the ID as `any` lets the parent use its own ID type, so the component's root node joins the parent's
+[focus](/input/focus) order. A `Focus` moves between nodes whose IDs have its type, whatever the field's type:
+
+```go
+type control int
+
+const (
+	tabsMain control = iota
+	tabsSide
+)
+
+m.main = Tabs{ID: tabsMain, Labels: []string{"inbox", "sent", "drafts"}}
+m.side = Tabs{ID: tabsSide, Labels: []string{"people", "labels"}}
+```
+
+The ID must be comparable, like any ID. The unexported `tabID` type keeps the parts' IDs apart from everything
+else's, and the parent can still find one, such as with `m.ui.Frame().Rect(...)`, if the component exports a way
+to make it.
+
+## Take keys from the parent
+
+Keys aren't routed to nodes; they go to the parent's `Update`. Give the component an `Update` method of its own, and
+have the parent call it while the component has focus. For a click on the tabs to focus them, give the root the
+parent's focus with [`bloom.WithFocus(&m.focus)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus):
+
+```go
+// Update moves between tabs with the arrow keys.
+func (t *Tabs) Update(msg tea.Msg) tea.Cmd {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch msg.String() {
+		case "left":
+			return t.pick(max(t.Active-1, 0))
+		case "right":
+			return t.pick(min(t.Active+1, len(t.Labels)-1))
+		}
+	}
+	return nil
+}
+```
+
+```go
+	case tea.KeyPressMsg:
+		cmd, ok := m.focus.Update(msg, m.ui.Frame())
+		if !ok {
+			switch id, _ := m.focus.Current(); id {
+			case tabsMain:
+				cmd = m.main.Update(msg)
+			case tabsSide:
+				cmd = m.side.Update(msg)
+			}
+		}
+```
+
+Pass on any other messages the component needs, such as its own `TabMsg` or animation frames, the same way. See
+[Route keys to the focused node](/input/focus#route-keys-to-the-focused-node).
+
+## The complete component
+
+```go title="tabs.go"
+package main
+
+import (
+	"bloomfx.dev/bloom"
+	"bloomfx.dev/bloom/on"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+)
+
+var (
+	tabStyle    = lipgloss.NewStyle().Padding(0, 1)
+	activeStyle = tabStyle.Reverse(true)
+)
+
+// Tabs is a row of tabs, one of which is active.
+type Tabs struct {
+	ID     any // set by the parent, unique to this instance
+	Labels []string
+	Active int
+}
+
+// TabMsg is sent when the user picks a tab.
+type TabMsg struct {
+	ID     any
+	Active int
+}
+
+// tabID is the ID of one tab of a Tabs.
+type tabID struct {
+	tabs any
+	i    int
+}
+
+// View draws the tabs on their own, outside a bloom layout.
+func (t *Tabs) View() string {
+	return bloom.Render(0, 0, t.Layout(bloom.Context{}))
+}
+
+// Layout shows each label in full when there's room, and only its first
+// letter when there isn't.
+func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
+	short := ctx.Width > 0 && ctx.Width < t.width() // zero is its natural size
+	tabs := make([]bloom.Child, len(t.Labels))
+	for i, label := range t.Labels {
+		if short {
+			label = ansi.Truncate(label, 1, "")
+		}
+		style := tabStyle
+		if i == t.Active {
+			style = activeStyle
+		}
+		tabs[i] = bloom.Text(label).Style(style).ID(tabID{t.ID, i}).
+			On(on.Click(func() tea.Cmd { return t.pick(i) }))
+	}
+	return bloom.Row(tabs...).ID(t.ID).Focusable()
+}
+
+// Update moves between tabs with the arrow keys. The parent calls it while
+// the tabs have focus.
+func (t *Tabs) Update(msg tea.Msg) tea.Cmd {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch msg.String() {
+		case "left":
+			return t.pick(max(t.Active-1, 0))
+		case "right":
+			return t.pick(min(t.Active+1, len(t.Labels)-1))
+		}
+	}
+	return nil
+}
+
+func (t *Tabs) pick(i int) tea.Cmd {
+	t.Active = i
+	id := t.ID
+	return func() tea.Msg { return TabMsg{ID: id, Active: i} }
+}
+
+// width is how wide the tabs are with their full labels.
+func (t *Tabs) width() int {
+	w := 0
+	for _, label := range t.Labels {
+		w += ansi.StringWidth(label) + tabStyle.GetHorizontalFrameSize()
+	}
+	return w
+}
+```
+
+A test can click a tab by its ID, with [`m.ui.Click`](/bubble-tea/testing):
+
+```go
+m.View()
+if _, ok := m.ui.Click(tabID{tabsMain, 1}); !ok || m.main.Active != 1 {
+	t.Fatal("the sent tab was not picked")
+}
+```
+
+## Related
+
+- [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter), [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer),
+  and [`Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context) API reference
+- [How a bloom program runs](/concepts/how-a-program-runs#ids), for what IDs are for
+- [Responsive layouts](/layout/responsive)
+- [Keep the dropdown with its component](/layers/dropdowns#keep-the-dropdown-with-its-component)
+- [Using Bubbles components](/bubble-tea/bubbles-components)

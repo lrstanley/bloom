@@ -10,6 +10,8 @@ import { withBase } from "../lib/site";
 
 const install = "go get bloomfx.dev/bloom@latest";
 
+const requirements = "Needs Go 1.27+, Bubble Tea v2, and Lip Gloss v2.";
+
 const tagline = "Layout, motion, and effects for Bubble Tea.";
 
 const summary =
@@ -90,7 +92,7 @@ const chores = [
         title: "Scrolling a huge log",
         without: "Slice out the lines in sight, wrap them again on every resize, and keep the same line at the top.",
         code: "bloom.Viewport(m.log).At(m.pos).Follow()",
-        href: "/layout/viewports",
+        href: "/content/viewports",
     },
     {
         title: "Selecting and copying text",
@@ -141,8 +143,8 @@ const paths = [
         title: "Bringing bloom to an existing app",
         body: "Your model and components stay as they are. Anything with a View() string drops into a layout.",
         links: [
-            { text: "Introduction", href: "/getting-started/introduction" },
-            { text: "Using Bubbles components", href: "/layout/bubbles-components" },
+            { text: "Add bloom to an existing program", href: "/getting-started/existing-app" },
+            { text: "Using Bubbles components", href: "/bubble-tea/bubbles-components" },
             { text: "How layout works", href: "/concepts/how-layout-works" },
         ],
     },
@@ -188,6 +190,8 @@ ${summary}
 \`\`\`console
 ${install}
 \`\`\`
+
+${requirements} See [Installation](/getting-started/installation#requirements).
 
 ## All of it in one program
 
@@ -257,7 +261,7 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                         <CopyInstall text={install} />
                         <p className="bloom-notice">
                             <span className="bloom-chip">Pre-1.0</span>
-                            Expect breaking changes until v1.0.0.
+                            Expect breaking changes until v1.0.0. {requirements}
                         </p>
                     </div>
                     <div className="bloom-hero-demo">

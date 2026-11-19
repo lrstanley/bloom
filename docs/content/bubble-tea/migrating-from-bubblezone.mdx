@@ -16,8 +16,7 @@ bubblezone's successor for programs on Bubble Tea v2.
 
 bubblezone v2, `github.com/lrstanley/bubblezone/v2`, also runs on Bubble Tea v2, and a program that already uses
 it and builds its view as one string can stay on it. It may not work with Lip Gloss v2's canvas and compositor,
-though. For a new Bubble Tea v2 program, or one that's adding layers,
-dialogs, or more mouse handling, use bloom.
+though. For a new Bubble Tea v2 program, or one that's adding layers, dialogs, or more mouse handling, use bloom.
 
 ## What changes
 
@@ -37,10 +36,9 @@ What you gain:
   that trims a string can't cut a zone in half.
 - **More kinds of input.** Hover, drags, double clicks, and clicks outside a node are
   [built in](/input/mouse#attach-handlers), along with keyboard [focus](/input/focus).
-- **No global state.** There's no manager to start and no background worker to close. Handlers don't need IDs,
-  so there are no prefixes to keep components apart. When you do need an ID, it can be any comparable value: a
-  type such as `type itemID int` keeps one kind of component's IDs apart from another's, though two instances of
-  the same component still need different values.
+- **No global state.** There's no manager to start and no background worker to close, and since handlers don't
+  need IDs, no prefixes to keep components apart. See [IDs](/concepts/how-a-program-runs#ids) for when you do need
+  one.
 - **Layout, layers, and motion come with it.** bloom also sizes panes, draws dialogs and toasts over the screen,
   and animates them. See the [introduction](/getting-started/introduction#why-bloom-exists).
 
@@ -58,9 +56,9 @@ What you give up:
 
 | bubblezone | bloom |
 | --- | --- |
-| `zone.NewGlobal()`, `zone.New()` | `bloom.New()`, kept in your model as a `*bloom.Root`. |
+| `zone.NewGlobal()`, `zone.New()` | [`bloom.New()`](https://pkg.go.dev/bloomfx.dev/bloom#New), kept in your model as a `*bloom.Root`. |
 | `zone.Scan(view)` in the root `View` | `m.ui.View(width, height, layout)`, which returns the `tea.View`. |
-| `zone.Mark(id, s)` | `bloom.Text(s).On(...)` with a handler. Add `.ID(id)` only when something else needs to find the node. |
+| `zone.Mark(id, s)` | `bloom.Text(s).On(...)` with a handler, or `.On(...)` on the `Box` or slot that holds it. Add `.ID(id)` only when something else needs to find the node. |
 | `zone.Get(id).InBounds(msg)` in `Update` | A handler on the node, such as `on.Click(fn)`. |
 | `zone.Get(id).Pos(msg)` | `on.ClickAt(func(e on.Event) tea.Cmd)`, with `e.X` and `e.Y` relative to the node. |
 | Checking `InBounds` on motion events for hover | `HoverStyle(style)`, or `on.Hover(fn)`. |
@@ -126,8 +124,9 @@ func main() {
 
 ### Add a root to the model
 
-Replace `zone.NewGlobal()` with a `*bloom.Root` in the model. bloom needs the window's size, so keep that too, and
-pass every message to `m.ui.Update`:
+`zone.NewGlobal()` becomes a `*bloom.Root` in the model. Set it up as in
+[Add bloom to an existing program](/getting-started/existing-app#add-a-root): keep the window's size, return
+`m.ui.Init()` from `Init`, pass every message to `m.ui.Update`, and give the methods pointer receivers:
 
 ```go
 type model struct {
@@ -156,7 +155,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 m := &model{ui: bloom.New(), items: []string{"Groceries", "Ideas", "Reading"}}
 ```
 
-The `tea.MouseReleaseMsg` case is gone. The methods now have pointer receivers, which the next step relies on.
+The `tea.MouseReleaseMsg` case is gone: the next step puts the click on the node.
 
 </Step>
 <Step>
@@ -188,10 +187,8 @@ func (m *model) View() tea.View {
 
 The `v.MouseMode` line is gone too: `m.ui.View` turns on the mouse reporting the frame's handlers need.
 
-The handler is a closure made in `View`, so it can only change the model through a pointer receiver. With a value
-receiver it changes a copy, and the click does nothing. When a handler can't reach the state, such as in a
-component kept by value, have it send a message with `on.Msg` instead. See
-[Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+The handler is a closure made in `View`, so it changes the model through the pointer receiver from the last step.
+See [Change state, or send a message](/input/mouse#change-state-or-send-a-message) for components kept by value.
 
 </Step>
 <Step>
@@ -213,6 +210,7 @@ draws text, so a `zone.Mark` inside a bloom layout never registers a zone.
 ## Related
 
 - [Mouse events](/input/mouse), for every handler and how bloom picks the node that gets an event
+- [Add bloom to an existing program](/getting-started/existing-app), for the rest of the move, such as sizing panes
 - [Build your first layout](/getting-started/first-layout), a tutorial that starts from an empty screen
-- [Using Bubbles components](/layout/bubbles-components), for components you used to wrap in `zone.Mark`
+- [Using Bubbles components](/bubble-tea/bubbles-components), for components you used to wrap in `zone.Mark`
 - [bubblezone on GitHub](https://github.com/lrstanley/bubblezone)

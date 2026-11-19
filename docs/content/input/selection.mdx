@@ -17,7 +17,7 @@ its own selection, and a list of ten thousand requests:
 ## Make text selectable
 
 `Selectable()` lets the left button select text in a node. Every node has it, from text and boxes to
-[viewports](/layout/viewports) and [lists](/layout/lists), except a `Drawable`, a `Scrollbar`, and a `TooltipSink`,
+[viewports](/content/viewports) and [lists](/content/lists), except a `Drawable`, a `Scrollbar`, and a `TooltipSink`,
 which have no text of their own:
 
 ```go
@@ -28,11 +28,11 @@ A selection can run across every node inside the selectable one, such as from a 
 but not out of it. On a box, only what's inside its frame is selected. When selectable nodes are inside each other,
 the innermost one under the pointer takes the drag.
 
-Selecting needs drags, which need only the motion reported while a button is down. The view from `m.ui.View` turns
-that on while a node is selectable.
+Selecting needs drag events, which `tea.MouseModeCellMotion` reports. The view from `m.ui.View` asks for it while
+any node is selectable.
 
-The root keeps the selection, and sends itself ticks while selecting, so pass every message to `m.ui.Update`, as
-you do for the rest of bloom.
+Pass every message to `m.ui.Update` and return its command, as you do for the rest of bloom: the root keeps the
+selection, and sends itself ticks while selecting.
 
 ## How the mouse selects
 
@@ -56,11 +56,11 @@ In a viewport, a double click finds the word in the buffer's text rather than in
 that wraps across rows is selected whole. A buffer can have word characters of its own, set with
 `buf.SetWordChars(chars)`, which its viewport uses in place of the root's. `Buffer.WordAt`, `NextWord`, and
 `PrevWord` find words with the same characters as the double click does, the buffer's or else the root's: see
-[words](/layout/editing#words).
+[words](/input/editing#words).
 
 ## Read what's selected
 
-When a drag that selected some text ends, the root sends a `bloom.SelectionMsg` with the text, and the ID of the node
+When a drag that selected some text ends, the root sends a [`bloom.SelectionMsg`](https://pkg.go.dev/bloomfx.dev/bloom#SelectionMsg) with the text, and the ID of the node
 it was selected in, or of its nearest ancestor with one:
 
 ```go
@@ -77,16 +77,16 @@ click, `m.ui.ClearSelection()`, or a copy.
 
 A selection reads the text of the nodes it covers, rather than the cells drawn:
 
-- All of a `Text`, including the lines scrolled out of sight in a [`Scroll`](/layout/scrolling).
+- All of a `Text`, including the lines scrolled out of sight in a [`Scroll`](/content/scrolling).
 - Text that a style wrapped to fit, joined back into the lines it was.
-- Text [cut short with `Truncate`](/layout/text-and-boxes#keep-text-on-one-line), copied whole.
+- Text [cut short with `Truncate`](/content/text#keep-text-on-one-line), copied whole.
 - A viewport's lines, including those scrolled away, without its line numbers and gutters.
 - What a component draws, read from its cells, or what it says it shows, if it implements
   [`TextSource`](#components-that-know-their-text).
 - The text of a component that scrolls or wraps its own, if it implements
   [`TextMap`](#components-that-scroll-their-own-text), or that edits it, if it implements
   [`Editable`](#components-that-edit-their-text).
-- Every item of a [list](/layout/lists) the selection covers, including those scrolled out of view: see
+- Every item of a [list](/content/lists) the selection covers, including those scrolled out of view: see
   [Selections in a list](#selections-in-a-list).
 
 What's drawn around the text, such as a box's border, padding, and the edges on it, isn't selected.
@@ -121,7 +121,7 @@ The text is sent to the terminal's clipboard with OSC 52, which reaches the clip
 runs on, even over SSH. Not every terminal allows it, and those that do don't answer, so there's no telling whether
 it arrived.
 
-`bloom.WithClipboard(write)` writes to the system clipboard as well, first, with a function you give it, such as one
+[`bloom.WithClipboard(write)`](https://pkg.go.dev/bloomfx.dev/bloom#WithClipboard) writes to the system clipboard as well, first, with a function you give it, such as one
 that runs `wl-copy`, `xclip`, or `pbcopy`. A function that can't reach a system clipboard, such as over SSH, should
 return `nil` and leave the copy to OSC 52:
 
@@ -164,10 +164,10 @@ case "esc":
 Dragging past the edge of what's shown of a selectable node scrolls it while the pointer is held there,
 the way the wheel would:
 
-- A [viewport](/layout/viewports#select-text) scrolls through its `OnScroll`.
-- Text in a [`Scroll`](/layout/scrolling) scrolls through the `on.Scroll` handler on the node around it, the one the
+- A [viewport](/content/viewports#select-text) scrolls through its `OnScroll`.
+- Text in a [`Scroll`](/content/scrolling) scrolls through the `on.Scroll` handler on the node around it, the one the
   wheel uses.
-- A [list](/layout/lists) scrolls through its `on.Scroll` handler, and the selection takes each item that scrolls
+- A [list](/content/lists) scrolls through its `on.Scroll` handler, and the selection takes each item that scrolls
   into view.
 
 ```go
@@ -184,7 +184,7 @@ A viewport keeps its selection as places in its buffer's text, not as cells, so 
 text whatever happens around it:
 
 - Scrolled either way, or resized so its lines wrap differently, or switched to another `Wrap` mode.
-- Lines appended, as a log grows, or its first lines taken out, as a [capped log](/layout/viewports#cap-a-log)
+- Lines appended, as a log grows, or its first lines taken out, as a [capped log](/content/viewports#cap-a-log)
   takes them.
 - The buffer edited before the selection, inside it, or after it, with `Replace`, `Insert`, `Delete`, or `Edit`.
 
@@ -321,7 +321,7 @@ func (r *reader) Cells(from, to bloom.Pos, size bloom.Size, row func(y, x0, x1 i
 func (r *reader) Text(from, to bloom.Pos) string
 ```
 
-A `bloom.Pos` is a line of your text and a byte of that line, as in a [buffer](/layout/viewports#edit-the-text).
+A `bloom.Pos` is a line of your text and a byte of that line, as in a [buffer](/content/viewports#edit-the-text).
 `to` and `x1` are exclusive. bloom may pass positions past the end of a line or of the text, for "to the end", so
 clamp them.
 
@@ -344,7 +344,7 @@ the frame. If its text changes under a selection, clearing the selection is up t
 
 An editor or an input has a caret, which is one end of its selection, and the keyboard makes and moves the
 selection as often as the mouse does. To edit the lines of a `Buffer`, give a viewport a caret, which does all of
-this for you: see [Editing text](/layout/editing). For a component of your own, implement `bloom.Editable`, a
+this for you: see [Editing text](/input/editing). For a component of your own, implement `bloom.Editable`, a
 `TextMap` that keeps its own range, with its caret at `Head`:
 
 ```go
@@ -391,8 +391,9 @@ the mouse selects, not for what your component selects.
 ## Related
 
 - [Mouse events](/input/mouse)
-- [Viewports](/layout/viewports)
-- [Lists](/layout/lists)
-- [Editing text](/layout/editing), for a viewport with a caret
+- [Viewports](/content/viewports)
+- [Lists](/content/lists)
+- [Editing text](/input/editing), for a viewport with a caret
 - The [`selection` example](https://github.com/lrstanley/bloom/tree/master/_examples/selection)
-- [`Root.Selection` API reference](https://pkg.go.dev/bloomfx.dev/bloom#Root.Selection)
+- [`Root.Selection`](https://pkg.go.dev/bloomfx.dev/bloom#Root.Selection), [`SelectionMsg`](https://pkg.go.dev/bloomfx.dev/bloom#SelectionMsg), [`TextSource`](https://pkg.go.dev/bloomfx.dev/bloom#TextSource),
+  [`TextMap`](https://pkg.go.dev/bloomfx.dev/bloom#TextMap), and [`Editable`](https://pkg.go.dev/bloomfx.dev/bloom#Editable) API reference

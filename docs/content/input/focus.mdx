@@ -9,8 +9,8 @@ layout is the tab order.
 
 ## Make nodes focusable
 
-Focus refers to nodes by ID, so give everything that can take focus an ID of the same type. A type of your own,
-with a constant for each node, keeps them apart from other IDs:
+Focus refers to nodes by [ID](/concepts/how-a-program-runs#ids), so give everything that can take focus an ID of
+the same type. A type of your own, with a constant for each node, keeps them apart from other IDs:
 
 ```go
 // control is the ID of a node that can take focus.
@@ -63,7 +63,7 @@ reports whether it handled the message:
 `m.ui.Frame()` is the layout of the last frame drawn, which has the nodes that can be focused and their order.
 Focus wraps around from the last node to the first.
 
-To move focus to what's clicked, give the root your focus with `bloom.WithFocus`:
+To move focus to what's clicked, give the root your focus with [`bloom.WithFocus`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus):
 
 ```go
 func newModel() *model {
@@ -73,12 +73,14 @@ func newModel() *model {
 }
 ```
 
-A click then focuses the innermost focusable node under the pointer, before any [mouse handler](/input/mouse) for
-the click runs, so a handler can move focus on from there, as a "next" button would. The root keeps a pointer to
-your `Focus`, so keep the model behind a pointer too.
+A click then focuses the innermost focusable node under the pointer, then runs [mouse handlers](/input/mouse), so
+a handler can move focus again, as a "next" button would. The root keeps a pointer to your `Focus`, so keep the
+model behind a pointer too.
 
 You can also move focus yourself: `Set(id)`, `Next(frame)`, `Prev(frame)`, and `Clear()`. `Set` takes an ID of the
-focus's type, so `m.focus.Set("cancel")` sets the `control` `"cancel"`.
+focus's type, so `m.focus.Set("cancel")` sets the `control` `"cancel"`. `Set` doesn't check the node: it can be
+one that isn't focusable, or is outside the current scope, and `Is` reports it focused anyway. `Next` and `Prev`
+report whether they found a node to move to.
 
 ## Press buttons with the keyboard
 
@@ -163,7 +165,7 @@ layer covers that cell. `ansi` here is `github.com/charmbracelet/x/ansi`, which 
 the terminal does.
 
 For Bubbles text inputs, use the cursor the component reports; see
-[Using Bubbles components](/layout/bubbles-components#show-the-terminal-cursor).
+[Using Bubbles components](/bubble-tea/bubbles-components#show-the-terminal-cursor).
 
 ## Keep focus inside a dialog
 
@@ -210,7 +212,7 @@ if m.focus.Within(m.ui.Frame(), scopeForm) {
 
 ## Related
 
-- [`Focus` API reference](https://pkg.go.dev/bloomfx.dev/bloom#Focus)
+- [`Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) and [`WithFocus`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus) API reference
 - [Dialogs and modals](/layers/dialogs)
 - The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with focusable inputs,
   buttons, and stacked dialog scopes

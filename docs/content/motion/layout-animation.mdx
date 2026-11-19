@@ -29,7 +29,8 @@ going this way:
 
 ## Requirements
 
-Layout animation is kept by the `*bloom.Root` between frames, so it needs three things:
+Layout animation is kept by the `*bloom.Root` between frames, so it needs three things. Without them, `Animate`
+does nothing, with no error:
 
 - **An ID** on each animated slot or layer, so bloom can match it from one frame to the next.
 - **A `Root`**, rendering with `m.ui.View`. `bloom.Render` and `bloom.Solve` don't keep state between calls, and
@@ -110,7 +111,7 @@ was last laid out. To move slots your own way, write an effect that
 `m.ui.Frame().Rect(id)` reports where a node was drawn on screen, so mid-animation it's the in-between
 rectangle. A node that [moves with effects](#move-with-effects) is laid out where it goes from the first frame, so
 it reports that. `bloom.Solve` reports where the layout is headed. Use `Solve` when you need final sizes in `Update`,
-such as to [size a Bubbles component](/layout/bubbles-components).
+such as to [size a Bubbles component](/bubble-tea/bubbles-components).
 
 ## When to use a Value instead
 

@@ -88,9 +88,10 @@ one item at a time:
 fx.Stagger{Effect: fx.Slide{From: bloom.Left}, From: bloom.Top}
 ```
 
-`From` is the side the first part is at: `Top` and `Bottom` split the node into rows, and `Left` and `Right` into
-columns. Parts are whole rows or columns, so a corner is taken as its top or bottom side. `Spread` is how much of the progress is spent starting the parts; the default, 0.5, starts the last part
-when the first is halfway done.
+`From` is the side the first part is at. `Top` and `Bottom` split the node into rows, `Left` and `Right` into
+columns, and a corner counts as its top or bottom side. The default is `Bottom`, which starts with the last row.
+`Spread` is how much of the progress is spent starting the parts: the default, 0.5, starts the last part when the
+first is halfway done.
 
 ### Run in sequence with Delay
 
