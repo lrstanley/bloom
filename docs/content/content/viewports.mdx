@@ -195,15 +195,17 @@ and keeps that, so scrolling and appending don't wrap anything again.
 ## Line numbers and gutters
 
 `LineNumbers(style)` draws the number of each line beside it, as wide as the largest number. Rows that continue a
-wrapped line have none.
+wrapped line, and rows below the last line, have none, but are still drawn in `style`, so a background runs the
+viewport's full height.
 
 `Gutter(width, fn)` draws a column of what `fn` returns for each row in sight, such as a marker beside changed lines
 or a breakpoint. The `GutterRow` it gets has the `Line` the row shows, and `Continued` for the rows after the first
-of a wrapped line:
+of a wrapped line. The column runs the viewport's full height: below the last line, `fn` is called with a `Line` of
+`-1`, to draw the gutter's background there, a `~`, or nothing:
 
 ```go
 bloom.Viewport(m.file).LineNumbers(muted).Gutter(2, func(r bloom.GutterRow) string {
-	if !r.Continued && m.changed[r.Line] {
+	if r.Line >= 0 && !r.Continued && m.changed[r.Line] {
 		return changed.Render("▎")
 	}
 	return ""

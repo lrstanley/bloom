@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1072,6 +1073,53 @@ func TestViewportGutters(t *testing.T) {
 	c := canvas.Parse(Render(10, 1, Viewport(b).LineNumbers(lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")))), ansi.GraphemeWidth)
 	if c.CellAt(1, 0).Style.Fg == nil || c.CellAt(4, 0).Style.Fg != nil {
 		t.Fatal("line numbers drawn without their style, or the line with it")
+	}
+}
+
+func TestViewportGuttersPastEnd(t *testing.T) {
+	t.Parallel()
+
+	tilde := func(row GutterRow) string {
+		if row.Line == -1 {
+			return "~"
+		}
+		return strconv.Itoa(row.Line)
+	}
+	// The gutter runs down past the last line, with Line -1 there.
+	wantRender(t, 4, 4, Viewport(NewBuffer("a\nb")).Gutter(2, tilde),
+		"0 a ",
+		"1 b ",
+		"~   ",
+		"~   ")
+	// As it does for an empty buffer, whose rows are all past its end.
+	wantRender(t, 4, 2, Viewport(NewBuffer("")).Gutter(2, tilde),
+		"~   ",
+		"~   ")
+	// With no room for the lines, which rows have one is not known, so
+	// none are drawn as past the end.
+	wantRender(t, 2, 3, Viewport(NewBuffer("a")).Gutter(2, tilde),
+		"  ",
+		"  ",
+		"  ")
+
+	// Line numbers leave the rows past the end blank, in their style,
+	// beside the viewport's own style in the text.
+	bg, fill := lipgloss.Color("#112233"), lipgloss.Color("#445566")
+	c := canvas.Parse(Render(6, 4, Viewport(NewBuffer("a\nb")).Style(lipgloss.NewStyle().Background(fill)).
+		LineNumbers(lipgloss.NewStyle().Background(bg))), ansi.GraphemeWidth)
+	for y := range 4 {
+		for x := range 6 {
+			want := fill
+			if x < 2 {
+				want = bg
+			}
+			if got := c.CellAt(x, y).Style.Bg; got == nil || !sameRGBA(got, want) {
+				t.Fatalf("cell %d,%d background %v, want %v", x, y, got, want)
+			}
+		}
+		if y >= 2 && strings.TrimSpace(c.CellAt(0, y).Content+c.CellAt(1, y).Content) != "" {
+			t.Fatalf("row %d past the end numbered", y)
+		}
 	}
 }
 

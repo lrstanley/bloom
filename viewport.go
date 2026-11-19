@@ -126,7 +126,8 @@ func (n ViewportNode) Follow() ViewportNode { n.follow = true; return n }
 
 // GutterRow is a row of a [Viewport] that a gutter is drawn beside.
 type GutterRow struct {
-	// Line is the line the row shows.
+	// Line is the line the row shows, or -1 for a row below the last line,
+	// which shows none.
 	Line int
 	// Continued is set for a row after the first of a line that wraps.
 	Continued bool
@@ -146,8 +147,10 @@ type gutter struct {
 // Gutter draws a column width cells wide on the left of the lines, beside
 // them, with what fn returns for each row in sight, such as a marker for a
 // changed line or a breakpoint. Text wider than the gutter is cut off.
-// Gutters are drawn left to right in the order given, and take their space
-// from the lines.
+// The column runs the viewport's full height: fn is also called for the
+// rows below the last line, with a Line of -1, such as to carry the
+// gutter's background down, or draw a "~". Gutters are drawn left to right
+// in the order given, and take their space from the lines.
 func (n ViewportNode) Gutter(width int, fn func(row GutterRow) string) ViewportNode {
 	if width <= 0 || fn == nil {
 		return n
@@ -158,7 +161,8 @@ func (n ViewportNode) Gutter(width int, fn func(row GutterRow) string) ViewportN
 
 // LineNumbers draws the number of each line, from 1, in a gutter on the
 // left as wide as the largest number and a space, drawn in style's colors
-// and attributes. Rows that continue a wrapped line have none.
+// and attributes. Rows that continue a wrapped line, and those below the
+// last line, have none, but are drawn in style.
 func (n ViewportNode) LineNumbers(style lipgloss.Style) ViewportNode {
 	n.gutters = append(slices.Clip(n.gutters), gutter{numbers: styleSGR(nil, style), lines: true})
 	return n
@@ -315,7 +319,7 @@ func (g *gutter) text(row GutterRow, w int) string {
 	var b strings.Builder
 	b.Grow(w + len(g.numbers) + len(ansi.ResetStyle))
 	b.WriteString(g.numbers)
-	if row.Continued {
+	if row.Continued || row.Line < 0 {
 		b.WriteString(strings.Repeat(" ", w))
 	} else {
 		num := strconv.Itoa(row.Line + 1)
@@ -681,6 +685,7 @@ type vpLayout struct {
 	view    ViewportView
 	content image.Rectangle
 	rows    [2]int
+	past    int // how many rows at the bottom are below the last line
 }
 
 // measureViewport returns the natural size of viewport n within avail: as
@@ -750,7 +755,12 @@ func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 	m := n.buf.s.Measure(e.method)
 	x := n.buf.s.Index(e.method, linebuf.Mode(n.wrap), w)
 	v.Lines, v.Width, v.Widest, v.TotalRows = lines, w, m.Widest, x.Total()
-	if lines == 0 || w <= 0 {
+	switch {
+	case lines == 0:
+		l.past = h
+		return
+	case w <= 0:
+		// No room for the lines, so which rows have one is not worked out.
 		return
 	}
 
@@ -775,6 +785,7 @@ func (e *engine) viewportRows(l *vpLayout, n ViewportNode, lines int) {
 	}
 
 	e.vpRows = x.InSight(line, sub, h, col, e.vpRows)
+	l.past = h - (len(e.vpRows) - l.rows[0])
 }
 
 // viewportOf returns how box i, a viewport, was laid out.
@@ -842,14 +853,7 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 	lineSGR, marks, markLine := "", r.vpMarks[:0], -1
 	for k, row := range rows {
 		y := content.Min.Y + k
-		gx := r.boxes[i].rect.Min.X
-		for g := range n.gutters {
-			gt := &n.gutters[g]
-			w := gt.size(buf.Len())
-			text := gt.text(GutterRow{Line: row.Line, Continued: row.Sub > 0, Lines: buf.Len()}, w)
-			r.blitText(text, n.trusted, image.Rect(gx, y, gx+w, y+1), vis.Intersect(image.Rect(gx, y, content.Min.X, y+1)))
-			gx += w
-		}
+		r.paintGutters(i, n, y, GutterRow{Line: row.Line, Continued: row.Sub > 0, Lines: buf.Len()}, vis)
 
 		if row.Line != markLine {
 			markLine, lineSGR, marks = row.Line, n.style, marks[:0]
@@ -875,11 +879,27 @@ func (r *renderer) paintViewport(i int, n ViewportNode, vis image.Rectangle) {
 		r.blitText(text, n.trusted, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
 	}
 	r.vpMarks = marks[:0]
+	for y := content.Max.Y - l.past; y < content.Max.Y; y++ {
+		r.paintGutters(i, n, y, GutterRow{Line: -1, Lines: l.view.Lines}, vis)
+	}
 	if n.style != "" && len(rows) < content.Dy() {
 		blank := n.style + strings.Repeat(" ", content.Dx()) + ansi.ResetStyle
 		for y := content.Min.Y + len(rows); y < content.Max.Y; y++ {
 			r.blit(blank, image.Rect(content.Min.X, y, content.Max.X, y+1), vis)
 		}
+	}
+}
+
+// paintGutters adds the ops that draw the gutters of viewport n, box i,
+// beside row, at y, inside vis.
+func (r *renderer) paintGutters(i int, n ViewportNode, y int, row GutterRow, vis image.Rectangle) {
+	end := r.viewportOf(i).content.Min.X
+	gx := r.boxes[i].rect.Min.X
+	for g := range n.gutters {
+		gt := &n.gutters[g]
+		w := gt.size(row.Lines)
+		r.blitText(gt.text(row, w), n.trusted, image.Rect(gx, y, gx+w, y+1), vis.Intersect(image.Rect(gx, y, end, y+1)))
+		gx += w
 	}
 }
 
