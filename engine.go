@@ -95,6 +95,7 @@ type engine struct {
 	vpRows     []linebuf.RowSpan // the rows they show, in spans
 	motion     *motion.Tracker   // nil for pooled renderers, which keep no state between frames
 	screen     func() *Frame     // the Root's frame on screen, for Context.Frame; nil outside a Root
+	lastFrame  func() *Frame     // the Root's frame drawn last, which the screen can be behind; nil outside a Root
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point

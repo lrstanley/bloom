@@ -129,6 +129,7 @@ func New(opts ...Option) *Root {
 	}
 	r.r.motion = motion.New(c.now)
 	r.r.screen = r.handlerFrame
+	r.r.lastFrame = r.Frame
 	r.r.selPaint.Style = textsel.NewStyle(cellStyle(c.selStyle), c.selStyled)
 	r.r.rooted = true
 	r.r.words.Chars = defaultWordChars

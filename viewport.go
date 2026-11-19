@@ -787,9 +787,9 @@ func (e *engine) viewportOf(i int) *vpLayout {
 
 // viewportScroll returns the wheel handler of viewport n, the box at path
 // with key, which finds where it was scrolled to in the frame the event is
-// in.
+// in, or in the frame drawn last when that still shows the same buffer.
 func (e *engine) viewportScroll(n ViewportNode, key nodeKey) on.Handler {
-	screen, fn := e.screen, n.onScroll
+	screen, lastFrame, fn := e.screen, e.lastFrame, n.onScroll
 	return on.Scroll(func(dx, dy int) tea.Cmd {
 		if screen == nil {
 			return nil
@@ -800,6 +800,16 @@ func (e *engine) viewportScroll(n ViewportNode, key nodeKey) on.Handler {
 			return nil
 		}
 		v := f.entries[k].vp
+		// A step goes from the frame drawn last, which has what the model made
+		// of the events before this one: a terminal can send several wheel
+		// events before the screen is redrawn, and each would otherwise step
+		// from the same place. The buffer must match, as a node without an ID
+		// is found by where it is, which another viewport may have taken.
+		if l := lastFrame(); l != nil && l != f {
+			if j := l.find(key); j >= 0 && l.entries[j].isVP && l.entries[j].vp.buf == v.buf {
+				v = l.entries[j].vp
+			}
+		}
 		p := v.Pos
 		switch {
 		case dy != 0:

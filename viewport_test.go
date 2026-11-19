@@ -985,6 +985,31 @@ func TestViewportWheel(t *testing.T) {
 	}
 }
 
+// TestViewportWheelBeforeRedraw checks that wheel events that come before
+// the screen is redrawn each scroll a step. Bubble Tea gives mouse events to
+// the view last flushed to the terminal, at its frame rate, though View runs
+// after every Update.
+func TestViewportWheelBeforeRedraw(t *testing.T) {
+	t.Parallel()
+
+	b := NewBuffer(strings.Repeat("line\n", 40))
+	r := New()
+	var pos ViewportPos
+	tree := func() Child {
+		return Viewport(b).At(pos).OnScroll(func(p ViewportPos) tea.Cmd { pos = p; return nil })
+	}
+	wheel := tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown}
+	flushed := r.View(10, 5, tree())
+	for range 4 {
+		flushed.OnMouse(wheel)
+		r.Update(wheel)
+		r.View(10, 5, tree())
+	}
+	if pos != (ViewportPos{Line: 12}) {
+		t.Fatalf("4 steps before a redraw scrolled to %+v, want line 12", pos)
+	}
+}
+
 func TestViewportScrollbar(t *testing.T) {
 	t.Parallel()
 
