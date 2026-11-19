@@ -152,6 +152,7 @@ pre {
   --td-cream: #fff1d6;
   --td-plum: #2b1328;
   --td-dur: 6s;
+  min-width: 0;
   margin: 0;
 }
 
@@ -446,30 +447,25 @@ pre {
   width: 100%;
 }
 
+#nd-home-layout {
+  background-image: radial-gradient(38rem 26rem at 72% 24rem, rgb(255 111 145 / 0.12), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+.dark #nd-home-layout {
+  background-image:
+    radial-gradient(40rem 28rem at 72% 24rem, #2b1328, transparent 70%),
+    radial-gradient(22rem 16rem at 72% 24rem, rgb(255 111 145 / 0.1), transparent 70%);
+}
+
 .bloom-hero {
-  position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 3rem;
   align-items: center;
   max-width: var(--home-width);
   margin: 0 auto;
   padding: clamp(2.5rem, 7vw, 5.5rem) 1.5rem clamp(3rem, 6vw, 5rem);
-}
-
-.bloom-hero::before {
-  content: "";
-  position: absolute;
-  inset: -4rem -10rem auto -10rem;
-  height: 44rem;
-  z-index: -1;
-  background: radial-gradient(38rem 26rem at 72% 42%, rgb(255 111 145 / 0.12), transparent 70%);
-  pointer-events: none;
-}
-
-.dark .bloom-hero::before {
-  background:
-    radial-gradient(40rem 28rem at 72% 42%, #2b1328, transparent 70%),
-    radial-gradient(22rem 16rem at 72% 42%, rgb(255 111 145 / 0.1), transparent 70%);
 }
 
 @media (min-width: 64rem) {
@@ -612,10 +608,6 @@ pre {
   text-transform: uppercase;
 }
 
-.bloom-hero-demo {
-  min-width: 0;
-}
-
 .bloom-section {
   max-width: var(--home-width);
   margin: 0 auto;
@@ -646,9 +638,14 @@ pre {
 
 .bloom-chore {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.35rem 2rem;
   padding: 1.1rem 0;
   border-bottom: 1px solid var(--color-fd-border);
+}
+
+.bloom-chore > * {
+  min-width: 0;
 }
 
 @media (min-width: 68rem) {
@@ -673,6 +670,7 @@ pre {
 
 .brand-code {
   margin: 0;
+  max-width: 100%;
   overflow-x: auto;
   font-family: var(--font-display);
   font-stretch: 87.5%;
