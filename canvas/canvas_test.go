@@ -210,6 +210,27 @@ func TestMixer(t *testing.T) {
 	}
 }
 
+// TestMixerNil checks that a nil color is no color to move from or toward,
+// rather than a panic: the other color is returned as it is.
+func TestMixerNil(t *testing.T) {
+	t.Parallel()
+
+	var m Mixer
+	white := color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	if got := m.Mix(nil, white, 0.5); got != color.Color(white) {
+		t.Fatalf("Mix(nil, white) = %v", got)
+	}
+	if got := m.Mix(white, nil, 0.5); got != color.Color(white) {
+		t.Fatalf("Mix(white, nil) = %v", got)
+	}
+	if got := m.Mix(nil, nil, 0.5); got != nil {
+		t.Fatalf("Mix(nil, nil) = %v", got)
+	}
+	if got := m.Gray(nil, 1); got != nil {
+		t.Fatalf("Gray(nil) = %v", got)
+	}
+}
+
 // benchFrame is a 200×60 frame of styled text.
 func benchFrame() string {
 	var b strings.Builder

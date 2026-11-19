@@ -89,13 +89,24 @@ type Mixer struct {
 }
 
 // Mix returns the color t of the way from a to b, so a at t=0 and b at t=1.
-// Neither color may be nil.
+// A nil color is no color to move from or toward, so with one nil, Mix
+// returns the other, and with both nil, nil.
 func (m *Mixer) Mix(a, b color.Color, t float64) color.Color {
+	switch {
+	case a == nil:
+		return b
+	case b == nil:
+		return a
+	}
 	return m.blend(opMix, a, b, t)
 }
 
-// Gray returns c moved t of the way toward its own luminance.
+// Gray returns c moved t of the way toward its own luminance, or nil for a
+// nil c.
 func (m *Mixer) Gray(c color.Color, t float64) color.Color {
+	if c == nil {
+		return nil
+	}
 	return m.blend(opGray, c, c, t)
 }
 
