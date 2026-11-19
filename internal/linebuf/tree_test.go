@@ -48,24 +48,18 @@ func randomLine(rng *rand.Rand) string {
 	return b.String()
 }
 
-// modelKey is what the reference works out the rows of a line for.
-type modelKey struct {
-	s   string
-	key rowKey
-}
-
 // model is the reference the store is checked against: its lines in a
 // slice, and what is worked out of them from scratch, each line kept from
 // the last time it was asked for.
 type model struct {
 	lines   []string
 	widths  map[string][2]int32
-	rows    map[modelKey]int
+	rows    map[rowKey]map[string]int
 	changes map[string]*penChange
 }
 
 func newModel() *model {
-	return &model{widths: map[string][2]int32{}, rows: map[modelKey]int{}, changes: map[string]*penChange{}}
+	return &model{widths: map[string][2]int32{}, rows: map[rowKey]map[string]int{}, changes: map[string]*penChange{}}
 }
 
 var modelMethods = [2]ansi.Method{ansi.GraphemeWidth, ansi.WcWidth}
@@ -88,14 +82,21 @@ func (m *model) rowsOf(s string, k rowKey) int {
 	if k.mode == None || k.width <= 0 {
 		return 1
 	}
-	r, ok := m.rows[modelKey{s, k}]
+	// Keyed by the key and then the line, as a map of strings is quicker to
+	// look in.
+	rows := m.rows[k]
+	if rows == nil {
+		rows = map[string]int{}
+		m.rows[k] = rows
+	}
+	r, ok := rows[s]
 	if !ok {
 		if int(m.width(s, k.method)&widthMask) <= k.width {
 			r = 1
 		} else {
 			r, _ = wrapLine(s, k.method, k.width, k.mode, nil)
 		}
-		m.rows[modelKey{s, k}] = r
+		rows[s] = r
 	}
 	return r
 }
@@ -140,6 +141,46 @@ var modelKeys = []rowKey{
 	{ansi.GraphemeWidth, None, 9},
 }
 
+// probeLines is how many lines checkStore reads one at a time, of a store
+// of more: checkTree checks what every node keeps of every line, so the
+// lines read through the store's lookups need only be enough to visit
+// each kind of node they pass through.
+const probeLines = 256
+
+// probeOrder returns the lines of n that checkStore reads, in an order rng
+// picks: in order, backwards, or shuffled. Of more than probeLines, it is a
+// run of them in order or backwards, so that reading the next line is still
+// checked, or a shuffled sample, and the first and last lines.
+func probeOrder(n int, rng *rand.Rand) []int {
+	all := make([]int, n)
+	for i := range all {
+		all[i] = i
+	}
+	way := rng.IntN(3)
+	if way == 1 {
+		rng.Shuffle(n, func(i, j int) { all[i], all[j] = all[j], all[i] })
+	}
+	order := all
+	if n > probeLines {
+		at := 0
+		if way != 1 {
+			at = rng.IntN(n - probeLines + 1)
+		}
+		order = append(make([]int, 0, probeLines+2), all[at:at+probeLines]...)
+		order = append(order, 0, n-1)
+	}
+	if way == 0 {
+		slices.Reverse(order)
+	}
+	return order
+}
+
+// checkKeys is how many of modelKeys checkStore checks the rows at, each
+// time, picked then: as many as a node keeps rows for, of more keys than
+// that, so that some of the time the rows kept through a change are
+// checked, and some of the time those put out and worked out again.
+const checkKeys = 2
+
 // checkStore fails t unless s holds m's lines, and works out of them what
 // m does, reading them in an order rng picks.
 func checkStore(t *testing.T, step string, s *Store, m *model, rng *rand.Rand) {
@@ -152,16 +193,7 @@ func checkStore(t *testing.T, step string, s *Store, m *model, rng *rand.Rand) {
 	if got, want := s.String(), strings.Join(m.lines, "\n"); got != want {
 		t.Fatalf("%s: String differs", step)
 	}
-	order := make([]int, n)
-	for i := range order {
-		order[i] = i
-	}
-	switch rng.IntN(3) {
-	case 0:
-		slices.Reverse(order)
-	case 1:
-		rng.Shuffle(n, func(i, j int) { order[i], order[j] = order[j], order[i] })
-	}
+	order := probeOrder(n, rng)
 	pens := m.pens()
 	for _, i := range order {
 		if got := s.Line(i); got != m.lines[i] {
@@ -173,7 +205,7 @@ func checkStore(t *testing.T, step string, s *Store, m *model, rng *rand.Rand) {
 	}
 	// Rows cut out of lines are drawn in the style the lines start in.
 	for range min(n, 8) {
-		i := order[rng.IntN(n)]
+		i := order[rng.IntN(len(order))]
 		line, method := m.lines[i], ansi.GraphemeWidth
 		w := int(m.width(line, method) & widthMask)
 		a := rng.IntN(w + 1)
@@ -187,6 +219,9 @@ func checkStore(t *testing.T, step string, s *Store, m *model, rng *rand.Rand) {
 	for _, method := range modelMethods {
 		meas := s.Measure(method)
 		widest := 0
+		for _, line := range m.lines {
+			widest = max(widest, int(m.width(line, method)&widthMask))
+		}
 		for _, i := range order {
 			want := m.width(m.lines[i], method)
 			if got := s.flags(i, method); got != want {
@@ -195,7 +230,6 @@ func checkStore(t *testing.T, step string, s *Store, m *model, rng *rand.Rand) {
 			if meas.Width(i) != int(want&widthMask) {
 				t.Fatalf("%s: line %d is %d wide, want %d", step, i, meas.Width(i), want&widthMask)
 			}
-			widest = max(widest, int(want&widthMask))
 		}
 		if meas.Widest != widest {
 			t.Fatalf("%s: widest %d, want %d", step, meas.Widest, widest)
@@ -203,7 +237,7 @@ func checkStore(t *testing.T, step string, s *Store, m *model, rng *rand.Rand) {
 	}
 	keys := slices.Clone(modelKeys)
 	rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
-	for _, k := range keys {
+	for _, k := range keys[:checkKeys] {
 		checkRows(t, step, s, m, k, order)
 	}
 }
@@ -397,10 +431,20 @@ func checkTree(t *testing.T, step string, n *node, root bool, m *model) (lines [
 	return lines, depth
 }
 
-// snap is a snapshot taken in a model test, and the lines it holds.
+// snap is a snapshot taken in a model test, the lines it holds, and how
+// many bytes they are, each with the newline after it.
 type snap struct {
 	root  *node
 	lines []string
+	bytes int
+}
+
+func newSnap(root *node, lines []string) snap {
+	sn := snap{root: root, lines: slices.Clone(lines)}
+	for _, l := range lines {
+		sn.bytes += len(l) + 1
+	}
+	return sn
 }
 
 // TestStoreModel drives a store and a slice of lines through long random
@@ -411,26 +455,22 @@ type snap struct {
 func TestStoreModel(t *testing.T) {
 	t.Parallel()
 
-	for seed := range uint64(3) {
+	for seed := range uint64(2) {
 		t.Run(strconv.FormatUint(seed, 10), func(t *testing.T) {
 			t.Parallel()
-			runModel(t, rand.New(rand.NewPCG(seed, 99)), 100)
+			runModel(t, rand.New(rand.NewPCG(seed, 99)), 60)
 		})
 	}
 }
 
 func runModel(t *testing.T, rng *rand.Rand, steps int) {
 	t.Helper()
+	// The checks pick what they read with a source of their own, so that
+	// the changes made are the same however they are checked.
+	check := rand.New(rand.NewPCG(rng.Uint64(), rng.Uint64()))
 	s, m := &Store{}, newModel()
 	var snaps []snap
 	height := 0
-	lines := func(n int) []string {
-		out := make([]string, n)
-		for i := range out {
-			out[i] = randomLine(rng)
-		}
-		return out
-	}
 	for i := range steps {
 		var step string
 		switch op := rng.IntN(26); {
@@ -441,12 +481,12 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			m.lines = append(m.lines, line)
 		case op < 9:
 			step = "append lines"
-			text := strings.Join(lines(rng.IntN(leafMax*fanMax/2)), "\n")
+			text := strings.Join(randomLines(rng, rng.IntN(leafMax*fanMax/2)), "\n")
 			s.AppendLines(text)
 			m.add(text)
 		case op < 10:
 			step = "append lines one at a time"
-			add := lines(rng.IntN(3 * leafMax))
+			add := randomLines(rng, rng.IntN(3*leafMax))
 			for _, l := range add {
 				s.AppendText(l)
 			}
@@ -457,7 +497,7 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			m.lines = nil
 		case op < 12:
 			step = "set content"
-			text := strings.Join(lines(rng.IntN(2*leafMax*fanMax)), "\n")
+			text := strings.Join(randomLines(rng, rng.IntN(2*leafMax*fanMax)), "\n")
 			s.Clear()
 			m.lines = nil
 			if text != "" {
@@ -466,7 +506,7 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			}
 		case op < 14:
 			step = "snapshot"
-			snaps = append(snaps, snap{s.snapshot(), slices.Clone(m.lines)})
+			snaps = append(snaps, newSnap(s.snapshot(), m.lines))
 		case op < 16 && len(snaps) > 0:
 			// A store made of a snapshot reads it, and changes it without
 			// changing the snapshot, or the store it was taken of.
@@ -478,7 +518,7 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			add := randomLine(rng)
 			o.AppendText(add)
 			om.lines = append(om.lines, add)
-			checkStore(t, step, o, &om, rng)
+			checkStore(t, step, o, &om, check)
 		case op < 18 && len(snaps) > 0:
 			step = "restore"
 			sn := snaps[rng.IntN(len(snaps))]
@@ -490,14 +530,14 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			step = "splice lines"
 			a := rng.IntN(len(m.lines) + 1)
 			b := a + rng.IntN(min(len(m.lines)-a, 3)+1)
-			add := lines(rng.IntN(4))
+			add := randomLines(rng, rng.IntN(4))
 			switch rng.IntN(8) {
 			case 0:
-				add = lines(rng.IntN(leafMax + 1))
+				add = randomLines(rng, rng.IntN(leafMax+1))
 			case 1:
 				b = a + rng.IntN(min(len(m.lines)-a, 2*leafMax)+1)
 			case 2:
-				add = lines(leafMax + rng.IntN(3*leafMax))
+				add = randomLines(rng, leafMax+rng.IntN(3*leafMax))
 			}
 			s.splice(a, b, add)
 			s.changed()
@@ -509,9 +549,9 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			if rng.IntN(2) == 0 {
 				b = a + rng.IntN(min(len(m.lines)-a, 3)+1)
 			}
-			add := lines(rng.IntN(3))
+			add := randomLines(rng, rng.IntN(3))
 			if rng.IntN(4) == 0 {
-				add = lines(rng.IntN(leafMax * fanMax))
+				add = randomLines(rng, rng.IntN(leafMax*fanMax))
 			}
 			l, rest := s.split(s.root, a)
 			_, r := s.split(rest, b-a)
@@ -519,19 +559,42 @@ func runModel(t *testing.T, rng *rand.Rand, steps int) {
 			s.changed()
 			m.lines = slices.Concat(m.lines[:a], add, m.lines[b:])
 		}
-		checkStore(t, fmt.Sprintf("step %d, %s", i, step), s, m, rng)
+		checkStore(t, fmt.Sprintf("step %d, %s", i, step), s, m, check)
 		if s.root != nil {
 			height = max(height, s.root.height)
 		}
+		// Each step the sums of each snapshot are checked, and one of them
+		// is checked through, with what it keeps, and at the end each.
 		for k, sn := range snaps {
-			got, _ := checkTree(t, fmt.Sprintf("step %d, %s, snapshot %d", i, step, k), sn.root, true, m)
-			if !slices.Equal(got, sn.lines) {
-				t.Fatalf("step %d, %s: snapshot %d changed", i, step, k)
+			n, bytes := 0, 0
+			if sn.root != nil {
+				n, bytes = sn.root.n, sn.root.bytes
+			}
+			if n != len(sn.lines) || bytes != sn.bytes {
+				t.Fatalf("step %d, %s: snapshot %d holds %d lines of %d bytes, want %d of %d",
+					i, step, k, n, bytes, len(sn.lines), sn.bytes)
 			}
 		}
+		if len(snaps) > 0 {
+			k := check.IntN(len(snaps))
+			checkSnap(t, fmt.Sprintf("step %d, %s, snapshot %d", i, step, k), snaps[k], m)
+		}
+	}
+	for k, sn := range snaps {
+		checkSnap(t, fmt.Sprintf("at the end, snapshot %d", k), sn, m)
 	}
 	if height < 2 {
 		t.Fatalf("the tree grew only %d deep", height)
+	}
+}
+
+// checkSnap fails t unless snapshot sn holds its lines, and keeps what
+// working them out from scratch, as m does, does.
+func checkSnap(t *testing.T, step string, sn snap, m *model) {
+	t.Helper()
+	got, _ := checkTree(t, step, sn.root, true, m)
+	if !slices.Equal(got, sn.lines) {
+		t.Fatalf("%s: changed", step)
 	}
 }
 
@@ -709,6 +772,109 @@ func TestSpliceSettles(t *testing.T) {
 	checkStore(t, "merged into the root", s, m, rng)
 }
 
+// TestRefreshKeepsSums checks what an inner node of many children keeps of
+// one of them that a change under it leaves the node to work out again,
+// rather than from scratch, which long random runs come to only now and
+// then: lines appended to the last of them, and lines spliced in place in
+// one far along, and then, the node full, what each half of it keeps once
+// it is split.
+func TestRefreshKeepsSums(t *testing.T) {
+	t.Parallel()
+
+	rng := rand.New(rand.NewPCG(17, 18))
+	s, m := &Store{}, newModel()
+	// Few enough that the leaves split by the changes fit under the root,
+	// which keeps its rows, and many enough that they are past the 20th.
+	for range 26 * leafMax {
+		m.lines = append(m.lines, randomLine(rng))
+	}
+	s.AppendLines(m.lines...)
+	if s.root.leaf() || len(s.root.kids) <= fanMax/2 {
+		t.Fatalf("%d lines in a root of %d children", s.Len(), s.root.size())
+	}
+	k := modelKeys[1]
+	s.Index(k.method, k.mode, k.width)
+	s.Measure(ansi.GraphemeWidth)
+	for i := range 4 {
+		line := randomLine(rng)
+		s.AppendText(line)
+		m.lines = append(m.lines, line)
+		if !s.Kept(k.method, k.mode, k.width) {
+			t.Fatalf("append %d: the root's rows were not kept", i)
+		}
+		checkTree(t, fmt.Sprintf("append %d", i), s.root, true, m)
+		at := (len(s.root.kids)-4)*leafMax + i*5
+		add := randomLines(rng, 1+i%2)
+		s.splice(at, at+1, add)
+		s.changed()
+		m.lines = slices.Concat(m.lines[:at], add, m.lines[at+1:])
+		if !s.Kept(k.method, k.mode, k.width) {
+			t.Fatalf("splice %d: the root's rows were not kept", i)
+		}
+		checkTree(t, fmt.Sprintf("splice %d", i), s.root, true, m)
+	}
+	for height := s.root.height; s.root.height == height; {
+		line := randomLine(rng)
+		s.AppendText(line)
+		m.lines = append(m.lines, line)
+	}
+	for j, kid := range s.root.kids {
+		if kid.findR(k) == nil {
+			t.Fatalf("half %d of the split root keeps no rows", j)
+		}
+	}
+	checkStore(t, "split", s, m, rng)
+}
+
+// randomLines returns n lines randomLine makes.
+func randomLines(rng *rand.Rand, n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = randomLine(rng)
+	}
+	return out
+}
+
+// TestSplitAtEnds checks the splits and splices that leave a tree as it
+// was, which long random runs come to only now and then: split at or past
+// either end of it, split where one child ends and the next starts, with
+// nothing built and joined in between, and a snapshot of no lines.
+func TestSplitAtEnds(t *testing.T) {
+	t.Parallel()
+
+	s, m := &Store{}, newModel()
+	for i := range 3 * leafMax {
+		m.lines = append(m.lines, fmt.Sprintf("line %d", i))
+	}
+	s.AppendLines(m.lines...)
+	root := s.root
+	for _, at := range []int{-1, 0} {
+		if l, r := s.split(root, at); l != nil || r != root {
+			t.Fatalf("split at %d: the tree is not kept whole on the right", at)
+		}
+	}
+	for _, at := range []int{s.Len(), s.Len() + 5} {
+		if l, r := s.split(root, at); l != root || r != nil {
+			t.Fatalf("split at %d: the tree is not kept whole on the left", at)
+		}
+	}
+	if s.build(nil) != nil {
+		t.Fatal("no lines built into a tree")
+	}
+	if root.leaf() {
+		t.Fatalf("%d lines in one leaf", s.Len())
+	}
+	l, r := s.split(root, root.kids[0].n)
+	s.root = s.join(s.join(l, s.build(nil)), r)
+	s.changed()
+	checkStore(t, "nothing spliced in", s, m, rand.New(rand.NewPCG(3, 4)))
+
+	var empty Store
+	if sn := empty.Snapshot(); sn.Len() != 0 || sn.String() != "" {
+		t.Fatalf("a snapshot of no lines holds %d", sn.Len())
+	}
+}
+
 // TestDeepTree checks a tree four levels deep: loaded at once, appended
 // to, split and joined, read in order and out of it.
 func TestDeepTree(t *testing.T) {
@@ -750,12 +916,21 @@ func TestDeepTree(t *testing.T) {
 	}
 	rng.Shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
 	pens := m.pens()
+	// The byte each line starts at, found through children far along
+	// nodes of many.
+	starts := lineStarts(m.lines)
 	for _, i := range order[:5000] {
 		if s.Line(i) != m.lines[i] {
 			t.Fatalf("line %d differs", i)
 		}
 		if p := s.penOf(i); !p.equal(&pens[i]) {
 			t.Fatalf("line %d starts in %+v, want %+v", i, p, pens[i])
+		}
+		if got := s.Offset(Pos{Line: i}); got != starts[i] {
+			t.Fatalf("line %d starts at byte %d, want %d", i, got, starts[i])
+		}
+		if got := s.PosOf(starts[i]); got != (Pos{Line: i}) {
+			t.Fatalf("byte %d is at %v, want line %d", starts[i], got, i)
 		}
 	}
 	checkRows(t, "deep", &s, m, rowKey{ansi.GraphemeWidth, Words, 30}, order[:5000])

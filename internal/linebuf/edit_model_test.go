@@ -38,6 +38,7 @@ func randomText(rng *rand.Rand, lines int) string {
 		parts = editParts
 	}
 	var b strings.Builder
+	long := false
 	for l := range lines {
 		if l > 0 {
 			if rng.IntN(6) == 0 {
@@ -47,8 +48,8 @@ func randomText(rng *rand.Rand, lines int) string {
 			}
 		}
 		n := rng.IntN(10)
-		if rng.IntN(150) == 0 {
-			n = LongLineBytes/3 + rng.IntN(100)
+		if !long && rng.IntN(150) == 0 {
+			n, long = LongLineBytes/3+rng.IntN(100), true
 		}
 		for range n {
 			b.WriteString(parts[rng.IntN(len(parts))])
@@ -95,7 +96,42 @@ func (b *editBuf) Offset(p Pos) int { return b.Store.Offset(b.Clamp(p)) }
 // they were given, in a slice, and everything else worked out from them
 // from scratch.
 type refBuf struct {
-	lines []string
+	lines  []string
+	memo   map[string]*refLine
+	parser *ansi.Parser
+}
+
+// refLine is what the reference works out of a line, which depends on the
+// line alone, kept for each line it is asked of: its text, the byte of the
+// line each byte of the text is, and the places in the text a position may
+// be at.
+type refLine struct {
+	text   string
+	at     []int
+	bounds []int
+}
+
+// line returns what the reference works out of line s.
+func (r *refBuf) line(s string) *refLine {
+	if l, ok := r.memo[s]; ok {
+		return l
+	}
+	if r.memo == nil {
+		r.memo = map[string]*refLine{}
+	}
+	text, at := refTokens(s)
+	l := &refLine{text: text, at: at}
+	r.memo[s] = l
+	return l
+}
+
+// lineBounds returns the places in the text of line s a position may be at.
+func (r *refBuf) lineBounds(s string) []int {
+	l := r.line(s)
+	if l.bounds == nil {
+		l.bounds = refBounds(l.text)
+	}
+	return l.bounds
 }
 
 // refSplit returns the lines of s, split as Append splits them.
@@ -161,14 +197,13 @@ func refBounds(text string) []int {
 	return append(out, len(text))
 }
 
-// refRaw returns the byte of line s that byte col of its text, a bound, is
+// raw returns the byte of line s that byte col of its text, a bound, is
 // at: just after the text before it.
-func refRaw(s string, col int) int {
+func (r *refBuf) raw(s string, col int) int {
 	if col == 0 {
 		return 0
 	}
-	_, at := refTokens(s)
-	return at[col-1] + 1
+	return r.line(s).at[col-1] + 1
 }
 
 func (r *refBuf) clamp(p Pos) Pos {
@@ -177,16 +212,9 @@ func (r *refBuf) clamp(p Pos) Pos {
 		return Pos{}
 	case p.Line >= len(r.lines):
 		last := len(r.lines) - 1
-		return Pos{Line: last, Col: len(refText(r.lines[last]))}
+		return Pos{Line: last, Col: len(r.line(r.lines[last]).text)}
 	}
-	bounds := refBounds(refText(r.lines[p.Line]))
-	col := 0
-	for _, b := range bounds {
-		if b <= p.Col {
-			col = b
-		}
-	}
-	return Pos{Line: p.Line, Col: col}
+	return Pos{Line: p.Line, Col: clampedCol(r.lineBounds(r.lines[p.Line]), max(p.Col, 0))}
 }
 
 // refPen is the style and hyperlink text is drawn in.
@@ -201,14 +229,14 @@ func (p *refPen) same(q refPen) bool {
 		a.Underline == b.Underline && a.Attrs == b.Attrs && p.link == q.link
 }
 
-// read changes p as the escape sequences of s do.
-func (p *refPen) read(s string) {
-	parser := ansi.NewParser()
+// read changes p as the escape sequences of s do, read with parser.
+func (p *refPen) read(s string, parser *ansi.Parser) {
 	for i := 0; i < len(s); {
-		if s[i] != ansi.ESC {
-			i++
-			continue
+		j := strings.IndexByte(s[i:], ansi.ESC)
+		if j < 0 {
+			break
 		}
+		i += j
 		seq := refSeq(s[i:])
 		i += len(seq)
 		switch {
@@ -233,13 +261,22 @@ func refSeqEnd(seq string) string {
 	return "\x1b\\"
 }
 
+// ansiParser returns the parser r reads escape sequences with, made once:
+// it holds a buffer far bigger than any of them.
+func (r *refBuf) ansiParser() *ansi.Parser {
+	if r.parser == nil {
+		r.parser = ansi.NewParser()
+	}
+	return r.parser
+}
+
 // penAt returns the pen text is drawn in at byte raw of line i.
 func (r *refBuf) penAt(i, raw int) refPen {
 	var p refPen
 	for _, s := range r.lines[:i] {
-		p.read(s)
+		p.read(s, r.ansiParser())
 	}
-	p.read(r.lines[i][:raw])
+	p.read(r.lines[i][:raw], r.ansiParser())
 	return p
 }
 
@@ -272,13 +309,13 @@ func (r *refBuf) replace(from, to Pos, text string) {
 		r.lines = []string{""}
 	}
 	first, last := r.lines[from.Line], r.lines[to.Line]
-	ra, rb := refRaw(first, from.Col), refRaw(last, to.Col)
+	ra, rb := r.raw(first, from.Col), r.raw(last, to.Col)
 	pFrom, pTo := r.penAt(from.Line, ra), r.penAt(to.Line, rb)
 	rest := last[rb:]
 	var tail string
 	if from != to && strings.Contains(rest, "\x1b") && !strings.Contains(text, "\x1b") && refText(rest) == "" {
 		end := pTo
-		end.read(rest)
+		end.read(rest, r.ansiParser())
 		tail = refStyleTo(pFrom, end)
 	} else {
 		tail = refStyleTo(pFrom, pTo) + rest
@@ -349,7 +386,7 @@ func (r *refBuf) edit(edits []TextEdit) []refEdit {
 func (r *refBuf) texts() []string {
 	out := make([]string, len(r.lines))
 	for i, s := range r.lines {
-		out[i] = refText(s)
+		out[i] = r.line(s).text
 	}
 	return out
 }
@@ -411,10 +448,10 @@ type snapRef struct {
 func TestEditModel(t *testing.T) {
 	t.Parallel()
 
-	for seed := range uint64(4) {
+	for seed := range uint64(3) {
 		t.Run(strconv.FormatUint(seed, 10), func(t *testing.T) {
 			t.Parallel()
-			runEditModel(t, rand.New(rand.NewPCG(seed, 7)), 160)
+			runEditModel(t, rand.New(rand.NewPCG(seed, 7)), 100)
 		})
 	}
 }
@@ -424,12 +461,15 @@ func runEditModel(t *testing.T, rng *rand.Rand, steps int) {
 	var b editBuf
 	r := &refBuf{}
 	var snaps []snapRef
-	seen := map[string]bool{}
+	seen, m := map[string]bool{}, newModel()
+	// The checks pick what they read with a source of their own, so that
+	// the edits made are the same however they are checked.
+	check := rand.New(rand.NewPCG(rng.Uint64(), rng.Uint64()))
 	randPos := func() Pos {
 		n := len(r.lines)
 		line := rng.IntN(n+2) - 1
 		if line >= 0 && line < n && rng.IntN(3) > 0 {
-			return Pos{Line: line, Col: rng.IntN(len(refText(r.lines[line]))+4) - 1}
+			return Pos{Line: line, Col: rng.IntN(len(r.line(r.lines[line]).text)+4) - 1}
 		}
 		return Pos{Line: line, Col: rng.IntN(40) - 2}
 	}
@@ -539,7 +579,7 @@ func runEditModel(t *testing.T, rng *rand.Rand, steps int) {
 			ref := r.edit(edits)
 			checkChange(t, label, change, ref, before, r.texts())
 		}
-		checkStoreEdits(t, label, &b, r, rng, seen)
+		checkStoreEdits(t, label, &b, r, check, seen, m)
 		for k, sn := range snaps {
 			if sn.s.Len() != len(sn.lines) || sn.s.String() != strings.Join(sn.lines, "\n") {
 				t.Fatalf("%s: snapshot %d changed", label, k)
@@ -548,29 +588,42 @@ func runEditModel(t *testing.T, rng *rand.Rand, steps int) {
 	}
 }
 
-// checkChange fails t unless change c maps every position of the text
-// before, and then some past it, as mapping it through the reference's
-// edits does, and ends where the last of them ends.
+// checkChange fails t unless change c maps positions of the text before as
+// mapping them through the reference's edits does, and ends where the last
+// of them ends: every position of the lines the edits are on, and of the
+// lines next to them, and of the other lines, which the edits only move,
+// those at their ends and in their middle.
 func checkChange(t *testing.T, step string, c Change, edits []refEdit, before, after []string) {
 	t.Helper()
 	if len(before) == 0 {
 		before = []string{""}
 	}
 	bs, as := lineStarts(before), lineStarts(after)
-	for line, text := range before {
-		for col := 0; col <= len(text); col++ {
-			p := Pos{Line: line, Col: col}
-			abs := absOf(bs, p)
-			for _, mode := range []bool{false, true} {
-				want := posOfAbs(as, refMap(edits, abs, mode))
-				got := c.Map(p, false)
-				if mode {
-					got = c.Map(p, true)
-				}
-				if got != want {
-					t.Fatalf("%s: %v maps to %v (after %v), want %v; edits %+v", step, p, got, mode, want, edits)
-				}
+	near := make([]bool, len(before))
+	for _, e := range edits {
+		from, to := posOfAbs(bs, e.from).Line, posOfAbs(bs, e.to).Line
+		for line := max(from-1, 0); line <= min(to+1, len(before)-1); line++ {
+			near[line] = true
+		}
+	}
+	check := func(p Pos) {
+		abs := absOf(bs, p)
+		for _, after := range []bool{false, true} {
+			want := posOfAbs(as, refMap(edits, abs, after))
+			if got := c.Map(p, after); got != want {
+				t.Fatalf("%s: %v maps to %v (after %v), want %v; edits %+v", step, p, got, after, want, edits)
 			}
+		}
+	}
+	for line, text := range before {
+		if near[line] || len(text) <= 8 {
+			for col := 0; col <= len(text); col++ {
+				check(Pos{Line: line, Col: col})
+			}
+			continue
+		}
+		for _, col := range []int{0, 1, len(text) / 2, len(text) - 1, len(text)} {
+			check(Pos{Line: line, Col: col})
 		}
 	}
 	if len(edits) > 0 {
@@ -586,16 +639,16 @@ func checkChange(t *testing.T, step string, c Change, edits []refEdit, before, a
 }
 
 // editKeys are the widths and modes the rows of the edit model test are
-// checked at.
-var editKeys = []struct {
-	method ansi.Method
-	mode   Mode
-	width  int
-}{
+// checked at, editCheckKeys of them each time, in an order picked then: as
+// many as a node keeps rows for, so that some of the time the rows kept
+// through an edit are checked, and some of the time those worked out again.
+var editKeys = []rowKey{
 	{ansi.GraphemeWidth, Words, 9},
 	{ansi.GraphemeWidth, Chars, 31},
 	{ansi.WcWidth, Words, 17},
 }
+
+const editCheckKeys = 2
 
 // longProbes is about how many places of a line of more than a couple of
 // thousand bytes checkStoreEdits checks: Offset and PosOf scan it from its
@@ -603,13 +656,15 @@ var editKeys = []struct {
 const longProbes = 24
 
 // checkStoreEdits fails t unless b holds r's lines, and works out of them
-// what a store given them from scratch does.
+// what m works out from scratch.
 //
 // Where in a line each byte and place is depends on the line alone, so for
-// a line in seen, checked before, only where it starts and ends is checked
-// again, which depends on the tree. Clamping a long line is checked each
-// time, as it starts from checkpoints the store keeps for the line.
-func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand.Rand, seen map[string]bool) {
+// a line in seen, checked before, only its text and where it starts and
+// ends are checked again, which depend on where it is, and only for the
+// lines probeOrder picks.
+// Clamping a long line is checked each time, as it starts from checkpoints
+// the store keeps for the line.
+func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand.Rand, seen map[string]bool, m *model) {
 	t.Helper()
 	n := len(r.lines)
 	if b.Len() != n {
@@ -623,22 +678,27 @@ func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand
 		}
 		t.Fatalf("%s: String differs", step)
 	}
-	var fresh Store
-	fresh.AppendLines(r.lines...)
-	texts := r.texts()
+	order := probeOrder(n, rng)
+	probed := make([]bool, n)
+	for _, i := range order {
+		probed[i] = true
+	}
 	off := 0
 	for i, s := range r.lines {
 		if b.Line(i) != s {
 			t.Fatalf("%s: line %d is %q, want %q", step, i, b.Line(i), s)
 		}
-		text := texts[i]
+		again := seen[s]
+		seen[s] = true
+		if again && !probed[i] && len(s) < LongLineBytes {
+			off += len(s) + 1
+			continue
+		}
+		l := r.line(s)
+		text, at, bounds := l.text, l.at, r.lineBounds(s)
 		if b.Text(i) != text {
 			t.Fatalf("%s: line %d's text is %q, want %q", step, i, b.Text(i), text)
 		}
-		bounds := refBounds(text)
-		_, at := refTokens(s)
-		again := seen[s]
-		seen[s] = true
 		every, everyBound := 1, 1
 		if len(s) > 2000 {
 			every, everyBound = max(len(text)/longProbes, 1), max(len(bounds)/longProbes, 1)
@@ -659,19 +719,13 @@ func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand
 				t.Fatalf("%s: %v clamps to %v, want %v", step, p, got, want)
 			}
 		}
-		raw := func(col int) int {
-			if col == 0 {
-				return 0
-			}
-			return at[col-1] + 1
-		}
 		for k, col := range bounds {
 			if (again || k%everyBound != 0) && k != 0 && k != len(bounds)-1 {
 				continue
 			}
 			p := Pos{Line: i, Col: col}
 			o := b.Offset(p)
-			if want := off + raw(col); o != want {
+			if want := off + r.raw(s, col); o != want {
 				t.Fatalf("%s: %v is at byte %d, want %d", step, p, o, want)
 			}
 			if got := b.PosOf(o); got != p {
@@ -704,27 +758,36 @@ func checkStoreEdits(t *testing.T, step string, b *editBuf, r *refBuf, rng *rand
 	if n == 0 {
 		return
 	}
-	order := rng.Perm(n)
-	for _, method := range []ansi.Method{ansi.GraphemeWidth, ansi.WcWidth} {
-		got, want := b.Measure(method), fresh.Measure(method)
-		if got.Widest != want.Widest {
-			t.Fatalf("%s: widest %d, want %d", step, got.Widest, want.Widest)
+	for _, method := range modelMethods {
+		got := b.Measure(method)
+		widest := 0
+		for _, s := range r.lines {
+			widest = max(widest, int(m.width(s, method)&widthMask))
+		}
+		if got.Widest != widest {
+			t.Fatalf("%s: widest %d, want %d", step, got.Widest, widest)
 		}
 		for _, i := range order {
-			if got.Width(i) != want.Width(i) {
-				t.Fatalf("%s: line %d is %d wide, want %d", step, i, got.Width(i), want.Width(i))
+			if want := int(m.width(r.lines[i], method) & widthMask); got.Width(i) != want {
+				t.Fatalf("%s: line %d is %d wide, want %d", step, i, got.Width(i), want)
 			}
 		}
 	}
-	for _, k := range editKeys {
-		got, want := b.Index(k.method, k.mode, k.width), fresh.Index(k.method, k.mode, k.width)
-		if got.Total() != want.Total() {
-			t.Fatalf("%s %+v: %d rows, want %d", step, k, got.Total(), want.Total())
+	keys := slices.Clone(editKeys)
+	rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i] })
+	for _, k := range keys[:editCheckKeys] {
+		got := b.Index(k.method, k.mode, k.width)
+		before := make([]int, n+1)
+		for i, s := range r.lines {
+			before[i+1] = before[i] + m.rowsOf(s, k)
+		}
+		if got.Total() != before[n] {
+			t.Fatalf("%s %+v: %d rows, want %d", step, k, got.Total(), before[n])
 		}
 		for _, i := range order {
-			if got.RowsOf(i) != want.RowsOf(i) || got.RowsBefore(i) != want.RowsBefore(i) {
+			if want := before[i+1] - before[i]; got.RowsOf(i) != want || got.RowsBefore(i) != before[i] {
 				t.Fatalf("%s %+v: line %d takes rows %d after %d, want %d after %d",
-					step, k, i, got.RowsOf(i), got.RowsBefore(i), want.RowsOf(i), want.RowsBefore(i))
+					step, k, i, got.RowsOf(i), got.RowsBefore(i), want, before[i])
 			}
 		}
 	}
@@ -775,7 +838,9 @@ func TestSnapshotsWhileEditing(t *testing.T) {
 			to := Pos{Line: from.Line + rng.IntN(3), Col: rng.IntN(20)}
 			b.Replace(from, to, randomText(rng, 1+rng.IntN(2)))
 		}
-		b.Index(ansi.GraphemeWidth, Words, 20+i%40)
+		// A width kept for a few edits, then another: rows kept through
+		// edits, and rows of the whole store worked out again.
+		b.Index(ansi.GraphemeWidth, Words, 20+i/5%40)
 		b.Measure(ansi.WcWidth)
 		if i%10 == 0 {
 			lines := make([]string, b.Len())

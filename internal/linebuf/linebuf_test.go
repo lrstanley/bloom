@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"math"
 	"math/rand/v2"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -178,14 +179,20 @@ func TestASCIIFastPaths(t *testing.T) {
 	}
 }
 
-// TestCountRowsInParallel checks that a buffer too big to measure and wrap
-// on one processor is measured and wrapped as it would be on one.
+// TestCountRowsInParallel checks that a buffer too big to build, measure,
+// and wrap on one processor is built, measured, and wrapped as it would be
+// on one: appended a line at a time, and all at once.
 func TestCountRowsInParallel(t *testing.T) {
 	t.Parallel()
+	if runtime.GOMAXPROCS(0) < 2 {
+		t.Skip("on one processor, nothing is shared between processors")
+	}
 
 	rng := rand.New(rand.NewPCG(5, 6))
 	words := []string{"a", "word", "longerword", "\x1b[32mgreen\x1b[m", "日本", "tab\there"}
-	lines := make([]string, 3*parallelLines+17)
+	// Enough to share between four processors, in spans of lines that
+	// differ.
+	lines := make([]string, parallelLines+17)
 	for i := range lines {
 		var parts []string
 		for range rng.IntN(24) {
@@ -193,23 +200,42 @@ func TestCountRowsInParallel(t *testing.T) {
 		}
 		lines[i] = strings.Join(parts, " ")
 	}
-	var b Store
-	appendAll(&b, lines...)
-	b.Measure(ansi.GraphemeWidth)
 	widths := make([]int32, len(lines))
 	measureLines(lines, ansi.GraphemeWidth, widths)
-	for i, w := range widths {
-		if b.flags(i, ansi.GraphemeWidth) != w {
-			t.Fatalf("line %d: width measured in parallel differs", i)
+	var one, all Store
+	appendAll(&one, lines...)
+	// Built in parallel, its leaves and the changes to the style they keep
+	// are those of the lines appended one at a time.
+	all.AppendLines(lines...)
+	m := newModel()
+	m.lines = lines
+	checkTree(t, "built", all.root, true, m)
+	for i, s := range lines {
+		if got := all.Line(i); got != s {
+			t.Fatalf("line %d built in parallel is %q, want %q", i, got, s)
+		}
+		if p, want := all.penOf(i), one.penOf(i); !p.equal(&want) {
+			t.Fatalf("line %d built in parallel starts in %+v, want %+v", i, p, want)
+		}
+	}
+	stores := map[string]*Store{"appended": &one, "built": &all}
+	for name, b := range stores {
+		b.Measure(ansi.GraphemeWidth)
+		for i, w := range widths {
+			if b.flags(i, ansi.GraphemeWidth) != w {
+				t.Fatalf("%s: line %d: width measured in parallel differs", name, i)
+			}
 		}
 	}
 	for _, mode := range []Mode{Words, Chars} {
-		x := b.Index(ansi.GraphemeWidth, mode, 13)
 		rows := make([]int32, len(lines))
 		countRowsOf(lines, widths, ansi.GraphemeWidth, 13, mode, rows)
-		for i, r := range rows {
-			if x.RowsOf(i) != int(r) {
-				t.Fatalf("mode %d line %d: %d rows in parallel, %d on one", mode, i, x.RowsOf(i), r)
+		for name, b := range stores {
+			x := b.Index(ansi.GraphemeWidth, mode, 13)
+			for i, r := range rows {
+				if x.RowsOf(i) != int(r) {
+					t.Fatalf("%s: mode %d line %d: %d rows in parallel, %d on one", name, mode, i, x.RowsOf(i), r)
+				}
 			}
 		}
 	}
@@ -346,18 +372,80 @@ func TestClampLongLine(t *testing.T) {
 	line := strings.Repeat("café \x1b[31m日本\x1b[m é\tok ", 4_000)
 	var s Store
 	s.AppendLines("short", line)
-	n := textLen(line)
+	// Where the glyphs of the line's text start, found once rather than by
+	// scanning the line from its start for each place.
+	bounds := refBounds(refText(line))
+	n := bounds[len(bounds)-1]
+	if got := textLen(line); got != n {
+		t.Fatalf("the text is %d bytes, want %d", got, n)
+	}
+	// Which agree with scanning the line from its start, at a few places.
+	for _, col := range []int{1, 7, n / 2, n - 3, n + 2} {
+		if _, got := textCol(line, col); got != clampedCol(bounds, col) {
+			t.Fatalf("byte %d is in the glyph at %d, scanned to %d", col, clampedCol(bounds, col), got)
+		}
+	}
 	for col := 0; col <= n+3; col += 97 {
-		_, want := textCol(line, col)
+		want := clampedCol(bounds, col)
 		if got := s.Clamp(Pos{Line: 1, Col: col}); got != (Pos{Line: 1, Col: want}) {
 			t.Fatalf("byte %d clamps to %d, want %d", col, got.Col, want)
 		}
 	}
 	// And from the end back, with the checkpoints all there.
 	for col := n; col >= 0; col -= 1_013 {
-		_, want := textCol(line, col)
+		want := clampedCol(bounds, col)
 		if got := s.Clamp(Pos{Line: 1, Col: col}); got.Col != want {
 			t.Fatalf("byte %d clamps to %d, want %d", col, got.Col, want)
 		}
 	}
+
+	// More long lines than the store keeps checkpoints of, each with its
+	// glyphs at other places, clamped in turn, and again: each is put out
+	// and worked out again, rather than clamped from another's.
+	var many Store
+	lines := make([]string, len(many.long)+1)
+	for k := range lines {
+		lines[k] = strings.Repeat(strings.Repeat("x", k+1)+"café \x1b[31m日本\x1b[m ok ", LongLineBytes/16)
+	}
+	many.AppendLines(lines...)
+	at := make([][]int, len(lines))
+	for k, line := range lines {
+		at[k] = refBounds(refText(line))
+	}
+	// Each line is as long as no other, which tells what is kept for it.
+	keeps := func(k int) bool {
+		for _, l := range many.long {
+			if l != nil && l.size == len(lines[k]) {
+				return true
+			}
+		}
+		return false
+	}
+	for round := range 2 {
+		for k := range lines {
+			end := at[k][len(at[k])-1]
+			for _, col := range []int{end / 3, end/2 + 1, end - 2} {
+				if got, want := many.Clamp(Pos{Line: k, Col: col}).Col, clampedCol(at[k], col); got != want {
+					t.Fatalf("round %d: line %d: byte %d clamps to %d, want %d", round, k, col, got, want)
+				}
+			}
+			if !keeps(k) {
+				t.Fatalf("round %d: nothing is kept of line %d, just clamped", round, k)
+			}
+			// Of one line more than are kept, the next is kept longest ago,
+			// and is put out, once every slot is used.
+			if next := (k + 1) % len(lines); (round > 0 || next == 0) && keeps(next) {
+				t.Fatalf("round %d: line %d is still kept, %d lines since", round, next, len(many.long))
+			}
+		}
+	}
+}
+
+// clampedCol returns the last of bounds, sorted, at or before col.
+func clampedCol(bounds []int, col int) int {
+	i, found := slices.BinarySearch(bounds, col)
+	if !found {
+		i--
+	}
+	return bounds[i]
 }
