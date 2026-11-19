@@ -148,6 +148,9 @@ func TestFade(t *testing.T) {
 }
 ```
 
+A presence has the same: `ShowAt(now)` and `HideAt(now)` start it moving, and `Advance(now)` moves it on. The
+hiding that `ShowFor` schedules runs on a timer message, so test it with a [whole program](#test-a-whole-program).
+
 [`bloom.WithClock`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock) does the same for the root, for
 [layout animation](/motion/layout-animation) and the timing of double clicks. Move the clock and draw again:
 

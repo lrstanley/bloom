@@ -331,6 +331,26 @@ func (p *Presence) Hide() tea.Cmd {
 	return p.v.To(0)
 }
 
+// ShowAt starts animating in at now without scheduling a command, as
+// [Value.SetTarget] does, cancelling hiding it after a [Presence.ShowFor].
+// Use [Presence.Advance] with the same clock to drive it, such as in a test
+// with a [Clock] of its own.
+func (p *Presence) ShowAt(now time.Time) {
+	p.hide++
+	p.v.SetTarget(1, now)
+}
+
+// HideAt starts animating out at now without scheduling a command, as
+// [Presence.ShowAt] starts animating in.
+func (p *Presence) HideAt(now time.Time) {
+	p.hide++
+	p.v.SetTarget(0, now)
+}
+
+// Advance moves the presence to now without scheduling a command, as
+// [Value.Advance] does, and reports whether it is still animating.
+func (p *Presence) Advance(now time.Time) bool { return p.v.Advance(now) }
+
 // Toggle starts animating in, or out if shown.
 func (p *Presence) Toggle() tea.Cmd {
 	if p.Shown() {

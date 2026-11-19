@@ -294,3 +294,50 @@ func TestUnfocusedFPS(t *testing.T) {
 		}
 	})
 }
+
+// TestPresenceAdvance checks that a presence can be driven without frame
+// messages, with ShowAt, HideAt, and Advance on a clock of its own.
+func TestPresenceAdvance(t *testing.T) {
+	t.Parallel()
+
+	c := &clock{now: time.Unix(0, 0)}
+	p := NewPresence(Duration(100*time.Millisecond), Ease(Linear), Clock(c.Now))
+
+	p.ShowAt(c.now)
+	if !p.Shown() || !p.Visible() {
+		t.Fatal("not shown after ShowAt")
+	}
+	c.advance(50 * time.Millisecond)
+	if !p.Advance(c.now) || !near(p.Progress(), 0.5) {
+		t.Fatalf("half way in = %v, animating %v", p.Progress(), p.Animating())
+	}
+	c.advance(60 * time.Millisecond)
+	if p.Advance(c.now) || p.Progress() != 1 {
+		t.Fatalf("in = %v, animating %v", p.Progress(), p.Animating())
+	}
+
+	p.HideAt(c.now)
+	if p.Shown() || !p.Visible() {
+		t.Fatal("hiding presence should be visible but not shown")
+	}
+	c.advance(110 * time.Millisecond)
+	if p.Advance(c.now) || p.Visible() {
+		t.Fatalf("still visible after hiding, at %v", p.Progress())
+	}
+}
+
+// TestPresenceShowAtCancelsShowFor checks that ShowAt, like Show, cancels
+// the hiding scheduled by ShowFor.
+func TestPresenceShowAtCancelsShowFor(t *testing.T) {
+	t.Parallel()
+
+	c := &clock{now: time.Unix(0, 0)}
+	p := NewPresence(Duration(100*time.Millisecond), Clock(c.Now))
+	p.ShowFor(time.Second)
+	stale := hideMsg{id: p.v.id, gen: p.hide}
+	p.ShowAt(c.now)
+	p.Update(stale)
+	if !p.Shown() {
+		t.Fatal("a ShowFor from before ShowAt hid the presence")
+	}
+}
