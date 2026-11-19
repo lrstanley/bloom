@@ -5,12 +5,12 @@ go 1.27.3
 replace bloomfx.dev/bloom => ../
 
 require (
-	bloomfx.dev/bloom v0.0.0-20261104061907-56513da5a6e9
+	bloomfx.dev/bloom v0.0.0-alpha.8
 	charm.land/bubbletea/v2 v2.1.2
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.1
 	getsteep.dev/steep v0.0.0-alpha.13
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
-	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/charmbracelet/x/ansi v0.11.10
 )
 
 require (
