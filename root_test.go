@@ -136,14 +136,19 @@ func goid() string {
 	return string(id)
 }
 
-// firstWrite is an output that reports when the program first draws.
+// firstWrite is an output that reports when the program first draws: the
+// first write holding want, the view's text, as Bubble Tea writes its
+// startup queries before it.
 type firstWrite struct {
 	once  sync.Once
+	want  []byte
 	drawn chan struct{}
 }
 
 func (w *firstWrite) Write(p []byte) (int, error) {
-	w.once.Do(func() { close(w.drawn) })
+	if bytes.Contains(p, w.want) {
+		w.once.Do(func() { close(w.drawn) })
+	}
 	return len(p), nil
 }
 
@@ -194,7 +199,7 @@ func TestBubbleTeaEventLoop(t *testing.T) {
 	t.Parallel()
 
 	in, feed := io.Pipe()
-	out := &firstWrite{drawn: make(chan struct{})}
+	out := &firstWrite{want: []byte("click"), drawn: make(chan struct{})}
 	m := &loopModel{ui: New()}
 	p := tea.NewProgram(m,
 		tea.WithInput(in), tea.WithOutput(out), tea.WithWindowSize(20, 2),
@@ -245,5 +250,113 @@ func TestBubbleTeaEventLoop(t *testing.T) {
 	}
 	if m.cmdOn == loop {
 		t.Fatal("the handler's command ran on the event loop")
+	}
+}
+
+// TestViewSameContentRoutesLatestFrame checks that a view routes with the
+// latest frame when it draws the same, as Bubble Tea keeps the view it
+// painted over newer ones with the same content, even after one drawing
+// something else that it never painted.
+func TestViewSameContentRoutesLatestFrame(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	r := New()
+	shown := r.View(10, 1, Text("same").On(on.Click(l.add("old"))))
+	r.View(10, 1, Text("other").On(on.Click(l.add("other"))))
+	r.View(10, 1, Text("same").On(on.Click(l.add("new"))))
+	shown.OnMouse(down(0, 0))
+	shown.OnMouse(release(0, 0))
+	expect(t, &l, "new")
+}
+
+// TestViewSameContentTooltip checks that a node given a tooltip while the
+// pointer is over it, drawing the same, arms it on the next motion, as an
+// editor showing the diagnostic under the pointer does.
+func TestViewSameContentTooltip(t *testing.T) {
+	t.Parallel()
+
+	over := false
+	tree := func() Child {
+		n := Text("alpha").On(on.Mouse(func(e on.Event) tea.Cmd {
+			over = e.Inside
+			return nil
+		}))
+		if over {
+			n = n.Tooltip("tip a")
+		}
+		return Column(Text(" "), Row(Fixed(6, n), Fill(Text(" "))))
+	}
+	g := newTipRig(t, 30, 2, tree)
+	// Every event goes to the first view, as it would in Bubble Tea before
+	// it paints a newer one.
+	shown := g.r.View(g.w, g.h, tree())
+	for _, msg := range []tea.MouseMsg{move(1, 1), move(2, 1)} {
+		shown.OnMouse(msg)
+		g.send(msg)
+	}
+	g.wait(defaultTipDelay)
+	g.want("tip a")
+}
+
+// swapModel has a click's handler replace itself with one that quits,
+// drawing the same.
+type swapModel struct {
+	ui      *Root
+	swapped bool
+}
+
+func (m *swapModel) Init() tea.Cmd { return nil }
+
+func (m *swapModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return m, m.ui.Update(msg)
+}
+
+func (m *swapModel) View() tea.View {
+	fn := func() tea.Cmd { m.swapped = true; return nil }
+	if m.swapped {
+		fn = func() tea.Cmd { return tea.Quit }
+	}
+	return m.ui.View(20, 2, Text("click").On(on.Click(fn)))
+}
+
+// TestBubbleTeaSameContent checks, in a running program, that a click is
+// routed with the frame drawn after the last click, which draws the same.
+func TestBubbleTeaSameContent(t *testing.T) {
+	t.Parallel()
+
+	in, feed := io.Pipe()
+	out := &firstWrite{want: []byte("click"), drawn: make(chan struct{})}
+	m := &swapModel{ui: New()}
+	p := tea.NewProgram(m,
+		tea.WithInput(in), tea.WithOutput(out), tea.WithWindowSize(20, 2),
+		tea.WithoutSignalHandler(), tea.WithoutCatchPanics(),
+	)
+	done := make(chan error, 1)
+	go func() {
+		_, err := p.Run()
+		done <- err
+	}()
+	defer func() { _ = feed.Close() }()
+
+	timeout := time.After(5 * time.Second)
+	select {
+	case <-out.drawn:
+	case <-timeout:
+		p.Kill()
+		<-done
+		t.Fatal("nothing was drawn")
+	}
+	// Two clicks at 0,0: the first swaps the handler, the second quits.
+	go func() { _, _ = feed.Write([]byte("\x1b[<0;1;1M\x1b[<0;1;1m\x1b[<0;1;1M\x1b[<0;1;1m")) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-timeout:
+		p.Kill()
+		<-done
+		t.Fatalf("the second click ran the first handler again (swapped %t)", m.swapped)
 	}
 }

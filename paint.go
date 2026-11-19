@@ -202,7 +202,11 @@ func (r *renderer) render(w, h int, c Child) string {
 		kept = r.paintTop(w, h, kept)
 	}
 	if !kept {
-		r.out = r.canvas.Render()
+		// Keeping the string when the bytes are the same lets comparing
+		// it with what a view drew skip comparing the bytes.
+		if out := r.canvas.Render(); out != r.out {
+			r.out = out
+		}
 		r.drawn, r.drawnEnv = image.Pt(w, h), r.env
 	}
 	r.cache.EndFrame(w * h)

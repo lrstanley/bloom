@@ -254,9 +254,10 @@ func (r *Root) Render(w, h int, c Child) string {
 // View lays out and draws c in a w×h frame, and returns a view showing it,
 // with the cursor of the [TextNode] that placed one, and an OnMouse handler
 // that runs the mouse handlers of the nodes under the pointer in this
-// frame, which is the one on screen when Bubble Tea calls it. It runs them
-// on the event loop, before Update gets the event, so they can change the
-// model, and returns their commands to run in the background.
+// frame, which is the one on screen when Bubble Tea calls it, or in the
+// latest frame if that draws the same. It runs them on the event loop,
+// before Update gets the event, so they can change the model, and returns
+// their commands to run in the background.
 //
 // The view's MouseMode is the least the frame needs: all motion while a
 // node follows the pointer with a hover style or [on.Hover], or has a
@@ -265,9 +266,19 @@ func (r *Root) Render(w, h int, c Child) string {
 // with a click (see [WithFocus]). Tooltips pinned open need nothing. Set the
 // field on the view returned to ask for something else.
 func (r *Root) View(w, h int, c Child) tea.View {
-	v := tea.NewView(r.Render(w, h, c))
+	content := r.Render(w, h, c)
 	f := r.r.frame
-	v.OnMouse = func(msg tea.MouseMsg) tea.Cmd { return r.mouseEvent(f, msg) }
+	v := tea.NewView(content)
+	v.OnMouse = func(msg tea.MouseMsg) tea.Cmd {
+		// Bubble Tea routes the mouse with the last view it painted, and
+		// may keep it over a newer one with the same content, whose
+		// handlers and tooltips would then never be routed with. A frame
+		// drawing something else may not be on screen yet.
+		if content == r.r.out {
+			return r.mouseEvent(r.r.frame, msg)
+		}
+		return r.mouseEvent(f, msg)
+	}
 	v.Cursor = f.cursor
 	v.MouseMode = f.mouseMode(r.focus != nil)
 	return v

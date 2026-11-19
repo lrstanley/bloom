@@ -261,6 +261,11 @@ before `Update` and the next `View`, which is what lets handlers change the mode
 right away. bloom runs the handlers there, and batches the commands they return, which Bubble Tea then runs in the
 background like any other.
 
+Bubble Tea routes each event with the view it painted last, so the handlers that run are those of the frame on
+screen. It can keep that view over a newer one with the same content, so when the latest frame draws the same,
+bloom routes with it instead, and handlers and tooltips that changed without changing what's drawn take effect on
+the next event.
+
 If the view doesn't come from `m.ui.View`, or something replaces its `OnMouse`, `m.ui.Update` runs the handlers
 instead when it gets the event, so pass it every message. It skips events that `OnMouse` already handled.
 
