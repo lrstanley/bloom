@@ -260,9 +260,7 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                             Expect breaking changes until v1.0.0.
                         </p>
                     </div>
-                    <div className="bloom-hero-demo">
-                        <TerminalDemo />
-                    </div>
+                    <TerminalDemo />
                 </section>
 
                 <section className="bloom-section">
