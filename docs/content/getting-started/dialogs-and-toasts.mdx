@@ -328,14 +328,10 @@ Add two fields to the model, `toast anim.Presence` and `deleted string`, and cre
 with `toast: anim.NewPresence()`. Pass it to `anim.Update` too: `anim.Update(msg, &m.confirm, &m.toast)`.
 
 Now make **Delete** delete. Import `slices`, and replace `press` with one that removes the selected note and
-shows the toast. `ShowFor` shows it and hides it again after a duration, with no timer messages of your own. A
-layer still takes clicks while it animates out, so `press` ignores them once the dialog is no longer shown:
+shows the toast. `ShowFor` shows it and hides it again after a duration, with no timer messages of your own.:
 
 ```go
 func (m *model) press(id buttonID) tea.Cmd {
-	if !m.confirm.Shown() {
-		return nil // the dialog is animating out
-	}
 	if id == "delete" {
 		m.deleted = m.notes[m.selected].title
 		m.notes = slices.Delete(m.notes, m.selected, m.selected+1)
@@ -499,9 +495,6 @@ func (m *model) closeDialog() tea.Cmd {
 }
 
 func (m *model) press(id buttonID) tea.Cmd {
-	if !m.confirm.Shown() {
-		return nil // the dialog is animating out
-	}
 	if id == "delete" {
 		m.deleted = m.notes[m.selected].title
 		m.notes = slices.Delete(m.notes, m.selected, m.selected+1)

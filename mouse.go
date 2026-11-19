@@ -496,9 +496,11 @@ func (r *Root) hover(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, chain []int) []
 		if containsKey(next, t.key) {
 			continue
 		}
-		// A node still in the frame has new handlers; one gone has its last.
+		// A node still in the frame has new handlers; one gone has its last,
+		// as does one that took input away, such as a layer animating out,
+		// so an on.Hover that was told the pointer came is told it left.
 		if f != nil {
-			if i := f.find(t.key); i >= 0 {
+			if i := f.find(t.key); i >= 0 && f.handlers[i] != nil {
 				t = f.target(i)
 			}
 		}

@@ -358,18 +358,23 @@ type TransitionNode struct {
 	child   Child
 	t       float64
 	effects []fx.Effect
+	leaving bool // drawn by a presence animating out, so it takes no input
 }
 
 // View implements [Child], drawing the node at its natural size.
 func (n TransitionNode) View() string { return Render(0, 0, n) }
 
 // Present draws child with p's progress while visible. When hidden, child
-// is absent, taking neither space nor a gap in its container.
+// is absent, taking neither space nor a gap in its container. While p
+// animates out, child is still drawn but takes no input: its mouse handlers
+// do not run, and its nodes cannot be focused, selected, or show tooltips.
 func Present(p anim.Presence, child Child, effects ...fx.Effect) TransitionNode {
 	if !p.Visible() {
 		return TransitionNode{child: absentNode{}}
 	}
-	return Transition(p.Progress(), child, effects...)
+	n := Transition(p.Progress(), child, effects...)
+	n.leaving = !p.Shown()
+	return n
 }
 
 type absentNode struct{}
@@ -463,6 +468,7 @@ type LayerNode struct {
 	modal     bool
 	float     bool
 	absent    bool
+	leaving   bool // drawn by a presence animating out, so it takes no input
 	clear     bool
 	backdrop  []fx.Effect
 	shadowX   int
@@ -569,9 +575,15 @@ func (n LayerNode) Transition(t float64, effects ...fx.Effect) LayerNode {
 }
 
 // Presence sets the transition from p, omitting the entire layer, including
-// its backdrop, shadow, and input entries, while p is not visible.
+// its backdrop, shadow, and input entries, while p is not visible. While p
+// animates out, the layer is still drawn but takes no input: its mouse
+// handlers do not run, and its nodes cannot be focused, selected, or show
+// tooltips. A modal layer still keeps events from what is beneath it until
+// it is gone, unless another modal layer is beneath it, such as the next
+// dialog of a stack, which then gets them.
 func (n LayerNode) Presence(p anim.Presence, effects ...fx.Effect) LayerNode {
 	n.absent = !p.Visible()
+	n.leaving = p.Visible() && !p.Shown()
 	return n.Transition(p.Progress(), effects...)
 }
 

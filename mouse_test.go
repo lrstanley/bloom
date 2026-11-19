@@ -810,3 +810,127 @@ func TestPresentTakesHandlers(t *testing.T) {
 	r.ClickAt(0, 0)
 	expect(t, &l, "present")
 }
+
+// leavingPresence returns a presence on a clock of its own, shown, then
+// hidden, so it is animating out until the clock moves on.
+func leavingPresence() (anim.Presence, *time.Time) {
+	now := time.Unix(1, 0)
+	p := anim.NewPresence(anim.Duration(time.Second), anim.Clock(func() time.Time { return now }))
+	p.ShowAt(now)
+	now = now.Add(2 * time.Second)
+	p.Advance(now)
+	p.HideAt(now)
+	return p, &now
+}
+
+// TestLeavingLayerTakesNoInput checks that a modal layer animating out is
+// drawn, but runs none of its handlers, while it still keeps clicks from
+// what is beneath it until it is gone.
+func TestLeavingLayerTakesNoInput(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	p, now := leavingPresence()
+	tree := func() Child {
+		return Overlay(
+			Text("base").ID("base").On(on.Click(l.add("base"))),
+			Layer(Text("ok").ID("ok").On(on.Click(l.add("ok")))).ID("dialog").
+				Modal().On(on.ClickOutside(l.add("outside"))).Presence(p),
+		)
+	}
+	r := New()
+	r.Render(20, 5, tree())
+	if _, ok := r.Frame().Rect("ok"); !ok {
+		t.Fatal("a layer animating out isn't in the frame")
+	}
+	r.Click("ok")
+	r.ClickAt(0, 0)
+	expect(t, &l)
+
+	*now = now.Add(2 * time.Second)
+	p.Advance(*now)
+	r.Render(20, 5, tree())
+	r.ClickAt(0, 0)
+	expect(t, &l, "base")
+}
+
+// TestLeavingLayerIsNotFocusable checks that focus passes over the nodes of
+// a layer animating out.
+func TestLeavingLayerIsNotFocusable(t *testing.T) {
+	t.Parallel()
+
+	p, _ := leavingPresence()
+	f := Solve(20, 5, Overlay(
+		Text("base").ID("base").Focusable(),
+		Layer(Text("ok").ID("ok").Focusable()).Presence(p),
+	))
+	var focus Focus[string]
+	focus.Next(f)
+	focus.Next(f)
+	if id, _ := focus.Current(); id != "base" {
+		t.Fatalf("focused %q, want only base to be focusable", id)
+	}
+}
+
+// TestLeavingPresentTakesNoInput checks that a node shown with Present runs
+// none of its handlers while it animates out, so a click reaches what is
+// around it.
+func TestLeavingPresentTakesNoInput(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	p, _ := leavingPresence()
+	r := New()
+	r.Render(10, 1, Row(Fill(Present(p, Text("toast").On(on.Click(l.add("toast")))))).On(on.Click(l.add("row"))))
+	r.ClickAt(0, 0)
+	expect(t, &l, "row")
+}
+
+// TestLeavingLayerEndsHover checks that a node hovered when its layer starts
+// animating out is told the pointer left, once it moves.
+func TestLeavingLayerEndsHover(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	shown := anim.NewPresence()
+	shown.Show()
+	leaving, _ := leavingPresence()
+	tree := func(p anim.Presence) Child {
+		return Overlay(Text("base"), Layer(Text("card").ID("card").On(on.Hover(func(over bool) tea.Cmd {
+			l = append(l, "hover "+strconv.FormatBool(over))
+			return nil
+		}))).Anchor(Start, Start).Presence(p))
+	}
+	r := New()
+	r.Render(20, 5, tree(shown))
+	r.Update(tea.MouseMotionMsg{X: 1, Y: 0})
+	expect(t, &l, "hover true")
+
+	r.Render(20, 5, tree(leaving))
+	r.Update(tea.MouseMotionMsg{X: 2, Y: 0})
+	expect(t, &l, "hover false")
+}
+
+// TestLeavingLayerPassesToDialogBeneath checks that a click while the top
+// dialog of a stack animates out goes to the dialog beneath it, rather than
+// being kept from it.
+func TestLeavingLayerPassesToDialogBeneath(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	shown := anim.NewPresence()
+	shown.Show()
+	leaving, _ := leavingPresence()
+	r := New()
+	r.Render(20, 5, Overlay(
+		Text("base").On(on.Click(l.add("base"))),
+		Layer(Text("first").ID("first").On(on.Click(l.add("first")))).Anchor(Start, Start).
+			Modal().On(on.ClickOutside(l.add("outside first"))).Presence(shown),
+		Layer(Text("second").On(on.Click(l.add("second")))).Anchor(Start, Start).
+			Modal().On(on.ClickOutside(l.add("outside second"))).Presence(leaving),
+	))
+	r.ClickAt(0, 0)
+	expect(t, &l, "first")
+	r.ClickAt(15, 4)
+	expect(t, &l, "outside first")
+}

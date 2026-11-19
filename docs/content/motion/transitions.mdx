@@ -35,6 +35,9 @@ bloom.Column(
 )
 ```
 
+Something shown with a presence takes no input while it animates out: its handlers don't run, and its nodes can't
+be focused, selected, or show tooltips.
+
 The `Transition` forms draw the node whatever the progress is. Use them for effects that run on something that's
 always there, or with progress you compute yourself:
 

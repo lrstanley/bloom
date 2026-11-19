@@ -55,6 +55,11 @@ return m, tea.Batch(cmd, m.ui.Update(msg), anim.Update(msg, &m.confirm))
 `m.confirm.Shown()` reports whether the dialog is open or opening, which is what your key handling should check.
 `Visible()` is also true while it animates out.
 
+While it animates out, the layer takes no input: its buttons don't run their handlers, and its nodes can't be
+focused, selected, or show tooltips. A modal layer still keeps clicks from what's beneath it until it's gone, so a
+quick second click doesn't land on the screen behind. If another modal dialog is open beneath it, as in a
+[stack](#stack-dialogs), that dialog gets the click instead.
+
 ## Make it modal
 
 `Modal()` makes a layer take every mouse event from what's beneath it. Clicks inside it go to its nodes as usual.

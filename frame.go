@@ -25,6 +25,7 @@ type entry struct {
 	hoverable               bool // the node has a hover style
 	selectable              bool
 	cut                     bool // a truncated text node cut to fit
+	leaving                 bool // drawn by a presence animating out, so it takes no events
 	list                    ListView
 	isList                  bool
 	vp                      ViewportView
@@ -204,9 +205,24 @@ func (f *Frame) Hit(x, y int) []any {
 // hit returns the entry the point p is on, the topmost one drawn, or -1.
 // When a modal layer takes the point although it is outside the layer,
 // outside is set and the entry is the layer's.
+//
+// Entries animating out take no point. A modal layer animating out still
+// takes p from what is beneath it, as if p were outside it, unless another
+// modal layer beneath it takes p, which then gets it, so that a click right
+// after closing the top dialog of a stack reaches the next.
 func (f *Frame) hit(p image.Point) (entry int, outside bool) {
+	block := -1
 	for i := len(f.entries) - 1; i >= 0; i-- {
 		e := &f.entries[i]
+		if e.leaving {
+			if block < 0 && e.modal && p.In(e.block) && f.modalUnder(i, p) < 0 {
+				block = i
+			}
+			continue
+		}
+		if block >= 0 {
+			return block, true
+		}
 		if p.In(e.vis) {
 			return i, false
 		}
@@ -214,7 +230,21 @@ func (f *Frame) hit(p image.Point) (entry int, outside bool) {
 			return i, true
 		}
 	}
+	if block >= 0 {
+		return block, true
+	}
 	return -1, false
+}
+
+// modalUnder returns the topmost modal layer drawn before entry i that
+// takes p and isn't animating out, or -1.
+func (f *Frame) modalUnder(i int, p image.Point) int {
+	for j := i - 1; j >= 0; j-- {
+		if e := &f.entries[j]; e.modal && !e.leaving && p.In(e.block) {
+			return j
+		}
+	}
+	return -1
 }
 
 // under appends to chain the entries that events at p reach, innermost
@@ -223,9 +253,19 @@ func (f *Frame) hit(p image.Point) (entry int, outside bool) {
 // Nothing before floor takes events at p, besides the entries inside the
 // modal layer itself.
 func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
+	// A modal layer animating out is the floor only when no other modal
+	// layer beneath it takes p; see [Frame.hit].
 	for i := len(f.entries) - 1; i >= 0; i-- {
 		if e := &f.entries[i]; e.modal && p.In(e.block) {
-			floor = i
+			if !e.leaving {
+				floor = i
+				break
+			}
+			if j := f.modalUnder(i, p); j >= 0 {
+				floor = j
+			} else {
+				floor = i
+			}
 			break
 		}
 	}
