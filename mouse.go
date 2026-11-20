@@ -220,6 +220,7 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 			r.r.focus.click(f, chain)
 		}
 		cmds = f.clickOutside(cmds, msg, p, chain, floor)
+		cmds = f.down(cmds, msg, p, chain)
 		s.press = press{button: m.Button}
 		if i := f.innermost(chain, clicks(m.Button)); i >= 0 {
 			s.press.click, s.press.ok = f.entries[i].key, true
@@ -432,6 +433,19 @@ func (f *Frame) clickOutside(cmds []tea.Cmd, msg tea.MouseMsg, p image.Point, ch
 		if has(f.handlers[i], k) && !slices.Contains(chain, i) {
 			t := f.target(i)
 			cmds = run(cmds, t.handlers, k, t.event(msg, p, false))
+		}
+	}
+	return cmds
+}
+
+// down runs the [on.Down] handlers of the entries under the pointer at p,
+// chain, innermost first, for a button going down.
+func (f *Frame) down(cmds []tea.Cmd, msg tea.MouseMsg, p image.Point, chain []int) []tea.Cmd {
+	k := kindsOf(on.KindDown)
+	for _, i := range chain {
+		if has(f.handlers[i], k) {
+			t := f.target(i)
+			cmds = run(cmds, t.handlers, k, t.event(msg, p, true))
 		}
 	}
 	return cmds

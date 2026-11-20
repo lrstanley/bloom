@@ -1088,3 +1088,36 @@ func TestNodesFollowTheirNearestID(t *testing.T) {
 	r.Update(release(6, 0))
 	expect(t, &l, "b drag")
 }
+
+// TestDown runs the Down handlers of every node the pointer is in as any
+// button goes down, innermost first, and leaves their clicks be.
+func TestDown(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	tree := Column(
+		Row(
+			Text("button").On(on.Click(l.add("click")), on.Down(l.add("button down"))),
+			Space(),
+		).On(on.Down(l.add("window down"))),
+		Text("beside"),
+	)
+	r := New()
+	r.Render(10, 2, tree)
+
+	r.Update(down(0, 0))
+	expect(t, &l, "button down", "window down")
+	r.Update(release(0, 0))
+	expect(t, &l, "click")
+
+	r.Update(down(8, 0))
+	r.Update(release(8, 0))
+	expect(t, &l, "window down")
+
+	r.Update(tea.MouseClickMsg{X: 8, Y: 0, Button: tea.MouseRight})
+	expect(t, &l, "window down")
+	r.Update(tea.MouseReleaseMsg{X: 8, Y: 0, Button: tea.MouseRight})
+
+	r.Update(down(0, 1))
+	expect(t, &l)
+}

@@ -157,6 +157,7 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 | `AnchorTo(id, side)` | place against a side of another node, flipping to the other side when it doesn't fit |
 | `Offset(x, y)` | move from where it's anchored |
 | `Size(w, h)` | set the size; zero uses the natural size |
+| `Place(r)` | put at a rectangle in the overlay: `Anchor(Start, Start)`, `Offset`, and `Size` in one, such as for a window the model keeps the place of |
 | `Margin(n)` | stay `n` cells from the overlay's edges |
 | `Float()` | place and draw against the whole screen, past the edges of its overlay and of a dialog it's in |
 | `Transparent()` | let the blank cells of its child show what's beneath, such as for a FIGlet banner over other content |
@@ -263,6 +264,7 @@ From [`bloomfx.dev/bloom/on`](https://pkg.go.dev/bloomfx.dev/bloom/on), for `On(
 | `on.Hover(fn)` | the pointer moving onto or off the node |
 | `on.Drag(fn)` | a left-button drag that starts on the node, until the button comes up |
 | `on.ClickOutside(fn)` | a button going down anywhere else; a modal layer's backdrop |
+| `on.Down(fn)` | a button going down on the node or anything in it, before any click |
 | `on.Mouse(fn)` | every mouse event over the node |
 | `on.Msg(msg)` | a handler function that sends `msg` to `Update` |
 

@@ -69,6 +69,7 @@ slots to boxes, rows, columns, layers, lists, and viewports.
 | `on.Hover(fn)` | the pointer moving onto the node (`true`) or off it (`false`) |
 | `on.Drag(fn)` | the button going down on the node, the pointer moving while it's held, and it coming up |
 | `on.ClickOutside(fn)` | a button going down anywhere but on the node |
+| `on.Down(fn)` | a button going down on the node or anything in it, without waiting for it to come up, such as to bring a window to the front; it takes nothing from the nodes in it |
 | `on.Mouse(fn)` | every mouse event over the node, for anything else |
 
 Most take a `func() tea.Cmd`, so methods such as `m.save` can be passed as they are. Clicks run when the button

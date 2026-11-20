@@ -69,6 +69,7 @@ const (
 	KindHover
 	KindDrag
 	KindClickOutside
+	KindDown
 	KindMouse
 )
 
@@ -170,6 +171,13 @@ func Drag(fn func(e Event) tea.Cmd) Handler { return Handler{kind: KindDrag, fn:
 // On a modal layer, it runs for a click on the backdrop, which the layer
 // still keeps from what is beneath it.
 func ClickOutside(fn func() tea.Cmd) Handler { return simple(KindClickOutside, fn) }
+
+// Down runs fn when a mouse button goes down on the node, or on a node in
+// it, such as to bring a window to the front. It doesn't wait for the button
+// to come up, as a click does, and takes nothing from the nodes in it: their
+// clicks and drags still run, and so do the Down handlers of every node the
+// pointer is in, innermost first. It is the opposite of [ClickOutside].
+func Down(fn func() tea.Cmd) Handler { return simple(KindDown, fn) }
 
 // Mouse runs fn for every mouse event over the node: presses, releases,
 // the wheel, and motion. The event is in e.Msg.

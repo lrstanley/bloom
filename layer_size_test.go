@@ -67,3 +67,18 @@ func TestLayerFixedHeightMeasuresAtHeight(t *testing.T) {
 		t.Fatalf("laid out at %v; want only height 3", sizes)
 	}
 }
+
+// TestLayerPlace puts layers at rectangles of their overlay, one of them
+// anchored to a node before, which Place undoes.
+func TestLayerPlace(t *testing.T) {
+	t.Parallel()
+	r := New()
+	r.Render(20, 10, Overlay(Text("base").ID("base"),
+		Layer(Text("window")).ID("window").Place(image.Rect(3, 2, 13, 6)),
+		Layer(Text("moved")).ID("moved").AnchorTo("base", Bottom).Place(image.Rect(-2, 8, 6, 12)),
+		Layer(Text("natural")).ID("natural").Place(image.Rect(1, 1, 1, 1)),
+	))
+	expectRect(t, r.Frame(), "window", image.Rect(3, 2, 13, 6))
+	expectRect(t, r.Frame(), "moved", image.Rect(-2, 8, 6, 12))
+	expectRect(t, r.Frame(), "natural", image.Rect(1, 1, 8, 2))
+}

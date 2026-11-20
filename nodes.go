@@ -507,6 +507,18 @@ func (n LayerNode) Margin(cells int) LayerNode { n.margin = max(cells, 0); retur
 // margin.
 func (n LayerNode) Size(w, h int) LayerNode { n.w, n.h = w, h; return n }
 
+// Place puts the layer at r in its overlay, or on the screen for a layer
+// that floats, for a layer whose place and size the model keeps, such as a
+// window that is dragged around. It is Anchor(Start, Start), Offset to
+// r.Min, and Size of r's, which a zero width or height of r leaves to the
+// child as Size does, and it undoes AnchorTo.
+func (n LayerNode) Place(r image.Rectangle) LayerNode {
+	n.x, n.y, n.anchor = Start, Start, nil
+	n.offsetX, n.offsetY = r.Min.X, r.Min.Y
+	n.w, n.h = r.Dx(), r.Dy()
+	return n
+}
+
 // AnchorTo places the layer against side of the node with ID id, such as a
 // dropdown below its input, and aligned with its start, shifted to stay
 // inside the overlay. A corner places the layer diagonally off that corner
