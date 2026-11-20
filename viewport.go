@@ -286,9 +286,8 @@ func (n ViewportNode) OnCaret(fn func(sel Range) tea.Cmd) ViewportNode {
 // Cursor shows the terminal cursor at the caret, the Head of the range given
 // to [ViewportNode.Caret], drawn on the side of a wrap its EndOfRow tells,
 // as [ViewportView.CaretCell] has it, while it is in sight, in c's shape and
-// color, as [TextNode.Cursor] does at a cell: give it only while the
-// viewport has focus. The position of c is not used. It does nothing without
-// a caret.
+// color, as [TextNode.Cursor] does at a cell, by its rules for which cursor
+// is shown. The position of c is not used. It does nothing without a caret.
 func (n ViewportNode) Cursor(c *tea.Cursor) ViewportNode { n.cursor = c; return n }
 
 // View implements [Child], drawing the node at its natural size.
@@ -903,20 +902,22 @@ func (r *renderer) paintGutters(i int, n ViewportNode, y int, row GutterRow, vis
 	}
 }
 
-// paintCaret notes box i, viewport n given a caret, drawn at vis, whose
-// range is kept in the model, adds the op that draws the range over it, and
-// shows the cursor at its Head.
-func (r *renderer) paintCaret(i int, n ViewportNode, vis image.Rectangle) {
+// paintCaret notes box i, viewport n given a caret, drawn at vis inside
+// entry parent, whose range is kept in the model, adds the op that draws the
+// range over it, and shows the cursor at its Head.
+func (r *renderer) paintCaret(i int, n ViewportNode, vis image.Rectangle, parent int) {
 	l := r.viewportOf(i)
 	if l == nil {
 		return
 	}
 	b := &r.boxes[i]
 	if n.cursor != nil {
-		if at, ok := l.view.CaretCell(*n.caret); ok {
-			c := *n.cursor
-			c.X, c.Y = at.X, at.Y
-			r.placeCursor(&c, b.rect.Min, vis)
+		if rank := r.rankCursor(i, parent); rank != cursorUnfocused {
+			if at, ok := l.view.CaretCell(*n.caret); ok {
+				c := *n.cursor
+				c.X, c.Y = at.X, at.Y
+				r.placeCursor(&c, b.rect.Min, vis, rank)
+			}
 		}
 	}
 	if !r.parse {

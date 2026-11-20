@@ -591,7 +591,7 @@ func (r *Root) armPointer(f *Frame, i int) tea.Cmd {
 // has a focus, returning the command for the tick that finds out which
 // node that is, once the model has moved the focus.
 func (r *Root) armFocus() tea.Cmd {
-	if r.focus == nil {
+	if r.r.focus == nil {
 		return nil
 	}
 	s := &r.tip
@@ -657,7 +657,7 @@ func (r *Root) fireTip() tea.Cmd {
 // focusedTip returns the entry of f of the focused node, if it has a
 // tooltip and is on screen, or -1.
 func (r *Root) focusedTip(f *Frame) int {
-	id, ok := r.focus.focusedID()
+	id, ok := r.r.focus.focusedID()
 	if !ok {
 		return -1
 	}
@@ -698,8 +698,8 @@ func (r *Root) dismissTip(f *Frame, chain []int) {
 // noteFocus notes the focus of the frame being drawn, for a key press to
 // tell whether it moved the focus.
 func (r *Root) noteFocus() {
-	if r.tip.on && r.focus != nil {
-		r.tip.lastFocus, r.tip.lastFocusOK = r.focus.focusedID()
+	if r.tip.on && r.r.focus != nil {
+		r.tip.lastFocus, r.tip.lastFocusOK = r.r.focus.focusedID()
 	}
 }
 
@@ -776,8 +776,8 @@ func (r *Root) paintActive(t *tipAt, screen image.Rectangle, sinkOn bool) {
 
 // focusIs reports whether the node with ID id is focused.
 func (r *Root) focusIs(id any) bool {
-	cur, ok := r.focus.focusedID()
-	return ok && cur == id
+	_, focused := r.r.focus.focuses(id)
+	return focused
 }
 
 // unfold returns the full text of cut text t drawn as a chip over it, in

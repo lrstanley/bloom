@@ -70,6 +70,14 @@ func (f *Focus[K]) focusedID() (any, bool) {
 	return f.current, true
 }
 
+// focuses reports whether f moves to a focusable node with ID id, which it
+// does when id is a K, and whether that node is focused, for the Root of
+// [WithFocus].
+func (f *Focus[K]) focuses(id any) (moves, focused bool) {
+	k, ok := id.(K)
+	return ok, ok && f.Is(k)
+}
+
 // Is reports whether the node with ID id is focused.
 func (f *Focus[K]) Is(id K) bool { return f.focused && f.current == id }
 

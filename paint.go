@@ -55,10 +55,9 @@ type op struct {
 
 	// For opPop: the index of its opPush, the frame entries drawn since it,
 	// and how far its effects moved what was drawn, known once executed.
-	push         int
-	entries      [2]int
-	offset       image.Point
-	cursorHidden bool // an effect hid the cell of the cursor drawn inside
+	push    int
+	entries [2]int
+	offset  image.Point
 }
 
 func (o *op) equal(p *op) bool {
@@ -105,9 +104,11 @@ type renderer struct {
 	handlers [][]on.Handler // by entry
 	hovered  []mouseTarget  // the hoverable nodes under the pointer, kept by Root
 
-	dragged  *mouseTarget // the node being dragged, if any, kept by Root
-	cursor   *tea.Cursor
-	cursorAt int // index of the op drawn after the cursor was placed
+	dragged  *mouseTarget   // the node being dragged, if any, kept by Root
+	cursor   *tea.Cursor    // the cursor shown, picked from placed
+	placed   []placedCursor // the cursors painted this frame that may be shown
+	prev     []placedCursor // and those of the last frame
+	focus    focusTarget    // the Root's focus, given by WithFocus
 	out      string
 	drawn    image.Point // size of the last composited frame
 	drawnEnv canvas.Env
@@ -186,12 +187,20 @@ func (r *renderer) render(w, h int, c Child) string {
 		r.fillSinks()
 	}
 
-	kept := r.drawn == image.Pt(w, h) && r.drawnEnv.Equal(r.env) && r.sameOps()
+	// The same ops have the same effects, which moved and hid things the
+	// same way, but only the cursors they were run with: one placed
+	// elsewhere inside them runs them again.
+	samePlaced := slices.EqualFunc(r.placed, r.prev, func(a, b placedCursor) bool { return a.c.Position == b.c.Position && a.op == b.op })
+	kept := r.drawn == image.Pt(w, h) && r.drawnEnv.Equal(r.env) && r.sameOps() &&
+		(samePlaced || !r.inPass(r.placed) && !r.inPass(r.prev))
 	if kept {
-		// The same ops have the same effects, which moved and hid things the
-		// same way.
 		for i := range r.ops {
-			r.ops[i].offset, r.ops[i].cursorHidden = r.prevOps[i].offset, r.prevOps[i].cursorHidden
+			r.ops[i].offset = r.prevOps[i].offset
+		}
+		if samePlaced {
+			for i := range r.placed {
+				r.placed[i].hidden = r.prev[i].hidden
+			}
 		}
 	} else {
 		r.canvas.Resize(w, h)
@@ -215,6 +224,7 @@ func (r *renderer) render(w, h int, c Child) string {
 	clear(r.prevFxs)
 	r.ops, r.prevOps = r.prevOps[:0], r.ops
 	r.fxs, r.prevFxs = r.prevFxs[:0], r.fxs
+	r.placed, r.prev = r.prev[:0], r.placed
 	return r.out
 }
 
@@ -222,7 +232,8 @@ func (r *renderer) render(w, h int, c Child) string {
 // were the last frame's if kept, and draws it, reporting whether the frame
 // is the last one drawn. What the top draws is like a layer drawn last: it
 // takes part in telling whether the frame changed, so what it drew last
-// goes away when it no longer draws it, and it hides the cursor beneath.
+// goes away when it no longer draws it, and the cursor beneath gives way to
+// any other in sight.
 // It adds no entries, so the mouse goes through it.
 func (r *renderer) paintTop(w, h int, kept bool) bool {
 	clear(r.prevTop)
@@ -231,7 +242,10 @@ func (r *renderer) paintTop(w, h int, kept bool) bool {
 	if r.top != nil {
 		r.top(w, h)
 	}
-	r.hideCursorUnder(r.topOps)
+	if r.cursor != nil && covers(r.topOps, image.Pt(r.cursor.X, r.cursor.Y)) {
+		// Another cursor may be in sight.
+		r.pickCursor(r.topOps)
+	}
 	if r.topRedrawn {
 		// The canvas was drawn again for the top to read, without what it
 		// drew last, so what it draws now is drawn whatever it is.
@@ -278,6 +292,7 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 	clear(r.handlers)
 	clear(r.tips)
 	r.ops, r.entries, r.handlers, r.fxs, r.cursor = r.ops[:0], r.entries[:0], r.handlers[:0], r.fxs[:0], nil
+	r.placed = r.placed[:0]
 	r.tips, r.sinks = r.tips[:0], r.sinks[:0]
 	r.floats, r.open = r.floats[:0], 0
 	clear(r.leaves)
@@ -298,9 +313,9 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 	return root
 }
 
-// placeEntries moves the entries and cursor drawn inside each effect pass by
-// the offset its effects moved its cells, clips them to where the cells were
-// composited, and then hides the cursor if something drawn later covers it.
+// placeEntries moves the entries drawn inside each effect pass by the offset
+// its effects moved its cells, clips them to where the cells were
+// composited, and then picks the cursor shown (see [renderer.pickCursor]).
 func (r *renderer) placeEntries() {
 	for i := range r.ops {
 		o := &r.ops[i]
@@ -317,16 +332,8 @@ func (r *renderer) placeEntries() {
 				s.vis = s.vis.Add(o.offset).Intersect(o.clip)
 			}
 		}
-		if r.cursor != nil && r.cursorAt > o.push && r.cursorAt <= i {
-			at := image.Pt(r.cursor.X, r.cursor.Y).Add(o.offset)
-			if at.In(o.clip) && !o.cursorHidden {
-				r.cursor.X, r.cursor.Y = at.X, at.Y
-			} else {
-				r.cursor = nil
-			}
-		}
 	}
-	r.hideCoveredCursor()
+	r.pickCursor(nil)
 }
 
 // size returns the frame size for a tree laid out in w×h.
@@ -336,6 +343,33 @@ func (r *renderer) size(root, w, h int) (width, height int) {
 		return rect.Dx(), rect.Dy()
 	}
 	return max(w, 0), max(h, 0)
+}
+
+// hideUnder notes which cursors drawn inside effect pass i the effects hid,
+// leaving them off surface s.
+func (r *renderer) hideUnder(i int, s *canvas.Surface) {
+	o := &r.ops[i]
+	for j := range r.placed {
+		if p := &r.placed[j]; o.push < p.op && p.op <= i {
+			at := image.Pt(p.c.X, p.c.Y).Sub(o.rect.Min)
+			p.hidden = p.hidden || !s.Visible(at.X, at.Y)
+		}
+	}
+}
+
+// inPass reports whether one of placed is drawn inside an effect pass of
+// the frame, which can hide it.
+func (r *renderer) inPass(placed []placedCursor) bool {
+	for i := range r.ops {
+		if o := &r.ops[i]; o.kind == opPop {
+			for _, p := range placed {
+				if o.push < p.op && p.op <= i {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (r *renderer) sameOps() bool {
@@ -504,7 +538,7 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 	case ViewportNode:
 		r.paintViewport(i, n, vis)
 		if n.caret != nil {
-			r.paintCaret(i, n, vis)
+			r.paintCaret(i, n, vis, parent)
 		}
 	case ScrollbarNode:
 		r.paintScrollbar(i, b, n, clip, parent)
@@ -548,7 +582,7 @@ func (r *renderer) paintText(i int, n *TextNode, vis, clip image.Rectangle, pare
 	}
 	r.blitText(text, n.trusted, b.rect, vis)
 	if n.cursor != nil {
-		r.placeCursor(n.cursor, b.rect.Min, vis)
+		r.placeCursor(n.cursor, b.rect.Min, vis, r.rankCursor(i, parent))
 	}
 }
 
@@ -770,37 +804,113 @@ func (r *renderer) isDragged(b *box) bool {
 	return r.dragged != nil && r.dragged.key == b.key()
 }
 
-// placeCursor shows c, relative to origin, if that cell is inside clip.
-func (r *renderer) placeCursor(c *tea.Cursor, origin image.Point, clip image.Rectangle) {
+// cursorRank is what a cursor was placed inside, which picks the one shown
+// when the Root has a focus: a cursor inside the focused node over one
+// that the focus has nothing to do with, and never one inside a node that
+// could take the focus but does not have it.
+type cursorRank int8
+
+const (
+	cursorUnfocused cursorRank = iota - 1 // inside a focusable node not focused, or leaving
+	cursorFree                            // inside no focusable node the focus moves to
+	cursorFocused                         // inside the focused node
+)
+
+// placedCursor is a cursor painted, which [renderer.pickCursor] shows if
+// nothing hides it and the focus prefers it.
+type placedCursor struct {
+	c      tea.Cursor // in frame cells, before effects move it
+	op     int        // index of the op drawn after it was placed
+	rank   cursorRank
+	hidden bool // an effect pass it is drawn inside hid its cell
+}
+
+// placeCursor places c, relative to origin, if that cell is inside clip,
+// and the focus allows it, as rank tells (see [renderer.rankCursor]).
+// Without a focus, only the cursor drawn last can be shown.
+func (r *renderer) placeCursor(c *tea.Cursor, origin image.Point, clip image.Rectangle, rank cursorRank) {
 	at := origin.Add(image.Pt(c.X, c.Y))
-	if !at.In(clip) {
+	if !at.In(clip) || rank == cursorUnfocused {
 		return
+	}
+	if r.focus == nil {
+		r.placed = r.placed[:0]
 	}
 	cur := *c
 	cur.X, cur.Y = at.X, at.Y
-	r.cursor, r.cursorAt = &cur, len(r.ops)
+	r.placed = append(r.placed, placedCursor{c: cur, op: len(r.ops), rank: rank})
 }
 
-// hideCoveredCursor hides the cursor when something drawn after it, such as
-// a dialog, covers its cell.
-func (r *renderer) hideCoveredCursor() {
-	if r.cursor != nil {
-		r.hideCursorUnder(r.ops[r.cursorAt:])
-	}
-}
-
-// hideCursorUnder hides the cursor when one of ops, drawn after it, covers
-// its cell.
-func (r *renderer) hideCursorUnder(ops []op) {
-	if r.cursor == nil {
-		return
-	}
-	for _, o := range ops {
-		if o.kind != opPop && o.kind != opEffects && o.kind != opSelect && image.Pt(r.cursor.X, r.cursor.Y).In(o.rect.Intersect(o.clip)) {
-			r.cursor = nil
-			return
+// pickCursor shows the cursor placed that is on screen once effects moved
+// it, and not hidden by them or covered by what is drawn after it, such as
+// a dialog, or by over: of those, the one inside the focused node, or the
+// one drawn last.
+func (r *renderer) pickCursor(over []op) {
+	r.cursor = nil
+	best := cursorUnfocused // no cursor placed has this rank
+	for j := len(r.placed) - 1; j >= 0 && best < cursorFocused; j-- {
+		p := &r.placed[j]
+		if p.hidden || p.rank <= best {
+			continue
+		}
+		if at, ok := r.onScreen(p); ok && !covers(over, at) {
+			cur := p.c
+			cur.X, cur.Y = at.X, at.Y
+			r.cursor, best = &cur, p.rank
 		}
 	}
+}
+
+// onScreen returns where cursor p is once the effect passes it is drawn
+// inside moved it, and reports whether it is still inside them and not
+// covered by what is drawn after it.
+func (r *renderer) onScreen(p *placedCursor) (image.Point, bool) {
+	at := image.Pt(p.c.X, p.c.Y)
+	for i := range r.ops {
+		if o := &r.ops[i]; o.kind == opPop && o.push < p.op && p.op <= i {
+			if at = at.Add(o.offset); !at.In(o.clip) {
+				return at, false
+			}
+		}
+	}
+	return at, !covers(r.ops[p.op:], at)
+}
+
+// rankCursor ranks a cursor drawn by box i, inside entry parent, by the
+// nearest focusable node it is in that the Root's focus moves to: the
+// cursor is that node's, shown only while it is focused. One in something
+// animating out, which takes no input, is never shown. Without a focus,
+// every cursor is free, and the one drawn last is shown.
+func (r *renderer) rankCursor(i, parent int) cursorRank {
+	if r.focus == nil {
+		return cursorFree
+	}
+	if r.boxes[i].inert {
+		return cursorUnfocused
+	}
+	for j := parent; j >= 0; j = r.entries[j].parent {
+		e := &r.entries[j]
+		if !e.focusable {
+			continue
+		}
+		if moves, focused := r.focus.focuses(e.id); moves {
+			if focused {
+				return cursorFocused
+			}
+			return cursorUnfocused
+		}
+	}
+	return cursorFree
+}
+
+// covers reports whether one of ops draws over cell at.
+func covers(ops []op, at image.Point) bool {
+	for _, o := range ops {
+		if o.kind != opPop && o.kind != opEffects && o.kind != opSelect && at.In(o.rect.Intersect(o.clip)) {
+			return true
+		}
+	}
+	return false
 }
 
 // target is where ops draw: the frame, or the cells of an opPush.
@@ -861,9 +971,8 @@ func (r *renderer) execute(again bool) {
 			}
 			parent.c.Composite(s, o.clip.Sub(parent.origin))
 			o.offset = s.Offset
-			if !again && r.cursor != nil && r.cursorAt > o.push && r.cursorAt <= i {
-				at := image.Pt(r.cursor.X, r.cursor.Y).Sub(o.rect.Min)
-				o.cursorHidden = !s.Visible(at.X, at.Y)
+			if !again {
+				r.hideUnder(i, s)
 			}
 		}
 	}

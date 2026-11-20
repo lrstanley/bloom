@@ -171,7 +171,10 @@ var builders = []builder{
 		Imports: []string{"charm.land/bubbletea/v2"},
 		Only:    []string{"TextNode"},
 		Doc: "Cursor shows the terminal cursor at c, relative to the {{.Noun}}'s top-left cell, " +
-			"while that cell is on screen and not covered by a later layer.",
+			"while that cell is on screen and not covered by a later layer. A terminal has one cursor: " +
+			"with [WithFocus], a cursor inside a focusable node whose ID is of the focus's type is shown " +
+			"only while the nearest such node, which may be the {{.Noun}} itself, is focused, and is shown " +
+			"over one in no such node. Otherwise the cursor drawn last is shown.",
 	},
 	{
 		Name: "Scope",

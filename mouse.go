@@ -135,6 +135,9 @@ type focusTarget interface {
 	// focusedID returns the ID of the focused node, and whether a node is
 	// focused.
 	focusedID() (any, bool)
+	// focuses reports whether the focus moves to a focusable node with ID
+	// id, and whether that node is the one focused.
+	focuses(id any) (moves, focused bool)
 }
 
 // mouseEvent is the OnMouse handler of the view [Root.View] made for frame
@@ -213,8 +216,8 @@ func (r *Root) route(f *Frame, msg tea.MouseMsg) tea.Cmd {
 			// A drag still going lost its release, such as outside the window.
 			cmds = r.endDrag(cmds, f, msg, p, chain)
 		}
-		if r.focus != nil {
-			r.focus.click(f, chain)
+		if r.r.focus != nil {
+			r.r.focus.click(f, chain)
 		}
 		cmds = f.clickOutside(cmds, msg, p, chain, floor)
 		s.press = press{button: m.Button}

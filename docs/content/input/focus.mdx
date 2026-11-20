@@ -150,20 +150,32 @@ A `bloom.Focus[any]` moves between every focusable node, whatever its ID.
 
 ## Show the cursor in an input
 
-`Cursor` on a text node shows the terminal's cursor at a position inside the node. Put it after the text in the
-focused input:
+`Cursor` on a text node shows the terminal's cursor at a position inside the node. Put it after the text of each
+input:
 
 ```go
-in := bloom.Text(value).Style(style).ID(id).Focusable()
-if m.focus.Is(id) {
-	// one column in, for the style's left padding
-	in = in.Cursor(tea.NewCursor(1+ansi.StringWidth(value), 0))
-}
+// one column in, for the style's left padding
+in := bloom.Text(value).Style(style).ID(id).Focusable().
+	Cursor(tea.NewCursor(1+ansi.StringWidth(value), 0))
 ```
 
 The position is relative to the node's top-left cell, wherever it ends up on screen. The cursor is hidden while a
 layer covers that cell. `ansi` here is `github.com/charmbracelet/x/ansi`, which measures the width of text the way
 the terminal does.
+
+The terminal has only one cursor, so bloom shows one. With [`WithFocus`](#move-focus-with-tab-and-clicks), it
+shows a cursor inside a focusable node only while that node is focused, so every input can give its cursor, and the
+cursor follows the focus. The cursor can be on the focusable node itself or anywhere inside it, such as on the text
+in a focusable box. The node that decides is the nearest focusable one with an ID of the focus's type: a node
+`Focus` passes over doesn't hide the cursor. A cursor in no such node is shown too, unless the focused node's
+cursor is in sight; of those, the one drawn last is shown. Without `WithFocus`, bloom shows the cursor drawn last, so give it only to the focused input:
+
+```go
+in := bloom.Text(value).Style(style).ID(id).Focusable()
+if m.focus.Is(id) {
+	in = in.Cursor(tea.NewCursor(1+ansi.StringWidth(value), 0))
+}
+```
 
 For Bubbles text inputs, use the cursor the component reports; see
 [Using Bubbles components](/bubble-tea/bubbles-components#show-the-terminal-cursor).

@@ -39,9 +39,9 @@ bloom.Viewport(m.buf).ID(paneText).At(m.pos).Wrap(bloom.WrapWords).LineNumbers(m
 
 The caret is the range's `Head`, and its `Anchor` is where the selection started; they're the same while nothing is
 selected. `Cursor` puts the terminal cursor at the caret while it's in sight, in the shape and color of the
-`tea.Cursor` you give it, and its position is ignored. Give it only while the viewport has
-[focus](/input/focus#make-nodes-focusable), such as `if m.focus.Is(paneText)`. Give the viewport an ID and
-`Focusable()` for a click to focus it.
+`tea.Cursor` you give it, and its position is ignored. Give the viewport an ID and `Focusable()` for a click to
+focus it. With [`WithFocus`](/input/focus#show-the-cursor-in-an-input), bloom shows the cursor only while the
+viewport has focus. Without it, give `Cursor` only then, such as `if m.focus.Is(paneText)`.
 
 The range is a pointer so that bloom reads it whenever it's asked, including in the same `Update` that changed it
 from the keyboard, and writes it from the mouse. A viewport with a caret is selectable without `Selectable()`.
@@ -311,7 +311,7 @@ does.
 
 - [Viewports](/content/viewports), for buffers, edits, and `Change`
 - [Selecting and copying text](/input/selection)
-- [Focus](/input/focus), for giving the cursor only to the focused viewport
+- [Focus](/input/focus), for showing the cursor only in the focused viewport
 - The [`editor` example](https://github.com/lrstanley/bloom/tree/master/_examples/editor)
 - [`ViewportNode.Caret`](https://pkg.go.dev/bloomfx.dev/bloom#ViewportNode.Caret), [`Buffer`](https://pkg.go.dev/bloomfx.dev/bloom#Buffer), [`ViewportView`](https://pkg.go.dev/bloomfx.dev/bloom#ViewportView), and
   [`Range`](https://pkg.go.dev/bloomfx.dev/bloom#Range) API reference

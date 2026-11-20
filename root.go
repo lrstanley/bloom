@@ -31,7 +31,6 @@ type Root struct {
 	blurred   bool
 	pending   bool
 	now       func() time.Time
-	focus     focusTarget
 	mouse     mouse
 	tip       tipState
 
@@ -106,8 +105,10 @@ func WithClock(now func() time.Time) Option { return func(c *config) { c.now = n
 // innermost node under the pointer that f can focus, as [Focus.Next]
 // would, before any handler for the click runs, so a handler can move the
 // focus on from there. With tooltips on (see [WithTooltips]), a key press
-// that moves the focus onto a node shows the node's tooltip. f must stay
-// where it is, as a field of a model used by pointer does.
+// that moves the focus onto a node shows the node's tooltip. f also picks
+// the terminal cursor: one given inside a focusable node f moves to is shown
+// only while that node is focused (see [TextNode.Cursor]). f must stay where
+// it is, as a field of a model used by pointer does.
 func WithFocus[K comparable](f *Focus[K]) Option { return func(c *config) { c.focus = f } }
 
 // New returns a Root.
@@ -121,7 +122,6 @@ func New(opts ...Option) *Root {
 		interval:  time.Second / time.Duration(c.fps),
 		unfocused: time.Second / time.Duration(min(c.unfocusedFPS, c.fps)),
 		now:       c.now,
-		focus:     c.focus,
 
 		copyFlash:  !c.noFlash,
 		clickDelay: !c.noClickDelay,
@@ -131,6 +131,7 @@ func New(opts ...Option) *Root {
 	r.r.motion = motion.New(c.now)
 	r.r.screen = r.handlerFrame
 	r.r.lastFrame = r.Frame
+	r.r.focus = c.focus
 	r.r.selPaint.Style = textsel.NewStyle(cellStyle(c.selStyle), c.selStyled)
 	r.r.rooted = true
 	r.r.words.Chars = defaultWordChars
@@ -281,7 +282,7 @@ func (r *Root) View(w, h int, c Child) tea.View {
 		return r.mouseEvent(f, msg)
 	}
 	v.Cursor = f.cursor
-	v.MouseMode = f.mouseMode(r.focus != nil)
+	v.MouseMode = f.mouseMode(r.r.focus != nil)
 	return v
 }
 

@@ -907,6 +907,22 @@ func TestTooltipAndCursor(t *testing.T) {
 	if v := g.r.View(30, 2, tree); v.Cursor == nil {
 		t.Fatal("no cursor after the tooltip closed")
 	}
+
+	// With a focus, the focused input's cursor under the unfolded text
+	// gives way to one in sight.
+	var f Focus[string]
+	f.Set("a")
+	tree = Column(
+		Row(Fixed(6, Text("> abcdefgh").Truncate().Cursor(tea.NewCursor(2, 0)).ID("a").Focusable()), Fill(Text(" "))),
+		Text("free").Cursor(tea.NewCursor(3, 0)),
+	)
+	g = newTipRig(t, 30, 2, func() Child { return tree }, WithFocus(&f))
+	g.move(1, 0)
+	g.wait(defaultTipDelay)
+	g.want("> abcdefgh")
+	if v := g.r.View(30, 2, tree); v.Cursor == nil || v.Cursor.Y != 1 {
+		t.Fatalf("cursor %+v, want the one in sight, on row 1", v.Cursor)
+	}
 }
 
 func TestTooltipOff(t *testing.T) {
