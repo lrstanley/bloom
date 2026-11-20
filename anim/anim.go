@@ -147,21 +147,18 @@ var ids atomic.Uint64
 // Value is a number that animates toward a target. The zero Value does not
 // animate; make one with [NewValue].
 type Value struct {
-	config
-
-	id, gen uint64
+	frames
 
 	current, target float64
 	from, velocity  float64
 	start, last     time.Time
 	running         bool
-	blurred         bool
 }
 
 // NewValue returns a value at v, which by default eases to each target over
 // 250ms.
 func NewValue(v float64, opts ...Option) Value {
-	return Value{id: ids.Add(1), current: v, target: v, config: defaults(opts)}
+	return Value{frames: newFrames(opts), current: v, target: v}
 }
 
 // Float returns the current value.
@@ -237,8 +234,7 @@ func (v *Value) Advance(now time.Time) bool {
 // [tea.BlurMsg] for [UnfocusedFPS].
 func (v *Value) Update(msg tea.Msg) tea.Cmd {
 	v.noteFocus(msg)
-	f, ok := msg.(FrameMsg)
-	if !ok || f.id != v.id || f.gen != v.gen || !v.running {
+	if !v.own(msg) || !v.running {
 		return nil
 	}
 	if !v.Advance(v.now()) {
@@ -247,24 +243,46 @@ func (v *Value) Update(msg tea.Msg) tea.Cmd {
 	return v.frame()
 }
 
+// frames asks for the frames of a value: its id and generation tell its own
+// frames apart from others', and from those asked for before it last
+// started or stopped, and it notes focus for [UnfocusedFPS].
+type frames struct {
+	config
+
+	id, gen uint64
+	blurred bool
+}
+
+func newFrames(opts []Option) frames { return frames{config: defaults(opts), id: ids.Add(1)} }
+
 // noteFocus notes whether the terminal is focused. A frame already scheduled
 // keeps its time, so the full rate comes back from the next one.
-func (v *Value) noteFocus(msg tea.Msg) {
+func (f *frames) noteFocus(msg tea.Msg) {
 	switch msg.(type) {
 	case tea.FocusMsg:
-		v.blurred = false
+		f.blurred = false
 	case tea.BlurMsg:
-		v.blurred = true
+		f.blurred = true
 	}
 }
 
-func (v *Value) frame() tea.Cmd {
-	msg := FrameMsg{id: v.id, gen: v.gen}
-	d := v.interval
-	if v.blurred {
-		d = max(d, v.unfocused)
+// own reports whether msg is the frame asked for last.
+func (f *frames) own(msg tea.Msg) bool {
+	m, ok := msg.(FrameMsg)
+	return ok && m.id == f.id && m.gen == f.gen
+}
+
+// delay is how long until the next frame.
+func (f *frames) delay() time.Duration {
+	if f.blurred {
+		return max(f.interval, f.unfocused)
 	}
-	return tea.Tick(d, func(time.Time) tea.Msg { return msg })
+	return f.interval
+}
+
+func (f *frames) frame() tea.Cmd {
+	msg := FrameMsg{id: f.id, gen: f.gen}
+	return tea.Tick(f.delay(), func(time.Time) tea.Msg { return msg })
 }
 
 // advance moves the value to where it is at now, reporting whether it is

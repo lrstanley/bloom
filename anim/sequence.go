@@ -125,8 +125,7 @@ func (s *Sequence) Stop() {
 // for the next one while it is running. It notes focus as [Value.Update] does.
 func (s *Sequence) Update(msg tea.Msg) tea.Cmd {
 	s.v.noteFocus(msg)
-	f, ok := msg.(FrameMsg)
-	if !ok || f.id != s.v.id || f.gen != s.v.gen || !s.running {
+	if !s.v.own(msg) || !s.running {
 		return nil
 	}
 	return s.advance()
