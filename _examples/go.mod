@@ -6,6 +6,7 @@ replace bloomfx.dev/bloom => ../
 
 require (
 	bloomfx.dev/bloom v0.0.0-alpha.8
+	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.2
 	charm.land/lipgloss/v2 v2.1.1
 	getsteep.dev/steep v0.0.0-alpha.13

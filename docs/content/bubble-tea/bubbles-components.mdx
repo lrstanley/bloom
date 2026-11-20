@@ -82,6 +82,23 @@ bloom.Box(panel, bloom.Text(m.input.View()).Cursor(m.input.Cursor()))
 `Cursor` returns `nil` when the input isn't focused, which shows no cursor. bloom also hides the cursor while a
 [layer](/layers/dialogs) covers its cell, so a dialog opening over an input doesn't leave a cursor blinking on top.
 
+The terminal has one cursor, so with several inputs bloom shows one of them. If the root has your focus through
+[`WithFocus`](/input/focus#move-focus-with-tab-and-clicks), give each input an ID and make it, or the box around it,
+focusable. bloom then shows only the focused input's cursor, even when the other inputs report one too:
+
+```go
+bloom.Column(
+	bloom.Box(panel, bloom.Text(m.name.View()).Cursor(m.name.Cursor())).ID(fieldName).Focusable(),
+	bloom.Box(panel, bloom.Text(m.email.View()).Cursor(m.email.Cursor())).ID(fieldEmail).Focusable(),
+)
+```
+
+bloom's focus is separate from the input's own, which its `Focus` and `Blur` set, and a click that moves bloom's
+focus doesn't change it. A Bubbles input ignores keys while it isn't focused itself, so call `Focus` on each input
+once, and pass keys only to the one bloom has focused, as in
+[Route keys to the focused node](/input/focus#route-keys-to-the-focused-node). Without `WithFocus`, bloom shows
+the cursor drawn last, so `Blur` every input but the focused one.
+
 ## A complete example
 
 A chat-style log with an input at the bottom. Type and press <kbd>enter</kbd> to add a line, and the log scrolls to
@@ -213,4 +230,6 @@ complete component that lays itself out, handles its own clicks, and keeps its I
 - [Writing components](/bubble-tea/writing-components)
 - [Viewports](/content/viewports), bloom's own scrolling text
 - [How layout works](/concepts/how-layout-works)
+- The [`inputs` example](https://github.com/lrstanley/bloom/tree/master/_examples/inputs), with two Bubbles text
+  inputs side by side and the cursor in the focused one
 - [Bubbles](https://github.com/charmbracelet/bubbles) on GitHub
