@@ -56,6 +56,29 @@ func TestTransparentLayer(t *testing.T) {
 	}
 }
 
+func TestTransparentLayerInTransition(t *testing.T) {
+	t.Parallel()
+
+	// The blank cells of a transparent layer show what is beneath them as it
+	// is, all through a transition, rather than the transition's own cells.
+	base := Text("abcdef\nghijkl").Style(lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")))
+	want := Render(6, 2, base)
+	for _, e := range []fx.Effect{fx.Fade{}, fx.Slide{From: fx.Bottom}, fx.Wipe{From: fx.Left}} {
+		for _, p := range []float64{0.3, 0.7} {
+			layer := Layer(Text("      \n      ")).Transparent().Anchor(Start, Start).Transition(p, e)
+			if got := Render(6, 2, Overlay(base, layer)); got != want {
+				t.Errorf("%T at %v: got\n%q\nwant\n%q", e, p, got, want)
+			}
+		}
+	}
+
+	// Its other cells still go through the transition.
+	layer := Layer(Text("X  X\n Y")).Transparent().Anchor(Start, Start).Transition(0.7, fx.Fade{})
+	if got := ansi.Strip(Render(6, 2, Overlay(base, layer))); got != "XbcXef\ngYijkl" {
+		t.Errorf("faded: got\n%s", got)
+	}
+}
+
 func TestPointerEffectsAreDrawnAgain(t *testing.T) {
 	t.Parallel()
 

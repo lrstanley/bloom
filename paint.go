@@ -715,7 +715,14 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	}
 	effects := n.effects
 	if n.clear {
-		effects = append(slices.Clip(effects), cutout{})
+		// Blank cells are hidden before the layer's own effects, which then
+		// leave them be rather than filling them in, as a fade does, and again
+		// after, for cells an effect drew blank.
+		if len(effects) > 0 {
+			effects = slices.Concat([]fx.Effect{cutout{}}, effects, []fx.Effect{cutout{}})
+		} else {
+			effects = []fx.Effect{cutout{}}
+		}
 	}
 	if len(effects) > 0 {
 		r.paintEffects(r.firstKid(i), b.rect, area, n.t, effects, parent, from)
@@ -733,8 +740,8 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	}
 }
 
-// cutout hides the blank cells of a transparent layer, after its own effects,
-// so that what is beneath shows through them.
+// cutout hides the blank cells of a transparent layer, before and after its
+// own effects, so that what is beneath shows through them.
 type cutout struct{}
 
 // Apply implements [fx.Effect].
