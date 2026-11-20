@@ -458,6 +458,12 @@ func (r *Root) dragEvent(cmds []tea.Cmd, f *Frame, msg tea.MouseMsg, p image.Poi
 	if s.drag == nil {
 		return cmds
 	}
+	if p != s.dragStart && s.press.button == tea.MouseLeft {
+		// Dragging is not a click on what was dragged, even back to where it
+		// started, nor half of a double click: a title bar dragged twice in a
+		// row stays put. Another button pressed meanwhile still clicks.
+		s.press.ok, s.press.doubleOK = false, false
+	}
 	e := s.drag.event(msg, p, f.inChain(chain, s.drag.key) >= 0)
 	e.Start, e.Done = s.dragStart, done
 	return run(cmds, s.drag.handlers, kindsOf(on.KindDrag), e)

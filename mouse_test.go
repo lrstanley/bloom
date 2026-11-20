@@ -1121,3 +1121,36 @@ func TestDown(t *testing.T) {
 	r.Update(down(0, 1))
 	expect(t, &l)
 }
+
+func TestDragIsNotAClick(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	tree := Text("title bar").On(
+		on.Drag(func(on.Event) tea.Cmd { return nil }),
+		on.Click(l.add("click")),
+		on.DoubleClick(l.add("double click")),
+	)
+	r := New()
+	r.Render(10, 1, tree)
+
+	// Two drags in a row, which end on the node, are neither clicks nor a
+	// double click.
+	for range 2 {
+		r.Update(down(0, 0))
+		r.Update(dragTo(3, 0))
+		r.Update(release(3, 0))
+	}
+	expect(t, &l)
+
+	// Nor is one that comes back to where it started.
+	r.Update(down(0, 0))
+	r.Update(dragTo(3, 0))
+	r.Update(release(0, 0))
+	expect(t, &l)
+
+	// A press that comes up where it went down is still a click.
+	r.Update(down(0, 0))
+	r.Update(release(0, 0))
+	expect(t, &l, "click")
+}
