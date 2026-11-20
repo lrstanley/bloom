@@ -172,12 +172,23 @@ See also: [Boxes and borders](/content/borders#put-titles-and-more-on-a-border),
 
 ## effects
 
-![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, two Recolor, and two Braille backdrops in turn](/demos/effects.webp)
+![The effects example: a gallery of effects entering and leaving on a loop](/demos/effects.webp)
 
-Every effect as a looping transition, two custom effects, a `Drawable`, and each backdrop.
+Effects as looping transitions, two custom effects, and a `Drawable`.
 
 See also: [Effects reference](/reference/effects), [Custom effects](/motion/custom-effects).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/effects), or `go run ./effects`.
+
+## backdrops
+
+![The backdrops example: ripples from clicks and the pointer, drifting glyphs, and rain behind a panel, then a dialog with each backdrop in turn](/demos/backdrops.webp)
+
+Every backdrop: `Ripple`, `Drift`, and `Rain` behind the whole screen on an `anim.Ticker`, following the mouse, and a
+dialog that cycles through `Dim`, `Desaturate`, `Recolor`, `Spotlight`, `Braille`, and an ambient effect as its
+backdrop.
+
+See also: [Effects reference](/reference/effects#backdrops), [Dialogs](/layers/dialogs).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/backdrops), or `go run ./backdrops`.
 
 ## transitions
 

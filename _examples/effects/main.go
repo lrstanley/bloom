@@ -5,10 +5,10 @@
 // Command effects is a gallery of cell effects. Every card runs its effect
 // as a transition, in and out on a loop driven by one animated value; two of
 // them are custom effects written with fx.Func, and one card is a
-// uv.Drawable placed with bloom.Drawable. A layer on top cycles through the
-// backdrop effects, applied to the whole gallery beneath it.
+// uv.Drawable placed with bloom.Drawable. The backdrops example shows the
+// backdrop effects.
 //
-// Keys: b cycles the backdrop, space pauses, q quits.
+// Keys: space pauses, q quits.
 package main
 
 import (
@@ -36,14 +36,12 @@ var (
 	muted   = theme.BrightBlack
 	accent  = theme.Purple
 	cyan    = theme.Cyan
-	warn    = theme.Yellow
 	surface = lipgloss.Lighten(theme.Bg, 0.1)
 
-	card    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	name    = lipgloss.NewStyle().Bold(true).Foreground(cyan)
-	sample  = lipgloss.NewStyle().Foreground(ink).Background(surface).Padding(0, 1)
-	overlay = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(warn).Padding(1, 3)
-	status  = lipgloss.NewStyle().Foreground(muted)
+	card   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
+	name   = lipgloss.NewStyle().Bold(true).Foreground(cyan)
+	sample = lipgloss.NewStyle().Foreground(ink).Background(surface).Padding(0, 1)
+	status = lipgloss.NewStyle().Foreground(muted)
 )
 
 const sampleText = "The quick brown fox\njumps over the lazy\ndog. 0123456789 ✓"
@@ -131,27 +129,12 @@ var gallery = []struct {
 	{"Custom: sweep", []fx.Effect{sweep}},
 }
 
-var backdrops = []struct {
-	name    string
-	effects []fx.Effect
-}{
-	{"Dim", []fx.Effect{fx.Dim{Amount: 0.6}}},
-	{"Desaturate", []fx.Effect{fx.Desaturate{Amount: 1}}},
-	{"Recolor: tint", []fx.Effect{fx.Recolor{Fg: accent, Bg: accent, Amount: 0.45}}},
-	{"Recolor: two colors", []fx.Effect{fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.17), Bg: lipgloss.Darken(theme.Bg, 0.3)}}},
-	{"Braille", []fx.Effect{fx.Braille{Seed: 7}}},
-	// Braille draws in grays; a Recolor after it tints them.
-	{"Braille: tinted", []fx.Effect{fx.Braille{Amount: 0.5, Seed: 7}, fx.Recolor{Fg: accent, Amount: 0.3}}},
-}
-
 type model struct {
-	ui       *bloom.Root
-	w, h     int
-	t        anim.Sequence // the gallery's progress, in and out, holding at each end
-	phase    anim.Sequence // the plasma's phase
-	backdrop int           // index into backdrops, the last one shown while the overlay fades out
-	overlay  anim.Presence
-	paused   bool
+	ui     *bloom.Root
+	w, h   int
+	t      anim.Sequence // the gallery's progress, in and out, holding at each end
+	phase  anim.Sequence // the plasma's phase
+	paused bool
 }
 
 func newModel() *model {
@@ -161,8 +144,7 @@ func newModel() *model {
 			anim.To(1), anim.Hold(700*time.Millisecond),
 			anim.To(0), anim.Hold(700*time.Millisecond),
 		).With(anim.Duration(1400*time.Millisecond), anim.Ease(anim.InOutCubic)),
-		phase:   anim.NewLoop(26 * time.Second),
-		overlay: anim.NewPresence(anim.Duration(300 * time.Millisecond)),
+		phase: anim.NewLoop(26 * time.Second),
 	}
 }
 
@@ -187,19 +169,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				cmds = append(cmds, m.t.Loop(), m.phase.Loop())
 			}
-		case "b":
-			switch {
-			case !m.overlay.Shown():
-				m.backdrop = 0
-				cmds = append(cmds, m.overlay.Show())
-			case m.backdrop == len(backdrops)-1:
-				cmds = append(cmds, m.overlay.Hide())
-			default:
-				m.backdrop++
-			}
 		}
 	}
-	return m, tea.Batch(append(cmds, anim.Update(msg, &m.t, &m.phase, &m.overlay))...)
+	return m, tea.Batch(append(cmds, anim.Update(msg, &m.t, &m.phase))...)
 }
 
 func (m *model) View() tea.View {
@@ -228,26 +200,11 @@ func (m *model) layout() bloom.Child {
 	drawing := bloom.Drawable(plasma{t: m.phase.Float()})
 	cards = append(cards, m.card("Drawable + Fade", bloom.Transition(t, drawing, fx.Fade{})))
 
-	hints := fmt.Sprintf(" t = %.2f · b: backdrop (%s) · space: pause · q: quit",
-		t, m.backdropName())
-	base := bloom.Column(
+	hints := fmt.Sprintf(" t = %.2f · space: pause · q: quit", t)
+	return bloom.Column(
 		bloom.Fill(bloom.Grid(3, cards...).Gap(1, 0)),
 		bloom.Text(hints).Style(status).Truncate(),
 	)
-
-	b := backdrops[m.backdrop]
-	label := bloom.Layer(bloom.Box(overlay, bloom.Text("Backdrop: "+b.name).Style(name))).
-		Backdrop(b.effects...).
-		Presence(m.overlay, fx.Fade{})
-
-	return bloom.Overlay(base, label)
-}
-
-func (m *model) backdropName() string {
-	if !m.overlay.Shown() {
-		return "none"
-	}
-	return backdrops[m.backdrop].name
 }
 
 func main() {

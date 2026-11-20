@@ -20,9 +20,9 @@ From a corner, effects that sweep across a node (`Wipe`, `Decode`, `Blinds`, `Wa
 bottom side. The zero value is the effect's default: `Bottom`, unless the table says otherwise. `Seed` fields pick a
 random pattern that stays the same for the same seed.
 
-The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/effects) loops every effect as a transition, then shows each backdrop over them:
+The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/effects) loops every effect as a transition:
 
-![The effects example: a gallery of every effect entering and leaving, then the Dim, Desaturate, two Recolor, and two Braille backdrops in turn](/demos/effects.webp)
+![The effects example: a gallery of effects entering and leaving on a loop](/demos/effects.webp)
 
 ## Entrances
 
@@ -55,6 +55,23 @@ The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/e
 `Amount` runs from 0, no change, to 1, all the way, except where a default is listed: there, zero is the
 default. Backdrops also work as transitions; `Recolor` on a node fades it in
 from a color, for example.
+
+### Ambient
+
+These draw a moving texture of glyphs into the empty cells beneath a layer, the blank cells on the terminal's
+background, keeping a cell away from anything drawn. Their `Time` is a clock, such as an `anim.Ticker`'s `Elapsed`,
+so they move while it runs. As a backdrop they fade with the layer; over a whole screen, use
+`bloom.Transition(1, screen, fx.Drift{Time: m.clock.Elapsed()})`.
+
+| Effect | Fields | Draws |
+| --- | --- | --- |
+| [`Ripple`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Ripple) | `Time`, `Drops`, `Rain float64`, `Color`, `Speed` (default 26), `Life` (default 1.8s), `Glyphs`, `Seed` | rings of scrambling glyphs that ripple out from each drop, such as a click, with a fading wake; `Rain` drops more at random, per second. Add drops from mouse events to an `fx.Drops`, which keeps the 32 most recent |
+| [`Drift`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Drift) | `Time`, `Color`, `Amount` (default 0.16), `Cover` (default 0.3), `Scale` (default 16), `Speed` (default 1), `Focus image.Point`, `Radius int`, `Glyphs`, `Seed` | faint patches of glyphs that drift and fade, scrambling as they fade in; with `Radius`, they gather around `Focus`, such as the pointer |
+| [`Rain`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Rain) | `Time`, `Color`, `Head`, `Amount` (default 0.5), `Density` (default 0.3), `Speed` (default 12), `Length` (default 14), `Glyphs`, `Seed` | streams of glyphs falling down, each led by a scrambling glyph in `Head` |
+
+The [backdrops example](https://github.com/lrstanley/bloom/tree/master/_examples/backdrops) shows every backdrop:
+
+![The backdrops example: ripples from clicks and the pointer, drifting glyphs, and rain behind a panel, then a dialog with each backdrop in turn](/demos/backdrops.webp)
 
 ## Feedback
 
