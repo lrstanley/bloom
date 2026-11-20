@@ -631,6 +631,11 @@ pre {
   color: var(--color-fd-muted-foreground);
 }
 
+/* Above a full-width recording, where a narrow paragraph leaves a gap beside it. */
+.bloom-section-lede-wide {
+  max-width: none;
+}
+
 .bloom-chores {
   margin-top: 2.25rem;
   border-top: 1px solid var(--color-fd-border);
@@ -689,6 +694,188 @@ pre {
   height: auto;
   margin-top: 1.75rem;
   border-radius: 12px;
+}
+
+/* Smaller recordings under the showcase (src/components/example-gallery.tsx). Each zooms open in a dialog. */
+.bloom-gallery {
+  display: grid;
+  gap: 2rem 1.75rem;
+  margin-top: 2.5rem;
+}
+
+@media (min-width: 48rem) {
+  .bloom-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * The recordings differ in shape, so each sits centered in a frame of one shape. The frame's gradient is the one
+ * the recordings are drawn on, so the space beside a narrower one blends into it.
+ */
+.bloom-gallery-thumb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 10px;
+  background: linear-gradient(to bottom right, #3a1835, #120c17);
+  cursor: zoom-in;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.bloom-gallery-thumb:hover {
+  border-color: rgb(255 111 145 / 0.55);
+  box-shadow: 0 8px 28px -12px rgb(255 111 145 / 0.45);
+}
+
+.bloom-gallery-thumb:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 3px;
+}
+
+.bloom-gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.bloom-gallery-text {
+  margin-top: 0.85rem;
+}
+
+.bloom-gallery-text h3 {
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.bloom-gallery-text h3 a:hover {
+  color: var(--color-fd-primary);
+}
+
+.bloom-gallery-text h3 a:focus-visible,
+.bloom-gallery-more:focus-visible,
+.bloom-zoom a:focus-visible,
+.bloom-zoom-close:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 3px;
+}
+
+.bloom-gallery-text p {
+  margin-top: 0.3rem;
+  line-height: 1.55;
+  color: var(--color-fd-muted-foreground);
+}
+
+.bloom-gallery-more {
+  display: inline-flex;
+  gap: 0.4rem;
+  margin-top: 2.25rem;
+  font-weight: 600;
+  color: var(--color-fd-primary);
+  text-decoration: underline transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 150ms;
+}
+
+.bloom-gallery-more:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Fills the screen, so a click anywhere around the recording lands on the dialog and closes it. */
+.bloom-zoom {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: clamp(1rem, 4vw, 3rem);
+  border: 0;
+  background: transparent;
+  color: var(--color-fd-foreground);
+  cursor: zoom-out;
+}
+
+.bloom-zoom[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.bloom-zoom::backdrop {
+  background: rgb(13 10 18 / 0.82);
+  backdrop-filter: blur(6px);
+}
+
+.bloom-zoom img {
+  width: auto;
+  height: auto;
+  max-width: min(100%, 96rem);
+  max-height: calc(100dvh - 10rem);
+  border-radius: 12px;
+  box-shadow: 0 24px 80px -20px rgb(0 0 0 / 0.7);
+  transform-origin: center;
+}
+
+.bloom-zoom-caption {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  width: min(100%, 52rem);
+  color: #e9dcd8;
+  cursor: auto;
+}
+
+.bloom-zoom-caption p {
+  flex: 1;
+  line-height: 1.5;
+}
+
+.bloom-zoom-caption strong {
+  margin-right: 0.35rem;
+  font-family: var(--font-display);
+  font-stretch: 87.5%;
+  color: #fff1ea;
+}
+
+.bloom-zoom-caption a {
+  font-weight: 600;
+  color: #ff6f91;
+  text-underline-offset: 3px;
+}
+
+.bloom-zoom-caption a:hover {
+  text-decoration: underline;
+}
+
+.bloom-zoom-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid rgb(255 241 234 / 0.25);
+  border-radius: 999px;
+  color: #fff1ea;
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.bloom-zoom-close:hover {
+  border-color: #ff6f91;
+  background: rgb(255 111 145 / 0.12);
+}
+
+.bloom-zoom-close svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .bloom-split {
@@ -854,7 +1041,10 @@ pre {
 
 @media (prefers-reduced-motion: reduce) {
   .bloom-button,
-  .bloom-effect {
+  .bloom-effect,
+  .bloom-gallery-thumb,
+  .bloom-gallery-more,
+  .bloom-zoom-close {
     transition: none;
   }
 }

@@ -3,6 +3,7 @@ import { Link } from "fumapress/client";
 import { asMarkdown, md } from "fumapress/markdown";
 import { BrandCode } from "../components/brand-code";
 import { CopyInstall } from "../components/copy-install";
+import { ExampleGallery, type Example } from "../components/example-gallery";
 import { LlmsLinks } from "../components/llms-links";
 import { Logo } from "../components/logo";
 import { TerminalDemo } from "../components/terminal-demo";
@@ -43,6 +44,57 @@ const showcase = {
     alt: "The showcase example: panes waving in with each bubbletint theme, a toast decoding the theme's name, a pane dragged across the others, which glide out of its way, a double click zooming a pane, a tour spotlighting each part, and panes collapsing as the terminal narrows",
     body: "switches between bubbletint themes, waving the panes back in with each one's colors while a toast decodes its name. Drag a pane by its title and the others glide out of its way, double click it to zoom, narrow the terminal to collapse panes by priority, and take a tour that spotlights each part. It's a few hundred lines.",
 };
+
+// Smaller recordings under the showcase. Sizes are the recordings' own, from "task docs:demos".
+const gallery: Example[] = [
+    {
+        name: "desktop",
+        width: 1200,
+        height: 887,
+        alt: "The desktop example: windows dragged by their title bars, one snapped to the left edge, a calculator resized from its corner, minimized to the taskbar and restored, and the theme changed from the start menu",
+        body: "Windows dragged by their title bars, snapped to an edge, resized from a corner, and minimized to a taskbar.",
+    },
+    {
+        name: "golens",
+        width: 1310,
+        height: 887,
+        alt: "The golens example: walking a Go project's call graph as a tree that opens to the right, and a function's code opening between its callers and callees",
+        body: "A call graph explorer for any Go project, as a tree whose branches glide open beside highlighted code.",
+    },
+    {
+        name: "editor",
+        width: 1200,
+        height: 787,
+        alt: "The editor example: typing, selecting words and cutting them, pasting, undo and redo, and wrapping turned off and on, in a million lines",
+        body: "A text editor on a million lines, with selection, cut and paste, undo and redo, and wrapping.",
+    },
+    {
+        name: "forms",
+        width: 1200,
+        height: 787,
+        alt: "The forms example: a form with an autocomplete dropdown, then two stacked modal dialogs over a recolored backdrop",
+        body: "Focusable inputs with an autocomplete dropdown, then stacked modal dialogs over a recolored backdrop.",
+    },
+    {
+        name: "dashboard",
+        width: 1420,
+        height: 887,
+        alt: "The dashboard example: selecting services, a restart dialog over a dimmed backdrop, toasts, the sidebar springing shut and open, and panels collapsing as the terminal narrows",
+        body: "Services, a restart dialog, toasts, and a sidebar that springs shut, drawn at 120 frames a second.",
+    },
+    {
+        name: "logs",
+        width: 1310,
+        height: 737,
+        alt: "The logs example: a quarter of a million log lines followed as they grow, scrolled sideways, searched with matches marked, and a line selected and copied",
+        body: "A quarter of a million log lines followed as they grow, searched, scrolled sideways, and copied.",
+    },
+].map((e) => ({
+    ...e,
+    src: `/demos/${e.name}.webp`,
+    docs: `/resources/examples#${e.name}`,
+    source: `https://github.com/lrstanley/bloom/tree/master/_examples/${e.name}`,
+}));
 
 // What a Bubble Tea program otherwise does by hand, next to the bloom code that replaces it.
 const chores = [
@@ -193,11 +245,15 @@ ${install}
 
 ${requirements} See [Installation](/getting-started/installation#requirements).
 
-## All of it in one program
+## A few programs built with bloom
 
 The [showcase example](${showcase.href}) ${showcase.body}
 
 ![${showcase.alt}](${showcase.src})
+
+${gallery.map((e) => `- [${e.name}](${e.docs}): ${e.body}`).join("\n")}
+
+See [all the examples](/resources/examples).
 
 ## What bloom takes off your hands
 
@@ -268,8 +324,8 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                 </section>
 
                 <section className="bloom-section">
-                    <h2>All of it in one program</h2>
-                    <p className="bloom-section-lede">
+                    <h2>A few programs built with bloom</h2>
+                    <p className="bloom-section-lede bloom-section-lede-wide">
                         The{" "}
                         <a href={showcase.href} target="_blank" rel="noreferrer">
                             showcase example
@@ -277,6 +333,10 @@ ${paths.map((p) => `- **${p.title}**: ${p.body} ${p.links.map((l) => `[${l.text}
                         {showcase.body}
                     </p>
                     <img className="bloom-showcase" src={withBase(showcase.src)} alt={showcase.alt} width={1238} height={578} loading="lazy" />
+                    <ExampleGallery examples={gallery} />
+                    <Link href="/resources/examples" className="bloom-gallery-more">
+                        See all the examples <span aria-hidden>→</span>
+                    </Link>
                 </section>
 
                 <section className="bloom-section">
