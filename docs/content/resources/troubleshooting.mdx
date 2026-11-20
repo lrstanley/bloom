@@ -11,7 +11,7 @@ the layout did, then find your symptom below.
 
 [`bloom.Debug`](https://pkg.go.dev/bloomfx.dev/bloom#Debug) lays out a tree like `Solve` and returns it as
 text: every node, how it's sized, its ID, and where it went. Nodes that were collapsed, scrolled away, or only partly
-on screen are marked. Write it somewhere you can read while the program runs, such as a log file:
+on screen are marked, and so is a node with the same ID as one before it, as `duplicate`. Write it somewhere you can read while the program runs, such as a log file:
 
 ```go
 func (m model) View() tea.View {

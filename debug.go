@@ -22,7 +22,10 @@ import (
 // on screen, is marked hidden; one partly on screen is marked with the part
 // that is, and one not on screen at all is marked offscreen. Components are
 // shown by their type, and those that build their own layout, such as a
-// [Layouter], with the tree they built.
+// [Layouter], with the tree they built. A node with the same ID as one
+// before it is marked duplicate: IDs should be unique in a frame, and the
+// nodes in two with the same ID, which are known by where they are in them,
+// are not told apart either.
 //
 // Debug is meant for finding out why a layout looks the way it does, such as
 // by writing it to a log from View. Its format may change between versions.
@@ -45,19 +48,24 @@ func Debug(w, h int, c Child) string {
 		return ""
 	}
 	var sb strings.Builder
-	r.debugTree(&sb, root, r.area, "", "", false)
+	r.debugTree(&sb, root, r.area, "", "", false, make(map[any]bool))
 	return sb.String()
 }
 
 // debugTree writes box i and the boxes in it, clipped to clip. lead is drawn
 // before the box, and indent before the boxes in it. hidden is set inside a
-// hidden box, as boxes in one are not laid out.
-func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lead, indent string, hidden bool) {
+// hidden box, as boxes in one are not laid out. ids are the IDs written so
+// far.
+func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lead, indent string, hidden bool, ids map[any]bool) {
 	b := &e.boxes[i]
 	kind, attrs := debugNode(b.child)
 	sb.WriteString(lead + kind)
-	if b.meta.id != nil {
-		sb.WriteString(" id=" + debugID(b.meta.id))
+	if id := b.meta.id; id != nil {
+		sb.WriteString(" id=" + debugID(id))
+		if ids[id] {
+			sb.WriteString(" duplicate")
+		}
+		ids[id] = true
 	}
 
 	hidden = hidden || b.hidden
@@ -109,9 +117,9 @@ func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lea
 	}
 	for j, k := range kids {
 		if j == len(kids)-1 {
-			e.debugTree(sb, k, clip, indent+"└─ ", indent+"   ", hidden)
+			e.debugTree(sb, k, clip, indent+"└─ ", indent+"   ", hidden, ids)
 		} else {
-			e.debugTree(sb, k, clip, indent+"├─ ", indent+"│  ", hidden)
+			e.debugTree(sb, k, clip, indent+"├─ ", indent+"│  ", hidden, ids)
 		}
 	}
 }

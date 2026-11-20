@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"slices"
 	"sync"
+	"testing"
 	"time"
 
 	"bloomfx.dev/bloom/anim"
@@ -250,6 +251,9 @@ func (r *Root) Render(w, h int, c Child) string {
 		shown.anchor, shown.head, shown.headFirst = r.r.sel.anchor, r.r.sel.head, r.r.sel.headFirst
 	}
 	r.r.updateFrame()
+	if testing.Testing() {
+		checkIDs(r.r.entries)
+	}
 	return out
 }
 

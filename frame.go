@@ -271,6 +271,28 @@ func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
 	return chain, floor
 }
 
+// checkIDs panics when two nodes of a frame with entries have the same ID,
+// other than those drawn by a presence animating out, which an entering node
+// may share an ID with. It is only called in test binaries, where the panic
+// fails the test that drew the frame: IDs should be unique in a frame, and
+// two nodes with the same one are not told apart, nor are the nodes in them.
+func checkIDs(entries []entry) {
+	var seen map[any]bool
+	for i := range entries {
+		e := &entries[i]
+		if e.id == nil || e.leaving {
+			continue
+		}
+		if seen == nil {
+			seen = make(map[any]bool)
+		}
+		if seen[e.id] {
+			panic("bloom: two nodes in the frame have the ID " + debugID(e.id) + "; IDs must be unique in a frame")
+		}
+		seen[e.id] = true
+	}
+}
+
 // find returns the entry of the node with key k, or -1.
 func (f *Frame) find(k nodeKey) int { return findKey(f.entries, k) }
 

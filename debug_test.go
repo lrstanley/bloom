@@ -83,6 +83,19 @@ Overlay 0,0 20x5
 └─ Layer id=bloom.debugKey(a b) 12,1 6x1 anchor=end,start offset=-1,0 margin=1 size=6x1
    └─ Text "toast" 12,1 6x1
 `},
+		{"duplicate", Row(
+			Fill(Text("a")).ID("pane"),
+			Fill(Text("b")).ID("pane"),
+			Fill(Text("c")).ID(debugKey("pane")),
+		), 9, 1, `
+Row 0,0 9x1
+├─ Fill id="pane" 0,0 3x1
+│  └─ Text "a" 0,0 3x1
+├─ Fill id="pane" duplicate 3,0 3x1
+│  └─ Text "b" 3,0 3x1
+└─ Fill id=bloom.debugKey(pane) 6,0 3x1
+   └─ Text "c" 6,0 3x1
+`},
 		{"nil", nil, 10, 1, "\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -92,4 +105,17 @@ Overlay 0,0 20x5
 			}
 		})
 	}
+}
+
+// TestDuplicateIDsPanicInTests draws two nodes with the same ID, which
+// panics in a test binary, and two that differ only in type, which does not.
+func TestDuplicateIDsPanicInTests(t *testing.T) {
+	t.Parallel()
+	New().Render(10, 1, Row(Text("a").ID("x"), Text("b").ID(debugKey("x"))))
+	defer func() {
+		if recover() == nil {
+			t.Fatal("two nodes with the same ID did not panic")
+		}
+	}()
+	New().Render(10, 1, Row(Text("a").ID("x"), Text("b").ID("x")))
 }

@@ -140,7 +140,8 @@ IDs are compared as Go values, type included, so `control(0)` and `0` are differ
 `"save"` and a `control` `"save"`. Look a node up with the same type you gave it.
 
 An ID should be unique in the frame. If two nodes share one, lookups such as `Frame.Rect` find the first laid out,
-and focus and layout animation can't tell them apart.
+focus and layout animation can't tell them apart, and neither can the mouse tell apart the nodes in them that have no
+ID. [`bloom.Debug`](/resources/troubleshooting) marks a node with the ID of one before it as `duplicate`.
 A component that can appear more than once needs a different ID for each instance, such as a struct with the
 instance's own key in it; see [Writing components](/bubble-tea/writing-components#give-each-instance-its-own-ids).
 
