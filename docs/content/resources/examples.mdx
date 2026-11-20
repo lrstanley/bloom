@@ -125,6 +125,23 @@ to stay on screen, hover styles, and `on.ClickOutside` to close it.
 See also: [Mouse events](/input/mouse), [Dropdowns](/layers/dropdowns).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu), or `go run ./contextmenu`.
 
+## desktop
+
+![The desktop example: a splash starting up, windows dragged by their title bars and dropped, one held against the left edge with an outline of where it snaps, a calculator clicked and resized from its corner, maximized and restored, minimized to the taskbar and back, the theme changed from the settings opened from the start menu, and a log out shutting it down](/demos/desktop.webp)
+
+Windows that stay where they're dropped. Each is a layer put at a rectangle in the model with `Place`, moved by an
+`on.Drag` on its title bar and resized by one on its corner. A press anywhere on a window brings it to the front with
+`on.Down`, and the layers stack in the order of the windows. `Animate` glides a window when it's maximized or snapped,
+and from where it was dropped, but not while it's dragged. Holding one against an edge of the screen shows a
+transparent outline of where it snaps, and the taskbar minimizes and restores windows through their `Presence`. The
+start menu is a layer that floats above its button, the settings change the theme between retro and neon
+[bubbletint](https://github.com/lrstanley/bubbletint) tints, and a splash with `fx.Decode` starts the desktop up and
+shuts it down, which opens from its middle row and closes back to it with `fx.Unfold`, like an old CRT.
+
+See also: [Mouse events](/input/mouse#drag), [Dropdowns](/layers/dropdowns),
+[Layout animation](/motion/layout-animation).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/desktop), or `go run ./desktop`.
+
 ## forms
 
 ![The forms example: a form with an autocomplete dropdown, then two stacked modal dialogs over a recolored backdrop](/demos/forms.webp)

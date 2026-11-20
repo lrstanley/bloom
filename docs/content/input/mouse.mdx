@@ -200,8 +200,27 @@ divider := bloom.Fixed(1, bloom.Text("│")).On(on.Drag(func(e on.Event) tea.Cmd
 to the node, outside it when the pointer is.
 
 A drag also ends, with `Done` set, when the node leaves the frame or a modal layer opens over it, and when the
-release gets lost, such as outside the window. bloom follows the dragged node from frame to frame by where it is in
-the tree, or by its ID if it has one, so give a node that moves around in the tree while it's dragged an ID.
+release gets lost, such as outside the window. bloom follows the dragged node from frame to frame by its ID, or
+without one, by where it is in the nearest node with an ID around it, or in the whole tree when there's none. Give a
+node that moves around in the tree while it's dragged an ID, or put it in one that has one: the title bar of a
+window whose layer has an ID stays the same node as the window is brought to the front.
+
+To drag something that moves, such as a window by its title bar, remember where it was when the button went down,
+and move it by as much as the pointer has moved since, `e.Screen.Sub(e.Start)`. The
+[desktop example](https://github.com/lrstanley/bloom/tree/master/_examples/desktop) moves and resizes windows that
+way, and they stay where they're dropped because where each one is lives in the model.
+
+`Place` puts the layer at a rectangle the model keeps, and `on.Down` brings the window to the front as soon as the
+button goes down on it, without taking the click from its buttons or the drag from its title bar. For a window that
+[animates](/motion/layout-animation) to follow the pointer cell for cell, leave `Animate` off while it's dragged. Once it's back, the window carries on from where it was dropped, so one let go against an edge glides
+into the place it snaps to:
+
+```go
+layer := bloom.Layer(window).ID(windowID).Place(m.rect).On(on.Down(m.raise))
+if !m.dragging {
+	layer = layer.Animate(anim.Spring(22, 1))
+}
+```
 
 ## Layers and the mouse
 
@@ -293,5 +312,7 @@ if _, ok := m.ui.Click(buttonSave); !ok || m.saves != 1 {
 - [`on` API reference](https://pkg.go.dev/bloomfx.dev/bloom/on)
 - The [`mouse` example](https://github.com/lrstanley/bloom/tree/master/_examples/mouse), with hover styles, double
   clicks, the wheel, and a draggable divider
+- The [`desktop` example](https://github.com/lrstanley/bloom/tree/master/_examples/desktop), with windows dragged by
+  their title bars, resized by their corners, and snapped to the edges of the screen
 - The [`contextmenu` example](https://github.com/lrstanley/bloom/tree/master/_examples/contextmenu), with right
   click menus that open at the pointer
