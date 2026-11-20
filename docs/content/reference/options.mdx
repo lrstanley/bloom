@@ -240,6 +240,7 @@ Options for one tooltip, for `Tooltip(text, opts...)`:
 | --- | --- |
 | [`Solve(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Solve) | lay out without drawing, and return the `*Frame` |
 | [`Render(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Render) | lay out and draw to a string, without a root |
+| [`Measure(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Measure) | the size a tree takes in `w`×`h`: its natural size, cut to fit; zero or less is unbounded |
 | [`Debug(w, h, tree)`](https://pkg.go.dev/bloomfx.dev/bloom#Debug) | the laid-out tree as text, with each node's ID, rectangle, and whether it's hidden |
 | `frame.Rect(id)` | where a node went, and whether it's in the frame |
 | `frame.Hit(x, y)` | the IDs of the nodes at a point, outermost first |
@@ -266,8 +267,9 @@ From [`bloomfx.dev/bloom/on`](https://pkg.go.dev/bloomfx.dev/bloom/on), for `On(
 | `on.Msg(msg)` | a handler function that sends `msg` to `Update` |
 
 Component interfaces: [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports a natural size,
-and [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a layout for the space given. The
-handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen, and `ctx.Side()`
+and [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a layout for the space given. A
+`Layouter` that's only placed in bloom layouts can embed [`NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) in
+place of writing a `View`. The handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen, and `ctx.Side()`
 tells which side a layer it's in opened on. See [Writing components](/bubble-tea/writing-components).
 [`TextSource`](https://pkg.go.dev/bloomfx.dev/bloom#TextSource), [`TextMap`](https://pkg.go.dev/bloomfx.dev/bloom#TextMap), and [`Editable`](https://pkg.go.dev/bloomfx.dev/bloom#Editable) change what
 [selection](/input/selection) reads from a component.

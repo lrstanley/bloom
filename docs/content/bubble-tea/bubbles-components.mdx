@@ -203,7 +203,8 @@ func main() {
 The components you write don't need anything bloom-specific either: a `View() string` method is enough. A
 component can opt in to more: implement [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) to report
 its natural size without being rendered, or [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) to
-build its own layout for the space it's given. [Writing components](/bubble-tea/writing-components) builds a
+build its own layout for the space it's given. A component that only lives in bloom layouts can embed
+[`bloom.NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) in place of writing a `View`. [Writing components](/bubble-tea/writing-components) builds a
 complete component that lays itself out, handles its own clicks, and keeps its IDs apart from other instances.
 
 ## Related

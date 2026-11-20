@@ -38,12 +38,9 @@ of columns from the space available:
 
 ```go
 type cards struct {
-	items []bloom.Child
-}
+	bloom.NoView
 
-// View is used when the cards are drawn on their own, outside a bloom layout.
-func (c cards) View() string {
-	return bloom.Render(0, 0, c.Layout(bloom.Context{}))
+	items []bloom.Child
 }
 
 func (c cards) Layout(ctx bloom.Context) bloom.Child {

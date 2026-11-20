@@ -243,11 +243,11 @@ func (m *model) activity() bloom.Child {
 // bars is a [bloom.Layouter], so it draws as many bars as fit the space it
 // is given.
 type bars struct {
+	bloom.NoView
+
 	phase float64
 	stops []color.Color
 }
-
-func (b bars) View() string { return "" }
 
 func (b bars) Layout(ctx bloom.Context) bloom.Child {
 	// Each bar is two cells wide, with a cell between them.

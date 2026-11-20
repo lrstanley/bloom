@@ -92,9 +92,11 @@ func TestScrollbarOf(t *testing.T) {
 
 // scrollLayout is a Layouter that builds a scroll, which is built again for
 // each size it is given while measuring and arranging.
-type scrollLayout struct{ lines string }
+type scrollLayout struct {
+	NoView
 
-func (scrollLayout) View() string { return "" }
+	lines string
+}
 
 func (l scrollLayout) Layout(Context) Child { return Scroll(Text(l.lines).ID("body"), 10) }
 
@@ -105,7 +107,7 @@ func TestScrollbarOfLayouter(t *testing.T) {
 	// the layouter's scroll is built more than once; the scrollbar follows
 	// the one on screen.
 	lines := strings.TrimSuffix(strings.Repeat("line\n", 20), "\n")
-	box := Box(rounded, scrollLayout{lines}).Edge(Right, Stretch, ScrollbarOf("body").Style(ScrollbarStyle{Thumb: "#"}))
+	box := Box(rounded, scrollLayout{lines: lines}).Edge(Right, Stretch, ScrollbarOf("body").Style(ScrollbarStyle{Thumb: "#"}))
 	if got := ansi.Strip(Render(12, 6, Row(box, Text("x")))); !strings.Contains(got, "#") {
 		t.Fatalf("no scrollbar for a scroll a layouter built:\n%s", got)
 	}

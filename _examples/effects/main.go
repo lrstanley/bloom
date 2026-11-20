@@ -82,8 +82,6 @@ var sweep = fx.Func(func(s *canvas.Surface, t float64) {
 // and a [bloom.Measurer] for its natural size.
 type plasma struct{ t float64 } // t is the loop's phase, from 0 to 1
 
-func (p plasma) View() string { return "" }
-
 func (p plasma) Measure(avail bloom.Size) bloom.Size {
 	return bloom.Size{W: min(avail.W, 28), H: min(avail.H, 4)}
 }

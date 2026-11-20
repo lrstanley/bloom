@@ -15,14 +15,16 @@ import (
 
 // sizeProbe records the sizes it is laid out at, and wraps a long line above
 // a last row.
-type sizeProbe struct{ sizes *[]Size }
+type sizeProbe struct {
+	NoView
+
+	sizes *[]Size
+}
 
 func (p sizeProbe) Layout(ctx Context) Child {
 	*p.sizes = append(*p.sizes, Size{W: ctx.Width, H: ctx.Height})
 	return Box(rounded, Column(Text(strings.Repeat("word ", 20)).Style(lipgloss.NewStyle()), Text("LAST")))
 }
-
-func (sizeProbe) View() string { return "" }
 
 func TestLayerFixedWidthFitsHeight(t *testing.T) {
 	t.Parallel()
@@ -42,12 +44,12 @@ func TestLayerFixedWidthFitsHeight(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var sizes []Size
-			f := Solve(120, 20, Overlay(base, Layer(sizeProbe{&sizes}).Size(tt.w, 0).ID("l")))
+			f := Solve(120, 20, Overlay(base, Layer(sizeProbe{sizes: &sizes}).Size(tt.w, 0).ID("l")))
 			expectRect(t, f, "l", tt.want)
 			if len(sizes) == 0 || slices.ContainsFunc(sizes, func(s Size) bool { return s.W != tt.width }) {
 				t.Fatalf("laid out at %v; want only width %d", sizes, tt.width)
 			}
-			if got := Render(120, 20, Overlay(base, Layer(sizeProbe{&sizes}).Size(tt.w, 0))); !strings.Contains(got, "LAST") {
+			if got := Render(120, 20, Overlay(base, Layer(sizeProbe{sizes: &sizes}).Size(tt.w, 0))); !strings.Contains(got, "LAST") {
 				t.Fatalf("last row cut off:\n%s", got)
 			}
 		})
@@ -57,7 +59,7 @@ func TestLayerFixedWidthFitsHeight(t *testing.T) {
 func TestLayerFixedHeightMeasuresAtHeight(t *testing.T) {
 	t.Parallel()
 	var sizes []Size
-	f := Solve(120, 20, Overlay(Text("base"), Layer(sizeProbe{&sizes}).Size(0, 3).ID("l")))
+	f := Solve(120, 20, Overlay(Text("base"), Layer(sizeProbe{sizes: &sizes}).Size(0, 3).ID("l")))
 	if r, ok := f.Rect("l"); !ok || r.Dy() != 3 {
 		t.Fatalf("layer at %v, in the frame %v; want 3 rows", r, ok)
 	}

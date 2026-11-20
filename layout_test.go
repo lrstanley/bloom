@@ -5,6 +5,7 @@
 package bloom
 
 import (
+	"errors"
 	"image"
 	"strings"
 	"testing"
@@ -494,9 +495,7 @@ func TestCenteredIgnoresSlotSizing(t *testing.T) {
 
 // sided is a menu that draws an arrow toward the node its layer is against,
 // and is taller below it than above it, as given by its Context.
-type sided struct{}
-
-func (sided) View() string { return "" }
+type sided struct{ NoView }
 
 func (sided) Layout(ctx Context) Child {
 	side, ok := ctx.Side()
@@ -507,6 +506,25 @@ func (sided) Layout(ctx Context) Child {
 		return Column(Text("item"), Text("item"), Text("vvvv").ID("arrow"))
 	}
 	return Column(Text("^^^^").ID("arrow"), Text("item"), Text("item"), Text("item"))
+}
+
+// pointerLayout is a Layouter only as a pointer, with its View from NoView.
+type pointerLayout struct{ NoView }
+
+func (*pointerLayout) Layout(Context) Child { return Text("laid out") }
+
+func TestNoView(t *testing.T) {
+	t.Parallel()
+
+	if got := ansi.Strip(Render(0, 0, &pointerLayout{})); got != "laid out" {
+		t.Fatalf("as a Layouter: got %q, want %q", got, "laid out")
+	}
+	defer func() {
+		if err, _ := recover().(error); !errors.Is(err, errNoView) {
+			t.Fatalf("placed by value: recovered %v, want errNoView", err)
+		}
+	}()
+	Render(0, 0, Column(pointerLayout{}))
 }
 
 func TestContextSide(t *testing.T) {

@@ -50,6 +50,7 @@
 package bloom
 
 import (
+	"errors"
 	"slices"
 
 	"bloomfx.dev/bloom/on"
@@ -73,10 +74,42 @@ type Child interface {
 // Layouter is a component that builds its own layout for the space it is
 // given, which lets it change with its size. Layout must not change the
 // component: it is called while measuring as well as for the final layout.
+//
+// In a layout, a Layouter is drawn from what Layout returns, and its View is
+// never called. View matters only where a string is wanted, such as when
+// the component is used by a program that doesn't use bloom, where it can
+// draw the layout with [Render]. A Layouter that is only placed in bloom
+// layouts can embed [NoView] instead of writing one.
 type Layouter interface {
 	Child
 	Layout(ctx Context) Child
 }
+
+// NoView is embedded in a [Layouter] that is only placed in bloom layouts,
+// such as a page or a component of the program, to give it the View method
+// [Child] asks for, which bloom never calls on a Layouter:
+//
+//	type sidebar struct {
+//		bloom.NoView
+//
+//		selected int
+//	}
+//
+//	func (s *sidebar) Layout(ctx bloom.Context) bloom.Child { ... }
+//
+// Its View panics, since it is only called when the component is misused:
+// placed as a type that is not a Layouter, such as a sidebar placed by value
+// when Layout is on *sidebar, which embedding NoView gives a View too, or
+// used where a string is wanted, such as by a program that doesn't use
+// bloom.
+type NoView struct{}
+
+// View implements [Child]. It panics: see [NoView].
+func (NoView) View() string { panic(errNoView) }
+
+// errNoView is what [NoView.View] panics with.
+var errNoView = errors.New("bloom: View called on a component that embeds bloom.NoView. Place it as the type " +
+	"its Layout method is on, such as a pointer, or give it a View of its own to use it where a string is wanted")
 
 // Measurer is a component that knows its natural size, so its View is not
 // measured. Measure returns the size the component wants within avail; the

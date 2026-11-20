@@ -20,6 +20,39 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+// wrapping is on one row when there is room for it, and on two when there
+// isn't.
+type wrapping struct{ NoView }
+
+func (wrapping) Layout(ctx Context) Child {
+	if ctx.Width >= 5 {
+		return Row(Text("abc"), Text("de"))
+	}
+	return Column(Text("abc"), Text("de"))
+}
+
+func TestMeasure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		w, h int
+		c    Child
+		want Size
+	}{
+		{"natural", 0, 0, Text("ab\ncde"), Size{W: 3, H: 2}},
+		{"cut", 2, 1, Text("ab\ncde"), Size{W: 2, H: 1}},
+		{"layouter with room", 0, 0, wrapping{}, Size{W: 5, H: 1}},
+		{"layouter without room", 4, 0, wrapping{}, Size{W: 3, H: 2}},
+		{"nil", 10, 10, nil, Size{}},
+	}
+	for _, tt := range tests {
+		if got := Measure(tt.w, tt.h, tt.c); got != tt.want {
+			t.Errorf("%s: Measure(%d, %d) = %v, want %v", tt.name, tt.w, tt.h, got, tt.want)
+		}
+	}
+}
+
 func TestSolveMatchesRoot(t *testing.T) {
 	t.Parallel()
 

@@ -193,9 +193,11 @@ func (m *model) chips() bloom.Child {
 
 // fontList is the fonts' names, scrolled to keep the one shown in the
 // middle, as tall as it is given.
-type fontList struct{ m *model }
+type fontList struct {
+	bloom.NoView
 
-func (l fontList) View() string { return bloom.Render(28, 10, l) }
+	m *model
+}
 
 func (l fontList) Layout(ctx bloom.Context) bloom.Child {
 	n := min(ctx.Height, len(gallery))

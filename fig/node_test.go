@@ -115,6 +115,28 @@ func TestTextNodeSize(t *testing.T) {
 	}
 }
 
+// twoWords is a Layouter with no View of its own, on one row when there is
+// room for it, and on two when there isn't.
+type twoWords struct{ bloom.NoView }
+
+func (twoWords) Layout(ctx bloom.Context) bloom.Child {
+	if ctx.Width >= 5 {
+		return bloom.Row(bloom.Text("abc"), bloom.Text("de"))
+	}
+	return bloom.Column(bloom.Text("abc"), bloom.Text("de"))
+}
+
+func TestFallbackLayouterSize(t *testing.T) {
+	t.Parallel()
+
+	// Too narrow for any font, so the fallback is measured, laid out for
+	// the space there is.
+	n := fig.Text("Bloom").Font(fonts.Small()).Fallback(twoWords{})
+	if got := n.Measure(bloom.Size{W: 4, H: 10}); got != (bloom.Size{W: 3, H: 2}) {
+		t.Fatalf("Measure = %v, want 3x2", got)
+	}
+}
+
 func TestFontChain(t *testing.T) {
 	t.Parallel()
 

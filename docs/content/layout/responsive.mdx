@@ -57,12 +57,9 @@ whatever it returns:
 
 ```go
 type toolbar struct {
-	actions []string
-}
+	bloom.NoView // drawn from Layout, so it needs no View of its own
 
-// View is used when the toolbar is drawn on its own, outside a bloom layout.
-func (t toolbar) View() string {
-	return strings.Join(t.actions, " ")
+	actions []string
 }
 
 func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
@@ -79,8 +76,11 @@ func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 ```
 
 `Layout` may be called more than once a frame, while bloom measures as well as for the final layout, so it must
-not change the component. Treat it like `View`: read state, return nodes. [Writing components](/bubble-tea/writing-components)
-covers the rest of what a component like this can do, such as handling its own clicks.
+not change the component. Treat it like `View`: read state, return nodes. Embedding
+[`bloom.NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) covers the `View` method a child needs; write one
+yourself only if the component is also used where a string is wanted.
+[Writing components](/bubble-tea/writing-components#write-a-view-only-where-a-string-is-wanted) covers that, and the
+rest of what a component like this can do, such as handling its own clicks.
 
 ## Switch between a row and a column
 
@@ -89,11 +89,9 @@ narrow one:
 
 ```go
 type editor struct {
-	code, preview bloom.Child
-}
+	bloom.NoView
 
-func (e editor) View() string {
-	return bloom.Render(0, 0, e.Layout(bloom.Context{}))
+	code, preview bloom.Child
 }
 
 func (e editor) Layout(ctx bloom.Context) bloom.Child {

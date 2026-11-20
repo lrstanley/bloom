@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/internal/motion"
 	"bloomfx.dev/bloom/internal/textsel"
 	"bloomfx.dev/bloom/on"
@@ -343,6 +344,27 @@ func Render(w, h int, c Child) string {
 	defer renderers.Put(r)
 	return r.render(w, h, c)
 }
+
+// Measure returns the size c takes in a w×h space: its natural size, cut
+// to w×h, as a slot that sizes it to its content would give it. A w or h of
+// zero or less is unbounded on that axis. A [Measurer] that falls back to
+// another child can return its size, and a component can size children it
+// is given. Like [Render], Measure is stateless.
+func Measure(w, h int, c Child) Size {
+	e, _ := engines.Get().(*engine)
+	defer engines.Put(e)
+	defer e.frameMemos.Retire()
+	defer e.textMemos.Retire()
+	s := e.measure(e.tree(c), space(w, h))
+	e.cache.EndFrame(0) // it holds sizes, not cells: no frame to size it by
+	return s
+}
+
+// engines are for [Measure], apart from renderers, so that measuring
+// doesn't drop what a renderer keeps for its next frame.
+var engines = sync.Pool{New: func() any {
+	return &engine{method: ansi.GraphemeWidth, cache: canvas.NewCache(ansi.GraphemeWidth)}
+}}
 
 // Solve lays out c in a w×h frame without drawing it, and returns its
 // geometry at animation targets. Solve is stateless; retained layout

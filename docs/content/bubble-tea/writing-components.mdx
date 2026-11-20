@@ -5,7 +5,8 @@ description: Build reusable components that lay themselves out for their space, 
 
 Any type with a `View() string` method can go in a bloom layout, so a component you already have needs nothing
 bloom-specific. This page is about components that go further: ones that change shape with their size, handle their
-own clicks, and can appear more than once on a screen.
+own clicks, and can appear more than once on a screen. A component like that, built for a bloom program, doesn't need
+a `View` of its own.
 
 It builds a row of tabs as the example. The [complete component](#the-complete-component) is at the end.
 
@@ -17,12 +18,16 @@ layout instead of a string. bloom calls its `Layout` method with a
 
 ```go
 type Tabs struct {
+	// Satisfies bloom.Layouter without a View of its own, which bloom doesn't
+	// use for a Layouter. Tabs then only works in bloom layouts.
+	bloom.NoView
+
 	Labels []string
 	Active int
 }
 
 func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
-	// Not room for every label in full. A width of zero is its natural size, such as from View.
+	// Not room for every label in full. A width of zero is its natural size.
 	short := ctx.Width > 0 && ctx.Width < t.width()
 	tabs := make([]bloom.Child, len(t.Labels))
 	for i, label := range t.Labels {
@@ -48,8 +53,18 @@ func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
 change the component. Treat it like `View`: read state, return nodes. [Responsive layouts](/layout/responsive) has
 more on changing shape with size.
 
-A `Layouter` still needs a `View` method, for when it's used outside a bloom layout, such as by a program that
-doesn't use bloom. [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) with a size of zero draws the
+### Write a View only where a string is wanted
+
+bloom draws a `Layouter` from what `Layout` returns, and never calls its `View`. Embedding
+[`bloom.NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) gives `Tabs` the `View` method a
+[`bloom.Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child) needs. That's all a component needs when it's only
+placed in bloom layouts, such as a page, a panel, or a component shared between bloom programs.
+
+A component that embeds `NoView` only works in bloom layouts. Anywhere else, such as in a program that doesn't use
+bloom, there's no view to draw, and calling its `View` panics.
+
+If the component is also used where a string is wanted, such as by a program that doesn't use bloom, write `View`
+in place of `NoView`. [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) with a size of zero draws the
 layout at its natural size:
 
 ```go
@@ -110,10 +125,13 @@ type model struct {
 bloom.Column(bloom.Auto(&m.main), bloom.Fill(body))
 ```
 
-With value receivers, or `m.main` in place of `&m.main`, the click changes a copy and does nothing. If a component
-must be kept by value, such as one written for Bubble Tea's usual `m.c, cmd = m.c.Update(msg)` pattern, have its
-handlers send a message with `on.Msg` and change state in its own `Update` instead. See
+With value receivers, the click changes a copy and does nothing. If a component must be kept by value, such as one
+written for Bubble Tea's usual `m.c, cmd = m.c.Update(msg)` pattern, have its handlers send a message with `on.Msg`
+and change state in its own `Update` instead. See
 [Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+
+Place the component as the type its `Layout` method is on. `Layout` is on `*Tabs`, so `m.main` in place of `&m.main`
+isn't a `Layouter`, and bloom draws it from the `View` it has from `NoView`, which panics.
 
 ### Read the frame from a handler
 
@@ -136,6 +154,8 @@ from it:
 
 ```go
 type Tabs struct {
+	bloom.NoView
+
 	ID     any // set by the parent, unique to this instance
 	Labels []string
 	Active int
@@ -272,6 +292,8 @@ var (
 
 // Tabs is a row of tabs, one of which is active.
 type Tabs struct {
+	bloom.NoView // no View of its own: Tabs only works in bloom layouts
+
 	ID     any // set by the parent, unique to this instance
 	Labels []string
 	Active int
@@ -287,11 +309,6 @@ type TabMsg struct {
 type tabID struct {
 	tabs any
 	i    int
-}
-
-// View draws the tabs on their own, outside a bloom layout.
-func (t *Tabs) View() string {
-	return bloom.Render(0, 0, t.Layout(bloom.Context{}))
 }
 
 // Layout shows each label in full when there's room, and only its first
@@ -355,7 +372,8 @@ if _, ok := m.ui.Click(tabID{tabsMain, 1}); !ok || m.main.Active != 1 {
 ## Related
 
 - [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter), [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer),
-  and [`Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context) API reference
+  [`NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView), and [`Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context)
+  API reference
 - [How a bloom program runs](/concepts/how-a-program-runs#ids), for what IDs are for
 - [Responsive layouts](/layout/responsive)
 - [Keep the dropdown with its component](/layers/dropdowns#keep-the-dropdown-with-its-component)

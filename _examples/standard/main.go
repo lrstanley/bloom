@@ -42,9 +42,11 @@ var pages = []string{"Home", "Settings", "About"}
 
 // sidebar lists the pages; it is a [bloom.Layouter], so its items fill the
 // sidebar's width.
-type sidebar struct{ selected int }
+type sidebar struct {
+	bloom.NoView
 
-func (s sidebar) View() string { return bloom.Render(0, 0, s.Layout(bloom.Context{})) }
+	selected int
+}
 
 func (s sidebar) Layout(bloom.Context) bloom.Child {
 	items := make([]bloom.Child, 0, len(pages)+2)

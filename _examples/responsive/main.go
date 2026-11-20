@@ -110,9 +110,11 @@ func essay(topic string, paragraphs int) string {
 
 // toolbar is a [bloom.Layouter]: it shows its actions with labels when there
 // is room, and only their icons when there is not.
-type toolbar struct{ title string }
+type toolbar struct {
+	bloom.NoView
 
-func (t toolbar) View() string { return t.title }
+	title string
+}
 
 func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 	actions := []string{"⟳ refresh", "✎ edit", "⇪ share", "⚙ settings"}

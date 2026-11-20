@@ -115,31 +115,18 @@ type memoKey struct {
 // index of its root box, or -1 for a nil c. A w or h of zero or less is the
 // tree's natural size on that axis.
 func (e *engine) layout(w, h int, c Child) int {
-	// Clearing drops last frame's components and strings, which the arena's
-	// storage would otherwise keep alive past a smaller frame.
-	clear(e.boxes)
-	clear(e.memo)
-	e.boxes, e.kids = e.boxes[:0], e.kids[:0]
-	e.vps, e.vpRows = e.vps[:0], e.vpRows[:0]
 	defer e.frameMemos.Retire()
 	defer e.textMemos.Retire()
-	if c == nil || absent(c) {
+	root := e.tree(c)
+	if root < 0 {
 		if e.motion != nil {
 			e.motion.Begin(w, h)
 			e.motion.End()
 		}
 		return -1
 	}
-	root := e.build(c, -1, 0)
 	if w <= 0 || h <= 0 {
-		avail := Size{W: w, H: h}
-		if w <= 0 {
-			avail.W = unbounded
-		}
-		if h <= 0 {
-			avail.H = unbounded
-		}
-		s := e.measure(root, avail)
+		s := e.measure(root, space(w, h))
 		w, h = s.W, s.H
 	}
 	e.area = image.Rect(0, 0, w, h)
@@ -151,6 +138,32 @@ func (e *engine) layout(w, h int, c Child) int {
 		e.motion.End()
 	}
 	return root
+}
+
+// tree drops the last tree and builds the one for c, returning the index of
+// its root box, or -1 for a nil c.
+func (e *engine) tree(c Child) int {
+	// Clearing drops last frame's components and strings, which the arena's
+	// storage would otherwise keep alive past a smaller frame.
+	clear(e.boxes)
+	clear(e.memo)
+	e.boxes, e.kids = e.boxes[:0], e.kids[:0]
+	e.vps, e.vpRows = e.vps[:0], e.vpRows[:0]
+	if c == nil || absent(c) {
+		return -1
+	}
+	return e.build(c, -1, 0)
+}
+
+// space is a w×h space, unbounded on an axis of zero or less.
+func space(w, h int) Size {
+	if w <= 0 {
+		w = unbounded
+	}
+	if h <= 0 {
+		h = unbounded
+	}
+	return Size{W: w, H: h}
 }
 
 // build adds a box for c, the child at index slot of box parent, and its

@@ -12,10 +12,8 @@ import (
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
-	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
-	"github.com/charmbracelet/x/ansi"
 )
 
 //go:embed fonts/data/standard.flf.gz
@@ -163,8 +161,10 @@ func (n TextNode) Measure(avail bloom.Size) bloom.Size {
 	if m, ok := fb.(bloom.Measurer); ok {
 		return m.Measure(avail)
 	}
-	w, h := canvas.Measure(fb.View(), ansi.GraphemeWidth)
-	return bloom.Size{W: min(w, avail.W), H: min(h, avail.H)}
+	// Cut to avail again: bloom.Measure takes a size of zero as unbounded,
+	// where here it is no room at all.
+	s := bloom.Measure(avail.W, avail.H, fb)
+	return bloom.Size{W: min(s.W, avail.W), H: min(s.H, avail.H)}
 }
 
 // Layout implements [bloom.Layouter].

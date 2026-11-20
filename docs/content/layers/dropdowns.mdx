@@ -85,9 +85,11 @@ the menu a [`Layouter`](/bubble-tea/writing-components), and read the side it we
 on, in the same frame, so the menu never draws the wrong edge:
 
 ```go
-type menu struct{ options []string }
+type menu struct {
+	bloom.NoView
 
-func (m menu) View() string { return "" }
+	options []string
+}
 
 func (m menu) Layout(ctx bloom.Context) bloom.Child {
 	box := menuStyle.BorderTop(false) // below the input: open at the top
