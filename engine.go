@@ -5,7 +5,9 @@
 package bloom
 
 import (
+	"hash/maphash"
 	"image"
+	"reflect"
 	"slices"
 
 	"bloomfx.dev/bloom/canvas"
@@ -34,7 +36,7 @@ type box struct {
 	kidsOff  int
 	kidsLen  int
 	expanded int    // root of a Layouter's subtree, or -1
-	path     uint64 // where the box is in the tree, kept from frame to frame
+	path     uint64 // where the box is in the nearest box with an ID, or in the tree, kept from frame to frame
 	slot     int    // where the box is in its parent's children
 
 	view   string // a component's View, called once per frame
@@ -177,6 +179,13 @@ func (e *engine) build(c Child, parent, slot int) int {
 	var kids []Child
 	b := &e.boxes[i]
 	builtin := nodeMeta(c, &b.meta)
+	if b.meta.id != nil {
+		// The nodes in one with an ID are known by where they are in it,
+		// rather than in the whole tree, so that they stay the same nodes as
+		// it moves, such as a layer brought to the front: a click on one goes
+		// down on one frame and comes up on the next.
+		b.path = idPath(b.meta.id)
+	}
 	switch n := c.(type) {
 	case SlotNode:
 		kids = []Child{n.child}
@@ -262,6 +271,17 @@ func childPath(parent uint64, slot int) uint64 {
 	x ^= x >> 27
 	x *= 0x94d049bb133111eb
 	return x ^ x>>31
+}
+
+// idSeed seeds the paths that IDs start, which are compared only within one
+// process.
+var idSeed = maphash.MakeSeed()
+
+// idPath returns the path that the nodes in one with ID id are known by
+// from. IDs of different types are different IDs, which hashing an
+// interface by its value alone would not tell apart.
+func idPath(id any) uint64 {
+	return childPath(maphash.Comparable(idSeed, id), 0) ^ maphash.Comparable(idSeed, reflect.TypeOf(id))
 }
 
 func (e *engine) kidsOf(i int) []int {

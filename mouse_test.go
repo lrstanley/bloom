@@ -1019,3 +1019,72 @@ func TestLeavingLayerEndsSelection(t *testing.T) {
 		t.Fatalf("selected %q in a layer animating out", text)
 	}
 }
+
+// TestNodesFollowTheirNearestID raises a window, a layer with an ID, as a
+// press goes down on a button in it without one: the button is known by
+// where it is in the window, so it is still the node the press went down
+// on when it comes up, for a click, a double click, and a drag.
+func TestNodesFollowTheirNearestID(t *testing.T) {
+	t.Parallel()
+
+	var l log
+	order := []string{"a", "b"}
+	tree := func() Child {
+		layers := make([]LayerNode, 0, len(order))
+		for _, name := range order {
+			raise := on.Mouse(func(e on.Event) tea.Cmd {
+				if _, ok := e.Msg.(tea.MouseClickMsg); ok {
+					order = append(slices.DeleteFunc(order, func(s string) bool { return s == name }), name)
+				}
+				return nil
+			})
+			x := 0
+			if name == "b" {
+				x = 5
+			}
+			button := Text(name).On(
+				on.Click(l.add(name+" click")),
+				on.DoubleClick(l.add(name+" double")),
+				on.Drag(func(e on.Event) tea.Cmd {
+					if !e.Done && e.Screen != e.Start {
+						l.add(name + " drag")()
+					}
+					return nil
+				}),
+			)
+			layers = append(layers, Layer(Row(button, Space())).ID(name).
+				Anchor(Start, Start).Offset(x, 0).Size(5, 1).On(raise))
+		}
+		return Overlay(Text(""), layers...)
+	}
+	now := time.Unix(0, 0)
+	r := New(WithClock(func() time.Time { return now }))
+	click := func(x int) {
+		r.Render(10, 1, tree())
+		r.Update(down(x, 0))
+		r.Render(10, 1, tree())
+		r.Update(release(x, 0))
+	}
+
+	click(0)
+	if !slices.Equal(order, []string{"b", "a"}) {
+		t.Fatalf("order is %q, want a raised", order)
+	}
+	expect(t, &l, "a click")
+
+	click(5)
+	now = now.Add(100 * time.Millisecond)
+	expect(t, &l, "b click")
+	click(0)
+	now = now.Add(100 * time.Millisecond)
+	click(0)
+	expect(t, &l, "a click", "a click", "a double")
+
+	r.Render(10, 1, tree())
+	r.Update(down(5, 0))
+	r.Render(10, 1, tree())
+	r.Update(dragTo(6, 0))
+	r.Render(10, 1, tree())
+	r.Update(release(6, 0))
+	expect(t, &l, "b drag")
+}

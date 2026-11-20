@@ -160,8 +160,9 @@ func Hover(fn func(over bool) tea.Cmd) Handler {
 // Drag runs fn when the left button goes down over the node, each time the
 // pointer moves while it is held, wherever the pointer is, and once more
 // with Done set when it comes up. A drag is followed from frame to frame by
-// the node's ID, or without one, by where the node is in the tree, so a
-// node that moves within the tree while dragged needs an ID.
+// the node's ID, or without one, by where the node is in the nearest node
+// with an ID around it, or in the tree, so a node that moves within the tree
+// while dragged needs an ID, or to be in a node with one that moves with it.
 func Drag(fn func(e Event) tea.Cmd) Handler { return Handler{kind: KindDrag, fn: fn} }
 
 // ClickOutside runs fn when a mouse button goes down anywhere but on the

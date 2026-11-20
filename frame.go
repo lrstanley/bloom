@@ -33,7 +33,8 @@ type entry struct {
 }
 
 // nodeKey is what a node is followed by from frame to frame: its ID, or
-// without one, where it is in the tree.
+// without one, where it is in the nearest node with an ID that it is in, or
+// in the tree.
 type nodeKey struct {
 	id   any
 	path uint64

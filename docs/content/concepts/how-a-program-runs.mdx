@@ -116,6 +116,11 @@ only `On`. Give a node an ID when something has to find it again, in a later fra
 - `Click` and `SelectAll` on the root, for [tests](/bubble-tea/testing) and shortcuts;
 - a node that moves around in the tree while it's [dragged](/input/mouse#drag).
 
+A node without an ID is known from one frame to the next by where it is in the nearest node with an ID around it, or
+in the whole tree when there's none. An ID on a window's layer is enough for every button in it to stay the same node
+as the window is brought to the front, which a click on a window behind the others needs: the press is on one frame,
+and the release on the next.
+
 `ID` takes any comparable value. A type of your own, with a constant for each node, keeps IDs from colliding and
 lets [`Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) move between only the nodes of that type:
 
