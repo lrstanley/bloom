@@ -54,6 +54,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 - A slot whose size becomes zero, like the closed sidebar above, animates closed rather than vanishing.
 - A layer anchored to a node, such as a marker [anchored](/layers/dropdowns#follow-the-node) to the selected row,
   follows it smoothly from row to row.
+- A slot or layer that was drawn without `Animate` on the frame before glides from where it was then. Leave
+  `Animate` off for as long as a node should jump, such as a window following the pointer while it's
+  [dragged](/input/mouse#drag), and it glides on from there once `Animate` is back.
 
 Some changes happen at once: a [collapsed](/layout/responsive) slot, a node removed from the tree, and a layer whose
 anchor disappears are gone on the next frame.
@@ -73,8 +76,8 @@ bloom.Layer(marker).
 	Animate(anim.Spring(20, 1))
 ```
 
-The options are captured when the ID first appears, so changing them later has no effect on a node already on
-screen. The frame rate and clock come from the root, set with
+The options are captured when the node starts animating, so changing them later has no effect on a node already
+animating. The frame rate and clock come from the root, set with
 [`bloom.WithFPS`](https://pkg.go.dev/bloomfx.dev/bloom#WithFPS),
 [`bloom.WithUnfocusedFPS`](https://pkg.go.dev/bloomfx.dev/bloom#WithUnfocusedFPS), and
 [`bloom.WithClock`](https://pkg.go.dev/bloomfx.dev/bloom#WithClock). Layout animation also stops when

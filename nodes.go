@@ -100,7 +100,8 @@ func (n SlotNode) Align(a Align) SlotNode { n.align, n.aligned = a, true; return
 // its child at each intermediate size. It needs an ID and a retained [Root];
 // without either it does nothing. Zero-size slots animate closed; collapsed
 // slots and removed nodes disappear immediately. Options default to [anim.NewValue]
-// and are captured when the ID first appears. Root controls the clock and FPS.
+// and are captured when it starts animating. A slot drawn without Animate on
+// the last frame glides from where it was then. Root controls the clock and FPS.
 func (n SlotNode) Animate(opts ...anim.Option) SlotNode {
 	n.animation = &layoutAnimation{opts: opts}
 	return n
@@ -607,8 +608,10 @@ func (n LayerNode) Presence(p anim.Presence, effects ...fx.Effect) LayerNode {
 
 // Animate smoothly moves and resizes the layer when layout changes. It needs
 // an ID and a retained [Root]; without either it does nothing. Options default
-// to [anim.NewValue] and are captured when the ID first appears. Root controls
-// the clock and FPS. A hidden anchor or removed layer disappears immediately.
+// to [anim.NewValue] and are captured when it starts animating. A layer drawn
+// without Animate on the last frame, such as one following the pointer while
+// dragged, glides from where it was then. Root controls the clock and FPS. A
+// hidden anchor or removed layer disappears immediately.
 func (n LayerNode) Animate(opts ...anim.Option) LayerNode {
 	n.animation = &layoutAnimation{opts: opts}
 	return n

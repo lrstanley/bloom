@@ -89,6 +89,22 @@ func (m *Tracker) Values(id any) (v [4]float64) {
 	return v
 }
 
+// Has reports whether the box with ID id has animation state, kept from the
+// last frame.
+func (m *Tracker) Has(id any) bool { return m.states[id] != nil }
+
+// Start has the box with ID id, which has no animation state, start from at,
+// where it was laid out last without an animation, relative to origin, as
+// [Tracker.Rect] and [Tracker.Move] work: it is left as a box that has
+// finished moving there with effects, so it glides from there, or moves
+// from there with effects, rather than starting where it goes. opts
+// configure its progress, as for Move.
+func (m *Tracker) Start(id any, opts []anim.Option, at image.Rectangle, origin image.Point) {
+	if m.states[id] == nil {
+		m.states[id] = &state{moving: true, at: at.Sub(origin), progress: anim.NewValue(1, opts...)}
+	}
+}
+
 // Rect returns where the box with ID id goes this frame, on its way to
 // target. Its position animates relative to origin, where the nearest
 // animated box it is in is on screen, so that it moves with that box rather

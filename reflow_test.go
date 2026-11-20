@@ -6,6 +6,7 @@ package bloom
 
 import (
 	"image"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -524,5 +525,63 @@ func TestLayerMoveWithOutOfSight(t *testing.T) {
 				t.Fatalf("to %d, own effects %v, at the start of the move: %q, want it as before, %q", to, own, got, before)
 			}
 		}
+	}
+}
+
+// TestLayoutAnimationCarriesOn animates a box from where it was laid out
+// last without Animate, such as a window that followed the pointer while it
+// was dragged and glides into place once dropped.
+func TestLayoutAnimationCarriesOn(t *testing.T) {
+	now := time.Unix(1, 0)
+	r := New(WithClock(func() time.Time { return now }))
+	tree := func(x int, animate bool) Child {
+		l := Layer(Text("window")).ID("window").Anchor(Start, Start).Offset(x, 0).Size(6, 2)
+		if animate {
+			l = l.Animate(linear...)
+		}
+		return Overlay(Text(""), l)
+	}
+	r.View(100, 10, tree(0, true))
+	r.View(100, 10, tree(10, false))
+	r.View(100, 10, tree(20, false))
+	expectRect(t, r.Frame(), "window", image.Rect(20, 0, 26, 2))
+	r.View(100, 10, tree(40, true))
+	expectRect(t, r.Frame(), "window", image.Rect(20, 0, 26, 2))
+	now = now.Add(500 * time.Millisecond)
+	r.View(100, 10, tree(40, true))
+	expectRect(t, r.Frame(), "window", image.Rect(30, 0, 36, 2))
+
+	// Many starting at once each start from where they were: those after
+	// the first few are found in an index of the last frame.
+	many := func(x int, animate bool) Child {
+		ls := make([]LayerNode, 10)
+		for i := range ls {
+			ls[i] = Layer(Text("w")).ID(strconv.Itoa(i)).Anchor(Start, Start).Offset(x, i).Size(6, 1)
+			if animate {
+				ls[i] = ls[i].Animate(linear...)
+			}
+		}
+		return Overlay(Text(""), ls...)
+	}
+	r = New(WithClock(func() time.Time { return now }))
+	r.View(100, 10, many(20, false))
+	r.View(100, 10, many(40, true))
+	for i := range 10 {
+		expectRect(t, r.Frame(), strconv.Itoa(i), image.Rect(20, i, 26, i+1))
+	}
+
+	// Nor does one moving with effects jump: it moves from there.
+	moves := func(x int, animate bool) Child {
+		s := Fixed(5, Text("x")).ID("x")
+		if animate {
+			s = s.Animate(linear...).MoveWith(fx.Fade{})
+		}
+		return Row(Fixed(x, nil), s)
+	}
+	r = New(WithClock(func() time.Time { return now }))
+	r.View(100, 10, moves(0, false))
+	r.View(100, 10, moves(20, true))
+	if !r.r.motion.Running() {
+		t.Fatal("did not move from where it was")
 	}
 }

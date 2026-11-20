@@ -96,6 +96,13 @@ type engine struct {
 	motion     *motion.Tracker   // nil for pooled renderers, which keep no state between frames
 	screen     func() *Frame     // the Root's frame on screen, for Context.Frame; nil outside a Root
 	lastFrame  func() *Frame     // the Root's frame drawn last, which the screen can be behind; nil outside a Root
+	// seeds counts the boxes this layout looked up in the last frame, to
+	// start animating from where they were then, and seedAt is where the
+	// last frame drew each ID, once more than scanSeeds are looked up. The
+	// next layout drops it, as a frame many boxes start animating in at once
+	// is rare.
+	seeds  int
+	seedAt map[any]image.Rectangle
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
@@ -115,6 +122,7 @@ type memoKey struct {
 // index of its root box, or -1 for a nil c. A w or h of zero or less is the
 // tree's natural size on that axis.
 func (e *engine) layout(w, h int, c Child) int {
+	e.seeds, e.seedAt = 0, nil
 	defer e.frameMemos.Retire()
 	defer e.textMemos.Retire()
 	root := e.tree(c)
@@ -898,12 +906,53 @@ func (e *engine) arrangeFlex(i int, n FlexNode, r image.Rectangle) {
 
 // animate returns where box i, with ID id, is drawn on its way to target:
 // gliding there, or, moving with effects, at target, with its move noted on
-// the box for painting. A box still gliding finishes its glide first.
+// the box for painting. A box still gliding finishes its glide first. One
+// that was laid out last frame without an animation, such as a window that
+// followed the pointer while it was dragged, starts from where it was then.
 func (e *engine) animate(i int, id any, cfg *layoutAnimation, moves []fx.Effect, target image.Rectangle) image.Rectangle {
+	if !e.motion.Has(id) {
+		if at, ok := e.lastRect(id); ok {
+			e.motion.Start(id, cfg.opts, at, e.moved)
+		}
+	}
 	if len(moves) > 0 && !e.motion.Gliding(id) {
 		b := &e.boxes[i]
 		b.from, b.moveT, b.moving = e.motion.Move(id, cfg.opts, target, e.moved)
 		return target
 	}
 	return e.motion.Rect(id, cfg.opts, target, e.moved)
+}
+
+// scanSeeds is how many boxes a layout looks up in the last frame by
+// scanning it, before it indexes the frame for the rest.
+const scanSeeds = 8
+
+// lastRect returns where the last frame drew the box with ID id. The first
+// few boxes a layout looks up scan the frame, and the rest share an index of
+// it, so that many boxes starting to animate at once, such as a long list
+// turning Animate on, each take a lookup rather than a scan.
+func (e *engine) lastRect(id any) (image.Rectangle, bool) {
+	var f *Frame
+	if e.lastFrame != nil {
+		f = e.lastFrame()
+	}
+	if f == nil {
+		return image.Rectangle{}, false
+	}
+	e.seeds++
+	if e.seeds <= scanSeeds {
+		return f.Rect(id)
+	}
+	if e.seedAt == nil {
+		e.seedAt = make(map[any]image.Rectangle)
+		// Backward, so that the first of a duplicated ID is the one, as for
+		// Frame.Rect.
+		for i := len(f.entries) - 1; i >= 0; i-- {
+			if en := &f.entries[i]; en.id != nil {
+				e.seedAt[en.id] = en.rect
+			}
+		}
+	}
+	at, ok := e.seedAt[id]
+	return at, ok
 }
