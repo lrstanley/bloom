@@ -20,6 +20,7 @@ import (
 
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/internal/linebuf"
+	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	uv "github.com/charmbracelet/ultraviolet"
@@ -983,6 +984,61 @@ func TestViewportWheel(t *testing.T) {
 	r.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelUp})
 	if called {
 		t.Fatal("the wheel scrolled up from the top")
+	}
+}
+
+// TestViewportWheelPassesOutward checks that a step of the wheel a viewport
+// can't take, at its edge or with all of it in sight, scrolls what the
+// viewport is in, on each axis on its own.
+func TestViewportWheelPassesOutward(t *testing.T) {
+	t.Parallel()
+
+	tall := NewBuffer(strings.TrimSuffix(strings.Repeat("0123456789abcdef\n", 10), "\n"))
+	short := NewBuffer("fits")
+	var pos ViewportPos
+	var outer [][2]int
+	shortMoved := false
+	tree := func() Child {
+		return Column(
+			Fixed(3, Viewport(tall).At(pos).OnScroll(func(p ViewportPos) tea.Cmd { pos = p; return nil })),
+			Fixed(1, Viewport(short).OnScroll(func(ViewportPos) tea.Cmd { shortMoved = true; return nil })),
+		).On(on.Scroll(func(dx, dy int) tea.Cmd {
+			outer = append(outer, [2]int{dx, dy})
+			return nil
+		}))
+	}
+	r := New()
+	wheel := func(x, y int, b tea.MouseButton, wantPos ViewportPos, wantOuter ...[2]int) {
+		t.Helper()
+		outer = nil
+		r.Render(8, 4, tree())
+		r.Update(tea.MouseWheelMsg{X: x, Y: y, Button: b})
+		if pos != wantPos || !slices.Equal(outer, wantOuter) {
+			t.Fatalf("%v at %d,%d: viewport at %+v, outer got %v; want %+v and %v", b, x, y, pos, outer, wantPos, wantOuter)
+		}
+	}
+
+	// At the top, up goes to the column, and down scrolls the viewport only.
+	wheel(1, 1, tea.MouseWheelUp, ViewportPos{}, [2]int{0, -1})
+	wheel(1, 1, tea.MouseWheelDown, ViewportPos{Line: 3})
+	// At the bottom, down goes to the column, and up stays in the viewport.
+	pos = ViewportPos{Line: 7}
+	wheel(1, 1, tea.MouseWheelDown, ViewportPos{Line: 7}, [2]int{0, 1})
+	wheel(1, 1, tea.MouseWheelUp, ViewportPos{Line: 4})
+	// Sideways, judged on the columns: at the left edge, left goes out.
+	wheel(1, 1, tea.MouseWheelLeft, ViewportPos{Line: 4}, [2]int{-1, 0})
+	wheel(1, 1, tea.MouseWheelRight, ViewportPos{Line: 4, X: 3})
+	// Followed to its end, it is still at the bottom.
+	pos = ViewportEnd
+	wheel(1, 1, tea.MouseWheelDown, ViewportEnd, [2]int{0, 1})
+
+	// A viewport its text fits in takes no step, whichever way.
+	wheel(1, 3, tea.MouseWheelDown, ViewportEnd, [2]int{0, 1})
+	wheel(1, 3, tea.MouseWheelUp, ViewportEnd, [2]int{0, -1})
+	wheel(1, 3, tea.MouseWheelRight, ViewportEnd, [2]int{1, 0})
+	wheel(1, 3, tea.MouseWheelLeft, ViewportEnd, [2]int{-1, 0})
+	if shortMoved {
+		t.Fatal("the wheel scrolled a viewport its text fits in")
 	}
 }
 

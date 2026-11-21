@@ -128,6 +128,35 @@ row or column, so a click anywhere along a list row's line can select it.
 
 Hover is the exception: every node under the pointer is hovered, as in CSS.
 
+### Pass an event on
+
+A handler that has no use for an event can return `on.Pass` instead of a command. The event then goes to the
+nearest node around it with a handler for it, as though the inner node had none, and on outward until a
+handler takes it. A cell with no menu of its own can leave a right click to its row:
+
+```go
+cell := bloom.Text(name).On(on.RightClick(func() tea.Cmd {
+	if !m.hasMenu(i) {
+		return on.Pass // the row's menu opens instead
+	}
+	return m.openMenu(i)
+}))
+row := bloom.Row(cells...).On(on.RightClickAt(m.rowMenu))
+```
+
+The handler that takes the event gets it relative to its own node, as though it had been the innermost. Return
+`on.Pass` only when the handler changed nothing, since the handlers around it act on the event too.
+
+`on.Pass` works for the handlers that send an event to one node: `Click`, `ClickAt`, `RightClick`, `RightClickAt`,
+`MiddleClick`, `DoubleClick`, `Press`, `Scroll`, and `Mouse`. A `Press` run by <kbd>enter</kbd> or <kbd>space</kbd>
+that passes leaves the key to your `Update`, as `m.focus.Update` reports it unhandled. A left click goes to the next
+`Click`, `ClickAt`, or `Press`, whichever it is. `Hover`, `Down`, and `ClickOutside` already run for every node
+they're on, and a drag stays with the node it started on: they take `on.Pass` as `nil`. Events never pass out of a
+[modal layer](/layers/dialogs).
+
+Return `on.Pass` as it is, like `tea.Quit`. `tea.Batch(on.Pass)` is still `on.Pass`, but batched with any other
+command it's a command, and the handler takes the event.
+
 Nodes made [selectable](/input/selection) take left-button drags to select their text, unless a node inside them
 has an `on.Drag` handler.
 
@@ -158,6 +187,34 @@ bloom.Fill(m.reader).On(on.Scroll(func(_, dy int) tea.Cmd { m.offset += dy * 3; 
 ```
 
 Clamp the offset in `Update`, which gets the wheel event after the handler ran.
+
+### Scroll inside something that scrolls
+
+A step that a handler [passes on](#pass-an-event-on) goes to the nearest node around it with an `on.Scroll`
+handler, the way a browser hands the wheel from a box that can't scroll to the page. Return `on.Pass` when the
+step would change nothing, such as when the cursor is already on the last item. Then the wheel over a field in a
+form scrolls the form once the field can't move:
+
+```go
+bloom.List(len(m.items), m.row).Keep(m.cursor).On(on.Scroll(func(_, dy int) tea.Cmd {
+	next := min(max(m.cursor+dy, 0), len(m.items)-1)
+	if next == m.cursor {
+		return on.Pass // the form around the list scrolls instead
+	}
+	m.cursor = next
+	return nil
+}))
+```
+
+A [viewport](/content/viewports)'s `OnScroll` does this on its own: a step at its edge, or with all its text in
+sight, goes to what the viewport is in. So a one-line input can keep its `OnScroll`, and the wheel over it scrolls
+the form. Each axis is judged on its own, so an input with a line too long to show still scrolls sideways.
+
+A handler with nothing around it to pass steps to, such as the form's, can take every step and clamp in `Update`
+as above.
+
+Each step is judged on its own, even within a quick turn of the wheel, so a turn that takes a viewport to its end
+carries on into what it's in.
 
 ## Hover
 

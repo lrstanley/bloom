@@ -119,8 +119,11 @@ func (p *picker) Layout(ctx bloom.Context) bloom.Child {
 	return bloom.List(len(p.items), p.row).Offset(p.offset).Keep(p.cursor).ID(p.id).
 		On(on.Scroll(func(_, dy int) tea.Cmd {
 			v, _ := ctx.Frame().List(p.id)
-			p.offset = v.First
-			p.cursor = min(max(p.cursor+dy*3, 0), len(p.items)-1)
+			next := min(max(p.cursor+dy*3, 0), len(p.items)-1)
+			if next == p.cursor {
+				return on.Pass // at either end, the wheel scrolls what the picker is in
+			}
+			p.offset, p.cursor = v.First, next
 			return nil
 		}))
 }

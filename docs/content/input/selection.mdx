@@ -170,6 +170,9 @@ the way the wheel would:
 - A [list](/content/lists) scrolls through its `on.Scroll` handler, and the selection takes each item that scrolls
   into view.
 
+As with the wheel, a step that the innermost handler [passes on](/input/mouse#pass-an-event-on) goes to the one
+around it, so text that's at its end but partly scrolled out of the page it's in scrolls the page.
+
 ```go
 bloom.Fixed(10, bloom.Scroll(bloom.Text(m.help).Selectable(), m.offset)).
 	On(on.Scroll(func(_, dy int) tea.Cmd { m.offset = min(max(m.offset+dy, 0), m.maxOffset); return nil }))

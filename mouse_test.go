@@ -112,6 +112,139 @@ func TestInnermostOfEachKind(t *testing.T) {
 	expect(t, &l)
 }
 
+// passer logs the handlers that run, which pass their event on with
+// [on.Pass] unless they are marked to take it.
+type passer struct {
+	l    log
+	take map[string]bool
+}
+
+func (p *passer) fn(name string) func() tea.Cmd {
+	return func() tea.Cmd {
+		p.l = append(p.l, name)
+		if p.take[name] {
+			return nil
+		}
+		return on.Pass
+	}
+}
+
+func TestScrollPassesOutward(t *testing.T) {
+	t.Parallel()
+
+	p := &passer{take: map[string]bool{}}
+	scroll := func(name string) on.Handler {
+		return on.Scroll(func(_, dy int) tea.Cmd { return p.fn(name + " " + strconv.Itoa(dy))() })
+	}
+	mouse := func(name string) on.Handler { return on.Mouse(func(on.Event) tea.Cmd { return p.fn(name)() }) }
+	// A node with no handler of its own between them is passed over.
+	tree := Column(
+		Column(Text("x").On(scroll("inner"), mouse("inner mouse"))).On(on.Click(p.l.add("click"))),
+		Text("y"),
+	).On(scroll("middle"), scroll("middle too"))
+	r := New()
+	r.Render(10, 3, Column(tree).On(scroll("outer"), mouse("outer mouse")))
+	wheel := func() { r.Update(tea.MouseWheelMsg{X: 0, Y: 0, Button: tea.MouseWheelDown}) }
+
+	// The first handler that takes the step has it, and those around it
+	// don't run. on.Mouse is passed on the same way.
+	p.take["outer 1"], p.take["outer mouse"] = true, true
+	wheel()
+	expect(t, &p.l, "inner 1", "middle 1", "middle too 1", "outer 1", "inner mouse", "outer mouse")
+	p.take["middle too 1"], p.take["inner mouse"] = true, true
+	wheel()
+	expect(t, &p.l, "inner 1", "middle 1", "middle too 1", "inner mouse")
+	p.take["inner 1"] = true
+	wheel()
+	expect(t, &p.l, "inner 1", "inner mouse")
+
+	// None taking it is the end of it.
+	clear(p.take)
+	wheel()
+	expect(t, &p.l, "inner 1", "middle 1", "middle too 1", "outer 1", "inner mouse", "outer mouse")
+
+	// Away from the inner node, the step starts further out.
+	p.take["outer -1"] = true
+	r.Update(tea.MouseWheelMsg{X: 0, Y: 1, Button: tea.MouseWheelUp})
+	expect(t, &p.l, "middle -1", "middle too -1", "outer -1", "outer mouse")
+}
+
+func TestClickPassesOutward(t *testing.T) {
+	t.Parallel()
+
+	p := &passer{take: map[string]bool{}}
+	var at on.Event
+	cell := Text("cell").On(
+		on.Click(p.fn("cell")),
+		on.RightClick(p.fn("cell right")),
+		on.DoubleClick(p.fn("cell double")),
+		on.MiddleClick(func() tea.Cmd { p.l = append(p.l, "cell middle"); return tea.Batch(nil, on.Pass) }),
+	)
+	row := Row(Fixed(1, nil), Fill(cell)).On(on.Press(p.fn("row")))
+	pane := Box(lipgloss.NewStyle().Border(lipgloss.NormalBorder()), row).On(
+		on.ClickAt(func(e on.Event) tea.Cmd { at = e; return p.fn("pane")() }),
+		on.RightClickAt(func(on.Event) tea.Cmd { return p.fn("pane right")() }),
+		on.MiddleClick(p.fn("pane middle")),
+		on.DoubleClick(p.fn("pane double")),
+	)
+	r := New(WithClock(func() time.Time { return time.Unix(1, 0) }))
+	r.Render(10, 3, pane)
+	click := func(b tea.MouseButton) {
+		r.Update(tea.MouseClickMsg{X: 3, Y: 1, Button: b})
+		r.Update(tea.MouseReleaseMsg{X: 3, Y: 1, Button: b})
+	}
+
+	// A click passed on by the cell and the row reaches the pane, with where
+	// it was in the pane.
+	p.take["pane"] = true
+	click(tea.MouseLeft)
+	expect(t, &p.l, "cell", "row", "pane")
+	if at.X != 3 || at.Y != 1 || at.W != 10 {
+		t.Fatalf("the pane got the click at %d,%d of %d, want 3,1 of 10", at.X, at.Y, at.W)
+	}
+	// The second click of a double click is a click too, and the cell's
+	// double click handler passes it to the pane's.
+	p.take["pane double"] = true
+	click(tea.MouseLeft)
+	expect(t, &p.l, "cell", "row", "pane", "cell double", "pane double")
+
+	p.take["row"] = true
+	click(tea.MouseRight)
+	expect(t, &p.l, "cell right", "pane right")
+	click(tea.MouseLeft)
+	expect(t, &p.l, "cell", "row")
+
+	// Pass batched with nothing is still Pass.
+	p.take["pane middle"] = true
+	click(tea.MouseMiddle)
+	expect(t, &p.l, "cell middle", "pane middle")
+
+	// Nothing taking it is the end of it.
+	clear(p.take)
+	click(tea.MouseRight)
+	expect(t, &p.l, "cell right", "pane right")
+}
+
+// TestHeldClickPassesOutward checks that a click on selectable text, held
+// back until it can no longer become a double click, is passed on when it
+// runs.
+func TestHeldClickPassesOutward(t *testing.T) {
+	t.Parallel()
+
+	p := &passer{take: map[string]bool{"pane": true}}
+	tree := Column(Text("words here").Selectable().On(on.Click(p.fn("text")))).On(on.Click(p.fn("pane")))
+	r := New()
+	r.after = immediate
+	r.Render(12, 1, tree)
+	r.Update(down(1, 0))
+	held := r.Update(release(1, 0))
+	expect(t, &p.l)
+	for _, msg := range drain(held) {
+		r.Update(msg)
+	}
+	expect(t, &p.l, "text", "pane")
+}
+
 func TestEventIsRelativeToHandlerNode(t *testing.T) {
 	t.Parallel()
 

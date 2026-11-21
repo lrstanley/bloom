@@ -186,6 +186,31 @@ func TestFocusUpdate(t *testing.T) {
 	}
 }
 
+// TestFocusPressPasses checks that a key a Press handler passes on with
+// [on.Pass] is left to the program.
+func TestFocusPressPasses(t *testing.T) {
+	t.Parallel()
+	var f Focus[string]
+	disabled, pressed := true, 0
+	r := New(WithFocus(&f))
+	r.Render(10, 1, Text("save").ID("save").Focusable().On(on.Press(func() tea.Cmd {
+		if disabled {
+			return on.Pass
+		}
+		pressed++
+		return nil
+	})))
+	f.Set("save")
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	if cmd, ok := f.Update(enter, r.Frame()); ok || cmd != nil {
+		t.Fatalf("a passed press was handled (%v), with command %v", ok, cmd != nil)
+	}
+	disabled = false
+	if _, ok := f.Update(enter, r.Frame()); !ok || pressed != 1 {
+		t.Fatalf("handled %v, pressed %d times, want handled once", ok, pressed)
+	}
+}
+
 // TestFocusEveryNode checks that focus moves to node types that could not
 // be focused before every node type was given Focusable.
 func TestFocusEveryNode(t *testing.T) {

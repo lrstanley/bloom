@@ -41,7 +41,9 @@ bloom.Box(panel, bloom.Viewport(m.log).ID(paneLog).At(m.pos).
 
 `OnScroll` scrolls it with the wheel, three rows a step, and the [`ScrollbarOf`](/content/scrolling#show-a-scrollbar)
 its ID drags it with the same function. Selecting text in it with the mouse scrolls it too, when the pointer is
-held past its edge.
+held past its edge. A step it can't take, at its edge or with all its text in sight, goes to the
+[`on.Scroll` handler around it](/input/mouse#scroll-inside-something-that-scrolls), such as a form's, so a viewport
+used as a one-line input can keep its `OnScroll`.
 
 Lines can hold ANSI styles and hyperlinks, such as the output of a syntax highlighter. A style left open at the end
 of a line carries on into the next, as it would in a terminal, so a comment highlighted over several lines stays

@@ -192,8 +192,9 @@ func (f *Focus[K]) focusable(frame *Frame, i int) (K, bool) {
 // space, which run the [on.Press] handlers of the focused node in frame. It
 // returns their commands, and reports whether it handled msg: tab keys are
 // handled even when frame has no focusable nodes, and enter and space only
-// when the focused node has a Press handler. Clicks move the focus with
-// [WithFocus].
+// when the focused node has a Press handler that takes the key, rather than
+// passing it on with [on.Pass], such as a button that is disabled leaving
+// enter to the form. Clicks move the focus with [WithFocus].
 func (f *Focus[K]) Update(msg tea.Msg, frame *Frame) (tea.Cmd, bool) {
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
@@ -218,9 +219,9 @@ func (f *Focus[K]) Update(msg tea.Msg, frame *Frame) (tea.Cmd, bool) {
 			// It can't take focus now, such as from outside the scope pushed.
 			return nil, false
 		}
-		var cmds []tea.Cmd
 		t := frame.target(i)
-		return tea.Batch(run(cmds, t.handlers, kindsOf(on.KindPress), on.Event{W: t.rect.Dx(), H: t.rect.Dy()})...), true
+		cmds, took := runTook(nil, t.handlers, kindsOf(on.KindPress), on.Event{W: t.rect.Dx(), H: t.rect.Dy()})
+		return tea.Batch(cmds...), took
 	}
 	return nil, false
 }

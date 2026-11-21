@@ -49,6 +49,10 @@ reader := bloom.Fill(bloom.Box(panel, bloom.Scroll(content, m.offset))).
 The handler runs just before `Update` gets the wheel event, so clamp the offset in `Update` as you do for
 [keys](/bubble-tea/sizes-in-update#find-a-nodes-size-in-update).
 
+For a scroll inside another one, such as a pane in a form, return `on.Pass` when the offset is already at the end
+it's moving toward, and the form around it takes the step. See
+[Scroll inside something that scrolls](/input/mouse#scroll-inside-something-that-scrolls).
+
 ## Scroll sideways
 
 `X(offset)` scrolls a `Scroll` sideways too: its child gets as much width as it wants, so long lines don't wrap,

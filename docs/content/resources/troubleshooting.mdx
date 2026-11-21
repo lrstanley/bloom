@@ -54,8 +54,8 @@ Check each of these:
 - Mouse reporting is on. The view from `m.ui.View` turns it on for the handlers in its frame; if you set
   `v.MouseMode` yourself, it needs at least `tea.MouseModeCellMotion` (or `tea.MouseModeAllMotion` for hover).
 - The handler is on the node, or on something it's inside, with `On(...)`.
-- A node inside it doesn't have a handler of the same kind. The innermost one takes the event; see
-  [which node gets the event](/input/mouse#which-node-gets-the-event).
+- A node inside it doesn't have a handler for the event. The innermost one takes it unless it returns `on.Pass`;
+  see [which node gets the event](/input/mouse#which-node-gets-the-event).
 - A click runs when the button comes up over the node it went down on. Releasing it elsewhere cancels the click.
 - A modal layer isn't open, taking the events.
 - The view comes from `m.ui.View(...)`, which installs the `OnMouse` handler that runs your handlers. If you build

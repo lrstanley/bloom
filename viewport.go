@@ -236,9 +236,12 @@ func (n ViewportNode) Trusted() ViewportNode { n.trusted = true; return n }
 
 // OnScroll scrolls the viewport with the mouse wheel, three rows a step, or
 // three columns sideways, running fn with the position to scroll to, to
-// keep in the model for [ViewportNode.At]. A [ScrollbarOf] the viewport
-// without an OnScroll of its own drags it with fn too, and selecting text
-// in it scrolls it while the pointer is held past its edge.
+// keep in the model for [ViewportNode.At]. A step that doesn't move it, at
+// its edge or with all of its text in sight, isn't run through fn, and goes
+// to the [on.Scroll] handler of the node around it instead, such as the
+// form a one-line input is in. A [ScrollbarOf] the viewport without an
+// OnScroll of its own drags it with fn too, and selecting text in it
+// scrolls it while the pointer is held past its edge.
 func (n ViewportNode) OnScroll(fn func(pos ViewportPos) tea.Cmd) ViewportNode {
 	n.onScroll = fn
 	return n
@@ -797,17 +800,19 @@ func (e *engine) viewportOf(i int) *vpLayout {
 
 // viewportScroll returns the wheel handler of viewport n, the box at path
 // with key, which finds where it was scrolled to in the frame the event is
-// in, or in the frame drawn last when that still shows the same buffer.
+// in, or in the frame drawn last when that still shows the same buffer. A
+// step that doesn't move it, at its edge or with all of it in sight, is
+// left to the node around it.
 func (e *engine) viewportScroll(n ViewportNode, key nodeKey) on.Handler {
 	screen, lastFrame, fn := e.screen, e.lastFrame, n.onScroll
 	return on.Scroll(func(dx, dy int) tea.Cmd {
 		if screen == nil {
-			return nil
+			return on.Pass
 		}
 		f := screen()
 		k := f.find(key)
 		if k < 0 || !f.entries[k].isVP {
-			return nil
+			return on.Pass
 		}
 		v := f.entries[k].vp
 		// A step goes from the frame drawn last, which has what the model made
@@ -820,6 +825,11 @@ func (e *engine) viewportScroll(n ViewportNode, key nodeKey) on.Handler {
 				v = l.entries[j].vp
 			}
 		}
+		if v.Width <= 0 {
+			// No column for text, beside the caret's: the layout scrolls it
+			// neither way.
+			return on.Pass
+		}
 		p := v.Pos
 		switch {
 		case dy != 0:
@@ -828,7 +838,7 @@ func (e *engine) viewportScroll(n ViewportNode, key nodeKey) on.Handler {
 			p = v.Right(dx * wheelStep)
 		}
 		if p == v.Pos {
-			return nil
+			return on.Pass
 		}
 		return fn(p)
 	})

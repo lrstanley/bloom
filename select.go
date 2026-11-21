@@ -1950,7 +1950,7 @@ func (r *Root) autoScroll(f *Frame) tea.Cmd {
 	if r.sel.scrolling {
 		return nil
 	}
-	if _, _, h := r.scrollStep(f); h < 0 {
+	if _, _, chain := r.scrollStep(f); chain == nil {
 		return nil
 	}
 	r.sel.scrolling = true
@@ -1959,12 +1959,13 @@ func (r *Root) autoScroll(f *Frame) tea.Cmd {
 
 // scrollStep returns which way the text being selected in should scroll,
 // in frame f, for the pointer past the edge of what is shown of it to be
-// over it, and the entry whose [on.Scroll] handler scrolls it, as the wheel
-// would just inside that edge, or -1 when it cannot scroll that way.
-func (r *Root) scrollStep(f *Frame) (dx, dy, h int) {
+// over it, and the entries under the pointer just inside that edge, from
+// the innermost with an [on.Scroll] handler outward, which the wheel's
+// steps go to as they would there, or nil when none has one.
+func (r *Root) scrollStep(f *Frame) (dx, dy int, chain []int) {
 	s := &r.sel
 	if !s.dragging || f == nil || !s.held && r.r.rngSeq != s.seq {
-		return 0, 0, -1
+		return 0, 0, nil
 	}
 	// What is shown of the text, and all of it, as laid out. How much of a
 	// TextMap is out of sight is not known, so it is taken to go on, as is
@@ -1981,39 +1982,43 @@ func (r *Root) scrollStep(f *Frame) (dx, dy, h int) {
 		shown, all = r.r.outline.Extent()
 	}
 	if shown.Empty() {
-		return 0, 0, -1
+		return 0, 0, nil
 	}
 	p := s.pointer
 	dx = textsel.EdgeStep(p.X, shown.Min.X, shown.Max.X, all.Min.X, all.Max.X)
 	dy = textsel.EdgeStep(p.Y, shown.Min.Y, shown.Max.Y, all.Min.Y, all.Max.Y)
 	if dx == 0 && dy == 0 {
-		return 0, 0, -1
+		return 0, 0, nil
 	}
 	in := image.Pt(min(max(p.X, shown.Min.X), shown.Max.X-1), min(max(p.Y, shown.Min.Y), shown.Max.Y-1))
 	r.mouse.scrollChain, _ = f.under(in, r.mouse.scrollChain[:0])
-	if h = f.innermost(r.mouse.scrollChain, kindsOf(on.KindScroll)); h < 0 {
-		return 0, 0, -1
+	for j, i := range r.mouse.scrollChain {
+		if has(f.handlers[i], kindsOf(on.KindScroll)) {
+			return dx, dy, r.mouse.scrollChain[j:]
+		}
 	}
-	return dx, dy, h
+	return 0, 0, nil
 }
 
 // scrollSelection scrolls the text under the end of the selection a step,
-// for a tick of msg, with the [on.Scroll] handler that scrolls it, as the
-// wheel would, while the pointer is held past its edge.
+// for a tick of msg, with the [on.Scroll] handlers the wheel would, while
+// the pointer is held past its edge: when the innermost can't scroll that
+// way, such as a viewport at its end partly scrolled out of the page it is
+// in, the next one out takes the step.
 func (r *Root) scrollSelection(msg tea.Msg) tea.Cmd {
 	if t, ok := msg.(selScrollMsg); !ok || t.root != r {
 		return nil
 	}
 	r.sel.scrolling = false
 	f := r.r.frame
-	dx, dy, h := r.scrollStep(f)
-	if h < 0 {
+	dx, dy, chain := r.scrollStep(f)
+	if chain == nil {
 		return nil
 	}
 	outer := r.mouse.routing
 	r.mouse.routing = f
 	defer func() { r.mouse.routing = outer }()
-	t, p := f.target(h), r.sel.pointer
+	p := r.sel.pointer
 	var cmds []tea.Cmd
 	wheel := func(d int, back, fwd tea.MouseButton) {
 		if d != 0 {
@@ -2022,7 +2027,7 @@ func (r *Root) scrollSelection(msg tea.Msg) tea.Cmd {
 				b = back
 			}
 			msg := tea.MouseWheelMsg{X: p.X, Y: p.Y, Button: b}
-			cmds = run(cmds, t.handlers, kindsOf(on.KindScroll), t.event(msg, p, false))
+			cmds = f.offer(cmds, chain, kindsOf(on.KindScroll), msg, p, false)
 		}
 	}
 	wheel(dy, tea.MouseWheelUp, tea.MouseWheelDown)

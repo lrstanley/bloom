@@ -386,6 +386,57 @@ func TestSelectScrollsPastTheEdge(t *testing.T) {
 	}
 }
 
+// TestSelectScrollsOutward checks that dragging past the edge of text in a
+// scroll that is at its end, but partly scrolled out of the page it is in,
+// scrolls the page, as the wheel would there.
+func TestSelectScrollsOutward(t *testing.T) {
+	t.Parallel()
+
+	lines := make([]string, 10)
+	for i := range lines {
+		lines[i] = "line " + string(rune('0'+i))
+	}
+	inner, page := 7, 0
+	clamped := func(at *int, most int) on.Handler {
+		return on.Scroll(func(_, dy int) tea.Cmd {
+			was := *at
+			if *at = min(max(*at+dy, 0), most); *at == was {
+				return on.Pass
+			}
+			return nil
+		})
+	}
+	tree := func() Child {
+		return Column(
+			Fixed(4, Scroll(Column(
+				Text("a\nb\nc"),
+				Fixed(3, Scroll(Text(strings.Join(lines, "\n")).Selectable(), inner)).On(clamped(&inner, 7)),
+			), page)).On(clamped(&page, 2)),
+			Text("status"),
+		)
+	}
+	r := New()
+	r.Render(10, 5, tree())
+	// Only the first row of the inner scroll, line 7, is in sight.
+	r.Update(down(0, 3))
+	r.Render(10, 5, tree())
+	if cmd := r.Update(dragTo(3, 4)); cmd == nil {
+		t.Fatal("dragging past the edge did not start scrolling")
+	}
+	r.Render(10, 5, tree())
+	for range 5 {
+		r.Update(selScrollMsg{root: r})
+		r.Render(10, 5, tree())
+	}
+	if inner != 7 || page != 2 {
+		t.Fatalf("inner at %d, page at %d; want the page scrolled to its end, 2, and the inner left at 7", inner, page)
+	}
+	r.Update(release(4, 4))
+	if got, _ := r.Selection(); got != "line 7\nline 8\nline 9" {
+		t.Fatalf("selected %q, want the lines the page scrolled into sight", got)
+	}
+}
+
 // hardWrapped is a component that wraps its text every w cells, and knows
 // the text it wrapped.
 type hardWrapped struct {
