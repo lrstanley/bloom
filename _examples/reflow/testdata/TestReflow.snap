@@ -3,9 +3,9 @@ Reflow / automatic layout animations
 │Workspace       ││ Ember                                                 ││Preview                │
 │                ││                                                       ││                       │
 │Projects        ││ Delta                                                 ││Children reflow at the │
-│Activity        ││                                                       ││                       │
-│Settings        ││ Cedar                                                 ││Try b, s, r and d.     │
-│                ││                                                       ││                       │
+│Activity        ││                                                       ││current visual size.   │
+│Settings        ││ Cedar                                                 ││                       │
+│                ││                                                       ││Try b, s, r and d.     │
 │                ││ Birch                                                 < selected               │
 │                ││                                                       ││                       │
 │                ││ Atlas                                                 ││                       │

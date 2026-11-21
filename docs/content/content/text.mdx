@@ -3,24 +3,31 @@ title: Text
 description: Show styled, wrapped, and truncated text, and keep escape sequences from text you did not write away from the terminal.
 ---
 
-`bloom.Text(s)` is how a plain string goes into a layout. It keeps the string's ANSI styles and hyperlinks, wraps and
-fills with a Lip Gloss style, or stays on one line and is cut short with "…". It also keeps escape sequences in text
-you didn't write from reaching the terminal.
+`bloom.Text(s)` is how a plain string goes into a layout. It keeps the string's ANSI styles and hyperlinks, wraps to
+fit, fills its node with a Lip Gloss style, or stays on one line and is cut short with "…". It also keeps escape
+sequences in text you didn't write from reaching the terminal.
 
 ## Show text
 
-`bloom.Text(s)` shows a string, which may already contain ANSI styles. On its own it's drawn as is, and clipped
-to the space it's given. Give it a Lip Gloss style with `Style` and it's rendered at the size of its node instead,
-so long lines wrap and a background fills the whole node. See [`TextNode.Style`](https://pkg.go.dev/bloomfx.dev/bloom#TextNode.Style):
+`bloom.Text(s)` shows a string, which may already contain ANSI styles. A line wider than the space it's given wraps
+onto the next, at a space where it can and mid-word where a word is too long, and the node is as tall as the lines
+it wraps to. Styles and hyperlinks carry on across the break. Give it a Lip Gloss style with `Style` and it's
+rendered at the size of its node, so a background fills the whole node, and lines wrap inside the style's padding
+and borders. See [`TextNode.Style`](https://pkg.go.dev/bloomfx.dev/bloom#TextNode.Style):
 
 ```go
-bloom.Text(body)                                                   // clipped
+bloom.Text(body)                                                   // wraps to the node's width
 bloom.Text(body).Style(lipgloss.NewStyle().Padding(0, 1))          // wraps inside 1 column of padding
 bloom.Text(title).Style(lipgloss.NewStyle().Background(highlight)) // background fills the node
+bloom.Text(art).NoWrap()                                           // lines kept whole, cut off at the edge
 ```
 
 A width or height set on the style itself is kept, so `Style(s.Width(20))` is 20 columns wide wherever it's
 placed.
+
+[`NoWrap`](https://pkg.go.dev/bloomfx.dev/bloom#TextNode.NoWrap) keeps each line whole, for text that's laid out in
+columns of its own, such as a table or ASCII art. What doesn't fit is cut off at the edge, inside the style's padding
+and borders, and the node is as tall as the text has lines.
 
 ### Keep text on one line
 

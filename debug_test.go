@@ -74,8 +74,8 @@ Overlay 0,0 20x5
 │  ├─ bloom.MarqueeNode 0,1 20x1
 │  │  └─ Text "scrolling" 0,1 20x1
 │  ├─ Text "in" id="in" 0,2 20x1 focusable
-│  └─ Transition 0,3 20x1 t=0.50 effects=fx.Fade
-│     └─ Text "fading in over the fram…" 0,3 20x1
+│  └─ Transition 0,3 20x2 t=0.50 effects=fx.Fade
+│     └─ Text "fading in over the fram…" 0,3 20x2
 ├─ Layer 0,3 4x1 anchorTo="in"/bottom modal scope
 │  └─ Text "drop" 0,3 4x1
 ├─ Layer hidden anchorTo="missing"/top

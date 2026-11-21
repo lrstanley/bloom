@@ -115,8 +115,9 @@ See [Viewports](/content/viewports).
 
 | Method | Does |
 | --- | --- |
-| `Style(style)` | render with a Lip Gloss style at the node's size, wrapping long lines |
+| `Style(style)` | render with a Lip Gloss style at the node's size, so its background fills the node |
 | `Truncate()` | one line, cut short with "…", whose full text is its [tooltip](/input/tooltips#show-cut-text-in-full) |
+| `NoWrap()` | keep lines whole, cut off at the edge rather than wrapped, for tables and ASCII art |
 | `Cursor(c)` | show the terminal cursor at `c`, relative to the node |
 | `HoverStyle(style)` | render with `style` while the pointer is over the node |
 | `Trusted()` | keep the commands in the text meant for the terminal, such as images, which are dropped otherwise |

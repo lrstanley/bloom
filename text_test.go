@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -336,16 +337,16 @@ func TestStack(t *testing.T) {
 	}
 }
 
-// TestStyledTextSizeKept checks that the size of a styled text, kept from
-// frame to frame rather than rendered again, follows its text, style, and
-// width as they change.
-func TestStyledTextSizeKept(t *testing.T) {
+// TestTextSizeKept checks that the size of a wrapped text, styled or not,
+// kept from frame to frame rather than wrapped again, follows its text,
+// style, and width as they change.
+func TestTextSizeKept(t *testing.T) {
 	t.Parallel()
 
 	r := New()
-	after := func(w int, s string, style lipgloss.Style) int {
+	after := func(w int, n TextNode) int {
 		t.Helper()
-		r.Render(w, 20, Column(Text(s).Style(style), Text("after").ID("after")))
+		r.Render(w, 20, Column(n, Text("after").ID("after")))
 		rect, ok := r.Frame().Rect("after")
 		if !ok {
 			t.Fatal("no text after")
@@ -354,22 +355,169 @@ func TestStyledTextSizeKept(t *testing.T) {
 	}
 	plain := lipgloss.NewStyle()
 	words := "one two three four five six"
+	more := words + " seven eight nine"
 	for _, tc := range []struct {
-		w     int
-		s     string
-		style lipgloss.Style
-		want  int
+		w    int
+		n    TextNode
+		want int
 	}{
-		{10, words, plain, 3},
-		{10, words, plain, 3},
-		{20, words, plain, 2},
-		{20, words + " seven eight nine", plain, 3},
-		{20, words + " seven eight nine", plain.PaddingTop(2), 5},
-		{20, words + " seven eight nine", plain.Width(10), 5},
-		{40, words, plain, 1},
+		{10, Text(words).Style(plain), 3},
+		{10, Text(words).Style(plain), 3},
+		{20, Text(words).Style(plain), 2},
+		{20, Text(more).Style(plain), 3},
+		{20, Text(more).Style(plain.PaddingTop(2)), 5},
+		{20, Text(more).Style(plain.Width(10)), 5},
+		{40, Text(words).Style(plain), 1},
+		{10, Text(words), 3},
+		{10, Text(words), 3},
+		{20, Text(words), 2},
+		{20, Text(more), 3},
+		{20, Text(more).Style(plain.PaddingTop(2)), 5},
+		{20, Text(more), 3},
+		{20, Text(more).Truncate(), 1},
+		{20, Text(more), 3},
+		{40, Text(words), 1},
 	} {
-		if got := after(tc.w, tc.s, tc.style); got != tc.want {
-			t.Errorf("%q at %d: after it at row %d, want %d", tc.s, tc.w, got, tc.want)
+		if got := after(tc.w, tc.n); got != tc.want {
+			t.Errorf("%q at %d: after it at row %d, want %d", tc.n.s, tc.w, got, tc.want)
 		}
+	}
+}
+
+// TestTextWraps checks that text too wide for the space it is given wraps
+// to it and is measured that many lines tall, styled or not, and that
+// truncated text is cut to one line instead.
+func TestTextWraps(t *testing.T) {
+	t.Parallel()
+
+	const long = "the quick brown fox jumps over the lazy dog, then keeps on running"
+	wrapped := []string{"the quick brown fox jumps over", "the lazy dog, then keeps on", "running"}
+	for _, tt := range []struct {
+		name string
+		node TextNode
+		want []string
+	}{
+		{"unstyled", Text(long), wrapped},
+		{"styled", Text(long).Style(lipgloss.NewStyle().Bold(true)), wrapped},
+		{"padded", Text(long).Style(lipgloss.NewStyle().Padding(0, 2)), []string{
+			"  the quick brown fox jumps", "  over the lazy dog, then", "  keeps on running",
+		}},
+		{"truncated", Text(long).Truncate(), []string{"the quick brown fox jumps ove…"}},
+		{"unstyled, a word too long", Text(strings.Repeat("abcdefghij", 4)), []string{
+			strings.Repeat("abcdefghij", 3), "abcdefghij",
+		}},
+		{"unstyled, not wrapped", Text(long + "\nshort").NoWrap(), []string{"the quick brown fox jumps over", "short"}},
+		{"styled, not wrapped", Text(long + "\nshort").Style(lipgloss.NewStyle().Padding(0, 2)).NoWrap(), []string{
+			"  the quick brown fox jumps", "  short",
+		}},
+		{"truncated, not wrapped", Text(long).Truncate().NoWrap(), []string{"the quick brown fox jumps ove…"}},
+		// Lip Gloss draws a tab as spaces, by default 4, and wraps to a
+		// style's own width even at the node's natural size.
+		{"tabs, not wrapped", Text("a\tbcde\nx").Style(lipgloss.NewStyle().Width(6)).NoWrap(), []string{"a    b", "x"}},
+		{"no tabs, not wrapped", Text("a\tbcdefg").Style(lipgloss.NewStyle().Width(6).TabWidth(0)).NoWrap(), []string{"abcdef"}},
+		{"transformed, not wrapped", Text("x").Style(lipgloss.NewStyle().Width(4).Transform(func(string) string {
+			return "abcdefgh"
+		})).NoWrap(), []string{"abcd"}},
+		{"a string of the style's, not wrapped", Text("tail").Style(lipgloss.NewStyle().Width(4).SetString("head")).NoWrap(), []string{
+			"head",
+		}},
+		{"inline, not wrapped", Text("abcd").Style(lipgloss.NewStyle().Inline(true).Width(4).Padding(0, 1)).NoWrap(), []string{"abcd"}},
+		{"a string of the style's, truncated", Text("x").Style(lipgloss.NewStyle().Width(6).SetString("abcdefgh")).Truncate(), []string{
+			"abcde…",
+		}},
+		{"tabs, truncated", Text("a\tbcdefgh").Style(lipgloss.NewStyle().Width(6)).Truncate(), []string{"a    …"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tree := Column(tt.node.ID("text"), Text("end").ID("end"))
+			// The column is as tall as all of the lines, and the text below
+			// them follows them.
+			f := Solve(30, 0, tree)
+			if r, _ := f.Rect("end"); r.Min.Y != len(tt.want) {
+				t.Fatalf("end at row %d, want %d", r.Min.Y, len(tt.want))
+			}
+			got := strings.Split(ansi.Strip(Render(30, 0, tree)), "\n")
+			for i := range got {
+				got[i] = strings.TrimRight(got[i], " ")
+			}
+			if want := append(tt.want, "end"); !slices.Equal(got, want) {
+				t.Fatalf("drawn:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+			}
+		})
+	}
+
+	// At its natural size, nothing wraps.
+	if got := Render(0, 0, Text(long)); got != long {
+		t.Fatalf("natural size: %q", got)
+	}
+
+	// Its measured size is the size it is drawn at.
+	for _, s := range []string{"ab", long, "a\nmuch longer line with\nlines of its own", "wide 字字字 glyphs, wrapped"} {
+		for _, avail := range []int{0, 2, 5, 9, 14, 30, 80} {
+			n := Text(s)
+			f := Solve(avail, 0, Row(Auto(n).ID("n")))
+			r, _ := f.Rect("n")
+			got, _ := textOf(n, r.Dx(), 0, ansi.GraphemeWidth)
+			if w, h := lipgloss.Size(got); w != r.Dx() || h != r.Dy() {
+				t.Errorf("%q in %d: measured %dx%d, drawn %dx%d:\n%s", s, avail, r.Dx(), r.Dy(), w, h, got)
+			}
+		}
+	}
+
+	// Text that does not wrap is measured as it is drawn too, its lines cut
+	// inside its style's frame, at any width with room for the frame.
+	framed := lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1)
+	for _, s := range []string{"ab", long, "a\nmuch longer line with\nlines of its own", "wide 字字字 glyphs, cut"} {
+		for _, avail := range []int{0, 4, 5, 9, 14, 30, 80} {
+			n := Text(s).Style(framed).NoWrap()
+			f := Solve(avail, 0, Row(Auto(n).ID("n")))
+			r, _ := f.Rect("n")
+			got, _ := textOf(n, r.Dx(), 0, ansi.GraphemeWidth)
+			if w, h := lipgloss.Size(got); w != r.Dx() || h != r.Dy() || h != strings.Count(s, "\n")+3 {
+				t.Errorf("%q in %d: measured %dx%d, drawn %dx%d:\n%s", s, avail, r.Dx(), r.Dy(), w, h, got)
+			}
+		}
+	}
+
+	// Styles and links go on across the rows they wrap to, as they do for
+	// styled text.
+	styled := "\x1b[31mred words that wrap around\x1b[m and " + ansi.SetHyperlink("https://example.com") + "a link that wraps" + ansi.ResetHyperlink()
+	if got, want := Render(12, 0, Text(styled)), Render(12, 0, Text(styled).Style(lipgloss.NewStyle())); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	// Truncated text that fits is not cut where an inline style ignores its
+	// padding, nor laid out on more than a line where tabs are kept.
+	inlinePad := Row(Auto(Text("abc").Style(lipgloss.NewStyle().Inline(true).PaddingLeft(1)).Truncate()), Text("|"))
+	if got := ansi.Strip(Render(10, 0, inlinePad)); !strings.HasPrefix(got, "abc") || strings.Contains(got, "…") {
+		t.Fatalf("inline, truncated: %q", got)
+	}
+	kept := Column(Text("a\tbcde").Style(lipgloss.NewStyle().TabWidth(lipgloss.NoTabConversion)).Truncate(), Text("end"))
+	if got := ansi.Strip(Render(4, 0, kept)); strings.Count(got, "\n") != 1 {
+		t.Fatalf("kept tabs, truncated: %q", got)
+	}
+
+	// An inline style joins the lines into one.
+	inline := Column(Text("abc\ndef").Style(lipgloss.NewStyle().Inline(true).Width(10)).NoWrap(), Text("end"))
+	if got := ansi.Strip(Render(10, 0, inline)); !strings.HasPrefix(got, "abc def") || strings.Count(got, "\n") != 1 {
+		t.Fatalf("inline: %q", got)
+	}
+
+	// At its natural width, tabs count as the spaces they are drawn as.
+	if got := ansi.Strip(Render(0, 0, Text("a\tbcde\nx").Style(lipgloss.NewStyle().MaxWidth(20)).NoWrap())); got != "a    bcde\nx        " {
+		t.Fatalf("tabs at its natural width: %q", got)
+	}
+
+	// Styled text that does not wrap is cut as Lip Gloss measures it, so it
+	// has nothing to wrap, whatever the renderer measures with.
+	hearts := Text("❤️❤️❤️\nabc").Style(lipgloss.NewStyle()).NoWrap()
+	if got := ansi.Strip(newRenderer(ansi.WcWidth).render(4, 0, Column(hearts, Text("end")))); !strings.HasSuffix(got, "\nabc\nend") || strings.Count(got, "\n") != 2 {
+		t.Fatalf("WcWidth, not wrapped: %q", got)
+	}
+
+	// It wraps at the width the renderer measures with: "❤️" is one cell to
+	// WcWidth and two to GraphemeWidth.
+	if got := ansi.Strip(newRenderer(ansi.WcWidth).render(4, 0, Text("❤️❤️❤️❤️❤️❤️abc"))); got != "❤️❤️❤️❤️\n❤️❤️ab\nc   " {
+		t.Fatalf("WcWidth: %q", got)
 	}
 }

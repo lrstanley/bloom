@@ -543,21 +543,34 @@ func TestSelectTrailingBlankRows(t *testing.T) {
 func TestSelectWrappedText(t *testing.T) {
 	t.Parallel()
 
-	plain := lipgloss.NewStyle()
-	tree := func() Child {
-		return Column(
-			Fixed(3, Text("alpha beta gamma delta").Style(plain)),
-			Fixed(3, Text("abcdefghijkl\nnext").Style(plain)),
-		).Selectable()
+	for name, text := range map[string]func(string) TextNode{
+		"styled":   func(s string) TextNode { return Text(s).Style(lipgloss.NewStyle()) },
+		"unstyled": Text,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tree := func() Child {
+				return Column(
+					Fixed(3, text("alpha beta gamma delta")),
+					Fixed(3, text("abcdefghijkl\nnext")),
+				).Selectable()
+			}
+			r := New()
+			// Wrapped at spaces, the rows join with them again.
+			selectDrag(r, 10, 6, tree, 0, [2]int{0, 0}, [2]int{9, 2})
+			wantSelection(t, r, "alpha beta gamma delta")
+			// Wrapped inside a word, they join with nothing, and a line break
+			// of the text's own stays.
+			selectDrag(r, 10, 6, tree, 0, [2]int{0, 3}, [2]int{9, 5})
+			wantSelection(t, r, "abcdefghijkl\nnext")
+
+			// Lines cut off rather than wrapped are not joined, even where
+			// the next starts with what the cut left off.
+			clipped := func() Child { return text("abcdefghij\nghij").NoWrap().Selectable() }
+			selectDrag(r, 6, 2, clipped, 0, [2]int{0, 0}, [2]int{5, 1})
+			wantSelection(t, r, "abcdef\nghij")
+		})
 	}
-	r := New()
-	// Wrapped at spaces, the rows join with them again.
-	selectDrag(r, 10, 6, tree, 0, [2]int{0, 0}, [2]int{9, 2})
-	wantSelection(t, r, "alpha beta gamma delta")
-	// Wrapped inside a word, they join with nothing, and a line break of
-	// the text's own stays.
-	selectDrag(r, 10, 6, tree, 0, [2]int{0, 3}, [2]int{9, 5})
-	wantSelection(t, r, "abcdefghijkl\nnext")
 }
 
 func TestSelectAcrossNodes(t *testing.T) {

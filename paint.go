@@ -385,15 +385,16 @@ func (r *renderer) sameOps() bool {
 }
 
 // styledMemo is a text node as drawn in a box, kept since rendering with
-// Lip Gloss is slow, as is truncating a long line, and a box tends to look
-// the same from one frame to the next.
+// Lip Gloss is slow, as are truncating a long line and wrapping a long text,
+// and a box tends to look the same from one frame to the next.
 type styledMemo struct {
-	style    lipgloss.Style
-	s        string
-	truncate bool
-	w, h     int
-	out      string
-	full     string // the line a truncated node was cut from, if it was
+	style            lipgloss.Style
+	s                string
+	styled, truncate bool
+	nowrap           bool
+	w, h             int
+	out              string
+	full             string // the line a truncated node was cut from, if it was
 }
 
 // textAt returns text node n as drawn at w×h for box i, and for a
@@ -401,17 +402,20 @@ type styledMemo struct {
 // [textOf] does.
 func (r *renderer) textAt(i int, n TextNode, w, h int) (out, full string) {
 	if !n.styled && !n.truncate {
-		return n.s, ""
+		if !r.wraps(i, n, w) {
+			return n.s, "" // it fits, and is drawn as it is
+		}
+		return r.rendered(i, n, w).wrapped, "" // as measuring it wrapped it
 	}
 	m := r.styled.At(i)
 	// Comparing through pointers to storage that outlives the call keeps
 	// the styles from being copied to the heap.
 	r.style = n.style
-	if v := &m.V; m.OK && v.w == w && v.h == h && v.truncate == n.truncate && v.s == n.s && same.Style(&v.style, &r.style) {
+	if v := &m.V; m.OK && v.w == w && v.h == h && v.styled == n.styled && v.truncate == n.truncate && v.nowrap == n.nowrap && v.s == n.s && same.Style(&v.style, &r.style) {
 		return v.out, v.full
 	}
 	out, full = textOf(n, w, h, r.method)
-	m.OK, m.V = true, styledMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, h: h, out: out, full: full}
+	m.OK, m.V = true, styledMemo{style: n.style, s: n.s, styled: n.styled, truncate: n.truncate, nowrap: n.nowrap, w: w, h: h, out: out, full: full}
 	return out, full
 }
 

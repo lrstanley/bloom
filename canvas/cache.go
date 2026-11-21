@@ -55,6 +55,7 @@ type Cache struct {
 
 type cacheEntry struct {
 	w, h   int
+	tab    bool    // it holds a tab
 	canvas *Canvas // nil until parsed
 	safe   *Canvas // parsed sanitized, nil until then
 	used   uint64
@@ -72,7 +73,7 @@ func NewCache(method ansi.Method) *Cache {
 func (c *Cache) entry(s string) *cacheEntry {
 	e, ok := c.entries[s]
 	if !ok {
-		e = &cacheEntry{}
+		e = &cacheEntry{tab: strings.IndexByte(s, '\t') >= 0}
 		e.w, e.h = Measure(s, c.method)
 		c.entries[s] = e
 	}
@@ -84,6 +85,14 @@ func (c *Cache) entry(s string) *cacheEntry {
 func (c *Cache) Size(s string) (w, h int) {
 	e := c.entry(s)
 	return e.w, e.h
+}
+
+// SizeTab returns the size of s, as [Size] does, and whether it holds a
+// tab, which a Lip Gloss style draws as spaces, so that a caller measuring
+// text it styles need not look for one each time.
+func (c *Cache) SizeTab(s string) (w, h int, tab bool) {
+	e := c.entry(s)
+	return e.w, e.h, e.tab
 }
 
 // Get returns s parsed, as [Parse] does.

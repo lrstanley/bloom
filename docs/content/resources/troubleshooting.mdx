@@ -139,9 +139,11 @@ colors, bloom assumes white on black. Return `m.ui.Init()` from your model's `In
 
 ## Text doesn't wrap, or wraps when it shouldn't
 
-- `bloom.Text(s)` on its own is clipped, not wrapped. Add `.Style(...)`, even an empty `lipgloss.NewStyle()`, to wrap
-  it to its node's width.
+- `bloom.Text(s)` wraps to the width its node is given. Text that runs off the edge instead has `.NoWrap()`, or is in
+  a node that gives it as much width as it wants, such as a `Scroll` with `X`.
 - A status bar or title that should stay on one line needs `.Truncate()`.
+- Preformatted text, such as ASCII art or a table, that should be cut off at the edge rather than wrapped needs
+  `.NoWrap()`.
 - A string you rendered yourself with Lip Gloss has a fixed size already. Pass the style to `Text(...).Style(...)` or
   `Box(...)` instead, so bloom renders it at the right size.
 

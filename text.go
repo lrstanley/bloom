@@ -10,6 +10,7 @@ import (
 
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/internal/same"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -22,13 +23,18 @@ type TextNode struct {
 	style    lipgloss.Style
 	styled   bool
 	truncate bool
+	nowrap   bool
 	trusted  bool
 }
 
 // Text returns a node showing s, a string that may hold ANSI styles and
-// hyperlinks. Escape sequences meant for the terminal rather than for
-// drawing text, such as images, are dropped unless the text is
-// [TextNode.Trusted].
+// hyperlinks. A line wider than the node is given wraps onto the lines
+// after it, at a space where it can and mid-word where a word is too long,
+// and the node is measured that many lines tall. [TextNode.NoWrap] cuts it
+// off at the edge instead, and [TextNode.Truncate] keeps it to one line, cut
+// with "…". Escape sequences meant for the
+// terminal rather than for drawing text, such as images, are dropped unless
+// the text is [TextNode.Trusted].
 func Text(s string) TextNode { return TextNode{s: s} }
 
 // Trusted keeps the escape sequences in the text that are written to the
@@ -40,8 +46,9 @@ func Text(s string) TextNode { return TextNode{s: s} }
 func (n TextNode) Trusted() TextNode { n.trusted = true; return n }
 
 // Style renders the text with style at the size the node is given, so a
-// background fills the node and long lines wrap to its width. A width or
-// height set on style itself is kept.
+// background fills the node, and long lines wrap to its width less the
+// style's padding and borders. A width or height set on style itself is
+// kept.
 func (n TextNode) Style(style lipgloss.Style) TextNode {
 	n.style, n.styled = style, true
 	return n
@@ -53,9 +60,17 @@ func (n TextNode) Style(style lipgloss.Style) TextNode {
 // it as its tooltip, unless it has NoTooltip, and [Frame.Truncated] reports
 // whether it was cut.
 func (n TextNode) Truncate() TextNode {
-	n.s, n.truncate = lineBreaks.Replace(n.s), true
+	n.s, n.truncate, n.nowrap = lineBreaks.Replace(n.s), true, false
 	return n
 }
+
+// NoWrap keeps each line whole rather than wrapping it, cutting off what
+// does not fit at the edge of the node, less a style's padding and borders,
+// for text laid out in columns of its own, such as a table or ASCII art. The
+// node is measured at its lines' natural width, and as many lines tall as
+// it has. It does nothing to text that is [TextNode.Truncate]d, which is
+// kept to one line already.
+func (n TextNode) NoWrap() TextNode { n.nowrap = !n.truncate; return n }
 
 // View implements [Child], drawing the node at its natural size.
 func (n TextNode) View() string { return Render(0, 0, n) }
@@ -287,6 +302,78 @@ func truncateLine(s string, width int, method ansi.Method) string {
 		return ""
 	}
 	return padTo(method.Truncate(s, width, "…"), width, method)
+}
+
+// wraps reports whether text node n, box i, unstyled and set to wrap,
+// wraps when drawn w cells wide: whether a line of it is wider than w. A
+// cell takes at least a byte, so text no longer than w in bytes, as a label
+// tends to be, fits without being measured.
+func (e *engine) wraps(i int, n TextNode, w int) bool {
+	if n.styled || n.truncate || n.nowrap || w <= 0 || len(n.s) <= w {
+		return false
+	}
+	b := &e.boxes[i]
+	if b.textW == 0 {
+		b.textW, _ = e.cache.Size(n.s) // laid out without being measured
+	}
+	return b.textW > w
+}
+
+// clipLines returns styled node n with its text as its style renders it
+// before wrapping it, as [styleText] makes it, and each line cut to the
+// room it has inside w cells, or inside the style's own width for a w of
+// zero, so that Lip Gloss has nothing to wrap. Lines are measured as Lip
+// Gloss measures them, whatever the renderer measures with, as it wraps any
+// line it finds wider. An inline style does not wrap, so is not cut.
+func clipLines(n TextNode, w int) TextNode {
+	n = styleText(n)
+	if w <= 0 {
+		w = unbounded
+	}
+	room := lineWidth(n.style, w)
+	if len(n.s) <= room || n.style.GetInline() {
+		return n // a cell takes at least a byte, so every line fits
+	}
+	var b strings.Builder
+	for i, line := range strings.Split(n.s, "\n") {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(ansi.Truncate(line, room, ""))
+	}
+	n.s = b.String()
+	return n
+}
+
+// styleText returns styled node n with its text as Lip Gloss renders it
+// before wrapping it, the steps taken off its style: after the string the
+// style holds, transformed, and with tabs as spaces.
+func styleText(n TextNode) TextNode {
+	if v := n.style.Value(); v != "" {
+		n.s, n.style = v+" "+n.s, n.style.SetString()
+	}
+	if tf := n.style.GetTransform(); tf != nil {
+		n.s, n.style = tf(n.s), n.style.UnsetTransform()
+	}
+	if strings.Contains(n.s, "\t") {
+		if tw := tabWidth(n.style); tw >= 0 {
+			n.s = strings.ReplaceAll(n.s, "\t", strings.Repeat(" ", tw))
+		}
+	}
+	return n
+}
+
+// tabWidth returns how many spaces style draws a tab as, or -1 when it keeps
+// tabs. It is 4 unless the style sets it, and [lipgloss.Style.GetTabWidth]
+// reports an unset width as 0, the same as one set to 0, which drops tabs.
+func tabWidth(style lipgloss.Style) int {
+	if tw := style.GetTabWidth(); tw != 0 {
+		return tw
+	}
+	if zero := style.TabWidth(0); same.Style(&style, &zero) {
+		return 0
+	}
+	return 4
 }
 
 // cut returns the cells of s from left up to right, as [ansi.Method.Cut]

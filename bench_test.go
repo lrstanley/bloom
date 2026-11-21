@@ -209,19 +209,33 @@ func BenchmarkRenderMoving(b *testing.B) {
 	}
 }
 
-// BenchmarkRenderWrappedText scrolls a styled text of ten thousand lines,
-// wrapped to fit, which is measured once rather than wrapped every frame.
+// BenchmarkRenderWrappedText scrolls a text of ten thousand lines, styled
+// and not, wrapped to fit, which is measured once rather than wrapped every
+// frame.
 func BenchmarkRenderWrappedText(b *testing.B) {
 	lines := make([]string, 10_000)
 	for i := range lines {
 		lines[i] = benchLogLine(i)
 	}
-	text := Text(strings.Join(lines, "\n")).Style(benchItem)
-	r := New(WithColors(color.White, color.Black))
-	b.ReportAllocs()
-	for i := 0; b.Loop(); i++ {
-		r.View(benchW, benchH, Box(benchBorder, Scroll(text, i*3%10_000)))
+	plain := Text(strings.Join(lines, "\n"))
+	for name, text := range map[string]TextNode{"styled": plain.Style(benchItem), "unstyled": plain} {
+		b.Run(name, func(b *testing.B) {
+			r := New(WithColors(color.White, color.Black))
+			b.ReportAllocs()
+			for i := 0; b.Loop(); i++ {
+				r.View(benchW, benchH, Box(benchBorder, Scroll(text, i*3%10_000)))
+			}
+		})
 	}
+	// A row that measures the text at its own width and at what is left
+	// beside a sidebar, both of which are kept.
+	b.Run("unstyled beside", func(b *testing.B) {
+		r := New(WithColors(color.White, color.Black))
+		b.ReportAllocs()
+		for b.Loop() {
+			r.View(benchW, benchH, Row(Auto(plain).Align(Start), Fixed(10, Text("side"))))
+		}
+	})
 }
 
 // The viewport benchmarks draw a buffer of log lines, styled, of mixed

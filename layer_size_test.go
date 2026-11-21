@@ -9,8 +9,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"charm.land/lipgloss/v2"
 )
 
 // sizeProbe records the sizes it is laid out at, and wraps a long line above
@@ -23,7 +21,7 @@ type sizeProbe struct {
 
 func (p sizeProbe) Layout(ctx Context) Child {
 	*p.sizes = append(*p.sizes, Size{W: ctx.Width, H: ctx.Height})
-	return Box(rounded, Column(Text(strings.Repeat("word ", 20)).Style(lipgloss.NewStyle()), Text("LAST")))
+	return Box(rounded, Column(Text(strings.Repeat("word ", 20)), Text("LAST")))
 }
 
 func TestLayerFixedWidthFitsHeight(t *testing.T) {

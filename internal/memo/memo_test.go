@@ -4,7 +4,10 @@
 
 package memo
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestRetire(t *testing.T) {
 	t.Parallel()
@@ -30,5 +33,30 @@ func TestRetire(t *testing.T) {
 	// A slot past the end grows the table.
 	if s := tab.At(9); s.OK || len(tab.slots) != 10 {
 		t.Fatalf("slot 9 is %+v, in %d slots", *s, len(tab.slots))
+	}
+}
+
+func TestMapRetire(t *testing.T) {
+	t.Parallel()
+
+	var m Map[int, int]
+	for k := range 8 {
+		s := m.At(k)
+		s.OK, s.V = true, k
+	}
+	m.Retire()
+
+	// The next frame uses only 1, which keeps its value, and the map, far
+	// emptier than it was, is made again.
+	before := fmt.Sprintf("%p", m.slots)
+	if s := m.At(1); !s.OK || s.V != 1 {
+		t.Fatalf("1 is %+v after a frame that used it", *s)
+	}
+	m.Retire()
+	if len(m.slots) != 1 || m.slots[1] == nil || m.peak != 1 {
+		t.Fatalf("kept %v, peak %d", m.slots, m.peak)
+	}
+	if fmt.Sprintf("%p", m.slots) == before {
+		t.Fatal("not made again")
 	}
 }

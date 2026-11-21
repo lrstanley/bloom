@@ -63,6 +63,10 @@ type box struct {
 	frame   frame
 	frameOK bool
 
+	// textW is the natural width of a text node's string, once measured, so
+	// that drawing it does not measure a long text again; 0 until then.
+	textW int
+
 	rect   image.Rectangle // set by arrange; empty for boxes not laid out
 	hidden bool            // collapsed by its container
 	// A slot or layer moving with effects is drawn at rect, with them
@@ -81,11 +85,11 @@ type engine struct {
 	cache      *canvas.Cache
 	memo       map[memoKey]Size // every measurement this frame
 	boxes      []box
-	kids       []int                 // children of each box, in spans
-	stack      []int                 // children of the boxes being built
-	frameMemos memo.Table[frameMemo] // by box index, from the last layout
-	textMemos  memo.Table[textMemo]  // by twice the box index, and once more for a width
-	scratch    lipgloss.Style        // for comparing styles without allocating
+	kids       []int                         // children of each box, in spans
+	stack      []int                         // children of the boxes being built
+	frameMemos memo.Table[frameMemo]         // by box index, from the last layout
+	textMemos  memo.Map[textWidth, textMemo] // by box and the width it was rendered at
+	scratch    lipgloss.Style                // for comparing styles without allocating
 	tracks     []flex.Track
 	ints       []int
 	apart      bool      // it builds the items of lists apart from a frame; see itemApart
@@ -327,9 +331,10 @@ func (e *engine) viewOf(i int) string {
 }
 
 // textOf returns what a text node shows at w×h, or at its natural size for
-// a w or h of zero, measuring with method. A width or height the style sets
-// itself is kept. For a truncated node cut to fit, full is the line it was
-// cut from, as its style's transform made it; it is empty otherwise.
+// a w or h of zero, measuring with method. Lines wider than w wrap, unless
+// the node is truncated or does not wrap. A width or height the style sets itself is kept.
+// For a truncated node cut to fit, full is the line it was cut from, as its
+// style's transform made it; it is empty otherwise.
 func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 	if n.truncate {
 		var inner int
@@ -339,7 +344,15 @@ func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 		}
 	}
 	if !n.styled {
-		return n.s, full
+		if w > 0 && !n.truncate && !n.nowrap {
+			// Unstyled text is drawn as it is, with no style to fill its
+			// box, so it is only wrapped, not padded to w×h.
+			return method.Wrap(n.s, w, ""), full
+		}
+		return n.s, full // cut off at the edge of its box if too wide
+	}
+	if n.nowrap {
+		n = clipLines(n, w)
 	}
 	st := n.style
 	if w > 0 && st.GetWidth() == 0 {
@@ -352,12 +365,16 @@ func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 }
 
 // truncLine returns truncated node n as its line is cut, w cells wide or at
-// its natural width for a w of zero: with its style's transform applied
-// first, so what the transform makes is kept to one line, and the room the
-// line has.
+// its natural width for a w of zero: for a styled node, with its text as
+// its style renders it first, as [styleText] makes it, so all of it is kept
+// to one line, and the room the line has.
 func truncLine(n TextNode, w int) (_ TextNode, room int) {
-	if tf := n.style.GetTransform(); tf != nil {
-		n.s, n.style = lineBreaks.Replace(tf(n.s)), n.style.UnsetTransform()
+	if n.styled {
+		t := styleText(n)
+		if t.s != n.s {
+			t.s = lineBreaks.Replace(t.s) // what the style added
+		}
+		n = t
 	}
 	if w <= 0 {
 		w = unbounded
@@ -456,13 +473,19 @@ func (e *engine) measureChild(i int, avail Size) Size {
 	}
 }
 
-// measureText returns the natural size of a text node within avail. A
-// styled node is measured from its style's frame rather than rendered,
-// unless it is too wide and wraps, or its style changes it in ways only
-// rendering tells.
+// measureText returns the natural size of a text node within avail. Text
+// too wide for avail wraps, and is measured wrapped, unless it is
+// truncated or does not wrap. A styled node is measured from its style's frame rather than
+// rendered, unless it wraps or its style changes it in ways only rendering
+// tells.
 func (e *engine) measureText(i int, n TextNode, avail Size) Size {
-	w, h := e.cache.Size(n.s)
+	w, h, tab := e.cache.SizeTab(n.s)
+	e.boxes[i].textW = w
 	if !n.styled {
+		if w > avail.W && avail.W > 0 && !n.truncate && !n.nowrap {
+			// Too wide: measured wrapped to the available width.
+			return e.rendered(i, n, avail.W).size
+		}
 		return Size{W: w, H: h}
 	}
 	// Lip Gloss's Width and Height include padding and borders, not margins.
@@ -473,9 +496,14 @@ func (e *engine) measureText(i int, n TextNode, avail Size) Size {
 		w += f.l + f.r
 	}
 	h = max(h+f.t+f.b-f.my, st.GetHeight()) + f.my
-	if n.truncate && st.GetTransform() == nil {
-		// A truncated line is cut to fit rather than wrapped, so its size
-		// follows from the style alone, without rendering a long line.
+	// Tabs drawn as spaces, a string the style holds, a transform, and an
+	// inline style, which joins the lines of text not truncated to one
+	// already, change the text in ways only rendering tells.
+	changed := tab && tabWidth(st) >= 0 || st.GetTransform() != nil || st.Value() != "" || st.GetInline() && !n.truncate
+	if (n.truncate || n.nowrap) && !changed {
+		// Truncated or unwrapped lines are cut to fit rather than wrapped,
+		// so its size follows from the style alone, without rendering a
+		// long text.
 		if mw := st.GetMaxWidth(); mw > 0 {
 			w = min(w, mw)
 		}
@@ -487,47 +515,55 @@ func (e *engine) measureText(i int, n TextNode, avail Size) Size {
 		}
 		return Size{W: w, H: h}
 	}
-	if st.GetWidth() > 0 || st.GetTransform() != nil || st.GetMaxWidth() > 0 || st.GetMaxHeight() > 0 {
-		// The style wraps or changes the text in ways only rendering tells.
-		natural := e.renderedSize(i, n, 0)
+	if changed || st.GetWidth() > 0 || st.GetMaxWidth() > 0 || st.GetMaxHeight() > 0 {
+		// The style changes the text, or wraps it to a width of its own.
+		natural := e.rendered(i, n, 0).size
 		w, h = natural.W, natural.H
 	}
 	if w > avail.W {
 		// Too wide: rendered at the available width, where it wraps.
-		return e.renderedSize(i, n, avail.W)
+		return e.rendered(i, n, avail.W).size
 	}
 	return Size{W: w, H: h}
 }
 
-// textMemo is the size of a text node, box i, as rendered w cells wide, or
-// at its natural size for 0, in the last frame.
+// textWidth is a text node's box, and a width it was rendered at, or 0 for
+// its natural size.
+type textWidth struct{ box, w int }
+
+// textMemo is the size of a text node as rendered at a width in the last
+// frame, and for an unstyled node, the text as wrapped to it.
 type textMemo struct {
-	style    lipgloss.Style
-	s        string
-	truncate bool
-	w        int
-	size     Size
+	style            lipgloss.Style
+	s                string
+	styled, truncate bool
+	nowrap           bool
+	size             Size
+	wrapped          string
 }
 
-// renderedSize returns the size of text node n, box i, rendered w cells
-// wide, or at its natural size for 0. Rendering with Lip Gloss is slow, and
-// a long text wrapped to fit takes long enough to render that doing it every
-// frame would be most of the frame, so the size is kept from frame to frame
-// while the box shows the same text in the same style at the same width.
-func (e *engine) renderedSize(i int, n TextNode, w int) Size {
-	slot := 2 * i
-	if w > 0 {
-		slot++
-	}
-	m := e.textMemos.At(slot)
+// rendered returns the memo of text node n, box i, rendered w cells wide,
+// or at its natural size for 0. Rendering with Lip Gloss is slow, and a
+// long text wrapped to fit, styled or not, takes long enough to wrap that
+// doing it every frame would be most of the frame, so it is kept from frame
+// to frame while the box shows the same text in the same style, at each
+// width that the last frame measured or drew it at: a row can measure a
+// child at more than one width in a frame.
+func (e *engine) rendered(i int, n TextNode, w int) *textMemo {
+	m := e.textMemos.At(textWidth{box: i, w: w})
 	e.scratch = n.style
-	if v := &m.V; m.OK && v.w == w && v.truncate == n.truncate && v.s == n.s && same.Style(&v.style, &e.scratch) {
-		return v.size
+	if v := &m.V; m.OK && v.styled == n.styled && v.truncate == n.truncate && v.nowrap == n.nowrap && v.s == n.s && same.Style(&v.style, &e.scratch) {
+		return v
 	}
 	out, _ := textOf(n, w, 0, e.method)
 	sw, sh := e.cache.Size(out)
-	m.OK, m.V = true, textMemo{style: n.style, s: n.s, truncate: n.truncate, w: w, size: Size{W: sw, H: sh}}
-	return m.V.size
+	m.OK, m.V = true, textMemo{style: n.style, s: n.s, styled: n.styled, truncate: n.truncate, nowrap: n.nowrap, size: Size{W: sw, H: sh}}
+	if !n.styled {
+		// Kept for drawing it. A styled node is drawn at its height too, so
+		// what it was measured as is not what is drawn.
+		m.V.wrapped = out
+	}
+	return &m.V
 }
 
 // axes returns a size's main and cross lengths for a row, or a column when

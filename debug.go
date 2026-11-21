@@ -135,6 +135,9 @@ func debugNode(c Child) (kind string, attrs []string) {
 		if n.truncate {
 			attrs = append(attrs, "truncate")
 		}
+		if n.nowrap {
+			attrs = append(attrs, "nowrap")
+		}
 		return "Text " + debugText(n.s), attrs
 	case SlotNode:
 		return debugSlot(n)

@@ -1284,7 +1284,7 @@ func (e *engine) measureSink(i int, n TooltipSinkNode, avail Size) Size {
 	if w >= unbounded {
 		w = 0
 	}
-	s := e.renderedSize(i, n.line(""), w)
+	s := e.rendered(i, n.line(""), w).size
 	if w > 0 {
 		s.W = w
 	}

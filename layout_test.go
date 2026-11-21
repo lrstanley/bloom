@@ -259,11 +259,10 @@ func TestEmptySlotTakesNoGap(t *testing.T) {
 // their row is at its natural size.
 func TestFillNaturalSize(t *testing.T) {
 	t.Parallel()
-	wraps := lipgloss.NewStyle() // Styled text wraps where plain text is cut.
 	row := Row(
-		Fill(Text("ab").Style(wraps)).ID("a"),
-		Fill(Text("abcdef").Style(wraps)).ID("b"),
-		Grow(2, Text("abcd").Style(wraps)).ID("c"),
+		Fill(Text("ab")).ID("a"),
+		Fill(Text("abcdef")).ID("b"),
+		Grow(2, Text("abcd")).ID("c"),
 	).Gap(1)
 	// 22 cells, plus the gaps, is the least in which b gets its 6.
 	f := Solve(0, 0, row)
@@ -274,8 +273,8 @@ func TestFillNaturalSize(t *testing.T) {
 	// A child held to its Min or Max leaves the others the rest, as
 	// sharing out space does, so the row needs no more than their sizes.
 	for want, row := range map[int]Child{
-		11: Row(Fill(Text("x").Style(wraps)).Max(1), Fill(Text("abcdefghij").Style(wraps))),
-		30: Row(Fill(Text("x").Style(wraps)).Min(20), Fill(Text("abcdefghij").Style(wraps))),
+		11: Row(Fill(Text("x")).Max(1), Fill(Text("abcdefghij"))),
+		30: Row(Fill(Text("x")).Min(20), Fill(Text("abcdefghij"))),
 	} {
 		r, _ := Solve(0, 0, Column(row, Text("end").ID("end"))).Rect("end")
 		if r.Dx() != want || r.Min.Y != 1 {

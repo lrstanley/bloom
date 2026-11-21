@@ -122,8 +122,8 @@ func TestScrollX(t *testing.T) {
 	if got := ansi.Strip(Render(6, 2, Scroll(long, 0).X(3))); strings.TrimSpace(got) != "345678" {
 		t.Fatalf("got %q", got)
 	}
-	// Without X, the child gets the scroll's width.
-	expectRect(t, Solve(6, 1, Scroll(long, 0)), "text", image.Rect(0, 0, 6, 2))
+	// Without X, the child gets the scroll's width, and wraps to it.
+	expectRect(t, Solve(6, 1, Scroll(long, 0)), "text", image.Rect(0, 0, 6, 4))
 	if got := Debug(6, 1, Scroll(long, 1).X(3)); !strings.Contains(got, "Scroll 0,0 6x1 offset=1 x=3") {
 		t.Fatalf("Debug:\n%s", got)
 	}

@@ -322,7 +322,7 @@ type selLeaf struct {
 	src        *canvas.Canvas // its cells, all of them; nil for a TextSource drawn by its layout
 	lazy       bool           // src is parsed only once wanted, for a leaf out of sight
 	view       string         // what a component out of sight showed this frame, to parse then
-	text       string         // the string of a styled text node, to find where it wrapped, or of one cut to fit
+	text       string         // the string of a text node that wraps, to find where it did, or of one cut to fit
 	truncated  bool           // text was cut to fit, with "…"
 	source     TextSource
 	inner      bool      // cells drawn by a TextSource's layout, which are not text of their own
@@ -457,7 +457,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 	switch n := b.child.(type) {
 	case TextNode:
 		l := leaf(true)
-		if n.styled || n.truncate {
+		if n.truncate || n.styled && !n.nowrap || r.wraps(i, n, b.rect.Dx()) {
 			l.text, l.truncated = n.s, n.truncate
 		}
 	case BoxNode:
@@ -1677,8 +1677,8 @@ func (r *Root) selectAllHeld(f *Frame, i int, h *heldLeaf) bool {
 // Selection returns the text selected with the mouse and whether any is
 // selected, as laid out in the last frame. Text is read from the nodes
 // inside the node selected in: all of a [Text] or component, including what
-// is scrolled out of sight, with the lines that a styled text wrapped to
-// fit joined again, and from a [TextSource], what it says it shows. Text
+// is scrolled out of sight, with the lines that a text wrapped to fit
+// joined again, and from a [TextSource], what it says it shows. Text
 // drawn around them, such as a [Box]'s border, is not selected. Every item
 // of a [List] that the selection covers is read, including those the last
 // frame did not build, which are built now to read, as the list would build

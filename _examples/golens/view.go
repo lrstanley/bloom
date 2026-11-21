@@ -226,7 +226,7 @@ func (m *model) sidebar() bloom.Child {
 		bloom.Fixed(1, nil),
 		bloom.Text(f.pkg).Style(m.st.muted).Truncate(),
 		bloom.Fixed(1, nil),
-		bloom.Text(m.st.signature(f)).Style(lipgloss.NewStyle()),
+		bloom.Text(m.st.signature(f)),
 		bloom.Fixed(1, nil),
 		bloom.Fill(bloom.Text(doc).Style(m.st.muted)),
 		bloom.Fixed(1, nil),
@@ -419,7 +419,7 @@ func (m *model) codeView() bloom.Child {
 			note = "An interface method, so there is no body to show. Its implementations in the project are on the right."
 		}
 		body = bloom.Column(
-			bloom.Text(m.st.signature(f)).Style(lipgloss.NewStyle()),
+			bloom.Text(m.st.signature(f)),
 			bloom.Fixed(1, nil),
 			bloom.Text(note).Style(m.st.muted),
 		)
