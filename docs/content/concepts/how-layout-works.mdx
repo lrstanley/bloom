@@ -68,17 +68,19 @@ On the other axis, children stretch to the row's height unless an `Align` says o
 
 ## Components that know their size
 
-bloom can measure any component by rendering its `View()` and counting lines and columns. Two optional interfaces
-let a component do better:
+A component is a [`Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child): its `Layout` method answers "what layout
+do you want, given this much space?" by returning nodes, which bloom measures and places like any others. This is
+how a component changes its shape with its size, rather than only stretching. A component placed with
+[`bloom.View`](https://pkg.go.dev/bloomfx.dev/bloom#View), such as a Bubbles one, is measured by rendering its
+`View()` and counting lines and columns.
 
-- [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) answers "how big do you want to be, given
-  this much space?" without rendering, which is cheaper and lets a component ask for less than its view.
-- [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) answers "what layout do you want, given this
-  much space?" by returning nodes. This is how a component changes its shape with its size, rather than only
-  stretching.
+[`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) lets either kind do better: it answers "how big do you
+want to be, given this much space?" without rendering or laying out, which is cheaper and lets a component ask for
+less than its view.
 
-A `Layouter`'s `Layout` method can be called several times per frame, while measuring and for the final layout,
-which is why it must not change the component.
+A component's `Layout` method can be called several times per frame, while measuring and for the final layout,
+which is why it must not change the component. bloom notes which of the `Context`'s sizes it reads, and calls it
+again only for a space that differs in one of those, so a component that reads no size is laid out once a frame.
 
 ## Layout is a pure function
 

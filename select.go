@@ -52,9 +52,9 @@ type CopyMsg struct {
 // in it with the mouse reads instead of its cells as drawn: such as to copy
 // a secret it shows masked, or to leave out what it draws around its text.
 // A component that implements it is selectable without being made so, as
-// with [SlotNode.Selectable].
+// with [SlotNode.Selectable]. It is checked on a component laid out by its
+// Layout, and on the [Viewer] of a [View].
 type TextSource interface {
-	Child
 	// SelectedText returns the text of the component in span.
 	SelectedText(span Span) string
 }
@@ -83,11 +83,11 @@ type TextSource interface {
 // under a selection, clearing the selection, with [Root.ClearSelection], is
 // the program's to do.
 //
-// It is for a component that draws its own cells, with View. One that is a
-// [Layouter] is drawn by the nodes it lays out, whose text the root reads
-// from them, and is not taken as a TextMap, or as an [Editable].
+// It is for a component that draws its own cells, with View, and is
+// checked on the [Viewer] of a [View]. A component laid out by its Layout is
+// drawn by the nodes it lays out, whose text the root reads from them, and
+// is not taken as a TextMap, or as an [Editable].
 type TextMap interface {
-	Child
 	// PosAt returns the position in the text of the character drawn at
 	// cell, relative to the component's top-left, laid out at size: the end
 	// of the row for a cell past its text, including one just past the
@@ -441,14 +441,8 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 				l.view = r.viewOf(i)
 			}
 		}
-		switch c := b.child.(type) {
-		case TextMap:
-			l.tm = c
-		case TextSource:
-			l.source = c
-		}
-		if inner {
-			l.tm, l.source = nil, nil
+		if !inner {
+			l.tm, l.source = textOfLeaf(b.child)
 		}
 		r.leaves = append(r.leaves, l)
 		r.outline.AddLeaf(textsel.Leaf{Rect: l.rect, Clip: l.clip, Inner: inner, Open: l.tm != nil})
@@ -483,15 +477,35 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 			r.outline.AddLeaf(textsel.Leaf{Rect: rect, Clip: shown})
 		}
 	case DrawableNode, ScrollbarNode, TooltipSinkNode:
-	case Layouter:
+	case ViewNode:
+		leaf(true)
+	default:
+		if !b.laid {
+			break
+		}
 		_, src := b.child.(TextSource)
 		if src && !inner {
 			leaf(false)
 		}
 		kid(b.expanded, inner || src)
-	default:
-		leaf(true)
 	}
+}
+
+// textOfLeaf returns the TextMap or the TextSource that tells the text of
+// a leaf drawn by c: the [Viewer] of a [View], or a component laid out by
+// its Layout, which is only taken as a TextSource.
+func textOfLeaf(c Child) (TextMap, TextSource) {
+	if n, ok := c.(ViewNode); ok {
+		switch v := n.v.(type) {
+		case TextMap:
+			return v, nil
+		case TextSource:
+			return nil, v
+		}
+		return nil, nil
+	}
+	src, _ := c.(TextSource)
+	return nil, src
 }
 
 // noteList notes list n, box i at path, and the leaves of the items it

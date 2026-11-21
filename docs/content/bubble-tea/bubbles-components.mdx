@@ -3,16 +3,19 @@ title: Using Bubbles components
 description: Place Bubbles components such as viewport, textinput, list, and table in a bloom layout, give them the size they need, and show the real terminal cursor.
 ---
 
-[Bubbles](https://github.com/charmbracelet/bubbles) components work in bloom without any wrapping: each has a
-`View() string` method, so it can be a child anywhere in a layout. bloom draws its view into whatever space it's
-given and clips anything that doesn't fit.
+[Bubbles](https://github.com/charmbracelet/bubbles) components are drawn from their `View() string` method, so
+place each one with [`bloom.View`](https://pkg.go.dev/bloomfx.dev/bloom#View), which makes it a child that can go
+anywhere in a layout. bloom draws its view into whatever space it's given and clips anything that doesn't fit.
 
 ```go
 bloom.Row(
-	bloom.Fixed(30, m.list),
-	bloom.Fill(m.viewport),
+	bloom.Fixed(30, bloom.View(&m.list)),
+	bloom.Fill(bloom.View(&m.viewport)),
 )
 ```
+
+Pass a pointer to the component in your model, as above, so it isn't copied each frame. bloom calls its `View` at
+most once a frame, and only when it's measured or drawn, so a component in a collapsed pane isn't rendered.
 
 Many components also need to know their size, because they decide what to render from it: a viewport shows as
 many lines as its height, a list pages by its height, and a table truncates columns by its width. bloom decides
@@ -40,7 +43,7 @@ where each node with an ID goes:
 ```go
 func (m *model) layout() bloom.Child {
 	return bloom.Column(
-		bloom.Fill(bloom.Box(panel, m.log)).ID(paneLog),
+		bloom.Fill(bloom.Box(panel, bloom.View(&m.log))).ID(paneLog),
 		statusbar,
 	)
 }
@@ -155,7 +158,7 @@ func (m *model) Init() tea.Cmd {
 func (m *model) layout() bloom.Child {
 	field := bloom.Text(m.input.View()).Cursor(m.input.Cursor())
 	return bloom.Column(
-		bloom.Fill(bloom.Box(panel, m.log)).ID(paneLog),
+		bloom.Fill(bloom.Box(panel, bloom.View(&m.log))).ID(paneLog),
 		bloom.Auto(bloom.Box(panel, field)).ID(paneInput),
 	)
 }
@@ -217,12 +220,12 @@ func main() {
 
 ## Write your own components the same way
 
-The components you write don't need anything bloom-specific either: a `View() string` method is enough. A
-component can opt in to more: implement [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) to report
-its natural size without being rendered, or [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) to
-build its own layout for the space it's given. A component that only lives in bloom layouts can embed
-[`bloom.NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) in place of writing a `View`. [Writing components](/bubble-tea/writing-components) builds a
-complete component that lays itself out, handles its own clicks, and keeps its IDs apart from other instances.
+A component you've already written with a `View() string` method goes in a layout the same way, with `bloom.View`.
+It can also implement [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) to report its natural size
+without being rendered. A new component is simpler as a [`bloom.Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child):
+it has a `Layout` method that returns bloom nodes for the space it's given, needs no `View`, and goes in a layout as
+it is. [Writing components](/bubble-tea/writing-components) builds a complete component that lays itself out,
+handles its own clicks, and keeps its IDs apart from other instances.
 
 ## Related
 

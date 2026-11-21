@@ -45,8 +45,8 @@ What you gain:
 What you give up:
 
 - **Your root view becomes a bloom tree.** `lipgloss.JoinHorizontal` and `lipgloss.JoinVertical` between parts
-  you want to click on become `bloom.Row` and `bloom.Column`. Components with a `View() string` method, and any
-  string, can still be leaves of the tree as they are.
+  you want to click on become `bloom.Row` and `bloom.Column`. Components with a `View() string` method can still be
+  leaves of the tree through `bloom.View`, and any string through `bloom.Text`.
 - **Newer requirements.** bloom needs Bubble Tea v2, Lip Gloss v2, and Go 1.27 or newer.
 - **A pre-1.0 API.** bloom's API may still change in breaking ways before v1.0.0.
 - **More to learn.** bubblezone is a handful of functions. bloom is a layout engine with its own model of slots

@@ -80,14 +80,12 @@ offset flips with it, so the gap stays between the layer and the node.
 ### Draw for the side it opened on
 
 A menu often draws the edge facing its node differently, such as leaving it open so the menu joins the input. Make
-the menu a [`Layouter`](/bubble-tea/writing-components), and read the side it went on from
+the menu a [component with a `Layout` method](/bubble-tea/writing-components), and read the side it went on from
 [`Context.Side`](https://pkg.go.dev/bloomfx.dev/bloom#Context.Side). It's the side the layer was actually placed
 on, in the same frame, so the menu never draws the wrong edge:
 
 ```go
 type menu struct {
-	bloom.NoView
-
 	options []string
 }
 

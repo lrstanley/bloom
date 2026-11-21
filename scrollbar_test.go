@@ -93,8 +93,6 @@ func TestScrollbarOf(t *testing.T) {
 // scrollLayout is a Layouter that builds a scroll, which is built again for
 // each size it is given while measuring and arranging.
 type scrollLayout struct {
-	NoView
-
 	lines string
 }
 

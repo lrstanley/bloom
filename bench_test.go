@@ -84,9 +84,9 @@ func benchTree(selected, frame int, dialog float64) Child {
 			Fixed(28, Box(benchBorder, Column(items...))).ID("sidebar").Collapsible(1),
 			Fill(Column(
 				Row(cards...).Gap(1),
-				Fill(Box(benchBorder, Scroll(benchList, selected*3))),
+				Fill(Box(benchBorder, Scroll(View(benchList), selected*3))),
 			)).Min(60),
-			Fixed(48, Box(benchBorder, benchLog(frame))).ID("log").Collapsible(2),
+			Fixed(48, Box(benchBorder, View(benchLog(frame)))).ID("log").Collapsible(2),
 		).Gap(1)),
 		Text(fmt.Sprintf("frame %d", frame)).Style(benchHeader),
 	)

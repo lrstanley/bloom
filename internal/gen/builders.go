@@ -6,7 +6,9 @@ package main
 
 // nodes are the exported node types of package bloom, in the order their
 // builders are written. Each embeds meta, which the builders set. Noun is
-// what a builder's documentation calls the node.
+// what a builder's documentation calls the node. Own marks a node with a
+// Layout of its own, which bloom calls to lay it out; every other node is
+// given a Layout that returns the node itself, which bloom never calls.
 //
 //nolint:goconst // each type is named where something is said of it.
 var nodes = []node{
@@ -24,9 +26,9 @@ var nodes = []node{
 	{Type: "LayerNode", Noun: "layer"},
 	{Type: "ListNode", Noun: "list"},
 	{Type: "ViewportNode", Noun: "viewport"},
-	{Type: "MarqueeNode", Noun: "marquee"},
-	{Type: "SkeletonNode", Noun: "skeleton"},
-	{Type: "MinSizeNode", Noun: "node"},
+	{Type: "MarqueeNode", Own: true, Noun: "marquee"},
+	{Type: "SkeletonNode", Own: true, Noun: "skeleton"},
+	{Type: "MinSizeNode", Own: true, Noun: "node"},
 	{Type: "ScrollbarNode", Noun: "scrollbar"},
 	{Type: "TooltipSinkNode", Noun: "sink"},
 }

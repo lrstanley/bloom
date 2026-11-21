@@ -43,17 +43,21 @@ func MinSize(w, h int, child Child) MinSizeNode {
 	return MinSizeNode{child: child, min: Size{W: max(w, 0), H: max(h, 0)}}
 }
 
-// View implements [Child], drawing the node at its natural size, which is
-// never too small.
-func (n MinSizeNode) View() string { return Render(0, 0, n) }
-
-// Layout implements [Layouter], returning the child, or the note when the
-// space is too small.
+// Layout implements [Child], returning the child, or the note when the
+// space is too small. It reads only the sizes it has a minimum for, so the
+// child is laid out again only when one of those changes.
 func (n MinSizeNode) Layout(ctx Context) Child {
-	if !n.tooSmall(Size{W: ctx.Width, H: ctx.Height}) {
+	var size Size
+	if n.min.W > 0 {
+		size.W = ctx.Width()
+	}
+	if n.min.H > 0 {
+		size.H = ctx.Height()
+	}
+	if !n.tooSmall(size) {
 		return n.child
 	}
-	return Centered(Transition(1, Text(n.note(ctx.Width)).Truncate(), tooSmallFade))
+	return Centered(Transition(1, Text(n.note(ctx.Width())).Truncate(), tooSmallFade))
 }
 
 // tooSmall reports whether size is below the minimum on either axis.

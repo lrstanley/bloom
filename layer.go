@@ -46,7 +46,7 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 			// for the side asked for, so the layer's child is built again
 			// for the side it goes on, and placed there at its new size.
 			// What was built before stays in the arena, unreachable and
-			// never arranged, as boxes a Layouter built for other space do.
+			// never arranged, as boxes a component built for other space do.
 			kid = e.build(n.child, i, 0)
 			b := &e.boxes[i]
 			b.kidsOff, b.kidsLen = len(e.kids), 1

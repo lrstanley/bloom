@@ -22,10 +22,10 @@ import (
 
 // wrapping is on one row when there is room for it, and on two when there
 // isn't.
-type wrapping struct{ NoView }
+type wrapping struct{}
 
 func (wrapping) Layout(ctx Context) Child {
-	if ctx.Width >= 5 {
+	if ctx.Width() >= 5 {
 		return Row(Text("abc"), Text("de"))
 	}
 	return Column(Text("abc"), Text("de"))

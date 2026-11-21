@@ -72,9 +72,6 @@ func (n ListNode) Gap(cells int) ListNode { n.gap = max(cells, 0); return n }
 // item every time the text is read.
 func (n ListNode) ItemText(text func(i int) string) ListNode { n.itemText = text; return n }
 
-// View implements [Child], drawing the node at its natural size.
-func (n ListNode) View() string { return Render(0, 0, n) }
-
 // ListView is the part of a [List] that a frame showed, as [Frame.List]
 // reports it.
 type ListView struct {

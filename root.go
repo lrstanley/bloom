@@ -339,6 +339,12 @@ func sameCursor(a, b *tea.Cursor) bool {
 
 var renderers = sync.Pool{New: func() any { return newRenderer(ansi.GraphemeWidth) }}
 
+// layouts are for [Solve] and [Debug], which end frames of their renderers'
+// caches without drawing them. Apart from renderers, the frame a renderer
+// drew last, which names canvases of its cache, outlives none of the frames
+// its cache keeps them for, so the next frame is not taken for it.
+var layouts = sync.Pool{New: func() any { return newRenderer(ansi.GraphemeWidth) }}
+
 // Render lays out and draws c in a w×h frame and returns it as a string,
 // for using a layout where a string is wanted. A w or h of zero or less is
 // c's natural size on that axis. A model's View should use [Root] instead,
@@ -384,8 +390,8 @@ var engines = sync.Pool{New: func() any {
 //			m.reader.SetHeight(r.Dy())
 //		}
 func Solve(w, h int, c Child) *Frame {
-	r, _ := renderers.Get().(*renderer)
-	defer renderers.Put(r)
+	r, _ := layouts.Get().(*renderer)
+	defer layouts.Put(r)
 	r.parse = false
 	defer func() { r.parse = true }()
 	r.paintTree(w, h, c)

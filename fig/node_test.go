@@ -115,12 +115,12 @@ func TestTextNodeSize(t *testing.T) {
 	}
 }
 
-// twoWords is a Layouter with no View of its own, on one row when there is
-// room for it, and on two when there isn't.
-type twoWords struct{ bloom.NoView }
+// twoWords is a component on one row when there is room for it, and on two
+// when there isn't.
+type twoWords struct{}
 
 func (twoWords) Layout(ctx bloom.Context) bloom.Child {
-	if ctx.Width >= 5 {
+	if ctx.Width() >= 5 {
 		return bloom.Row(bloom.Text("abc"), bloom.Text("de"))
 	}
 	return bloom.Column(bloom.Text("abc"), bloom.Text("de"))

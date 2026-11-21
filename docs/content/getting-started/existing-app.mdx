@@ -117,15 +117,16 @@ handles the mouse itself, keep setting yours after the call until you
 ### Replace Join calls with rows and columns
 
 Each `lipgloss.JoinHorizontal` becomes a `bloom.Row` and each `JoinVertical` a `bloom.Column`. A component goes in
-as it is: anything with a `View() string` method is a node. Wrap each child in a [slot](/layout/slots) that says
-how it shares the space, and a box for anything that had a border:
+through [`bloom.View`](https://pkg.go.dev/bloomfx.dev/bloom#View): anything with a `View() string` method becomes a
+node, drawn from its view. Wrap each child in a [slot](/layout/slots) that says how it shares the space, and a box
+for anything that had a border:
 
 ```go
 func (m *model) layout() bloom.Child {
 	return bloom.Column(
 		bloom.Fill(bloom.Row(
-			bloom.Fixed(24, m.list),
-			bloom.Fill(bloom.Box(panel, m.reader)),
+			bloom.Fixed(24, bloom.View(&m.list)),
+			bloom.Fill(bloom.Box(panel, bloom.View(&m.reader))),
 		)),
 		bloom.Fixed(1, bloom.Text(m.status()).Style(statusStyle)),
 	)
@@ -159,7 +160,7 @@ type pane int
 const paneReader pane = iota
 
 // in layout
-bloom.Fill(bloom.Box(panel, m.reader)).ID(paneReader)
+bloom.Fill(bloom.Box(panel, bloom.View(&m.reader))).ID(paneReader)
 ```
 
 ```go

@@ -26,6 +26,7 @@ type opKind uint8
 
 const (
 	opBlit    opKind = iota // copy src into rect, blanking the rest of it
+	opStretch               // copy src into rect, stretched to fill it at mid
 	opClear                 // blank rect, background and all
 	opDraw                  // draw a uv.Drawable into rect
 	opEffects               // apply effects to rect of the frame
@@ -45,6 +46,7 @@ type op struct {
 	clip     image.Rectangle
 	viewport image.Rectangle
 	sub      image.Rectangle // for opPop: the part of rect effects apply to; empty for all of it
+	mid      image.Point     // for opStretch: the column and row of src repeated
 	effects  []fx.Effect
 	t        float64
 	from     image.Rectangle // for opPop of a slot moving with effects: where it was
@@ -62,7 +64,7 @@ type op struct {
 
 func (o *op) equal(p *op) bool {
 	if o.kind != p.kind || o.kind == opDraw || o.src != p.src || o.rect != p.rect ||
-		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.t != p.t || o.from != p.from || o.sel != p.sel || o.held != p.held || o.rev != p.rev || o.buf != p.buf || len(o.effects) != len(p.effects) {
+		o.clip != p.clip || o.viewport != p.viewport || o.sub != p.sub || o.mid != p.mid || o.t != p.t || o.from != p.from || o.sel != p.sel || o.held != p.held || o.rev != p.rev || o.buf != p.buf || len(o.effects) != len(p.effects) {
 		return false
 	}
 	for i := range o.effects {
@@ -79,15 +81,16 @@ func (o *op) equal(p *op) bool {
 type renderer struct {
 	engine
 
-	styled   memo.Table[styledMemo] // by box index, from the last frame
-	columns  memo.Table[columnMemo] // by twice the box index, for scrollbars
-	drag     scrollbarDrag          // the scrollbar being dragged, if any
-	vpMarks  []linebuf.Overlay      // scratch for the marks of a viewport's line, in cells
-	vpSpans  []linebuf.Overlay      // and as they were given, in bytes
-	vpPens   linebuf.SGRs           // the styles of viewports' text, kept from frame to frame
-	vpCell   linebuf.RowMemo        // the viewport row whose cells selection last asked for
-	style    lipgloss.Style         // scratch for comparing styles without allocating
-	fxs      []fx.Effect            // effects of this frame's ops, copied from the tree
+	styled   memo.Table[styledMemo]     // by box index, from the last frame
+	stretch  memo.Map[int, stretchMemo] // by box index, from the last frame; few boxes have one
+	columns  memo.Table[columnMemo]     // by twice the box index, for scrollbars
+	drag     scrollbarDrag              // the scrollbar being dragged, if any
+	vpMarks  []linebuf.Overlay          // scratch for the marks of a viewport's line, in cells
+	vpSpans  []linebuf.Overlay          // and as they were given, in bytes
+	vpPens   linebuf.SGRs               // the styles of viewports' text, kept from frame to frame
+	vpCell   linebuf.RowMemo            // the viewport row whose cells selection last asked for
+	style    lipgloss.Style             // scratch for comparing styles without allocating
+	fxs      []fx.Effect                // effects of this frame's ops, copied from the tree
 	prevFxs  []fx.Effect
 	env      canvas.Env
 	mixer    canvas.Mixer
@@ -309,6 +312,7 @@ func (r *renderer) paintTree(w, h int, c Child) int {
 		r.paintFloats(0)
 	}
 	r.styled.Retire()
+	r.stretch.Retire()
 	r.columns.Retire()
 	return root
 }
@@ -490,26 +494,22 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		if b.cramped {
 			return
 		}
-		style := n.style
+		style, hovered := n.style, false
 		if n.hover != nil && r.isHovered(b) {
-			style = *n.hover
-		}
-		var frame string
-		if r.parse {
-			frame, _ = r.textAt(i, TextNode{style: style, styled: true}, b.rect.Dx(), b.rect.Dy())
+			style, hovered = *n.hover, true
 		}
 		if border := n.bordered(b.rect); len(n.borderFx) > 0 && !border.Empty() {
 			// Drawn on its own, so the effects see only the frame, with the
 			// border as the outer cells of what they are given.
 			push := r.push(b.rect)
-			r.blit(frame, b.rect, b.rect)
+			r.paintFrame(i, style, hovered, b.rect)
 			r.pop(op{
 				kind: opPop, rect: b.rect, clip: vis, viewport: clip, sub: border,
 				t: n.borderT, effects: r.snapshot(n.borderFx),
 				push: push, entries: [2]int{len(r.entries), len(r.entries)},
 			})
 		} else {
-			r.blit(frame, b.rect, vis)
+			r.paintFrame(i, style, hovered, vis)
 		}
 		// What is inside, then the children on its edges, over its border.
 		for _, k := range r.kidsOf(i) {
@@ -548,19 +548,12 @@ func (r *renderer) paintBox(i int, clip image.Rectangle, parent int) {
 		r.paintScrollbar(i, b, n, clip, parent)
 	case LayerNode:
 		// Layers are painted by their overlay.
-	case Layouter:
-		r.paint(b.expanded, vis, parent)
+	case ViewNode:
+		r.paintView(i, n, vis)
 	default:
-		r.paintComponent(i, vis)
-	}
-}
-
-// paintComponent adds the op for box i, a component, drawn at vis, and for
-// an [Editable], the op that draws its range over it.
-func (r *renderer) paintComponent(i int, vis image.Rectangle) {
-	r.blit(r.viewOf(i), r.boxes[i].rect, vis)
-	if ed, ok := r.boxes[i].child.(Editable); ok && r.parse {
-		r.paintHeld(i, ed, vis)
+		if b.laid {
+			r.paint(b.expanded, vis, parent)
+		}
 	}
 }
 
@@ -942,6 +935,8 @@ func (r *renderer) execute(again bool) {
 		switch o.kind {
 		case opBlit:
 			t.c.Blit(o.src, o.rect.Sub(t.origin), o.clip.Sub(t.origin))
+		case opStretch:
+			t.c.BlitStretched(o.src, o.mid, o.rect.Sub(t.origin), o.clip.Sub(t.origin))
 		case opClear:
 			t.c.ClearArea(o.rect.Sub(t.origin))
 		case opSelect:

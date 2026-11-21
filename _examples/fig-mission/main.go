@@ -316,27 +316,27 @@ func (c chart) View() string { return bloom.Render(len(c), 6, c) }
 
 func (c chart) Layout(ctx bloom.Context) bloom.Child {
 	// A bar every other column, as many of the latest values as fit.
-	vals := c[max(len(c)-(ctx.Width+1)/2, 0):]
+	vals := c[max(len(c)-(ctx.Width()+1)/2, 0):]
 	peak := 1
 	for _, v := range vals {
 		peak = max(peak, v)
 	}
 	const eighths = " ▁▂▃▄▅▆▇█"
 	levels := []rune(eighths)
-	rows := make([]string, ctx.Height)
+	rows := make([]string, ctx.Height())
 	for y := range rows {
 		var b strings.Builder
-		b.WriteString(strings.Repeat(" ", max(ctx.Width-2*len(vals)+1, 0)))
+		b.WriteString(strings.Repeat(" ", max(ctx.Width()-2*len(vals)+1, 0)))
 		for i, v := range vals {
 			// How many eighths of this row the bar fills, from the bottom.
-			fill := v*ctx.Height*8/peak - (ctx.Height-1-y)*8
+			fill := v*ctx.Height()*8/peak - (ctx.Height()-1-y)*8
 			if i > 0 {
 				b.WriteByte(' ')
 			}
 			b.WriteRune(levels[min(max(fill, 0), 8)])
 		}
 		// Rows toward the top, reached only under heavy load, are warmer.
-		t := 1 - float64(y)/float64(max(ctx.Height-1, 1))
+		t := 1 - float64(y)/float64(max(ctx.Height()-1, 1))
 		rows[y] = onBg.Foreground(blend(theme.Green, theme.Red, t*t)).Render(b.String())
 	}
 	return bloom.Text(strings.Join(rows, "\n"))

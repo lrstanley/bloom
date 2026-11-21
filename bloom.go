@@ -8,7 +8,7 @@
 // A view is described each frame as a tree of nodes built from model state:
 // [Row] and [Column] share space between children, [Box] draws a Lip Gloss
 // frame around one, [Overlay] puts [Layer]s such as dialogs over a base, and
-// any Bubble Tea component with a View() string method is a leaf.
+// a Bubble Tea component is placed with [View].
 //
 //	bloom.Column(
 //		bloom.Row(
@@ -24,8 +24,8 @@
 // each child's rectangle, whether it is collapsed, and how it is clipped. How
 // a child takes part in sharing space is set where it is placed, by wrapping
 // it in a slot such as [Fixed] or [Fill], not by the child itself. A child
-// only knows the size it was given: a component that wants it can implement
-// [Layouter], and one that knows its natural size can implement [Measurer].
+// only knows the size it was given: a component builds its layout from it
+// in Layout, and one that knows its natural size can implement [Measurer].
 //
 // # Rendering
 //
@@ -50,8 +50,8 @@
 package bloom
 
 import (
-	"errors"
 	"slices"
+	"sync/atomic"
 
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
@@ -59,60 +59,47 @@ import (
 )
 
 // Child is anything that can be placed in a layout: every node of this
-// package, and any Bubble Tea component, which is drawn from its View
-// string. Use [Text] for a plain string.
+// package, and any component that builds its own layout for the space it
+// is given, which lets it change with its size. A component drawn from a
+// View string, such as a Bubbles component, is placed with [View], and a
+// plain string with [Text].
 //
-// A component's view is drawn as it is, with any commands in it that are
-// written to the terminal rather than drawn, such as images, which [Text]
-// and [Viewport] drop unless they are trusted. A component that shows text
-// from outside the program, such as a file, should clean it with
-// [bloomfx.dev/bloom/canvas.Sanitize] first.
+// Layout must not change the component: it is called while measuring as
+// well as for the final layout, and its result is reused for any space that
+// differs only in a size it did not read from ctx. A node's Layout returns
+// the node itself, as bloom lays nodes out without calling it, so a
+// component can return a node, another component, or nil for nothing.
+//
+// A component that is also used where a string is wanted, such as by a
+// program that doesn't use bloom, can draw itself with [Render], or with a
+// [Root] it keeps, which skips drawing a frame that did not change.
 type Child interface {
-	View() string
-}
-
-// Layouter is a component that builds its own layout for the space it is
-// given, which lets it change with its size. Layout must not change the
-// component: it is called while measuring as well as for the final layout.
-//
-// In a layout, a Layouter is drawn from what Layout returns, and its View is
-// never called. View matters only where a string is wanted, such as when
-// the component is used by a program that doesn't use bloom, where it can
-// draw the layout with [Render]. A Layouter that is only placed in bloom
-// layouts can embed [NoView] instead of writing one.
-type Layouter interface {
-	Child
 	Layout(ctx Context) Child
 }
 
-// NoView is embedded in a [Layouter] that is only placed in bloom layouts,
-// such as a page or a component of the program, to give it the View method
-// [Child] asks for, which bloom never calls on a Layouter:
+// LayoutFunc is a function that builds a layout for the space it is given,
+// placed as a [Child]: a responsive piece of a layout that needs no type of
+// its own. A nil LayoutFunc lays out nothing, as a nil child does.
 //
-//	type sidebar struct {
-//		bloom.NoView
-//
-//		selected int
-//	}
-//
-//	func (s *sidebar) Layout(ctx bloom.Context) bloom.Child { ... }
-//
-// Its View panics, since it is only called when the component is misused:
-// placed as a type that is not a Layouter, such as a sidebar placed by value
-// when Layout is on *sidebar, which embedding NoView gives a View too, or
-// used where a string is wanted, such as by a program that doesn't use
-// bloom.
-type NoView struct{}
+//	bloom.LayoutFunc(func(ctx bloom.Context) bloom.Child {
+//		if ctx.Width() < 80 {
+//			return bloom.Column(sidebar, body)
+//		}
+//		return bloom.Row(bloom.Fixed(30, sidebar), bloom.Fill(body))
+//	})
+type LayoutFunc func(ctx Context) Child
 
-// View implements [Child]. It panics: see [NoView].
-func (NoView) View() string { panic(errNoView) }
+// Layout implements [Child], calling f.
+func (f LayoutFunc) Layout(ctx Context) Child {
+	if f == nil {
+		return nil
+	}
+	return f(ctx)
+}
 
-// errNoView is what [NoView.View] panics with.
-var errNoView = errors.New("bloom: View called on a component that embeds bloom.NoView. Place it as the type " +
-	"its Layout method is on, such as a pointer, or give it a View of its own to use it where a string is wanted")
-
-// Measurer is a component that knows its natural size, so its View is not
-// measured. Measure returns the size the component wants within avail; the
+// Measurer is a component that knows its natural size, so it is not
+// measured from what it lays out or draws. It is checked on a component, on
+// the [Viewer] of a [View], and on the drawable of a [Drawable]. Measure returns the size the component wants within avail; the
 // result is clamped to avail. Return what the component needs, not avail
 // itself: when a layout is drawn at its natural size, avail is unbounded.
 type Measurer interface {
@@ -124,15 +111,61 @@ type Size struct {
 	W, H int
 }
 
-// Context is what a [Layouter] is given to build its layout for.
+// Context is what a component is given to build its layout for: the space
+// it has, and where it is.
+//
+// The sizes a component reads are noted, so that bloom calls Layout again
+// only when a size it read changes. A component that never reads its size,
+// such as one that leaves sizing to the nodes it returns, is laid out once a
+// frame wherever it is. A size read later, such as by a component it
+// returned, or by the item builder of a list, is the one the component is
+// laid out in by then.
 type Context struct {
-	// Width and Height are the space available. Once layout is done they
-	// are the exact size the component was given.
-	Width, Height int
-
+	space  *laidSpace
 	wc     bool          // text is measured with ansi.WcWidth rather than ansi.GraphemeWidth
 	screen func() *Frame // the Root's frame on screen, or nil outside a Root
 	side   Direction     // the side the layer the component is in went on; see Side
+}
+
+// laidSpace is the space a component is laid out in, which the [Context] it
+// was given reads, and the sizes it read, as readW and readH. A size it has
+// not read follows the space its layout is used again in. It is atomic, as
+// a component may keep its Context and read it from anywhere, which only
+// makes its next layout read more.
+type laidSpace struct {
+	w, h  atomic.Int64
+	reads atomic.Uint32
+}
+
+// The sizes of a [Context] a component read.
+const (
+	readW = 1 << iota
+	readH
+)
+
+// Width returns the width available. Once layout is done it is the exact
+// width the component was given.
+func (c Context) Width() int {
+	if c.space == nil {
+		return 0
+	}
+	c.space.reads.Or(readW)
+	return int(c.space.w.Load())
+}
+
+// Height returns the height available. Once layout is done it is the exact
+// height the component was given.
+func (c Context) Height() int {
+	if c.space == nil {
+		return 0
+	}
+	c.space.reads.Or(readH)
+	return int(c.space.h.Load())
+}
+
+// Size returns the space available, its width and height together.
+func (c Context) Size() Size {
+	return Size{W: c.Width(), H: c.Height()}
 }
 
 // Side returns the side or corner of its node that the layer the component

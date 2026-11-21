@@ -51,21 +51,20 @@ Unlike `Fixed`, a percentage slot can shrink below its share when space runs sho
 Some components should change shape, not just size: a toolbar that shows icon labels when wide and only icons
 when narrow, or a form that's two columns on a wide screen and one on a narrow one.
 
-A component that implements [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds its
-own layout. bloom calls its `Layout` method with a `bloom.Context` holding the width and height it has, and draws
-whatever it returns:
+A component with a `Layout` method, a [`bloom.Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child), builds its
+own layout. bloom calls `Layout` with a `bloom.Context`, whose `Width` and `Height` methods return the space it
+has, and draws whatever it returns:
 
 ```go
 type toolbar struct {
-	bloom.NoView // drawn from Layout, so it needs no View of its own
-
 	actions []string
 }
 
 func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 	children := []bloom.Child{bloom.Text("◆ reader"), bloom.Space()}
+	narrow := ctx.Width() < 70
 	for _, action := range t.actions {
-		if ctx.Width < 70 {
+		if narrow {
 			// "⟳ refresh" becomes "⟳".
 			action, _, _ = strings.Cut(action, " ")
 		}
@@ -76,30 +75,39 @@ func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 ```
 
 `Layout` may be called more than once a frame, while bloom measures as well as for the final layout, so it must
-not change the component. Treat it like `View`: read state, return nodes. Embedding
-[`bloom.NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) covers the `View` method a child needs; write one
-yourself only if the component is also used where a string is wanted.
-[Writing components](/bubble-tea/writing-components#write-a-view-only-where-a-string-is-wanted) covers that, and the
-rest of what a component like this can do, such as handling its own clicks.
+not change the component. Treat it like `View`: read state, return nodes. bloom lays the component out again only
+when a size it read changes, so the toolbar, which reads only its width, isn't laid out again for a new height.
+[Writing components](/bubble-tea/writing-components#read-only-the-sizes-you-use) covers that, and the rest of what a
+component like this can do, such as handling its own clicks.
 
 ## Switch between a row and a column
 
-The same idea works for a whole screen. A `Layouter` can return a row on a wide terminal and a column on a
+The same idea works for a whole screen. A component can return a row on a wide terminal and a column on a
 narrow one:
 
 ```go
 type editor struct {
-	bloom.NoView
-
 	code, preview bloom.Child
 }
 
 func (e editor) Layout(ctx bloom.Context) bloom.Child {
-	if ctx.Width >= 100 {
+	if ctx.Width() >= 100 {
 		return bloom.Row(bloom.Fill(e.code), bloom.Fill(e.preview)).Gap(1)
 	}
 	return bloom.Column(bloom.Fill(e.code), bloom.Fill(e.preview))
 }
+```
+
+When the switch needs no type of its own, a [`bloom.LayoutFunc`](https://pkg.go.dev/bloomfx.dev/bloom#LayoutFunc)
+does the same inline:
+
+```go
+bloom.LayoutFunc(func(ctx bloom.Context) bloom.Child {
+	if ctx.Width() >= 100 {
+		return bloom.Row(bloom.Fill(code), bloom.Fill(preview)).Gap(1)
+	}
+	return bloom.Column(bloom.Fill(code), bloom.Fill(preview))
+})
 ```
 
 `bloom.Render` with a size of zero draws a layout at its natural size, which gives the component a sensible
@@ -142,7 +150,7 @@ For a note of your own, check the size yourself and return it from your layout i
 
 ## Related
 
-- [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) and [`MinSize`](https://pkg.go.dev/bloomfx.dev/bloom#MinSize) API reference
+- [`Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child), [`LayoutFunc`](https://pkg.go.dev/bloomfx.dev/bloom#LayoutFunc), and [`MinSize`](https://pkg.go.dev/bloomfx.dev/bloom#MinSize) API reference
 - [Sizing with slots](/layout/slots)
 - [Writing components](/bubble-tea/writing-components)
 - [Sizes and positions in Update](/bubble-tea/sizes-in-update)

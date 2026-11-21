@@ -328,14 +328,12 @@ func (m *model) wire(j, n, sel int) bloom.Child {
 // wireRun is a wire down to a callee, drawn for the height it is given, so
 // that it ends at its callee as both glide.
 type wireRun struct {
-	bloom.NoView
-
 	run, end string
 }
 
-// Layout implements [bloom.Layouter].
+// Layout implements [bloom.Child].
 func (w wireRun) Layout(ctx bloom.Context) bloom.Child {
-	lines := make([]string, max(ctx.Height, 1))
+	lines := make([]string, max(ctx.Height(), 1))
 	for i := range lines {
 		lines[i] = w.run
 	}

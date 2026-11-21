@@ -50,8 +50,9 @@ For text that should scroll rather than be cut short, such as a long title in a 
 
 ### Plain strings and components
 
-Anything with a `View() string` method can go in a layout, including your own components and
-[Bubbles](/bubble-tea/bubbles-components). `Text` is for plain strings.
+Anything with a `View() string` method goes in a layout with [`bloom.View`](https://pkg.go.dev/bloomfx.dev/bloom#View),
+including your own components and [Bubbles](/bubble-tea/bubbles-components). `Text` is for plain strings. Unlike
+`Text`, a view isn't wrapped to its width, and its escape sequences are kept as if it were trusted.
 
 ### Text from outside your program
 

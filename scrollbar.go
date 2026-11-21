@@ -122,9 +122,6 @@ func (n ScrollbarNode) look(hovered bool) ScrollbarStyle {
 	return s
 }
 
-// View implements [Child], drawing the node at its natural size.
-func (n ScrollbarNode) View() string { return Render(0, 0, n) }
-
 // thumbSpan returns the cells of a track length cells long that the thumb
 // covers, or an empty span when all of the content is in view.
 func (n ScrollbarNode) thumbSpan(length int) (start, end int) {

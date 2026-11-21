@@ -79,7 +79,7 @@ func TestTrustedKeepsCommands(t *testing.T) {
 	for node, c := range map[string]Child{
 		"Text":            Text("ab" + apc + "cd").Trusted(),
 		"Text.Style":      Text("ab" + apc + "cd").Style(lipgloss.NewStyle().Bold(true)).Trusted(),
-		"component":       rawView("ab" + apc + "cd"),
+		"component":       View(rawView("ab" + apc + "cd")),
 		"Viewport":        Viewport(NewBuffer("ab" + apc + "cd")).Trusted(),
 		"Viewport gutter": Viewport(NewBuffer("x")).Gutter(3, func(GutterRow) string { return apc + ">" }).Trusted(),
 	} {
@@ -146,7 +146,7 @@ func TestTooManyParams(t *testing.T) {
 			"Text":         Text(s),
 			"Text.Trusted": Text(s).Trusted(),
 			"Text.Style":   Text(s).Style(lipgloss.NewStyle().Bold(true)),
-			"component":    rawView(s),
+			"component":    View(rawView(s)),
 			"Viewport":     Viewport(buf).Trusted(),
 			"Viewport wrapped and styled": Viewport(buf).Wrap(WrapWords).
 				LineStyle(func(int) lipgloss.Style { return lipgloss.NewStyle().Underline(true) }).
@@ -189,7 +189,7 @@ func FuzzRenderUntrusted(f *testing.F) {
 				t.Fatalf("%s: %q leaks: %q", node, s, out)
 			}
 		}
-		Render(7, 3, rawView(s))
+		Render(7, 3, View(rawView(s)))
 		Render(7, 3, Viewport(NewBuffer(s)).Trusted())
 	})
 }

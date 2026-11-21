@@ -32,11 +32,13 @@ func Measure(s string, method ansi.Method) (w, h int) {
 // hyperlinks, sized as [Measure] reports.
 func Parse(s string, method ansi.Method) *Canvas {
 	w, h := Measure(s, method)
-	return parseSized(s, w, h, method)
+	return parseInto(&Canvas{method: method}, s, w, h)
 }
 
-func parseSized(s string, w, h int, method ansi.Method) *Canvas {
-	c := New(w, h, method)
+// parseInto parses s into c, sized w×h, reusing its storage when it is big
+// enough, and returns c.
+func parseInto(c *Canvas, s string, w, h int) *Canvas {
+	c.Resize(w, h)
 	// The parser panics on a sequence with too many parameters, which no
 	// style needs, but text from outside the program could hold.
 	uv.NewStyledString(escape.DropOverflows(s)).Draw(c, c.Bounds())
@@ -46,12 +48,24 @@ func parseSized(s string, w, h int, method ansi.Method) *Canvas {
 // Cache keeps strings measured and parsed between frames, so a component
 // whose view did not change is not measured or parsed again. Canvases it
 // returns are shared and must not be changed.
+//
+// A canvas it returns is kept for as long as its string is asked for, and
+// until the [Cache.EndFrame] after the last frame it was asked for in; it is
+// then reused for another string, so text that changes every frame, such
+// as a live table, parses into the same storage rather than allocating
+// more. A caller that keeps a canvas longer, without asking for it again,
+// copies it.
 type Cache struct {
 	method  ansi.Method
 	entries map[string]*cacheEntry
 	frame   uint64
-	cells   int // cells held by all parsed entries
+	cells   int       // cells held by all parsed entries
+	free    []*Canvas // canvases of dropped entries, to parse into
+	freeLen int       // cells their storage holds
 }
+
+// maxFree is how many dropped canvases a cache keeps to parse into.
+const maxFree = 16
 
 type cacheEntry struct {
 	w, h   int
@@ -99,7 +113,7 @@ func (c *Cache) SizeTab(s string) (w, h int, tab bool) {
 func (c *Cache) Get(s string) *Canvas {
 	e := c.entry(s)
 	if e.canvas == nil {
-		e.canvas = parseSized(s, e.w, e.h, c.method)
+		e.canvas = parseInto(c.take(e.w*e.h), s, e.w, e.h)
 		c.cells += e.w * e.h
 	}
 	return e.canvas
@@ -113,7 +127,7 @@ func (c *Cache) Sanitized(s string) *Canvas {
 		if t := Sanitize(s); t == s {
 			e.safe = c.Get(s)
 		} else {
-			e.safe = parseSized(t, e.w, e.h, c.method)
+			e.safe = parseInto(c.take(e.w*e.h), t, e.w, e.h)
 			c.cells += e.w * e.h
 		}
 	}
@@ -132,19 +146,83 @@ func (e *cacheEntry) cellsOf() int {
 	return n
 }
 
+// take returns a canvas to parse a string of n cells into: the smallest
+// dropped one whose storage holds them without being much bigger, which a
+// larger string would want, or a new one.
+func (c *Cache) take(n int) *Canvas {
+	best := -1
+	if n == 0 {
+		// Of no cells, but as many rows as it has lines, which a dropped
+		// canvas would keep holding.
+		return &Canvas{method: c.method}
+	}
+	for i, f := range c.free {
+		if k := cap(f.cells); k >= n && k <= 2*n+64 && (best < 0 || k < cap(c.free[best].cells)) {
+			best = i
+		}
+	}
+	if best < 0 {
+		return &Canvas{method: c.method}
+	}
+	return c.unfree(best)
+}
+
+// drop keeps canvas f of a dropped entry to parse into, while the canvases
+// kept hold no more than limit cells and number no more than maxFree,
+// making room by letting go of the smallest.
+func (c *Cache) drop(f *Canvas, limit int) {
+	if f == nil || cap(f.cells) == 0 || cap(f.cells) > limit {
+		return
+	}
+	for len(c.free) > 0 && (len(c.free) == maxFree || c.freeLen+cap(f.cells) > limit) {
+		small := 0
+		for i, g := range c.free {
+			if cap(g.cells) < cap(c.free[small].cells) {
+				small = i
+			}
+		}
+		c.unfree(small)
+	}
+	// What its cells held, such as an image, is not kept for as long as it
+	// waits.
+	clear(f.cells[:cap(f.cells)])
+	c.free = append(c.free, f)
+	c.freeLen += cap(f.cells)
+}
+
+// unfree removes canvas i from the dropped canvases, returning it.
+func (c *Cache) unfree(i int) *Canvas {
+	f := c.free[i]
+	c.freeLen -= cap(f.cells)
+	last := len(c.free) - 1
+	c.free[i], c.free[last] = c.free[last], nil
+	c.free = c.free[:last]
+	return f
+}
+
 // EndFrame marks the end of a frame of frameCells cells. Entries unused for a
 // while are dropped, and when the cache holds much more than a few frames'
 // worth of cells, such as when a large view changes on every frame, every
-// entry not used in this frame is dropped.
+// entry not used in this frame is dropped. The canvases of dropped entries
+// are parsed into again, up to a frame's worth of cells or two.
 func (c *Cache) EndFrame(frameCells int) {
-	limit := 4*frameCells + 1<<16
+	frameCells = max(frameCells, 0) // a natural size given as a negative one
+	limit, free := 4*frameCells+1<<16, 2*frameCells+1<<14
 	if c.cells > limit || c.frame%cacheIdleFrames == 0 {
 		for s, e := range c.entries {
 			if e.used < c.frame && (c.cells > limit || e.used+cacheIdleFrames < c.frame) {
 				c.cells -= e.cellsOf()
+				if e.safe != e.canvas {
+					c.drop(e.safe, free)
+				}
+				c.drop(e.canvas, free)
 				delete(c.entries, s)
 			}
 		}
+	}
+	// Those kept for a larger frame, such as before the terminal shrank.
+	for c.freeLen > free && len(c.free) > 0 {
+		c.unfree(0)
 	}
 	c.frame++
 }

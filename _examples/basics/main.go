@@ -131,7 +131,7 @@ func examples() []example {
 		).Gap(1)},
 		{"A layout is a string to Lip Gloss too", 0, 0, bloom.Text(lipgloss.JoinHorizontal(
 			lipgloss.Center,
-			bloom.Column(card("node"), card("tree")).View(),
+			bloom.Render(0, 0, bloom.Column(card("node"), card("tree"))),
 			" → ",
 			border.Render("lipgloss"),
 		))},

@@ -150,9 +150,9 @@ type secret struct {
 	style      lipgloss.Style
 }
 
-func (s secret) View() string {
+func (s secret) Layout(bloom.Context) bloom.Child {
 	masked := strings.Repeat("•", len(s.value)-s.head-s.tail)
-	return s.style.Render(s.value[:s.head] + masked + s.value[len(s.value)-s.tail:])
+	return bloom.Text(s.style.Render(s.value[:s.head] + masked + s.value[len(s.value)-s.tail:]))
 }
 
 // SelectedText implements bloom.TextSource: the token is one row, a
@@ -605,14 +605,15 @@ func (m *model) layout() bloom.Child {
 		Edge(bloom.Top, bloom.Start, bloom.Text("request").Style(title))
 
 	// The notes scroll their own text with the wheel, and are selectable as
-	// a bloom.TextMap, without being made so.
-	notesPane := bloom.Box(panel, bloom.Column(bloom.Fill(m.notes).ID(notesText).
+	// a bloom.TextMap, without being made so. They draw their own cells, so
+	// they are placed with bloom.View.
+	notesPane := bloom.Box(panel, bloom.Column(bloom.Fill(bloom.View(m.notes)).ID(notesText).
 		On(on.Scroll(func(_, dy int) tea.Cmd { m.notes.scroll(dy); return nil })))).
 		Edge(bloom.Top, bloom.Start, bloom.Text("notes").Style(title))
 
 	// The note keeps its own selection, as a bloom.Editable, and is placed
 	// by pointer. A click on it starts typing.
-	notePane := bloom.Box(panel, bloom.Row(bloom.Fill(m.note).ID(noteText).
+	notePane := bloom.Box(panel, bloom.Row(bloom.Fill(bloom.View(m.note)).ID(noteText).
 		On(on.Click(func() tea.Cmd { m.note.typing = true; return nil })))).
 		Edge(bloom.Top, bloom.Start, bloom.Text("note").Style(title))
 

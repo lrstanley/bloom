@@ -45,7 +45,7 @@ func TestTextTruncate(t *testing.T) {
 			}
 		})
 	}
-	if got := Text("abc\ndef").Truncate().View(); got != "abc def" {
+	if got := Render(0, 0, Text("abc\ndef").Truncate()); got != "abc def" {
 		t.Fatalf("natural size: %q", got)
 	}
 	if got := ansi.Strip(Render(3, 0, Column(Text("abcdef").Truncate(), Text("end")))); got != "ab…\nend" {
@@ -162,7 +162,7 @@ func TestMarqueeNaturalSize(t *testing.T) {
 	if got := Render(0, 0, n); ansi.Strip(got) != "hello world" {
 		t.Fatalf("natural render = %q", got)
 	}
-	if v := n.View(); v != Render(0, 0, n) {
+	if v := Render(0, 0, n); v != Render(0, 0, n) {
 		t.Fatalf("View = %q", v)
 	}
 

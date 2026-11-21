@@ -293,9 +293,6 @@ func (n ViewportNode) OnCaret(fn func(sel Range) tea.Cmd) ViewportNode {
 // is shown. The position of c is not used. It does nothing without a caret.
 func (n ViewportNode) Cursor(c *tea.Cursor) ViewportNode { n.cursor = c; return n }
 
-// View implements [Child], drawing the node at its natural size.
-func (n ViewportNode) View() string { return Render(0, 0, n) }
-
 // gutterWidth returns how many cells gutters take, beside a buffer of lines
 // lines.
 func gutterWidth(gutters []gutter, lines int) int {

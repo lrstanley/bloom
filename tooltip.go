@@ -1088,7 +1088,14 @@ func (r *Root) chip(m *chipMemo, t *tipAt, limit int) *canvas.Canvas {
 	if tw, _ := canvas.Measure(text, r.r.method); limit > 0 && out.GetWidth() == 0 && tw+out.GetHorizontalFrameSize() > limit {
 		out = out.Width(max(limit-out.GetHorizontalMargins(), 0))
 	}
-	src := fillChip(r.r.cache.Sanitized(out.Render(text)), st, r.r.method)
+	parsed := r.r.cache.Sanitized(out.Render(text))
+	src := fillChip(parsed, st, r.r.method)
+	if src == parsed {
+		// Kept past the frames the cache keeps it for, which then parses
+		// other text into it.
+		src = canvas.New(parsed.Width(), parsed.Height(), r.r.method)
+		src.Blit(parsed, src.Bounds(), src.Bounds())
+	}
 	*m = chipMemo{ok: true, text: text, style: st, limit: limit, out: src}
 	return src
 }
@@ -1259,9 +1266,6 @@ func (n TooltipSinkNode) Style(style lipgloss.Style) TooltipSinkNode {
 	n.style, n.styled = style, true
 	return n
 }
-
-// View implements [Child], drawing the node at its natural size, blank.
-func (n TooltipSinkNode) View() string { return Render(0, 0, n) }
 
 // line returns the text node sink n draws to show text.
 func (n TooltipSinkNode) line(text string) TextNode {

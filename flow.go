@@ -34,9 +34,6 @@ func (n GridNode) Gap(x, y int) GridNode {
 	return n
 }
 
-// View implements [Child], drawing the grid at its natural size.
-func (n GridNode) View() string { return Render(0, 0, n) }
-
 // WrapNode flows children at their natural sizes onto successive lines.
 // Build one with [Wrap].
 type WrapNode struct {
@@ -57,9 +54,6 @@ func (n WrapNode) Gap(x, y int) WrapNode {
 	n.gapX, n.gapY = max(x, 0), max(y, 0)
 	return n
 }
-
-// View implements [Child], drawing the flow at its natural size.
-func (n WrapNode) View() string { return Render(0, 0, n) }
 
 // flow measures or arranges using the same cached natural sizes. Height is
 // unbounded so an Auto slot in a Column gets every wrapped line.

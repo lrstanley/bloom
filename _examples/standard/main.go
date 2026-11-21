@@ -40,11 +40,9 @@ type openMsg int
 
 var pages = []string{"Home", "Settings", "About"}
 
-// sidebar lists the pages; it is a [bloom.Layouter], so its items fill the
-// sidebar's width.
+// sidebar lists the pages; it is a component with a Layout, so its items
+// fill the sidebar's width.
 type sidebar struct {
-	bloom.NoView
-
 	selected int
 }
 
@@ -61,7 +59,7 @@ func (s sidebar) Layout(bloom.Context) bloom.Child {
 	return bloom.Box(panel, bloom.Column(items...))
 }
 
-// reader is a plain Bubble Tea component.
+// reader is a plain Bubble Tea component, placed with bloom.View.
 type reader struct{ page int }
 
 func (r reader) View() string {
@@ -69,12 +67,10 @@ func (r reader) View() string {
 	return fmt.Sprintf("# %s\n\n%s", pages[r.page], body)
 }
 
-// statusbar knows its own height, so it measures itself.
+// statusbar is one line, cut to fit.
 type statusbar struct{ msg string }
 
-func (s statusbar) View() string { return " " + s.msg }
-
-func (statusbar) Measure(avail bloom.Size) bloom.Size { return bloom.Size{W: avail.W, H: 1} }
+func (s statusbar) Layout(bloom.Context) bloom.Child { return bloom.Text(" " + s.msg).Truncate() }
 
 type model struct {
 	ui      *bloom.Root
@@ -112,7 +108,7 @@ func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, bloom.Column(
 		bloom.Fill(bloom.Row(
 			bloom.Fixed(20, m.sidebar).Collapsible(1),
-			bloom.Fill(bloom.Box(panel.Padding(0, 1), m.reader)).Min(30),
+			bloom.Fill(bloom.Box(panel.Padding(0, 1), bloom.View(&m.reader))).Min(30),
 		)),
 		m.status,
 	))

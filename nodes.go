@@ -120,9 +120,6 @@ func (n SlotNode) MoveWith(effects ...fx.Effect) SlotNode {
 	return n
 }
 
-// View implements [Child], drawing the slot at its natural size.
-func (n SlotNode) View() string { return Render(0, 0, n) }
-
 // natural reports whether the slot starts at its child's natural size: an
 // Auto slot, or a Percent slot in a container of unbounded size, as when a
 // layout is drawn at its natural size, which has no size to take a percentage
@@ -180,9 +177,6 @@ func (n FlexNode) Justify(j flex.Justify) FlexNode { n.justify = j; return n }
 // Align sets where children go on the cross axis. The default is
 // [Stretch].
 func (n FlexNode) Align(a Align) FlexNode { n.align = a; return n }
-
-// View implements [Child], drawing the node at its natural size.
-func (n FlexNode) View() string { return Render(0, 0, n) }
 
 // BoxNode draws a Lip Gloss style's frame, its margins, border, padding, and
 // background, around a child. Build one with [Box].
@@ -264,9 +258,6 @@ func (n BoxNode) BorderFx(t float64, effects ...fx.Effect) BoxNode {
 	return n
 }
 
-// View implements [Child], drawing the node at its natural size.
-func (n BoxNode) View() string { return Render(0, 0, n) }
-
 // bordered returns the part of r, a rectangle the box was given, inside its
 // margins, whose outer cells are its border.
 func (n BoxNode) bordered(r image.Rectangle) image.Rectangle {
@@ -309,9 +300,6 @@ type CenterNode struct {
 	child Child
 }
 
-// View implements [Child], drawing the node at its natural size.
-func (n CenterNode) View() string { return Render(0, 0, n) }
-
 // ScrollNode shows part of a child bigger than the space it is given. Build
 // one with [Scroll].
 type ScrollNode struct {
@@ -337,9 +325,6 @@ func (n ScrollNode) X(offset int) ScrollNode {
 	n.x, n.horizontal = max(offset, 0), true
 	return n
 }
-
-// View implements [Child], drawing the node at its natural size.
-func (n ScrollNode) View() string { return Render(0, 0, n) }
 
 // content returns the space the child of a scroll w cells wide is measured
 // in: unbounded down, and across too when it scrolls sideways.
@@ -368,9 +353,6 @@ type TransitionNode struct {
 	leaving bool // drawn by a presence animating out, so it takes no input
 }
 
-// View implements [Child], drawing the node at its natural size.
-func (n TransitionNode) View() string { return Render(0, 0, n) }
-
 // Present draws child with p's progress while visible. When hidden, child
 // is absent, taking neither space nor a gap in its container. While p
 // animates out, child is still drawn but takes no input: its mouse handlers
@@ -386,7 +368,7 @@ func Present(p anim.Presence, child Child, effects ...fx.Effect) TransitionNode 
 
 type absentNode struct{}
 
-func (absentNode) View() string { return "" }
+func (n absentNode) Layout(Context) Child { return n }
 
 // absent distinguishes a hidden presence from an empty slot, which still
 // takes space. Slots and single-child wrappers preserve absence.
@@ -416,9 +398,6 @@ type DrawableNode struct {
 	d uv.Drawable
 }
 
-// View implements [Child], drawing the node at its natural size.
-func (n DrawableNode) View() string { return Render(0, 0, n) }
-
 // Drawable returns a node that draws d directly onto the cells it is given,
 // clipped to them. Its natural size is zero unless d implements [Measurer].
 func Drawable(d uv.Drawable) DrawableNode { return DrawableNode{d: d} }
@@ -439,9 +418,6 @@ func Overlay(base Child, layers ...LayerNode) OverlayNode {
 	}
 	return OverlayNode{base: base, layers: layers}
 }
-
-// View implements [Child], drawing the node at its natural size.
-func (n OverlayNode) View() string { return Render(0, 0, n) }
 
 // Direction is a side or a corner of a node or of the screen, such as where
 // a layer is anchored to a node, or where an effect starts from.
@@ -529,7 +505,7 @@ func (n LayerNode) Place(r image.Rectangle) LayerNode {
 // A layer that does not fit on that side goes on the opposite one when it
 // fits there, such as above its input near the bottom of the screen, and is
 // shifted over the node otherwise. A corner flips each way on its own. A
-// [Layouter] in the layer reads the side it went on from [Context.Side], and
+// component in the layer reads the side it went on from [Context.Side], and
 // [LayerNode.Offset] is mirrored with it, so a gap stays between the layer
 // and the node.
 //
@@ -625,6 +601,3 @@ func (n LayerNode) MoveWith(effects ...fx.Effect) LayerNode {
 	n.moves = effects
 	return n
 }
-
-// View implements [Child], drawing the layer's child at its natural size.
-func (n LayerNode) View() string { return Render(0, 0, n.child) }

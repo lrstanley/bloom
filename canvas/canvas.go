@@ -237,6 +237,82 @@ func (c *Canvas) Blit(src *Canvas, r, clip image.Rectangle) {
 	}
 }
 
+// Stretchable reports whether c, such as a Lip Gloss frame drawn around a
+// middle at least two cells wide and tall whose top-left cell is mid, can
+// be drawn at a larger size by repeating its column and row at mid, as
+// [Canvas.BlitStretched] does: the column at mid.X is the same as the one
+// after it, the row at mid.Y is the same as the one below it, and every
+// glyph is one cell wide.
+func (c *Canvas) Stretchable(mid image.Point) bool {
+	if mid.X < 0 || mid.Y < 0 || mid.X+1 >= c.w || mid.Y+1 >= c.h {
+		return false
+	}
+	for i := range c.cells {
+		if c.cells[i].Width != 1 {
+			return false
+		}
+	}
+	for y := range c.h {
+		if !cellSame(&c.lines[y][mid.X], &c.lines[y][mid.X+1]) {
+			return false
+		}
+	}
+	for x := range c.w {
+		if !cellSame(&c.lines[mid.Y][x], &c.lines[mid.Y+1][x]) {
+			return false
+		}
+	}
+	return true
+}
+
+func cellSame(a, b *uv.Cell) bool {
+	return a.Content == b.Content && a.Width == b.Width && styleEqual(&a.Style, &b.Style) &&
+		a.Link.URL == b.Link.URL && a.Link.Params == b.Link.Params
+}
+
+// BlitStretched is [Canvas.Blit] of src drawn at the size of r: the columns
+// before mid.X and the rows before mid.Y go at r's top-left, those after
+// them at its bottom-right, and the column at mid.X and the row at mid.Y
+// fill the space between, which takes a src that [Canvas.Stretchable]
+// reports true for. A r smaller than src is drawn as Blit draws it.
+func (c *Canvas) BlitStretched(src *Canvas, mid image.Point, r, clip image.Rectangle) {
+	if r.Dx() < src.w || r.Dy() < src.h {
+		c.Blit(src, r, clip)
+		return
+	}
+	area := r.Intersect(clip).Intersect(c.Bounds())
+	if area.Empty() {
+		return
+	}
+	// The columns and rows after the middle, counted from r's far edges.
+	right, bottom := src.w-mid.X-1, src.h-mid.Y-1
+	from := func(d, n, m, tail int) int {
+		switch {
+		case d < m:
+			return d
+		case d >= n-tail:
+			return m + 1 + tail - (n - d)
+		}
+		return m
+	}
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		dst := c.lines[y]
+		row := src.lines[from(y-r.Min.Y, r.Dy(), mid.Y, bottom)]
+		x0, x1 := area.Min.X, area.Max.X
+		if dst[x0].Width == 0 {
+			blankLead(dst, x0)
+		}
+		for x := x0; x < x1; x++ {
+			bg := dst[x].Style.Bg
+			dst[x] = row[from(x-r.Min.X, r.Dx(), mid.X, right)]
+			if dst[x].Style.Bg == nil {
+				dst[x].Style.Bg = bg
+			}
+		}
+		fixEdges(dst, nil, x0, x1, 0)
+	}
+}
+
 func hasBg(l uv.Line) bool {
 	for i := range l {
 		if l[i].Style.Bg != nil {

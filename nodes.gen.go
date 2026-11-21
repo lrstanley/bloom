@@ -12,9 +12,10 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// nodeMeta sets to to the meta of c, and reports true, when c is one of
-// the node types.
-func nodeMeta(c Child, to *meta) bool {
+// nodeMeta sets to to the meta of c, and reports whether c is one of the
+// node types, and whether it is one with a Layout of its own, which bloom
+// calls to lay it out.
+func nodeMeta(c Child, to *meta) (node, own bool) {
 	switch n := c.(type) {
 	case TextNode:
 		*to = n.meta
@@ -46,19 +47,86 @@ func nodeMeta(c Child, to *meta) bool {
 		*to = n.meta
 	case MarqueeNode:
 		*to = n.meta
+		return true, true
 	case SkeletonNode:
 		*to = n.meta
+		return true, true
 	case MinSizeNode:
 		*to = n.meta
+		return true, true
 	case ScrollbarNode:
 		*to = n.meta
 	case TooltipSinkNode:
 		*to = n.meta
 	default:
-		return false
+		return false, false
 	}
-	return true
+	return true, false
 }
+
+// Layout implements [Child], returning the node itself: bloom lays it out
+// without calling it.
+func (n TextNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the slot itself: bloom lays it out
+// without calling it.
+func (n SlotNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the row or column itself: bloom lays
+// it out without calling it.
+func (n FlexNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the grid itself: bloom lays it out
+// without calling it.
+func (n GridNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the flow itself: bloom lays it out
+// without calling it.
+func (n WrapNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the box itself: bloom lays it out
+// without calling it.
+func (n BoxNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the node itself: bloom lays it out
+// without calling it.
+func (n CenterNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the scroll itself: bloom lays it out
+// without calling it.
+func (n ScrollNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the transition itself: bloom lays it
+// out without calling it.
+func (n TransitionNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the node itself: bloom lays it out
+// without calling it.
+func (n DrawableNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the overlay itself: bloom lays it out
+// without calling it.
+func (n OverlayNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the layer itself: bloom lays it out
+// without calling it.
+func (n LayerNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the list itself: bloom lays it out
+// without calling it.
+func (n ListNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the viewport itself: bloom lays it out
+// without calling it.
+func (n ViewportNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the scrollbar itself: bloom lays it
+// out without calling it.
+func (n ScrollbarNode) Layout(Context) Child { return n }
+
+// Layout implements [Child], returning the sink itself: bloom lays it out
+// without calling it.
+func (n TooltipSinkNode) Layout(Context) Child { return n }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the node by.
 func (n TextNode) ID[K comparable](id K) TextNode {

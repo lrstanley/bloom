@@ -350,6 +350,7 @@ func table(frame int) bloom.Child {
 	const dim, green, reset = "\x1b[38;2;86;95;137m", "\x1b[38;2;158;206;106m", "\x1b[m"
 
 	var b strings.Builder
+	b.Grow(120 * 96) // about the length of a row, so it is not grown row by row
 	for i := range 120 {
 		svc := services[i%len(services)]
 		rps := 900 + (i*37+frame)%400

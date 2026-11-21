@@ -347,11 +347,9 @@ func (m *model) selectNode(s *selectField) bloom.Child {
 	}))
 }
 
-// optionList is the open list of a select. It is a [bloom.Layouter], to read
+// optionList is the open list of a select. It is a component, to read
 // from its Context which side of the field it opened on.
 type optionList struct {
-	bloom.NoView
-
 	m *model
 	s *selectField
 }

@@ -14,13 +14,11 @@ import (
 // sizeProbe records the sizes it is laid out at, and wraps a long line above
 // a last row.
 type sizeProbe struct {
-	NoView
-
 	sizes *[]Size
 }
 
 func (p sizeProbe) Layout(ctx Context) Child {
-	*p.sizes = append(*p.sizes, Size{W: ctx.Width, H: ctx.Height})
+	*p.sizes = append(*p.sizes, ctx.Size())
 	return Box(rounded, Column(Text(strings.Repeat("word ", 20)), Text("LAST")))
 }
 

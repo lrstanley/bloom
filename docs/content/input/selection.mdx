@@ -281,8 +281,8 @@ selected, in cells from the component's top-left, and returns the text for it:
 ```go
 type secret struct{ value string }
 
-func (s secret) View() string {
-	return s.value[:4] + strings.Repeat("•", len(s.value)-4)
+func (s secret) Layout(bloom.Context) bloom.Child {
+	return bloom.Text(s.value[:4] + strings.Repeat("•", len(s.value)-4))
 }
 
 // SelectedText implements bloom.TextSource: the token is one row, a
@@ -302,14 +302,15 @@ func (s secret) SelectedText(span bloom.Span) string {
 
 `Start` and `End` are the first and last cells selected, inclusive. `Block` is set for a rectangle, and `Size` is
 the size the component was laid out at, to wrap its text the same way again. A component that implements
-`TextSource` is selectable without being made so.
+`TextSource` is selectable without being made so. bloom looks for it on a component with a `Layout` method, as
+here, and on one placed with `bloom.View`.
 
 ## Components that scroll their own text
 
 `TextSource` suits a component whose text is its cells. A component that shows a window of its text, with its own
 scroll offset, or wraps its text itself, needs the selection kept on its text instead, so that it follows the
 text as the component scrolls and reaches the text out of sight. Implement `bloom.TextMap`, and tell bloom where in
-your text each cell is:
+your text each cell is. A `TextMap` draws its own cells, from its `View`, so it's placed with `bloom.View`:
 
 ```go
 // PosAt returns the position of the character drawn at cell: the end of
@@ -334,7 +335,7 @@ click. Dragging past the component's edge scrolls it through the `on.Scroll` han
 as the pointer is held there, since bloom can't tell how much text is out of sight:
 
 ```go
-bloom.Fill(m.reader).ID("notes").
+bloom.Fill(bloom.View(m.reader)).ID("notes").
 	On(on.Scroll(func(_, dy int) tea.Cmd { m.reader.scroll(dy); return nil }))
 ```
 
@@ -359,7 +360,8 @@ func (f *field) Selection() bloom.Range { return f.sel }
 func (f *field) Select(r bloom.Range) { f.sel = f.clamp(r) }
 ```
 
-Place it in the layout by pointer, such as `bloom.Fill(&m.input)`, so that `Select` reaches the model's copy.
+Place it in the layout by pointer, such as `bloom.Fill(bloom.View(&m.input))`, so that `Select` reaches the model's
+copy.
 
 The mouse sets the range through `Select`, as an editor does:
 

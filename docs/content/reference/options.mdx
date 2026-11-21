@@ -32,7 +32,11 @@ is on [pkg.go.dev](https://pkg.go.dev/bloomfx.dev/bloom).
 | [`Drawable(d)`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable) | an Ultraviolet `Drawable`, painting cells directly |
 | [`TooltipSink()`](https://pkg.go.dev/bloomfx.dev/bloom#TooltipSink) | a row showing the text of the [tooltip](/input/tooltips#show-tooltips-in-a-status-line) showing, for the kinds sent to it; `.Style(style)` |
 
-Any value with a `View() string` method can also be a child.
+| [`View(v)`](https://pkg.go.dev/bloomfx.dev/bloom#View) | a component drawn from its `View() string`, such as a Bubbles one; pass a pointer, such as `&m.input` |
+| [`LayoutFunc(fn)`](https://pkg.go.dev/bloomfx.dev/bloom#LayoutFunc) | a layout built by `fn` for the space it's given, read from its `Context` |
+
+Any value with a `Layout(ctx bloom.Context) bloom.Child` method, a [`Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child),
+can also be a child.
 
 ## Container options
 
@@ -270,10 +274,10 @@ From [`bloomfx.dev/bloom/on`](https://pkg.go.dev/bloomfx.dev/bloom/on), for `On(
 | `on.Msg(msg)` | a handler function that sends `msg` to `Update` |
 | `on.Pass` | a command a handler returns to [pass its event on](/input/mouse#pass-an-event-on) to the node around it |
 
-Component interfaces: [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports a natural size,
-and [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) builds a layout for the space given. A
-`Layouter` that's only placed in bloom layouts can embed [`NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) in
-place of writing a `View`. The handlers a `Layouter` makes can call `ctx.Frame()` when they run to read the frame on screen, and `ctx.Side()`
+Component interfaces: [`Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child) builds a layout for the space given,
+read with `ctx.Width()` and `ctx.Height()`, and is laid out again only when a size it read changes.
+[`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer) reports a natural size, on a component or on the one in
+a `View`. The handlers a component makes can call `ctx.Frame()` when they run to read the frame on screen, and `ctx.Side()`
 tells which side a layer it's in opened on. See [Writing components](/bubble-tea/writing-components).
 [`TextSource`](https://pkg.go.dev/bloomfx.dev/bloom#TextSource), [`TextMap`](https://pkg.go.dev/bloomfx.dev/bloom#TextMap), and [`Editable`](https://pkg.go.dev/bloomfx.dev/bloom#Editable) change what
 [selection](/input/selection) reads from a component.

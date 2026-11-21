@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -183,6 +184,54 @@ func TestCache(t *testing.T) {
 	}
 	if c.cells > 4*200*60+1<<16+200*61 {
 		t.Fatalf("cache holds %d cells", c.cells)
+	}
+}
+
+func TestCacheReuse(t *testing.T) {
+	// A large view changing every frame parses into the canvases of the
+	// views before it, beside one that stays.
+	c := NewCache(method)
+	big := strings.Repeat(strings.Repeat("x", 200)+"\n", 59) + strings.Repeat("x", 200)
+	frame := func(i int) {
+		c.Get("stays")
+		c.Get(fmt.Sprintf("%03d", i%1000) + big[3:])
+		c.Get(fmt.Sprintf("status %d", i))
+		c.EndFrame(200 * 60)
+	}
+	for i := range 20 {
+		frame(i)
+	}
+	stays := c.Get("stays")
+	i := 20
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	for range 50 {
+		frame(i)
+		i++
+	}
+	runtime.ReadMemStats(&after)
+	// A canvas of the view is more than a megabyte.
+	if perFrame := (after.TotalAlloc - before.TotalAlloc) / 50; perFrame > 64<<10 {
+		t.Fatalf("a frame allocates %d bytes", perFrame)
+	}
+
+	// A canvas asked for every frame is never parsed into.
+	if c.Get("stays") != stays || ansi.Strip(stays.Render()) != "stays" {
+		t.Fatalf("a canvas in use was reused: %q", stays.Render())
+	}
+	view := fmt.Sprintf("%03d", i%1000) + big[3:]
+	if got := c.Get(view).Render(); ansi.Strip(got) != view {
+		t.Fatal("a reused canvas does not hold its own text")
+	}
+
+	// A frame of a negative size, as a natural size is asked for, ends as
+	// one of no cells.
+	c.EndFrame(-200 * 60)
+
+	// A small string is not parsed into a large canvas.
+	f := c.take(10)
+	if cap(f.cells) > 2*10+64 {
+		t.Fatalf("a string of 10 cells took a canvas of %d", cap(f.cells))
 	}
 }
 

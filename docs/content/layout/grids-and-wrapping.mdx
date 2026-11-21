@@ -33,18 +33,16 @@ bloom.Grid(3, cards...).Gap(1, 0)
 
 ### Change the column count with the width
 
-Combine a grid with a [`Layouter`](/bubble-tea/writing-components) to pick the number
+Combine a grid with a [component that lays itself out](/bubble-tea/writing-components) to pick the number
 of columns from the space available:
 
 ```go
 type cards struct {
-	bloom.NoView
-
 	items []bloom.Child
 }
 
 func (c cards) Layout(ctx bloom.Context) bloom.Child {
-	cols := max(ctx.Width/30, 1) // a column for every 30 cells
+	cols := max(ctx.Width()/30, 1) // a column for every 30 cells
 	return bloom.Grid(cols, c.items...).Gap(2, 1)
 }
 ```

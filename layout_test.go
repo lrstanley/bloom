@@ -5,8 +5,9 @@
 package bloom
 
 import (
-	"errors"
+	"fmt"
 	"image"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -53,7 +54,7 @@ func TestNestedMeasureIsLinear(t *testing.T) {
 	t.Parallel()
 
 	var n int
-	Solve(200, 60, nested(16, meteredLeaf{n: &n}))
+	Solve(200, 60, nested(16, View(meteredLeaf{n: &n})))
 	if n > 200 {
 		t.Fatalf("the leaf was measured %d times at depth 16", n)
 	}
@@ -67,14 +68,14 @@ func TestGrid(t *testing.T) {
 	expectRect(t, f, "a", image.Rect(0, 0, 5, 3))
 	expectRect(t, f, "b", image.Rect(6, 0, 11, 3))
 	expectRect(t, f, "c", image.Rect(0, 4, 5, 7))
-	if got := n.View(); got != "a  bb\n     \nc    " {
+	if got := Render(0, 0, n); got != "a  bb\n     \nc    " {
 		t.Fatalf("natural: %q", got)
 	}
 	f = Solve(10, 2, Grid(2, Fixed(2, Text("a")).ID("fixed"), Fill(Text("b")).ID("fill")))
 	expectRect(t, f, "fixed", image.Rect(0, 0, 2, 2))
 	expectRect(t, f, "fill", image.Rect(5, 0, 10, 2))
 	expectRect(t, Solve(4, 2, Grid(0, Text("a").ID("a"))), "a", image.Rect(0, 0, 4, 2))
-	if got := Grid(2).View(); got != "" {
+	if got := Render(0, 0, Grid(2)); got != "" {
 		t.Fatalf("empty: %q", got)
 	}
 	n = Grid(2, Text("a\nb"), Text("c"), Text("d\ne\nf")).Gap(0, 1)
@@ -105,10 +106,10 @@ func TestWrap(t *testing.T) {
 	}
 	n := Wrap(Text("aaa").ID("a"), Text("bbb").ID("b")).Gap(1, 1)
 	expectRect(t, Solve(5, 10, Column(Auto(n), Text("end").ID("end"))), "end", image.Rect(0, 3, 5, 4))
-	if got := n.View(); got != "aaa bbb" {
+	if got := Render(0, 0, n); got != "aaa bbb" {
 		t.Fatalf("natural width: %q", got)
 	}
-	if got := Wrap().View(); got != "" {
+	if got := Render(0, 0, Wrap()); got != "" {
 		t.Fatalf("empty: %q", got)
 	}
 }
@@ -118,7 +119,7 @@ func TestWrapMeasureCache(t *testing.T) {
 	var calls int
 	children := make([]Child, 120)
 	for i := range children {
-		children[i] = meteredLeaf{n: &calls}
+		children[i] = View(meteredLeaf{n: &calls})
 	}
 	Solve(40, 60, Column(Auto(Wrap(children...).Gap(1, 1)), Text("footer")))
 	if calls != len(children) {
@@ -494,7 +495,7 @@ func TestCenteredIgnoresSlotSizing(t *testing.T) {
 
 // sided is a menu that draws an arrow toward the node its layer is against,
 // and is taller below it than above it, as given by its Context.
-type sided struct{ NoView }
+type sided struct{}
 
 func (sided) Layout(ctx Context) Child {
 	side, ok := ctx.Side()
@@ -507,23 +508,149 @@ func (sided) Layout(ctx Context) Child {
 	return Column(Text("^^^^").ID("arrow"), Text("item"), Text("item"), Text("item"))
 }
 
-// pointerLayout is a Layouter only as a pointer, with its View from NoView.
-type pointerLayout struct{ NoView }
+// pointerLayout is a component only as a pointer.
+type pointerLayout struct{}
 
 func (*pointerLayout) Layout(Context) Child { return Text("laid out") }
 
-func TestNoView(t *testing.T) {
+// selfView is a component laid out as a View of itself.
+type selfView string
+
+func (v selfView) Layout(Context) Child { return View(v) }
+func (v selfView) View() string         { return string(v) }
+
+// both is a component with a View for where a string is wanted.
+type both struct{}
+
+func (both) Layout(Context) Child { return Text("laid out") }
+func (both) View() string         { return "viewed" }
+
+func TestComponent(t *testing.T) {
 	t.Parallel()
 
 	if got := ansi.Strip(Render(0, 0, &pointerLayout{})); got != "laid out" {
-		t.Fatalf("as a Layouter: got %q, want %q", got, "laid out")
+		t.Fatalf("as a pointer: got %q, want %q", got, "laid out")
 	}
-	defer func() {
-		if err, _ := recover().(error); !errors.Is(err, errNoView) {
-			t.Fatalf("placed by value: recovered %v, want errNoView", err)
+	if got := ansi.Strip(Render(0, 0, both{})); got != "laid out" {
+		t.Fatalf("placed directly: got %q, want %q", got, "laid out")
+	}
+	if got := ansi.Strip(Render(0, 0, View(both{}))); got != "viewed" {
+		t.Fatalf("given to View: got %q, want %q", got, "viewed")
+	}
+	if got := ansi.Strip(Render(0, 0, selfView("self"))); got != "self" {
+		t.Fatalf("laid out as a View of itself: got %q, want %q", got, "self")
+	}
+}
+
+func TestLayoutFunc(t *testing.T) {
+	t.Parallel()
+
+	responsive := LayoutFunc(func(ctx Context) Child {
+		if ctx.Width() >= 5 {
+			return Row(Text("abc"), Text("de"))
 		}
-	}()
-	Render(0, 0, Column(pointerLayout{}))
+		return Column(Text("abc"), Text("de"))
+	})
+	if got := ansi.Strip(Render(5, 0, responsive)); got != "abcde" {
+		t.Fatalf("wide: got %q", got)
+	}
+	if got := ansi.Strip(Render(4, 0, responsive)); got != "abc\nde " {
+		t.Fatalf("narrow: got %q", got)
+	}
+	var none LayoutFunc
+	f := Solve(10, 2, Row(Fixed(3, none), Fill(Text("x")).ID("x")))
+	expectRect(t, f, "x", image.Rect(3, 0, 10, 2))
+	f = Solve(10, 2, Row(Auto(none), Fill(Text("x")).ID("x")))
+	expectRect(t, f, "x", image.Rect(0, 0, 10, 2))
+}
+
+// counted counts the times it is laid out, and reads the sizes in reads.
+type counted struct {
+	n     *int
+	reads uint32
+	inner Child
+}
+
+func (c counted) Layout(ctx Context) Child {
+	*c.n++
+	label := "leaf"
+	if c.reads&readW != 0 {
+		label = fmt.Sprintf("w%d", min(ctx.Width(), 99))
+	}
+	if c.reads&readH != 0 {
+		label += fmt.Sprintf("h%d", min(ctx.Height(), 99))
+	}
+	if c.inner == nil {
+		return Text(label)
+	}
+	return Box(rounded, Column(Auto(c.inner), Text(label)))
+}
+
+// chain returns depth components, each in the one before it, counting into
+// counts, outermost first, and reading the sizes in reads.
+func chain(counts []int, reads uint32) Child {
+	var c Child
+	for d := len(counts) - 1; d >= 0; d-- {
+		c = counted{n: &counts[d], reads: reads, inner: c}
+	}
+	return c
+}
+
+func TestLayoutReusedForSizesNotRead(t *testing.T) {
+	t.Parallel()
+
+	tree := func(c Child) Child { return Row(Auto(c), Fill(Text("x")), Centered(Auto(c))) }
+	counts := make([]int, 5)
+	Render(80, 24, tree(chain(counts, 0)))
+	for _, n := range counts {
+		// Placed twice, and laid out once in each place.
+		if n != 2 {
+			t.Fatalf("reading no size: laid out %v times, outermost first", counts)
+		}
+	}
+
+	// Reading only the width, measuring at a different height does not lay
+	// it out again.
+	counts = make([]int, 3)
+	Render(80, 24, Column(Auto(chain(counts, readW)), Fill(Text("x"))))
+	for _, n := range counts {
+		if n != 1 {
+			t.Fatalf("reading the width in a column: laid out %v times, outermost first", counts)
+		}
+	}
+
+	// A component that reads its size is laid out for each size it is given,
+	// and draws the same either way.
+	counts = make([]int, 3)
+	got := Render(80, 24, tree(chain(counts, readW|readH)))
+	if counts[0] < 2 || counts[len(counts)-1] <= counts[0] {
+		t.Fatalf("reading both sizes: laid out %v times, outermost first", counts)
+	}
+	want := Render(80, 24, tree(chain(make([]int, 3), readW|readH)))
+	if got != want {
+		t.Fatalf("not the same twice:\n%s\n%s", got, want)
+	}
+}
+
+// viewCount counts the times its View is called.
+type viewCount struct{ n *int }
+
+func (v viewCount) View() string { *v.n++; return "view" }
+
+func TestViewCalledOnceAFrame(t *testing.T) {
+	t.Parallel()
+
+	var n int
+	r := New()
+	r.Render(20, 5, Row(Auto(Box(rounded, View(viewCount{n: &n}))), Fill(Text("x"))))
+	if n != 1 {
+		t.Fatalf("View called %d times in a frame", n)
+	}
+	n = 0
+	r.Render(20, 5, Row(Fixed(0, View(viewCount{n: &n})).Collapsible(1), Fill(Text("x"))))
+	if n > 1 {
+		t.Fatalf("View called %d times in a frame for a collapsed slot", n)
+	}
 }
 
 func TestContextSide(t *testing.T) {
@@ -724,5 +851,40 @@ func TestAnchorInsideFloat(t *testing.T) {
 	))
 	if r, ok := f.Rect("tip"); ok {
 		t.Fatalf("tip at %v, though its anchor is off screen", r)
+	}
+}
+
+func TestLayoutReadLater(t *testing.T) {
+	t.Parallel()
+
+	// The list builds its item after Layout returned, and the item reads the
+	// height the component was laid out at: once arranged at its natural
+	// height, it is laid out again for it.
+	c := LayoutFunc(func(ctx Context) Child {
+		return List(1, func(int) Child { return Text(strconv.Itoa(ctx.Height())) })
+	})
+	got, _, _ := strings.Cut(ansi.Strip(Render(10, 10, Column(Auto(c), Fill(Text("x"))))), "\n")
+	if strings.TrimSpace(got) != "1" {
+		t.Fatalf("got %q, want the height it was arranged at, 1", got)
+	}
+}
+
+func TestLayoutReadAfterReuse(t *testing.T) {
+	t.Parallel()
+
+	// The outer component reads no size, so it is not laid out again when
+	// arranged narrower than it was measured, and the inner one reads the
+	// outer's width only once it is narrow: it reads the width the outer is
+	// arranged at, not the one it was measured at.
+	outer := LayoutFunc(func(ctx Context) Child {
+		return LayoutFunc(func(in Context) Child {
+			if in.Width() < 5 {
+				return Text(strconv.Itoa(ctx.Width()))
+			}
+			return Text("wide")
+		})
+	})
+	if got := strings.TrimSpace(ansi.Strip(Render(10, 1, Centered(outer)))); got != "4" {
+		t.Fatalf("got %q, want the width the outer component is arranged at, 4", got)
 	}
 }

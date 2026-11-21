@@ -4,7 +4,7 @@
 
 // Command responsive is a reader that adapts to the terminal's size. The
 // details panel collapses first and the article list second as the terminal
-// narrows; the toolbar is a Layouter that rebuilds itself for the space it
+// narrows; the toolbar is a component that rebuilds itself for the space it
 // gets; the tags wrap onto as many lines as they need; the reader is a
 // Viewport, which pages by its height on screen; the status bar is a
 // Measurer, which says what bloom.Solve finds in the frame about to be
@@ -108,11 +108,9 @@ func essay(topic string, paragraphs int) string {
 	return strings.TrimSpace(b.String())
 }
 
-// toolbar is a [bloom.Layouter]: it shows its actions with labels when there
-// is room, and only their icons when there is not.
+// toolbar is a component: it shows its actions with labels when there is
+// room, and only their icons when there is not.
 type toolbar struct {
-	bloom.NoView
-
 	title string
 }
 
@@ -123,7 +121,7 @@ func (t toolbar) Layout(ctx bloom.Context) bloom.Child {
 		bloom.Fill(bloom.Text("").Style(bar)),
 	}
 	for _, a := range actions {
-		if ctx.Width < 70 {
+		if ctx.Width() < 70 {
 			a, _, _ = strings.Cut(a, " ")
 		}
 		children = append(children, bloom.Text(a).Style(action))
@@ -140,8 +138,8 @@ func chips(tags []string) bloom.Child {
 	return bloom.Wrap(cs...).Gap(1, 1)
 }
 
-// statusbar is a [bloom.Measurer]: one row, of any width, as the column
-// it is in stretches it across.
+// statusbar is a plain Bubble Tea component and a [bloom.Measurer]: one
+// row, of any width, as the column it is in stretches it across.
 type statusbar struct{ text string }
 
 func (s statusbar) View() string { return bar.Render(" " + s.text) }
@@ -246,7 +244,7 @@ func (m *model) layout(status statusbar) bloom.Child {
 	return bloom.Column(
 		toolbar{title: "reader"},
 		bloom.Fill(bloom.Row(nav, reader, details).Gap(1)),
-		status,
+		bloom.View(status),
 	)
 }
 

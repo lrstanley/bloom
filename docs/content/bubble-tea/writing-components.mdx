@@ -3,32 +3,29 @@ title: Writing components
 description: Build reusable components that lay themselves out for their space, report their size, handle their own mouse events, keep their IDs apart from other instances, and take keys from their parent.
 ---
 
-Any type with a `View() string` method can go in a bloom layout, so a component you already have needs nothing
-bloom-specific. This page is about components that go further: ones that change shape with their size, handle their
-own clicks, and can appear more than once on a screen. A component like that, built for a bloom program, doesn't need
-a `View` of its own.
+A component you already have, with a `View() string` method, goes in a bloom layout with
+[`bloom.View`](/bubble-tea/bubbles-components), as a Bubbles component does. This page is about components built
+for bloom: ones that change shape with their size, handle their own clicks, and can appear more than once on a
+screen. A component like that returns bloom nodes from a `Layout` method, and doesn't need a `View` at all.
 
 It builds a row of tabs as the example. The [complete component](#the-complete-component) is at the end.
 
 ## Lay out for the space you're given
 
-A component that implements [`bloom.Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter) returns a bloom
-layout instead of a string. bloom calls its `Layout` method with a
-[`bloom.Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context), whose `Width` and `Height` are the space it has:
+A [`bloom.Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child) is anything with a `Layout` method that returns a
+bloom layout. bloom calls it with a [`bloom.Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context), whose `Width`
+and `Height` methods return the space it has:
 
 ```go
 type Tabs struct {
-	// Satisfies bloom.Layouter without a View of its own, which bloom doesn't
-	// use for a Layouter. Tabs then only works in bloom layouts.
-	bloom.NoView
-
 	Labels []string
 	Active int
 }
 
 func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
 	// Not room for every label in full. A width of zero is its natural size.
-	short := ctx.Width > 0 && ctx.Width < t.width()
+	w := ctx.Width()
+	short := w > 0 && w < t.width()
 	tabs := make([]bloom.Child, len(t.Labels))
 	for i, label := range t.Labels {
 		if short {
@@ -53,31 +50,39 @@ func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
 change the component. Treat it like `View`: read state, return nodes. [Responsive layouts](/layout/responsive) has
 more on changing shape with size.
 
-### Write a View only where a string is wanted
+A component that needs no type of its own, such as one piece of a screen that changes with its width, can be a
+[`bloom.LayoutFunc`](https://pkg.go.dev/bloomfx.dev/bloom#LayoutFunc): a function with the same signature as
+`Layout`, placed as a child.
 
-bloom draws a `Layouter` from what `Layout` returns, and never calls its `View`. Embedding
-[`bloom.NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView) gives `Tabs` the `View` method a
-[`bloom.Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child) needs. That's all a component needs when it's only
-placed in bloom layouts, such as a page, a panel, or a component shared between bloom programs.
+### Read only the sizes you use
 
-A component that embeds `NoView` only works in bloom layouts. Anywhere else, such as in a program that doesn't use
-bloom, there's no view to draw, and calling its `View` panics.
+bloom notes which of `ctx.Width()` and `ctx.Height()` a component calls, and lays it out again only when one of
+those changes. `Tabs` reads only its width, so measuring it at several heights lays it out once. A component that
+reads neither is laid out once a frame wherever it's placed, and so are the components it returns. Read a size
+only where the layout depends on it, and `Layout` must depend on nothing else but the component's state.
 
-If the component is also used where a string is wanted, such as by a program that doesn't use bloom, write `View`
-in place of `NoView`. [`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render) with a size of zero draws the
-layout at its natural size:
+### Draw it where a string is wanted
+
+bloom never needs a `View` from a component with a `Layout`. If the component is also used where a string is
+wanted, such as by a program that doesn't use bloom, give it a `View` that draws its layout with
+[`bloom.Render`](https://pkg.go.dev/bloomfx.dev/bloom#Render), which with a size of zero draws it at its natural
+size:
 
 ```go
 func (t *Tabs) View() string {
-	return bloom.Render(0, 0, t.Layout(bloom.Context{}))
+	return bloom.Render(0, 0, t)
 }
 ```
 
+`Render` keeps nothing between calls. For a view drawn every frame, keep a
+[`*bloom.Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) in the component and call its `Render`, which skips
+drawing a frame that didn't change.
+
 ## Report a natural size
 
-A component that isn't a `Layouter` is measured by rendering its view. When it knows its size without that, it can
-say so by implementing [`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer). A status bar is one row
-tall at any width:
+A component with a `View` is measured by rendering its view, and one with a `Layout` by measuring the nodes it
+returns. When it knows its size without that, it can say so by implementing
+[`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer). A status bar is one row tall at any width:
 
 ```go
 type statusbar struct{ text string }
@@ -87,7 +92,12 @@ func (s statusbar) View() string { return " " + s.text }
 func (s statusbar) Measure(bloom.Size) bloom.Size {
 	return bloom.Size{W: lipgloss.Width(s.View()), H: 1}
 }
+
+// in View
+bloom.Column(bloom.Fill(body), bloom.View(m.status))
 ```
+
+bloom checks for `Measurer` on the component inside a `bloom.View` too.
 
 Return the size the component needs, not the space it's offered: when a layout is drawn at its natural size, the
 space offered is unbounded. The result is clamped to the space there is.
@@ -131,7 +141,7 @@ and change state in its own `Update` instead. See
 [Change state, or send a message](/input/mouse#change-state-or-send-a-message).
 
 Place the component as the type its `Layout` method is on. `Layout` is on `*Tabs`, so `m.main` in place of `&m.main`
-isn't a `Layouter`, and bloom draws it from the `View` it has from `NoView`, which panics.
+isn't a `bloom.Child`, and doesn't compile.
 
 ### Read the frame from a handler
 
@@ -154,8 +164,6 @@ from it:
 
 ```go
 type Tabs struct {
-	bloom.NoView
-
 	ID     any // set by the parent, unique to this instance
 	Labels []string
 	Active int
@@ -292,8 +300,6 @@ var (
 
 // Tabs is a row of tabs, one of which is active.
 type Tabs struct {
-	bloom.NoView // no View of its own: Tabs only works in bloom layouts
-
 	ID     any // set by the parent, unique to this instance
 	Labels []string
 	Active int
@@ -314,7 +320,8 @@ type tabID struct {
 // Layout shows each label in full when there's room, and only its first
 // letter when there isn't.
 func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
-	short := ctx.Width > 0 && ctx.Width < t.width() // zero is its natural size
+	w := ctx.Width() // zero is its natural size
+	short := w > 0 && w < t.width()
 	tabs := make([]bloom.Child, len(t.Labels))
 	for i, label := range t.Labels {
 		if short {
@@ -371,9 +378,9 @@ if _, ok := m.ui.Click(tabID{tabsMain, 1}); !ok || m.main.Active != 1 {
 
 ## Related
 
-- [`Layouter`](https://pkg.go.dev/bloomfx.dev/bloom#Layouter), [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer),
-  [`NoView`](https://pkg.go.dev/bloomfx.dev/bloom#NoView), and [`Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context)
-  API reference
+- [`Child`](https://pkg.go.dev/bloomfx.dev/bloom#Child), [`LayoutFunc`](https://pkg.go.dev/bloomfx.dev/bloom#LayoutFunc),
+  [`View`](https://pkg.go.dev/bloomfx.dev/bloom#View), [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer), and
+  [`Context`](https://pkg.go.dev/bloomfx.dev/bloom#Context) API reference
 - [How a bloom program runs](/concepts/how-a-program-runs#ids), for what IDs are for
 - [Responsive layouts](/layout/responsive)
 - [Keep the dropdown with its component](/layers/dropdowns#keep-the-dropdown-with-its-component)

@@ -22,7 +22,7 @@ func TestDebug(t *testing.T) {
 	panes := Column(
 		Row(
 			Fixed(10, Box(lipgloss.NewStyle().Border(lipgloss.RoundedBorder()), Text("Inbox"))).ID("sidebar").Collapsible(1),
-			Fill(benchView{"reader"}).ID("reader").Min(12),
+			Fill(View(benchView{"reader"})).ID("reader").Min(12),
 		),
 		Text("ready").Truncate(),
 	)
@@ -39,7 +39,7 @@ Column 0,0 30x5
 │  │  └─ Box 0,0 10x3
 │  │     └─ Text "Inbox" 1,1 8x1
 │  └─ Fill id="reader" 10,0 20x3 min=12
-│     └─ bloom.benchView 10,0 20x3
+│     └─ View(bloom.benchView) 10,0 20x3
 └─ Text "ready" 0,3 30x1 truncate
 `},
 		{"collapsed", panes, 15, 5, `
@@ -49,7 +49,7 @@ Column 0,0 15x5
 │  │  └─ Box hidden
 │  │     └─ Text "Inbox" hidden
 │  └─ Fill id="reader" 0,0 15x1 min=12
-│     └─ bloom.benchView 0,0 15x1
+│     └─ View(bloom.benchView) 0,0 15x1
 └─ Text "ready" 0,1 15x1 truncate
 `},
 		{"overlay", Overlay(

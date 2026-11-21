@@ -110,7 +110,7 @@ See [Show a scrollbar](/content/scrolling#show-a-scrollbar) for how scrollbars l
 
 ## Lists in components
 
-A component that implements [`Layouter`](/bubble-tea/writing-components) has no root
+A [component with a `Layout` method](/bubble-tea/writing-components) has no root
 to ask, so its handlers read the frame from the `Context` its `Layout` was given. `ctx.Frame()` returns the frame on
 screen when it's called, which is the one the handler's event landed in:
 

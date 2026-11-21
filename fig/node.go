@@ -26,7 +26,7 @@ var standard = sync.OnceValue(func() *Font { return Lazy("standard", standardDat
 func Standard() *Font { return standard() }
 
 // TextNode shows text in a FIGlet font, as a bloom node. Build one with
-// [Text]. It implements [bloom.Layouter] and [bloom.Measurer].
+// [Text]. It implements [bloom.Child] and [bloom.Measurer].
 //
 // A node whose glyphs do not move is drawn as one string, which bloom
 // parses once and does not draw again while it is unchanged. Once glyphs
@@ -148,9 +148,6 @@ func (n TextNode) Enter(effects ...fx.Effect) TextNode { n.enter = effects; retu
 // The default is [fx.Fade].
 func (n TextNode) Leave(effects ...fx.Effect) TextNode { n.leave = effects; return n }
 
-// View implements [bloom.Child], drawing the node at its natural size.
-func (n TextNode) View() string { return bloom.Render(0, 0, n) }
-
 // Measure implements [bloom.Measurer].
 func (n TextNode) Measure(avail bloom.Size) bloom.Size {
 	if _, f, _ := n.pick(avail); f != nil {
@@ -167,9 +164,9 @@ func (n TextNode) Measure(avail bloom.Size) bloom.Size {
 	return bloom.Size{W: min(s.W, avail.W), H: min(s.H, avail.H)}
 }
 
-// Layout implements [bloom.Layouter].
+// Layout implements [bloom.Child].
 func (n TextNode) Layout(ctx bloom.Context) bloom.Child {
-	font, f, o := n.pick(bloom.Size{W: ctx.Width, H: ctx.Height})
+	font, f, o := n.pick(ctx.Size())
 	if f == nil {
 		return n.fallbackChild()
 	}

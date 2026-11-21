@@ -442,7 +442,7 @@ func mixedItems() func(i int) Child {
 			}
 			return Viewport(bufs[i])
 		case 2:
-			return &scroller{lines: []string{fmt.Sprintf("map %d", i)}, width: 12, height: 1}
+			return View(&scroller{lines: []string{fmt.Sprintf("map %d", i)}, width: 12, height: 1})
 		}
 		return Column(Fixed(2, List(3, func(k int) Child { return Text(fmt.Sprintf("in %d.%d", i, k)) })))
 	}

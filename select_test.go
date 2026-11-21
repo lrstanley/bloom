@@ -460,7 +460,7 @@ func (h hardWrapped) SelectedText(span Span) string {
 func TestSelectTextSource(t *testing.T) {
 	t.Parallel()
 
-	tree := func() Child { return Box(bordered, hardWrapped{s: "abcdefghij", w: 4}).ID("box") }
+	tree := func() Child { return Box(bordered, View(hardWrapped{s: "abcdefghij", w: 4})).ID("box") }
 	r := New()
 	// Selectable without being made so; read from the text it wrapped, and
 	// sent with the ID of the box it is in.
@@ -1107,7 +1107,7 @@ func TestSelectTextMap(t *testing.T) {
 
 	s := &scroller{lines: []string{"alpha beta", "gamma delta epsilon", "zeta", "eta theta", "iota"}, width: 10, height: 3}
 	tree := func() Child {
-		return Fixed(3, s).ID("pane").On(on.Scroll(func(_, dy int) tea.Cmd {
+		return Fixed(3, View(s)).ID("pane").On(on.Scroll(func(_, dy int) tea.Cmd {
 			s.top = min(max(s.top+dy, 0), len(s.lines)-1)
 			return nil
 		}))
@@ -1160,7 +1160,7 @@ func TestSelectTextMapWordsAndWide(t *testing.T) {
 
 	now := time.Unix(1, 0)
 	s := &scroller{lines: []string{"ab 日本 cd", "one two three four"}, width: 12, height: 3}
-	tree := func() Child { return s }
+	tree := func() Child { return View(s) }
 	r := New(WithClock(func() time.Time { return now }))
 	// Ending on the first half of 本 takes all of it, and starting on the
 	// second half of 日 too.
@@ -1186,7 +1186,7 @@ func TestSelectTextMapBesideText(t *testing.T) {
 
 	s := &scroller{lines: []string{"first line", "second"}, width: 8, height: 3}
 	tree := func() Child {
-		return Column(Text("title"), Fixed(3, s)).Selectable()
+		return Column(Text("title"), Fixed(3, View(s))).Selectable()
 	}
 	r := New()
 	// From the title into the middle of the component, which wraps "first
@@ -1195,7 +1195,7 @@ func TestSelectTextMapBesideText(t *testing.T) {
 	wantSelection(t, r, "itle\nfirst li")
 	// Through it, from before it to after it.
 	tree2 := func() Child {
-		return Column(Text("title"), Fixed(3, s), Text("end")).Selectable()
+		return Column(Text("title"), Fixed(3, View(s)), Text("end")).Selectable()
 	}
 	selectDrag(r, 8, 5, tree2, 0, [2]int{0, 0}, [2]int{1, 4})
 	wantSelection(t, r, "title\nfirst line\nsecond\nen")
@@ -1240,7 +1240,7 @@ func TestSelectEditableMouse(t *testing.T) {
 
 	now := time.Unix(1, 0)
 	f := &input{text: "hello big world"}
-	tree := func() Child { return Column(Fixed(1, f).ID("input"), Text("other text").Selectable()) }
+	tree := func() Child { return Column(Fixed(1, View(f)).ID("input"), Text("other text").Selectable()) }
 	r := New(WithClock(func() time.Time { return now }))
 
 	// A click puts the caret under it.
@@ -1291,7 +1291,7 @@ func TestSelectEditableKeyboard(t *testing.T) {
 
 	now := time.Unix(1, 0)
 	f := &input{text: "hello world"}
-	tree := func() Child { return Column(Fixed(1, f).ID("input"), Text("other text").Selectable()) }
+	tree := func() Child { return Column(Fixed(1, View(f)).ID("input"), Text("other text").Selectable()) }
 	var copied string
 	r := New(WithClock(func() time.Time { return now }), WithClipboard(func(s string) error { copied = s; return nil }))
 	selectDrag(r, 11, 2, tree, 0, [2]int{0, 1}, [2]int{4, 1})
@@ -1547,7 +1547,7 @@ func TestSelectionTextAskedAgain(t *testing.T) {
 	// A TextMap and an Editable tell their text when asked, which may have
 	// changed since it was last asked.
 	s := &scroller{lines: []string{"first line", "second"}, width: 12, height: 2}
-	tree := func() Child { return Column(Text("title"), Fixed(2, s)).Selectable() }
+	tree := func() Child { return Column(Text("title"), Fixed(2, View(s))).Selectable() }
 	r := New()
 	selectDrag(r, 12, 3, tree, 0, [2]int{0, 0}, [2]int{5, 2})
 	wantSelection(t, r, "title\nfirst line\nseco")
@@ -1556,7 +1556,7 @@ func TestSelectionTextAskedAgain(t *testing.T) {
 
 	f := &input{text: "hello big world", sel: span(0, 5)}
 	r = New()
-	r.Render(15, 1, f)
+	r.Render(15, 1, View(f))
 	wantSelection(t, r, "hello")
 	f.text = "HELLO big world"
 	wantSelection(t, r, "HELLO")

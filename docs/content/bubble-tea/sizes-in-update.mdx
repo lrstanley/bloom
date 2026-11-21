@@ -104,8 +104,8 @@ Components that pick what to render from their size, such as a Bubbles viewport 
 `Update`. Solve the layout, read the rectangle of the slot the component is in, and give the component its size
 before it draws. [Using Bubbles components](/bubble-tea/bubbles-components) walks through it.
 
-A component that builds its own layout can skip this by implementing
-[`Layouter`](/layout/responsive#build-a-layout-for-the-space-youre-given), which is given its size as it's laid out.
+A component that builds its own layout can skip this with a
+[`Layout` method](/layout/responsive#build-a-layout-for-the-space-youre-given), which is given its size as it's laid out.
 
 ## Use what's on screen
 
@@ -122,7 +122,7 @@ if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
 To find what's under a raw mouse event, `Hit` returns the IDs of the nodes there, outermost first. See
 [handle raw events yourself](/input/mouse#handle-raw-events-yourself).
 
-A [`Layouter`](/bubble-tea/writing-components) has no root to ask, so its handlers read the frame from the
+A [component with a `Layout` method](/bubble-tea/writing-components) has no root to ask, so its handlers read the frame from the
 `Context` its `Layout` was given, with `ctx.Frame()`. See
 [Read the frame from a handler](/bubble-tea/writing-components#read-the-frame-from-a-handler).
 

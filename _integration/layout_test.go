@@ -27,7 +27,7 @@ type responsive struct{}
 func (responsive) View() string { return "fallback" }
 
 func (responsive) Layout(ctx bloom.Context) bloom.Child {
-	if ctx.Width >= 30 {
+	if ctx.Width() >= 30 {
 		return bloom.Row(bloom.Fill(bloom.Text("wide-a")), bloom.Fill(bloom.Text("wide-b")))
 	}
 	return bloom.Column(bloom.Text("narrow-a"), bloom.Text("narrow-b"))
@@ -78,22 +78,22 @@ func TestLayout(t *testing.T) {
 		{"sidebar collapsed", 30, 6, sidebarTree()},
 		{"nested boxes", 20, 6, bloom.Box(border.Padding(0, 1), bloom.Column(bloom.Box(border, bloom.Text("inner")), bloom.Text("below")))},
 		{"styled text wraps", 12, 4, bloom.Column(bloom.Text("hello wrapping world").Style(lipgloss.NewStyle().Padding(0, 1)))},
-		{"scroll", 6, 3, bloom.Scroll(view("1\n2\n3\n4\n5\n6"), 2)},
+		{"scroll", 6, 3, bloom.Scroll(bloom.View(view("1\n2\n3\n4\n5\n6")), 2)},
 		{"centered", 11, 5, bloom.Centered(bloom.Box(border, bloom.Text("mid")))},
-		{"layer anchors", 30, 8, bloom.Overlay(dots,
+		{"layer anchors", 30, 8, bloom.Overlay(bloom.View(dots),
 			bloom.Layer(bloom.Text("TL")).Anchor(bloom.Start, bloom.Start),
 			bloom.Layer(bloom.Text("BR")).Anchor(bloom.End, bloom.End).Margin(1),
 			bloom.Layer(bloom.Column(bloom.Text("opaque"), bloom.Space(), bloom.Text("layer"))).Size(8, 4).Offset(0, -1),
 		)},
 		{"anchor to", 30, 8, bloom.Overlay(
-			bloom.Column(bloom.Row(bloom.Text("find: "), bloom.Fixed(12, bloom.Text("[query     ]")).ID("input")), bloom.Fill(dots)),
+			bloom.Column(bloom.Row(bloom.Text("find: "), bloom.Fixed(12, bloom.Text("[query     ]")).ID("input")), bloom.Fill(bloom.View(dots))),
 			bloom.Layer(bloom.Box(border, bloom.Text("result 1\nresult 2"))).AnchorTo("input", bloom.Bottom),
 		)},
 		{"layouter wide", 40, 1, responsive{}},
 		{"layouter narrow", 20, 2, responsive{}},
 		{"drawable clipped", 12, 4, bloom.Row(bloom.Fixed(3, bloom.Text("ab")), bloom.Fixed(4, bloom.Drawable(hatch{})), bloom.Text("cd"))},
 		{"wide glyphs clipped", 7, 2, bloom.Row(bloom.Fixed(3, bloom.Text("世界世").NoWrap()), bloom.Text("|界"))},
-		{"slide half way", 20, 6, bloom.Overlay(view(strings.Repeat("....................\n", 6)), bloom.Layer(bloom.Box(border, bloom.Text("up"))).Transition(0.5, fx.Slide{From: fx.Bottom}))},
+		{"slide half way", 20, 6, bloom.Overlay(bloom.View(view(strings.Repeat("....................\n", 6))), bloom.Layer(bloom.Box(border, bloom.Text("up"))).Transition(0.5, fx.Slide{From: fx.Bottom}))},
 		{"natural size", 0, 0, bloom.Row(bloom.Box(border, bloom.Text("a")), bloom.Box(border, bloom.Text("bb\nbb"))).Gap(1)},
 		{"natural size of a percent", 0, 0, bloom.Row(bloom.Percent(50, bloom.Box(border, bloom.Text("half"))), bloom.Text("|"))},
 		{"fill wraps at its share", 10, 4, bloom.Column(bloom.Row(

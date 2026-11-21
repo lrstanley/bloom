@@ -72,9 +72,6 @@ func (n TextNode) Truncate() TextNode {
 // kept to one line already.
 func (n TextNode) NoWrap() TextNode { n.nowrap = !n.truncate; return n }
 
-// View implements [Child], drawing the node at its natural size.
-func (n TextNode) View() string { return Render(0, 0, n) }
-
 // MarqueeNode is a line of text that scrolls when it does not fit. Build one
 // with [Marquee].
 type MarqueeNode struct {
@@ -122,12 +119,9 @@ func (n MarqueeNode) Gap(s string) MarqueeNode {
 	return n
 }
 
-// View implements [Child], drawing the marquee at its natural size.
-func (n MarqueeNode) View() string { return Render(0, 0, n) }
-
-// Layout implements [Layouter].
+// Layout implements [Child].
 func (n MarqueeNode) Layout(ctx Context) Child {
-	inner := lineWidth(n.style, ctx.Width)
+	inner := lineWidth(n.style, ctx.Width())
 	if inner <= 0 {
 		return nil
 	}
@@ -209,12 +203,9 @@ func (n SkeletonNode) Shimmer(phase float64) SkeletonNode {
 	return n
 }
 
-// View implements [Child], drawing the skeleton at its natural size.
-func (n SkeletonNode) View() string { return Render(0, 0, n) }
-
-// Layout implements [Layouter].
+// Layout implements [Child].
 func (n SkeletonNode) Layout(ctx Context) Child {
-	width := lineWidth(n.style, ctx.Width)
+	width := lineWidth(n.style, ctx.Width())
 	bar := func(w int) int { return min(max(w, 0), width) }
 
 	size := max(len(n.lines)-1, 0) // the line breaks
@@ -387,7 +378,7 @@ func cut(m ansi.Method, s string, left, right int) string {
 }
 
 // WidthMethod returns how the renderer laying out with ctx measures text,
-// set with [WithWidthMethod], for a [Layouter] that measures or cuts strings
+// set with [WithWidthMethod], for a component that measures or cuts strings
 // itself, as with [ansi.Method.StringWidth] and [ansi.Method.Truncate].
 func (ctx Context) WidthMethod() ansi.Method {
 	if ctx.wc {

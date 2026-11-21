@@ -7,7 +7,8 @@
 // and nodeMeta, which reads the meta of any of them. A method promoted from
 // the meta a node embeds would return the meta rather than the node, and
 // would be promoted again to a component that embeds a node, so each type
-// has its own. Run it with go generate, from package bloom.
+// has its own. It also writes the Layout of each node that bloom lays out
+// itself. Run it with go generate, from package bloom.
 package main
 
 import (
@@ -35,6 +36,7 @@ const output = "nodes.gen.go"
 type node struct {
 	Type string // the type's name
 	Noun string // what the documentation calls it
+	Own  bool   // it has a Layout of its own, which bloom calls
 }
 
 // builder is a builder method that node types share.
@@ -87,19 +89,26 @@ import (
 {{- end}}
 )
 
-// nodeMeta sets to to the meta of c, and reports true, when c is one of
-// the node types.
-func nodeMeta(c Child, to *meta) bool {
+// nodeMeta sets to to the meta of c, and reports whether c is one of the
+// node types, and whether it is one with a Layout of its own, which bloom
+// calls to lay it out.
+func nodeMeta(c Child, to *meta) (node, own bool) {
 	switch n := c.(type) {
 {{- range .Nodes}}
 	case {{.Type}}:
 		*to = n.meta
+		{{- if .Own}}
+		return true, true
+		{{- end}}
 {{- end}}
 	default:
-		return false
+		return false, false
 	}
-	return true
+	return true, false
 }
+{{range .Nodes}}{{if not .Own}}
+{{comment (printf "Layout implements [Child], returning the %s itself: bloom lays it out without calling it." .Noun)}}func (n {{.Type}}) Layout(Context) Child { return n }
+{{end}}{{end}}
 {{range .Methods}}
 {{comment .Doc}}func (n {{.Type}}) {{.Name}}{{or .Params "()"}} {{.Type}} {
 	{{.Body}}

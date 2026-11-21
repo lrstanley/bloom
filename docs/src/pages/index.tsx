@@ -193,7 +193,7 @@ const paths = [
     },
     {
         title: "Bringing bloom to an existing app",
-        body: "Your model and components stay as they are. Anything with a View() string drops into a layout.",
+        body: "Your model and components stay as they are. Anything with a View() string drops into a layout with bloom.View.",
         links: [
             { text: "Add bloom to an existing program", href: "/getting-started/existing-app" },
             { text: "Using Bubbles components", href: "/bubble-tea/bubbles-components" },

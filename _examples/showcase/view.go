@@ -240,25 +240,23 @@ func (m *model) activity() bloom.Child {
 	)
 }
 
-// bars is a [bloom.Layouter], so it draws as many bars as fit the space it
+// bars is a component with a Layout, so it draws as many bars as fit the space it
 // is given.
 type bars struct {
-	bloom.NoView
-
 	phase float64
 	stops []color.Color
 }
 
 func (b bars) Layout(ctx bloom.Context) bloom.Child {
 	// Each bar is two cells wide, with a cell between them.
-	n := max((ctx.Width+1)/3, 1)
+	n := max((ctx.Width()+1)/3, 1)
 	colors := lipgloss.Blend1D(n, b.stops...)
 	cols := make([]bloom.Child, n)
 	for i := range n {
 		x := float64(i) / float64(n)
 		level := 0.55 + 0.3*math.Sin(2*math.Pi*(b.phase+x)) + 0.15*math.Sin(2*math.Pi*(2*b.phase-1.7*x))
 		style := lipgloss.NewStyle().Foreground(colors[i])
-		cols[i] = bloom.Fixed(2, bloom.Text(bar(level, ctx.Height)).Style(style))
+		cols[i] = bloom.Fixed(2, bloom.Text(bar(level, ctx.Height())).Style(style))
 	}
 	return bloom.Row(cols...).Gap(1)
 }

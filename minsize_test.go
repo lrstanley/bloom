@@ -91,7 +91,7 @@ func TestMinSizeNaturalSize(t *testing.T) {
 	if lines := strings.Split(got, "\n"); len(lines) != 5 || !strings.HasPrefix(lines[0], "app") {
 		t.Fatalf("natural height:\n%s", got)
 	}
-	if got = MinSize(6, 2, Text("app")).View(); got != "app   \n      " {
+	if got = Render(0, 0, MinSize(6, 2, Text("app"))); got != "app   \n      " {
 		t.Fatalf("view: %q", got)
 	}
 

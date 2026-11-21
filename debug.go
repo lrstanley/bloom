@@ -21,8 +21,8 @@ import (
 // affects it. A node its container collapsed, or a layer whose anchor is not
 // on screen, is marked hidden; one partly on screen is marked with the part
 // that is, and one not on screen at all is marked offscreen. Components are
-// shown by their type, and those that build their own layout, such as a
-// [Layouter], with the tree they built. A node with the same ID as one
+// shown by their type, with the tree they built, and a [View] by the type
+// of what it draws. A node with the same ID as one
 // before it is marked duplicate: IDs should be unique in a frame, and the
 // nodes in two with the same ID, which are known by where they are in them,
 // are not told apart either.
@@ -39,8 +39,8 @@ import (
 //	│     └─ main.reader 10,0 20x3
 //	└─ Text "ready" 0,3 30x1 truncate
 func Debug(w, h int, c Child) string {
-	r, _ := renderers.Get().(*renderer)
-	defer renderers.Put(r)
+	r, _ := layouts.Get().(*renderer)
+	defer layouts.Put(r)
 	root := r.layout(w, h, c)
 	fw, fh := r.size(root, w, h)
 	r.cache.EndFrame(fw * fh)
@@ -182,6 +182,8 @@ func debugNode(c Child) (kind string, attrs []string) {
 		return "Scrollbar", nil
 	case TooltipSinkNode:
 		return "TooltipSink", nil
+	case ViewNode:
+		return fmt.Sprintf("View(%T)", n.v), nil
 	case ViewportNode:
 		lines := 0
 		if n.buf != nil {

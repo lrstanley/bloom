@@ -23,9 +23,9 @@ import (
 )
 
 // box is a node of the tree being laid out, kept in the engine's arena and
-// referred to by index, so a frame's tree costs no allocations once the
-// arena has grown to fit it. What a box does is decided by the type of its
-// child: one of this package's nodes, a [Layouter], or any other component.
+// referred to by index, so a frame's boxes cost no allocations once the
+// arena has grown to fit them. What a box does is decided by the type of its
+// child: one of this package's nodes, or a component laid out by its Layout.
 type box struct {
 	child    Child
 	meta     meta
@@ -35,7 +35,8 @@ type box struct {
 	parent   int
 	kidsOff  int
 	kidsLen  int
-	expanded int    // root of a Layouter's subtree, or -1
+	expanded int    // root of a component's subtree, or -1
+	laid     bool   // a component, laid out by calling its Layout
 	path     uint64 // where the box is in the nearest box with an ID, or in the tree, kept from frame to frame
 	slot     int    // where the box is in its parent's children
 
@@ -48,6 +49,12 @@ type box struct {
 	memoSize    Size
 	memoOK      bool
 	expandedFor Size
+	expandedIn  Direction // the side its layer went on, as in Context.Side
+	// space is the space a component's subtree, expanded, was laid out
+	// in, as its Context reads it, and the sizes it read, including those
+	// read later, such as by the item builder of a list it returned. It is
+	// nil until the component is laid out.
+	space *laidSpace
 
 	// list is what a [ListNode] shows, and listSize its natural size, for the
 	// space it was last expanded in, once listOK.
@@ -190,7 +197,13 @@ func (e *engine) build(c Child, parent, slot int) int {
 
 	var kids []Child
 	b := &e.boxes[i]
-	builtin := nodeMeta(c, &b.meta)
+	builtin, own := nodeMeta(c, &b.meta)
+	switch c.(type) {
+	case ViewNode, absentNode:
+		// Drawn, not laid out.
+	default:
+		b.laid = own || !builtin
+	}
 	if b.meta.id != nil {
 		// The nodes in one with an ID are known by where they are in it,
 		// rather than in the whole tree, so that they stay the same nodes as
@@ -235,7 +248,12 @@ func (e *engine) build(c Child, parent, slot int) int {
 		if n.onScroll != nil {
 			b.meta.handlers = with(n.handlers, []on.Handler{e.viewportScroll(n, b.key())})
 		}
-	case TextSource, TextMap:
+	case ViewNode:
+		switch n.v.(type) {
+		case TextSource, TextMap:
+			b.meta.selectable = true
+		}
+	case TextSource:
 		if !builtin {
 			b.meta.selectable = true
 		}
@@ -308,24 +326,43 @@ func (e *engine) firstKid(i int) int {
 	return -1
 }
 
-// expand returns the root of the subtree l builds for avail, building it
-// again only when avail changed.
-func (e *engine) expand(i int, l Layouter, avail Size) int {
-	if b := &e.boxes[i]; b.expanded >= 0 && b.expandedFor == avail {
-		return b.expanded
+// expand returns the root of the subtree that component c, box i, builds
+// for avail. It is built again only for a size c read from its Context that
+// changed, or in a layer on another side, so a component that reads no size
+// is laid out once however often it is measured, and the components in its
+// subtree keep their own layouts.
+func (e *engine) expand(i int, c Child, avail Size) int {
+	if s := e.boxes[i].space; s != nil && e.boxes[i].expandedIn == e.side {
+		read := s.reads.Load()
+		if (read&readW == 0 || int(s.w.Load()) == avail.W) && (read&readH == 0 || int(s.h.Load()) == avail.H) {
+			// A size not read yet is the one it is used in now, for what
+			// it built to read later.
+			s.w.Store(int64(avail.W))
+			s.h.Store(int64(avail.H))
+			return e.boxes[i].expanded
+		}
 	}
+	s := new(laidSpace)
+	s.w.Store(int64(avail.W))
+	s.h.Store(int64(avail.H))
+	child := c.Layout(Context{space: s, wc: e.method == ansi.WcWidth, screen: e.screen, side: e.side})
 	root := -1
-	if child := l.Layout(Context{Width: avail.W, Height: avail.H, wc: e.method == ansi.WcWidth, screen: e.screen, side: e.side}); child != nil {
+	if child != nil && !absent(child) {
 		root = e.build(child, i, -1)
 	}
-	e.boxes[i].expanded, e.boxes[i].expandedFor = root, avail
+	b := &e.boxes[i]
+	b.expanded, b.expandedIn, b.space = root, e.side, s
 	return root
 }
 
-// viewOf returns a component's View, calling it once per frame.
+// viewOf returns the View of box i, a [ViewNode], calling it once per
+// frame.
 func (e *engine) viewOf(i int) string {
 	if b := &e.boxes[i]; !b.viewOK {
-		b.view, b.viewOK = b.child.View(), true
+		if n, _ := b.child.(ViewNode); n.v != nil {
+			b.view = n.v.View()
+		}
+		b.viewOK = true
 	}
 	return e.boxes[i].view
 }
@@ -456,6 +493,12 @@ func (e *engine) measureChild(i int, avail Size) Size {
 		return Size{}
 	case TooltipSinkNode:
 		return e.measureSink(i, n, avail)
+	case ViewNode:
+		if m, ok := n.v.(Measurer); ok {
+			return m.Measure(avail)
+		}
+		w, h := e.cache.Size(e.viewOf(i))
+		return Size{W: w, H: h}
 	case Measurer:
 		return n.Measure(avail)
 	case MinSizeNode:
@@ -465,11 +508,11 @@ func (e *engine) measureChild(i int, avail Size) Size {
 			s.W, s.H = max(s.W, n.min.W), max(s.H, n.min.H)
 		}
 		return s
-	case Layouter:
-		return e.measure(e.expand(i, n, avail), avail)
 	default:
-		w, h := e.cache.Size(e.viewOf(i))
-		return Size{W: w, H: h}
+		if e.boxes[i].laid {
+			return e.measure(e.expand(i, n, avail), avail)
+		}
+		return Size{}
 	}
 }
 
@@ -730,190 +773,11 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 		e.arrangeList(i, n, r)
 	case ViewportNode:
 		e.layoutViewport(i, n, r)
-	case Layouter:
-		e.arrange(e.expand(i, n, Size{W: r.Dx(), H: r.Dy()}), r)
-	}
-}
-
-// frameOf returns the frame of style, the style of box i. It is worked out
-// once a frame, and kept from the last frame while the box at i has the same
-// style, as boxes usually do.
-func (e *engine) frameOf(i int, style lipgloss.Style) frame {
-	b := &e.boxes[i]
-	if b.frameOK {
-		return b.frame
-	}
-	m := e.frameMemos.At(i)
-	if e.scratch = style; !m.OK || !same.Style(&m.V.style, &e.scratch) {
-		m.OK, m.V = true, frameMemo{style: style, frame: frameOf(style)}
-	}
-	b.frame, b.frameOK = m.V.frame, true
-	return m.V.frame
-}
-
-// frameMemo is the frame of the style a box had in the last frame.
-type frameMemo struct {
-	style lipgloss.Style
-	frame frame
-}
-
-// boxContent returns the box of what is inside box node n at index i, or -1
-// when it has none. The children on its edges come after it.
-func (e *engine) boxContent(i int, n BoxNode) int {
-	if kids := e.kidsOf(i); len(kids) > len(n.edges) {
-		return kids[0]
-	}
-	return -1
-}
-
-// boxEdges returns the boxes of the children on box node n's edges, in the
-// order of n.edges.
-func (e *engine) boxEdges(i int, n BoxNode) []int {
-	kids := e.kidsOf(i)
-	return kids[len(kids)-len(n.edges):]
-}
-
-// arrangeEdges places the children on the edges of box node n at index i,
-// laid out in r. See [BoxNode.Edge].
-func (e *engine) arrangeEdges(i int, n BoxNode, r image.Rectangle) {
-	if len(n.edges) == 0 {
-		return
-	}
-	kids, ring, f := e.boxEdges(i, n), n.bordered(r), e.frameOf(i, n.style)
-	for _, side := range [...]Direction{Top, Bottom, Left, Right} {
-		if l, ok := f.edgeLine(side, ring); ok && !e.boxes[i].cramped {
-			e.arrangeEdge(n, kids, side, l)
-			continue
-		}
-		for j, edge := range n.edges {
-			if edge.side == side {
-				e.boxes[kids[j]].hidden = true
-			}
-		}
-	}
-}
-
-// edgeLine is the row or column of a side of a box's border.
-type edgeLine struct {
-	vertical   bool
-	at         int // the row, or column, of the side
-	lo, hi     int // the span of it that children share
-	mid        int // the middle of the side
-	start, end int // the whole side, corners and all, for [BoxNode.EdgeAt]
-}
-
-// edgeLine returns the line of side of the border of a box with frame f,
-// the outer cells of ring, reporting false if that side has no border.
-func (f frame) edgeLine(side Direction, ring image.Rectangle) (edgeLine, bool) {
-	// Children on the top and bottom are kept a cell from the corners.
-	horizontal := edgeLine{
-		lo: ring.Min.X + f.bl + 1, hi: ring.Max.X - f.br - 1, mid: (ring.Min.X + ring.Max.X) / 2,
-		start: ring.Min.X, end: ring.Max.X,
-	}
-	vertical := edgeLine{
-		vertical: true, lo: ring.Min.Y + f.bt, hi: ring.Max.Y - f.bb, mid: (ring.Min.Y + ring.Max.Y) / 2,
-		start: ring.Min.Y, end: ring.Max.Y,
-	}
-	switch side { //nolint:exhaustive // A corner, or the zero value, is not a side.
-	case Top:
-		horizontal.at = ring.Min.Y
-		return horizontal, f.bt > 0
-	case Bottom:
-		horizontal.at = ring.Max.Y - 1
-		return horizontal, f.bb > 0
-	case Left:
-		vertical.at = ring.Min.X
-		return vertical, f.bl > 0
-	case Right:
-		vertical.at = ring.Max.X - 1
-		return vertical, f.br > 0
-	}
-	return edgeLine{}, false
-}
-
-// arrangeEdge places the children of box node n on side, whose line is l,
-// given their boxes, kids.
-func (e *engine) arrangeEdge(n BoxNode, kids []int, side Direction, l edgeLine) {
-	// The ends first, in order, from the corners inward. Children at a cell
-	// of their own take no room from the rest.
-	for j, edge := range n.edges {
-		if edge.side != side {
-			continue
-		}
-		if edge.exact {
-			at, length := edge.at, l.end-l.start
-			if at < 0 {
-				at += length
-			}
-			if at < 0 || at >= length {
-				e.boxes[kids[j]].hidden = true
-				continue
-			}
-			e.placeEdge(kids[j], l, l.start+at, e.edgeSize(kids[j], l, length-at))
-			continue
-		}
-		if edge.align == Center {
-			continue
-		}
-		s := l.hi - l.lo
-		if edge.align != Stretch {
-			s = e.edgeSize(kids[j], l, s)
-		}
-		at := l.lo
-		if edge.align == End {
-			at = l.hi - s
-		}
-		if !e.placeEdge(kids[j], l, at, s) {
-			continue
-		}
-		if edge.align == End {
-			l.hi -= s + 1
-		} else {
-			l.lo += s + 1
-		}
-	}
-
-	// Then the middle, sized in order from what is left, and centered on the
-	// side as far as the ends allow. Measuring again in the same space is
-	// free.
-	total := -1
-	for j, edge := range n.edges {
-		if edge.side == side && !edge.exact && edge.align == Center {
-			if s := e.edgeSize(kids[j], l, l.hi-l.lo-total-1); s > 0 {
-				total += s + 1
-			}
-		}
-	}
-	at, used := min(max(l.mid-total/2, l.lo), l.hi-total), -1
-	for j, edge := range n.edges {
-		if edge.side == side && !edge.exact && edge.align == Center {
-			s := e.edgeSize(kids[j], l, l.hi-l.lo-used-1)
-			if e.placeEdge(kids[j], l, at, s) {
-				at, used = at+s+1, used+s+1
-			}
-		}
-	}
-}
-
-// edgeSize returns how much of room along line l box k takes.
-func (e *engine) edgeSize(k int, l edgeLine, room int) int {
-	main, _ := axes(e.measure(k, size(max(room, 0), 1, l.vertical)), l.vertical)
-	return main
-}
-
-// placeEdge arranges box k at at along line l, size cells long, or hides it
-// for a size of zero, reporting whether it was placed.
-func (e *engine) placeEdge(k int, l edgeLine, at, size int) bool {
-	switch {
-	case size <= 0:
-		e.boxes[k].hidden = true
-		return false
-	case l.vertical:
-		e.arrange(k, image.Rect(l.at, at, l.at+1, at+size))
 	default:
-		e.arrange(k, image.Rect(at, l.at, at+size, l.at+1))
+		if e.boxes[i].laid {
+			e.arrange(e.expand(i, n, Size{W: r.Dx(), H: r.Dy()}), r)
+		}
 	}
-	return true
 }
 
 func (e *engine) arrangeFlex(i int, n FlexNode, r image.Rectangle) {
