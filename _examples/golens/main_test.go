@@ -130,8 +130,7 @@ func TestGoLens(t *testing.T) {
 	h.Wait("normalize").Sleep(400 * time.Millisecond)
 
 	// A click selects a function anywhere in the tree.
-	at := h.Locate(reel.Contains("normalize"))
-	h.LeftClick(at.X+2, at.Y).Wait("normalize sorts tags").Sleep(demo.Hold(600 * time.Millisecond))
+	h.Locate(reel.Contains("normalize")).Offset(2, 0).LeftClick().Wait("normalize sorts tags").Sleep(demo.Hold(600 * time.Millisecond))
 	step("left")
 	step("left")
 	h.Wait("add saves a note")

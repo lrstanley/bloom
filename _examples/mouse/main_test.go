@@ -32,7 +32,7 @@ func TestMouse(t *testing.T) {
 	h.Sleep(demo.Hold(500 * time.Millisecond))
 
 	// The wheel scrolls the file it is over.
-	h.Mouse(vt.MousePress, vt.MouseWheelDown, 40, 6).WaitNot(" 1  // line 1").Sleep(demo.Hold(500 * time.Millisecond))
+	h.Wheel(vt.MouseWheelDown, 40, 6).WaitNot(" 1  // line 1").Sleep(demo.Hold(500 * time.Millisecond))
 
 	// The one-cell divider keeps the drag as the pointer leaves it.
 	h.MouseDrag(vt.MouseLeft, 22, 6, 36, 6, reel.Delay(40*time.Millisecond)).Wait("the sidebar is 36 cells")

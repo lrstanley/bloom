@@ -59,13 +59,13 @@ func TestLogs(t *testing.T) {
 	// as one and the selection below starts on a row still moving.
 	at := h.Locate(reel.Contains("14:00:00.137"))
 	for _, off := range []string{"14:00:00.274", "14:00:00.685", "14:00:00.959"} {
-		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X, at.Y).WaitNot(off).Sleep(demo.Hold(150 * time.Millisecond))
+		at.Wheel(vt.MouseWheelDown).WaitNot(off).Sleep(demo.Hold(150 * time.Millisecond))
 	}
 	h.Sleep(demo.Hold(500 * time.Millisecond))
 
 	// A selection across the rows of a wrapped line copies the one line.
 	at = h.Locate(reel.Contains("payments: dial tcp"))
-	h.LeftDrag(at.X, at.Y, at.X+30, at.Y+1, reel.Delay(30*time.Millisecond)).Wait(`selected "payments: dial tcp`).Sleep(demo.Hold(800 * time.Millisecond))
+	at.LeftDrag(at.Offset(30, 1), reel.Delay(30*time.Millisecond)).Wait(`selected "payments: dial tcp`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "payments: dial tcp`).Sleep(demo.Hold(600 * time.Millisecond))
 
 	h.Key("esc").Key("G").Wait("· following").Sleep(demo.Hold(800 * time.Millisecond))

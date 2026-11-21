@@ -5,7 +5,6 @@
 package main
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -13,36 +12,16 @@ import (
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
 	"getsteep.dev/steep/reel/effects"
-	"getsteep.dev/steep/reel/vt"
-	"github.com/charmbracelet/x/ansi"
 )
 
-// locate returns the cell text starts at in view.
-func locate(view, text string) (x, y int, ok bool) {
-	for y, line := range strings.Split(view, "\n") {
-		if before, _, ok := strings.Cut(line, text); ok {
-			return ansi.StringWidth(before), y, true
-		}
-	}
-	return 0, 0, false
-}
-
-// find returns the cell text starts at on screen, waiting for it first: a
-// tint's wave can still be scrambling the panes when a slow (such as -race)
-// run gets here.
-func find(h *steep.Harness, text string) (x, y int) {
-	at := h.Locate(reel.Contains(text))
-	return at.X, at.Y
-}
-
 // movedPast holds once the Activity pane's title is right of the Services
-// pane's.
+// pane's, on whichever rows they are.
 type movedPast struct{}
 
 func (movedPast) Check(screen reel.ScreenText) ([]reel.Match, bool) {
-	a, _, aok := locate(screen.Text, "⠿ Activity")
-	s, _, sok := locate(screen.Text, "⠿ Services")
-	return nil, aok && sok && a > s
+	a, aok := reel.Contains("⠿ Activity").Check(screen)
+	s, sok := reel.Contains("⠿ Services").Check(screen)
+	return nil, aok && sok && a[0].Col > s[0].Col
 }
 
 func (movedPast) String() string { return "Activity right of Services" }
@@ -55,11 +34,17 @@ func checkMovedPast(h *steep.Harness) {
 	h.WaitFor(movedPast{}).Sleep(1200 * time.Millisecond).WaitFor(movedPast{})
 }
 
+// dragActivity drags the Activity pane by its title to dx columns right of
+// the Services pane's title, and 4 rows below it.
+func dragActivity(h *steep.Harness, dx int) {
+	to := h.Locate(reel.Contains("⠿ Services")).Offset(dx, 4)
+	h.Locate(reel.Contains("⠿ Activity")).Offset(3, 0).LeftDrag(to, reel.Delay(20*time.Millisecond))
+}
+
 // pick clicks the tint named name in the sidebar, and waits for the panes
 // to wave back in with its colors.
 func pick(h *steep.Harness, name string) {
-	x, y := find(h, name)
-	h.LeftClick(x+2, y).Wait("▸ " + name).Sleep(1800 * time.Millisecond)
+	h.Locate(reel.Contains(name)).Offset(2, 0).LeftClick().Wait("▸ " + name).Sleep(1800 * time.Millisecond)
 }
 
 func TestShowcase(t *testing.T) {
@@ -73,24 +58,19 @@ func TestShowcase(t *testing.T) {
 	h.Wait("▸ TokyoNight").Wait("billing").Sleep(1500 * time.Millisecond)
 
 	// A click selects a service.
-	x, y := find(h, "billing")
-	h.LeftClick(x, y).Wait("billing is slow").Sleep(demo.Hold(500 * time.Millisecond))
+	h.Locate(reel.Contains("billing")).LeftClick().Wait("billing is slow").Sleep(demo.Hold(500 * time.Millisecond))
 	pick(h, "Rose Pine")
 
 	// A pane dragged by its title floats under the pointer, and the others
 	// make room as it passes them.
-	x1, y1 := find(h, "⠿ Activity")
-	x2, y2 := find(h, "⠿ Services")
-	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+20, y2+4, reel.Delay(20*time.Millisecond))
+	dragActivity(h, 20)
 	checkMovedPast(h)
 	pick(h, "Catppuccin Mocha")
 
 	// A double click zooms a pane, and another gives the rest their width
 	// back.
-	x, y = find(h, "⠿ Palette")
-	h.LeftClick(x+3, y, reel.Repeat(2)).WaitNot("⠿ Services").Sleep(1200 * time.Millisecond)
-	x, y = find(h, "⠿ Palette")
-	h.LeftClick(x+3, y, reel.Repeat(2)).Wait("⠿ Services").Sleep(demo.Hold(1000 * time.Millisecond))
+	h.Locate(reel.Contains("⠿ Palette")).Offset(3, 0).LeftClick(reel.Repeat(2)).WaitNot("⠿ Services").Sleep(1200 * time.Millisecond)
+	h.Locate(reel.Contains("⠿ Palette")).Offset(3, 0).LeftClick(reel.Repeat(2)).Wait("⠿ Services").Sleep(demo.Hold(1000 * time.Millisecond))
 
 	// The tour spotlights each part in turn.
 	h.Key("?").Wait("Click one to switch").Sleep(demo.Hold(1600 * time.Millisecond))
@@ -116,9 +96,7 @@ func TestDragPastCollapsed(t *testing.T) {
 
 	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(96, 24), steep.WithTimeout(20*time.Second))
 	h.Wait("billing").WaitNot("⠿ Palette").Sleep(800 * time.Millisecond)
-	x1, y1 := find(h, "⠿ Activity")
-	x2, y2 := find(h, "⠿ Services")
-	h.MouseDrag(vt.MouseLeft, x1+3, y1, x2+24, y2+4, reel.Delay(20*time.Millisecond))
+	dragActivity(h, 24)
 	checkMovedPast(h)
 	h.Key("q")
 	h.WaitFinished()

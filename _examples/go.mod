@@ -9,8 +9,8 @@ require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.2
 	charm.land/lipgloss/v2 v2.1.1
-	getsteep.dev/steep v0.0.0-alpha.13
-	getsteep.dev/steep/reel v0.0.0-alpha.13
+	getsteep.dev/steep v0.0.0-alpha.14
+	getsteep.dev/steep/reel v0.0.0-alpha.14
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f

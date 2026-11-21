@@ -8,13 +8,13 @@ require (
 	bloomfx.dev/bloom v0.0.0-alpha.8
 	charm.land/bubbletea/v2 v2.1.2
 	charm.land/lipgloss/v2 v2.1.1
-	getsteep.dev/steep v0.0.0-alpha.13
+	getsteep.dev/steep v0.0.0-alpha.14
 	github.com/charmbracelet/ultraviolet v0.0.0-20261023060817-a45b7c86333f
 	github.com/charmbracelet/x/ansi v0.11.10
 )
 
 require (
-	getsteep.dev/steep/reel v0.0.0-alpha.13 // indirect
+	getsteep.dev/steep/reel v0.0.0-alpha.14 // indirect
 	github.com/aymanbagabas/go-udiff v0.4.2 // indirect
 	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/x/conpty v0.2.0 // indirect

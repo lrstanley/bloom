@@ -26,7 +26,7 @@ func TestResponsive(t *testing.T) {
 	h.Key("pgup").Wait("row 1 of").Sleep(demo.Hold(300 * time.Millisecond))
 
 	// The wheel scrolls the reader it is over.
-	h.Mouse(vt.MousePress, vt.MouseWheelDown, 60, 10).Wait("row 4 of").Sleep(demo.Hold(300 * time.Millisecond))
+	h.Wheel(vt.MouseWheelDown, 60, 10).Wait("row 4 of").Sleep(demo.Hold(300 * time.Millisecond))
 
 	// Clicking an article opens it at the top; the tag grid reflows to fit.
 	h.LeftClick(5, 4).Wait("Parents place").Wait("row 1 of").Sleep(600 * time.Millisecond)

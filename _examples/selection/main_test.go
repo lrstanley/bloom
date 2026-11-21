@@ -28,7 +28,7 @@ func TestSelection(t *testing.T) {
 
 	// Across lines of the log, inside the log's box alone.
 	at := h.Locate(reel.Contains("upstream payments slow"))
-	h.LeftDrag(at.X, at.Y, at.X+20, at.Y+2, slow).Wait(`selected "upstream payments slow`).Sleep(demo.Hold(800 * time.Millisecond))
+	at.LeftDrag(at.Offset(20, 2), slow).Wait(`selected "upstream payments slow`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "upstream payments slow`).Sleep(demo.Hold(800 * time.Millisecond))
 
 	// Alt held as the drag starts selects a rectangle: the timestamps
@@ -42,26 +42,24 @@ func TestSelection(t *testing.T) {
 
 	// Across the request's fields, a value beside its label.
 	at = h.Locate(reel.Contains("method"))
-	h.LeftDrag(at.X, at.Y, at.X+40, at.Y+1, slow).
+	at.LeftDrag(at.Offset(40, 1), slow).
 		Wait(`selected "method POST⏎path /api/v1/orders/1042/`).Sleep(demo.Hold(800 * time.Millisecond))
 
 	// A value cut to fit is copied whole: a double click on it selects all
 	// of the word cut.
 	at = h.Locate(reel.Contains("7f3a9c2e"))
-	h.LeftClick(at.X+3, at.Y, reel.Repeat(2)).
+	at.Offset(3, 0).LeftClick(reel.Repeat(2)).
 		Wait(`selected "7f3a9c2e-41b8-4d0e-9a51-c2d8e6f01b77" in request`).Sleep(demo.Hold(800 * time.Millisecond))
 
 	// A click clears the selection; ctrl+c with none would quit.
-	h.LeftClick(at.X, at.Y).Sleep(demo.Hold(500 * time.Millisecond))
+	at.LeftClick().Sleep(demo.Hold(500 * time.Millisecond))
 
 	// A double click selects a word.
-	at = h.Locate(reel.Contains("rfnd_"))
-	h.LeftClick(at.X+3, at.Y, reel.Repeat(2)).Wait(`selected "rfnd_7Hc2Lq9xVb" in request`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Locate(reel.Contains("rfnd_")).Offset(3, 0).LeftClick(reel.Repeat(2)).Wait(`selected "rfnd_7Hc2Lq9xVb" in request`).Sleep(demo.Hold(800 * time.Millisecond))
 
 	// Across the rows the error wrapped to, it is copied as one line.
-	at = h.Locate(reel.Contains("refunding order"))
 	end := h.Locate(reel.Contains("3); the refund"))
-	h.LeftDrag(at.X, at.Y, end.X+2, end.Y, slow).Wait(`selected "refunding order 1042 (attempt 1 of 3);" in request`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Locate(reel.Contains("refunding order")).LeftDrag(end.Offset(2, 0), slow).Wait(`selected "refunding order 1042 (attempt 1 of 3);" in request`).Sleep(demo.Hold(800 * time.Millisecond))
 
 	// ctrl+a selects all of the log, scrolled out of sight or not.
 	h.Key("ctrl+a").Wait("selected all 36 lines of the log").Sleep(demo.Hold(600 * time.Millisecond))
@@ -78,7 +76,7 @@ func TestSelection(t *testing.T) {
 	// Inside the dialog, over the log it covers.
 	h.Key("d").Wait("API token created").Sleep(500 * time.Millisecond)
 	at = h.Locate(reel.Contains("blm_live_"))
-	h.LeftDrag(at.X, at.Y, at.X+34, at.Y, slow).Wait(`selected "blm_live_9Qk2Xv7rLp4TzW8nB3sHc6Yd" in dialog`).Sleep(demo.Hold(800 * time.Millisecond))
+	at.LeftDrag(at.Offset(34, 0), slow).Wait(`selected "blm_live_9Qk2Xv7rLp4TzW8nB3sHc6Yd" in dialog`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "blm_live_`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("esc").WaitNot("API token created").Sleep(demo.Hold(500 * time.Millisecond))
 
@@ -87,10 +85,8 @@ func TestSelection(t *testing.T) {
 	// it away.
 	at = h.Locate(reel.Contains("Refunds that"))
 	end = h.Locate(reel.Contains("retried three"))
-	h.LeftDrag(at.X, at.Y, end.X+12, end.Y, slow).Wait(`selected "Refunds that time out upstream`).Sleep(demo.Hold(800 * time.Millisecond))
-	for range 3 {
-		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X, at.Y).Sleep(200 * time.Millisecond)
-	}
+	at.LeftDrag(end.Offset(12, 0), slow).Wait(`selected "Refunds that time out upstream`).Sleep(demo.Hold(800 * time.Millisecond))
+	at.Wheel(vt.MouseWheelDown, reel.Repeat(3), reel.Delay(200*time.Millisecond))
 	h.Wait("its retries were").Key("ctrl+c").Wait(`copied "Refunds that time out upstream`).Sleep(demo.Hold(800 * time.Millisecond))
 
 	// The note keeps its own selection. Shift and the arrows make one,
@@ -103,8 +99,7 @@ func TestSelection(t *testing.T) {
 	h.Type("phone", slow).Wait("retried by phone").Sleep(demo.Hold(500 * time.Millisecond))
 	// The mouse selects in it as well, and ctrl+c copies what it selected,
 	// leaving it selected.
-	at = h.Locate(reel.Contains("retried by phone"))
-	h.LeftClick(at.X+2, at.Y, reel.Repeat(2)).Wait(`selected "retried" in note`).Sleep(demo.Hold(800 * time.Millisecond))
+	h.Locate(reel.Contains("retried by phone")).Offset(2, 0).LeftClick(reel.Repeat(2)).Wait(`selected "retried" in note`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "retried"`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("esc").Wait("stopped typing").Key("esc").Wait("selection cleared").Sleep(demo.Hold(500 * time.Millisecond))
 
@@ -115,13 +110,12 @@ func TestSelection(t *testing.T) {
 	// order 1002 to that of 1015, twelve rows below where it was.
 	h.Key("l").Wait("showing 10000 requests").Sleep(demo.Hold(500 * time.Millisecond))
 	at = h.Locate(reel.Contains("/api/v1/orders/1002/items"))
+	to := at.Offset(8, 1)
 	h.Mouse(vt.MousePress, vt.MouseLeft, at.X, at.Y).Sleep(100 * time.Millisecond)
-	h.Mouse(vt.MouseMotion, vt.MouseLeft, at.X+8, at.Y+1).Sleep(150 * time.Millisecond)
-	for range 4 {
-		h.Mouse(vt.MousePress, vt.MouseWheelDown, at.X+8, at.Y+1).Sleep(200 * time.Millisecond)
-	}
+	h.Mouse(vt.MouseMotion, vt.MouseLeft, to.X, to.Y).Sleep(150 * time.Millisecond)
+	to.Wheel(vt.MouseWheelDown, reel.Repeat(4), reel.Delay(200*time.Millisecond))
 	h.Wait("/api/v1/orders/1015/items").WaitNot("/api/v1/orders/1002/items")
-	h.Mouse(vt.MouseRelease, vt.MouseLeft, at.X+8, at.Y+1).
+	h.Mouse(vt.MouseRelease, vt.MouseLeft, to.X, to.Y).
 		Wait(`selected "/api/v1/orders/1002/items 201⏎14:02:01.`).Sleep(demo.Hold(800 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "/api/v1/orders/1002/items 201⏎14:02:01.`).Wait(`, 14 lines`).Sleep(demo.Hold(800 * time.Millisecond))
 

@@ -38,8 +38,7 @@ func TestEditor(t *testing.T) {
 
 	// A click puts the caret before the character under it, and typing goes
 	// in there.
-	at := h.Locate(reel.Contains("Try it:"))
-	h.LeftClick(at.X+len("Try it"), at.Y).Wait("Ln 6, Col 7").Sleep(demo.Hold(400 * time.Millisecond))
+	h.Locate(reel.Contains("Try it:")).Offset(len("Try it"), 0).LeftClick().Wait("Ln 6, Col 7").Sleep(demo.Hold(400 * time.Millisecond))
 	h.Type(", it is quick", slow).Wait("Try it, it is quick:").Sleep(demo.Hold(500 * time.Millisecond))
 
 	// Shift and ctrl with the arrows select by words, and the selection is
@@ -55,14 +54,13 @@ func TestEditor(t *testing.T) {
 	h.Type(" and ", slow).Key("ctrl+v").Wait("bloom.Buffer and it is quick").Sleep(demo.Hold(700 * time.Millisecond))
 
 	// A double click selects a word, and ctrl+c copies it.
-	at = h.Locate(reel.Contains("snapshots."))
-	h.LeftClick(at.X+3, at.Y, reel.Repeat(2)).Wait(`selected "snapshots"`).Sleep(demo.Hold(500 * time.Millisecond))
+	h.Locate(reel.Contains("snapshots.")).Offset(3, 0).LeftClick(reel.Repeat(2)).Wait(`selected "snapshots"`).Sleep(demo.Hold(500 * time.Millisecond))
 	h.Key("ctrl+c").Wait(`copied "snapshots"`).Sleep(demo.Hold(700 * time.Millisecond))
 
 	// A drag across the rows a line wraps to, and shift+click to carry the
 	// selection on.
-	at = h.Locate(reel.Contains("this paragraph is one line"))
-	h.LeftDrag(at.X, at.Y, at.X+30, at.Y+1, slow).Wait(`selected "this paragraph is one line`).Sleep(demo.Hold(600 * time.Millisecond))
+	at := h.Locate(reel.Contains("this paragraph is one line"))
+	at.LeftDrag(at.Offset(30, 1), slow).Wait(`selected "this paragraph is one line`).Sleep(demo.Hold(600 * time.Millisecond))
 	shiftClick(h, at.X+12, at.Y+2)
 	h.Wait("(152 selected)").Sleep(demo.Hold(700 * time.Millisecond))
 	h.Key("esc").WaitNot("selected)").Sleep(demo.Hold(300 * time.Millisecond))
@@ -77,8 +75,7 @@ func TestEditor(t *testing.T) {
 	// Without wrapping, the end of a long line scrolls the text sideways to
 	// keep the caret in sight; with it, the caret moves down the rows.
 	h.Key("alt+z").Wait("not wrapping").Sleep(demo.Hold(500 * time.Millisecond))
-	at = h.Locate(reel.Contains("Lines wrap at words"))
-	h.LeftClick(at.X, at.Y).Key("end").Wait("shows the rows.").Sleep(demo.Hold(700 * time.Millisecond))
+	h.Locate(reel.Contains("Lines wrap at words")).LeftClick().Key("end").Wait("shows the rows.").Sleep(demo.Hold(700 * time.Millisecond))
 	h.Key("alt+z").Wait("wrapping at words").Sleep(demo.Hold(400 * time.Millisecond))
 	steps("up", 2)
 	h.Sleep(demo.Hold(400 * time.Millisecond))
@@ -109,10 +106,7 @@ func TestEditor(t *testing.T) {
 	h.Sleep(demo.Hold(300 * time.Millisecond))
 
 	// The wheel scrolls it, and ctrl+home goes back to the top.
-	at = h.Locate(reel.Contains("typed at line"))
-	for range 3 {
-		h.Mouse(vt.MousePress, vt.MouseWheelUp, at.X, at.Y).Sleep(demo.Hold(150 * time.Millisecond))
-	}
+	h.Locate(reel.Contains("typed at line")).Wheel(vt.MouseWheelUp, reel.Repeat(3), reel.Delay(demo.Hold(150*time.Millisecond)))
 	h.Key("ctrl+home").Wait("Ln 1, Col 1").Sleep(demo.Hold(800 * time.Millisecond))
 
 	// A page down and back up keeps the caret on its row of the screen, as
