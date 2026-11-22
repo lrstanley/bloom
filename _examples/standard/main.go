@@ -8,80 +8,40 @@
 // sizes itself. The sidebar is kept by value, as components often are, so
 // a click on a page sends a message for Update to handle, rather than
 // changing the sidebar in the handler, which would only change a copy.
+//
+// The example is laid out as the others are: the styles are made from a
+// tint in styles.go, each component is in a file of its own, and this file
+// has the model, which keeps the components and places them in View.
 package main
 
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"bloomfx.dev/bloom"
-	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintEverforestDarkMed
-
-var (
-	muted  = theme.BrightBlack
-	accent = theme.Green
-	dark   = theme.Bg
-
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	item     = lipgloss.NewStyle().Padding(0, 1)
-	selected = item.Foreground(dark).Background(accent)
-)
-
-// openMsg opens the page at an index of pages.
-type openMsg int
-
+// pages are the pages the sidebar lists and the reader shows.
 var pages = []string{"Home", "Settings", "About"}
 
-// sidebar lists the pages; it is a component with a Layout, so its items
-// fill the sidebar's width.
-type sidebar struct {
-	selected int
-}
-
-func (s sidebar) Layout(bloom.Context) bloom.Child {
-	items := make([]bloom.Child, 0, len(pages)+2)
-	for i, name := range pages {
-		st := item
-		if i == s.selected {
-			st = selected
-		}
-		items = append(items, bloom.Text(name).Style(st).On(on.Click(on.Msg(openMsg(i)))))
-	}
-	items = append(items, bloom.Space(), bloom.Text("v1.0").Style(item))
-	return bloom.Box(panel, bloom.Column(items...))
-}
-
-// reader is a plain Bubble Tea component, placed with bloom.View.
-type reader struct{ page int }
-
-func (r reader) View() string {
-	body := strings.Repeat("Lorem ipsum dolor sit amet. ", 3)
-	return fmt.Sprintf("# %s\n\n%s", pages[r.page], body)
-}
-
-// statusbar is one line, cut to fit.
-type statusbar struct{ msg string }
-
-func (s statusbar) Layout(bloom.Context) bloom.Child { return bloom.Text(" " + s.msg).Truncate() }
-
 type model struct {
-	ui      *bloom.Root
-	w, h    int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
 	sidebar sidebar
 	reader  reader
 	status  statusbar
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), status: statusbar{msg: "click a page, or q to quit"}}
+	m := &model{st: newStyles(tint.TintEverforestDarkMed)}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.sidebar = sidebar{st: m.st}
+	m.status = statusbar{msg: "click a page, or q to quit"}
+	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
@@ -105,17 +65,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() tea.View {
+	// The layout is simple enough to build here. A screen with more to it
+	// builds its layout in a method of its own, as most of the examples do.
 	v := m.ui.View(m.w, m.h, bloom.Column(
 		bloom.Fill(bloom.Row(
-			bloom.Fixed(20, m.sidebar).Collapsible(1),
-			bloom.Fill(bloom.Box(panel.Padding(0, 1), bloom.View(&m.reader))).Min(30),
+			// The sidebar is placed by pointer, so that the tree doesn't copy it,
+			// and its styles, every frame.
+			bloom.Fixed(20, &m.sidebar).Collapsible(1),
+			bloom.Fill(bloom.Box(m.st.page, bloom.View(&m.reader))).Min(30),
 		)),
 		m.status,
 	))
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = theme.Bg
+	v.BackgroundColor = m.st.theme.Bg
 	return v
 }
 

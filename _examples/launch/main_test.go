@@ -53,7 +53,7 @@ func TestLaunch(t *testing.T) {
 	m := newModel()
 	// The numbers change when the test sends the update, so that the
 	// snapshots do not depend on timing.
-	m.every = time.Hour
+	m.stats.every = time.Hour
 	h := steep.NewHarness(t, m, demo.Options("launch", 100, 28)...)
 
 	// Cards shimmer as placeholders until the data arrives, which takes

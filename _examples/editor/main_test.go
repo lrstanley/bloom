@@ -127,18 +127,18 @@ func TestEditor(t *testing.T) {
 	h.Key("ctrl+c")
 	h.WaitFinished()
 
-	if n := m.buf.Len(); n != 1_000_001 {
+	if n := m.text.buf.Len(); n != 1_000_001 {
 		t.Fatalf("finished with %d lines", n)
 	}
-	if got := m.buf.Text(0); !strings.HasSuffix(got, "bloom.Buffer and it is quick") {
+	if got := m.text.buf.Text(0); !strings.HasSuffix(got, "bloom.Buffer and it is quick") {
 		t.Fatalf("first line %q", got)
 	}
-	if got := m.buf.Text(m.buf.Len() - 1); got != "The end, typed at line a million." {
+	if got := m.text.buf.Text(m.text.buf.Len() - 1); got != "The end, typed at line a million." {
 		t.Fatalf("last line %q", got)
 	}
-	t.Logf("the last edit to a million lines took %s", m.cost)
-	if m.cost > 10*time.Millisecond {
-		t.Errorf("the last edit took %s", m.cost)
+	t.Logf("the last edit to a million lines took %s", m.text.cost)
+	if m.text.cost > 10*time.Millisecond {
+		t.Errorf("the last edit took %s", m.text.cost)
 	}
 }
 

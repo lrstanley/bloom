@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"bloomfx.dev/bloom/_examples/internal/demo"
-	"bloomfx.dev/bloom/anim"
 	tea "charm.land/bubbletea/v2"
 	"getsteep.dev/steep"
 	"getsteep.dev/steep/reel"
@@ -23,7 +22,7 @@ func TestDesktop(t *testing.T) {
 
 	m := newModel()
 	// The clock shows Go's reference time, for the snapshot to match.
-	m.now = func() time.Time { return time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC) }
+	m.bar.Now = func() time.Time { return time.Date(2006, 1, 2, 15, 4, 5, 0, time.UTC) }
 	h := steep.NewHarness(t, m, demo.Options("desktop", 100, 30, effects.Mouse())...)
 	h.Wait("drag a title").Sleep(demo.Hold(800 * time.Millisecond))
 
@@ -87,16 +86,17 @@ func TestDesktop(t *testing.T) {
 // TestClickBehind clicks the close button of a window behind the others,
 // with a frame drawn between the press and the release, as there is for a
 // person: the press brings the window to the front, which moves it in the
-// tree, and the release still closes it. It doesn't run in parallel, as the
-// theme it draws with is the package's, which TestDesktop changes.
-func TestClickBehind(t *testing.T) { //nolint:paralleltest // See above.
+// tree, and the release still closes it.
+func TestClickBehind(t *testing.T) {
+	t.Parallel()
+
 	m := newModel()
-	m.power = anim.NewValue(poweredOn) // past the splash
+	m.splash.Skip() // past the splash
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m.View()
 
-	files := m.windows[0] // at the back
-	r, ok := m.ui.Frame().Rect(winID(files.id))
+	files := m.wm.Windows()[0] // at the back
+	r, ok := m.ui.Frame().Rect(files.ID())
 	if !ok {
 		t.Fatal("the files window was not drawn")
 	}
@@ -105,11 +105,11 @@ func TestClickBehind(t *testing.T) { //nolint:paralleltest // See above.
 	at := image.Pt(r.Max.X-3, r.Min.Y)
 	m.Update(tea.MouseClickMsg{X: at.X, Y: at.Y, Button: tea.MouseLeft})
 	m.View()
-	if m.top() != files {
+	if m.wm.Top() != files {
 		t.Fatal("the press did not bring the files window to the front")
 	}
 	m.Update(tea.MouseReleaseMsg{X: at.X, Y: at.Y, Button: tea.MouseLeft})
-	if !files.shut {
-		t.Fatalf("the click did not close the files window: %s", m.status)
+	if !files.Closing() {
+		t.Fatalf("the click did not close the files window: %s", m.bar.Status)
 	}
 }

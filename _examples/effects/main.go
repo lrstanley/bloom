@@ -13,139 +13,41 @@ package main
 
 import (
 	"fmt"
-	"image/color"
-	"math"
 	"os"
 	"time"
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
-	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	uv "github.com/charmbracelet/ultraviolet"
 	tint "github.com/lrstanley/bubbletint/v2"
-)
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintDracula
-
-var (
-	ink     = theme.Fg
-	muted   = theme.BrightBlack
-	accent  = theme.Purple
-	cyan    = theme.Cyan
-	surface = lipgloss.Lighten(theme.Bg, 0.1)
-
-	card   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	name   = lipgloss.NewStyle().Bold(true).Foreground(cyan)
-	sample = lipgloss.NewStyle().Foreground(ink).Background(surface).Padding(0, 1)
-	status = lipgloss.NewStyle().Foreground(muted)
 )
 
 const sampleText = "The quick brown fox\njumps over the lazy\ndog. 0123456789 ✓"
 
-// rainbow is a custom effect: glyphs take a hue by column that fades to
-// their own color as t reaches 1.
-var rainbow = fx.Func(func(s *canvas.Surface, t float64) {
-	for y := range s.Height() {
-		for x := range s.Width() {
-			c := s.Cell(x, y)
-			if c == nil || c.Content == " " {
-				continue
-			}
-			hue := math.Mod(float64(x)/float64(max(s.Width(), 1))+t, 1)
-			c.Style.Fg = s.Mix(hsv(hue), s.Fg(c), t)
-		}
-	}
-})
-
-// sweep is a custom effect: a bright band crosses the node diagonally,
-// leaving it as it was once it is past.
-var sweep = fx.Func(func(s *canvas.Surface, t float64) {
-	pos := t*float64(s.Width()+s.Height()+6) - 3
-	for y := range s.Height() {
-		for x := range s.Width() {
-			if d := math.Abs(float64(x+y) - pos); d < 3 {
-				c := s.Cell(x, y)
-				c.Style.Fg = s.Mix(s.Fg(c), color.White, 1-d/3)
-				c.Style.Bg = s.Mix(s.Bg(c), accent, (1-d/3)*0.6)
-			}
-		}
-	}
-})
-
-// plasma is a [uv.Drawable] painting a moving color field with half blocks,
-// and a [bloom.Measurer] for its natural size.
-type plasma struct{ t float64 } // t is the loop's phase, from 0 to 1
-
-func (p plasma) Measure(avail bloom.Size) bloom.Size {
-	return bloom.Size{W: min(avail.W, 28), H: min(avail.H, 4)}
-}
-
-func (p plasma) Draw(scr uv.Screen, area uv.Rectangle) {
-	phase := p.t * 20 * math.Pi // whole cycles of every wave, so the loop is seamless
-	for y := area.Min.Y; y < area.Max.Y; y++ {
-		for x := area.Min.X; x < area.Max.X; x++ {
-			// v is the field's value at this column, for a row of half
-			// blocks: three waves, across, diagonally, and down.
-			v := func(row float64) float64 {
-				col := float64(x)
-				across := math.Sin(col/4 + phase)
-				diagonal := math.Sin((col+row)/6 + phase*1.3)
-				down := math.Sin(row/3 - phase)
-				return across + diagonal + down
-			}
-			top, bottom := v(float64(2*y)), v(float64(2*y+1))
-			scr.SetCell(x, y, &uv.Cell{Content: "▀", Width: 1, Style: uv.Style{
-				Fg: hsv(math.Mod((top+3)/6+p.t*6, 1)),
-				Bg: hsv(math.Mod((bottom+3)/6+p.t*6, 1)),
-			}})
-		}
-	}
-}
-
-// hsv returns a saturated color of hue h, from 0 to 1.
-func hsv(h float64) color.Color {
-	f := func(n float64) uint8 {
-		k := math.Mod(n+h*6, 6)
-		return uint8(255 * (1 - 0.65*max(0, min(k, 4-k, 1))))
-	}
-	return color.RGBA{R: f(5), G: f(3), B: f(1), A: 0xff}
-}
-
-var gallery = []struct {
-	name    string
-	effects []fx.Effect
-}{
-	{"Fade", []fx.Effect{fx.Fade{}}},
-	{"Slide from the left", []fx.Effect{fx.Slide{From: fx.Left}}},
-	{"Wipe from the top", []fx.Effect{fx.Wipe{From: fx.Top}}},
-	{"Dissolve", []fx.Effect{fx.Dissolve{Seed: 11}}},
-	{"Typewriter", []fx.Effect{fx.Typewriter{}}},
-	{"Scramble + Fade", []fx.Effect{fx.Scramble{Seed: 5}, fx.Fade{}}},
-	{"Custom: rainbow", []fx.Effect{rainbow}},
-	{"Custom: sweep", []fx.Effect{sweep}},
-}
-
 type model struct {
-	ui     *bloom.Root
-	w, h   int
-	t      anim.Sequence // the gallery's progress, in and out, holding at each end
-	phase  anim.Sequence // the plasma's phase
-	paused bool
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
+	gallery []galleryCard // the cards, each with its effects
+	t       anim.Sequence // the gallery's progress, in and out, holding at each end
+	phase   anim.Sequence // the plasma's phase
+	paused  bool
 }
 
 func newModel() *model {
-	return &model{
-		ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
+	m := &model{
+		st: newStyles(tint.TintDracula),
 		t: anim.NewSequence(0,
 			anim.To(1), anim.Hold(700*time.Millisecond),
 			anim.To(0), anim.Hold(700*time.Millisecond),
 		).With(anim.Duration(1400*time.Millisecond), anim.Ease(anim.InOutCubic)),
 		phase: anim.NewLoop(26 * time.Second),
 	}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.gallery = newGallery(m.st.accent)
+	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
@@ -179,31 +81,25 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = theme.Bg
+	v.BackgroundColor = m.st.theme.Bg
 	return v
 }
 
-func (m *model) card(title string, body bloom.Child) bloom.Child {
-	return bloom.Box(card, bloom.Column(
-		bloom.Text(title).Style(name),
-		bloom.Fill(body),
-	))
-}
-
+// layout places the cards in a grid, over the status line.
 func (m *model) layout() bloom.Child {
 	t := m.t.Float()
-	cards := make([]bloom.Child, 0, len(gallery)+1)
-	for _, g := range gallery {
-		text := bloom.Text(sampleText).Style(sample)
-		cards = append(cards, m.card(g.name, bloom.Transition(t, text, g.effects...)))
+	cards := make([]bloom.Child, 0, len(m.gallery)+1)
+	for _, g := range m.gallery {
+		text := bloom.Text(sampleText).Style(m.st.sample)
+		cards = append(cards, m.st.card(g.name, bloom.Transition(t, text, g.effects...)))
 	}
 	drawing := bloom.Drawable(plasma{t: m.phase.Float()})
-	cards = append(cards, m.card("Drawable + Fade", bloom.Transition(t, drawing, fx.Fade{})))
+	cards = append(cards, m.st.card("Drawable + Fade", bloom.Transition(t, drawing, fx.Fade{})))
 
 	hints := fmt.Sprintf(" t = %.2f · space: pause · q: quit", t)
 	return bloom.Column(
 		bloom.Fill(bloom.Grid(3, cards...).Gap(1, 0)),
-		bloom.Text(hints).Style(status).Truncate(),
+		bloom.Text(hints).Style(m.st.status).Truncate(),
 	)
 }
 

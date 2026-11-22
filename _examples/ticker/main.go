@@ -15,43 +15,14 @@ package main
 
 import (
 	"fmt"
-	"image/color"
 	"os"
 	"strings"
 	"time"
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
-	"bloomfx.dev/bloom/fx"
-	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
-)
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintNightOwl
-
-var (
-	fg      = theme.Fg
-	muted   = theme.BrightBlack
-	accent  = theme.Blue
-	good    = theme.Green
-	bad     = theme.Red
-	warn    = theme.Yellow
-	bg      = theme.Bg
-	panelBg = lipgloss.Lighten(theme.Bg, 0.05)
-
-	onBg     = lipgloss.NewStyle().Background(bg)
-	onPanel  = lipgloss.NewStyle().Background(panelBg)
-	header   = onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
-	bar      = onPanel.Foreground(fg).Padding(0, 1)
-	badge    = onBg.Foreground(bg).Background(warn).Bold(true).Padding(0, 1)
-	panel    = onBg.Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	item     = onBg.Foreground(fg).Padding(0, 1)
-	selected = item.Foreground(bg).Background(accent).Bold(true)
-	status   = onBg.Foreground(muted).Padding(0, 1)
-	banner   = onPanel.Border(lipgloss.RoundedBorder()).BorderForeground(warn).Padding(0, 1)
 )
 
 // headlines scroll along the headline bar, one after the other.
@@ -62,40 +33,24 @@ var headlines = []string{
 	"Regulators approve the long-awaited merger of two regional lenders",
 }
 
-type stock struct {
-	name   string
-	price  float64
-	change float64 // percent
-}
-
-var stocks = []stock{
-	{"ACME Corp", 128.40, 1.2},
-	{"Globex International Holdings Group", 412.05, -0.8},
-	{"Initech", 33.17, 0.4},
-	{"Umbrella Pharmaceuticals and Biotechnology Ltd.", 87.92, -2.6},
-	{"Hooli", 215.60, 3.1},
-	{"Stark Industries Advanced Research Division", 530.00, 0.0},
-	{"Wayne Enterprises", 301.75, 1.9},
-	{"Soylent Nutritional Sciences, Incorporated", 19.48, -1.1},
-}
-
 type model struct {
-	ui       *bloom.Root
-	w, h     int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
 	selected int
 	paused   bool
-	alerts   int // banners shown
 
 	headline anim.Sequence // 0 to 1, once around the headline bar, over and over
 	name     anim.Sequence // 0 to 1, once around the selected name
 	pulse    anim.Sequence // 0 to 1 and back, for the live indicator
-	alert    anim.Presence // the banner, shown for a while
+	banner   banner
 }
 
 func newModel() *model {
 	linear := []anim.Option{anim.Ease(anim.Linear), anim.FPS(60)}
-	return &model{
-		ui:       bloom.New(bloom.WithColors(fg, bg)),
+	m := &model{
+		st:       newStyles(tint.TintNightOwl),
 		headline: anim.NewLoop(24*time.Second, anim.FPS(60)),
 		// The name waits a moment, truncated, before it starts to scroll.
 		name: anim.NewSequence(0,
@@ -107,12 +62,11 @@ func newModel() *model {
 			anim.To(1, anim.Duration(900*time.Millisecond)),
 			anim.To(0, anim.Duration(900*time.Millisecond)),
 		).With(anim.Ease(anim.InOutQuad), anim.FPS(30)),
-		alert: anim.NewPresence(
-			anim.Duration(400*time.Millisecond),
-			anim.Ease(anim.OutCubic),
-			anim.FPS(60),
-		),
 	}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.banner = newBanner()
+	m.banner.setStyles(m.st)
+	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
@@ -121,25 +75,31 @@ func (m *model) Init() tea.Cmd {
 	return m.play()
 }
 
-// play starts the motion that runs for as long as the feed is live.
-func (m *model) play() tea.Cmd {
-	return tea.Batch(m.headline.Loop(), m.name.Loop(), m.pulse.Loop())
-}
-
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.ui.Update(msg)}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		cmds = append(cmds, m.key(msg.String()))
+		cmds = append(cmds, m.key(msg))
 	}
-	cmds = append(cmds, anim.Update(msg, &m.headline, &m.name, &m.pulse, &m.alert))
+	cmds = append(cmds, anim.Update(msg, &m.headline, &m.name, &m.pulse, &m.banner.presence))
 	return m, tea.Batch(cmds...)
 }
 
-func (m *model) key(k string) tea.Cmd {
-	switch k {
+func (m *model) View() tea.View {
+	v := m.ui.View(m.w, m.h, m.layout())
+	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = m.st.theme.Bg
+	// The loops slow down while the terminal is not focused.
+	v.ReportFocus = true
+	return v
+}
+
+func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
 	case "q", "ctrl+c":
 		return tea.Quit
 	case "up":
@@ -147,8 +107,7 @@ func (m *model) key(k string) tea.Cmd {
 	case "down":
 		return m.selectItem((m.selected + 1) % len(stocks))
 	case "b":
-		m.alerts++
-		return m.alert.ShowFor(2400 * time.Millisecond)
+		return m.banner.show()
 	case "space":
 		m.paused = !m.paused
 		if m.paused {
@@ -160,6 +119,11 @@ func (m *model) key(k string) tea.Cmd {
 		return m.play()
 	}
 	return nil
+}
+
+// play starts the motion that runs for as long as the feed is live.
+func (m *model) play() tea.Cmd {
+	return tea.Batch(m.headline.Loop(), m.name.Loop(), m.pulse.Loop())
 }
 
 // selectItem selects an item, whose name starts scrolling from the start.
@@ -180,82 +144,32 @@ func (m *model) phase(s *anim.Sequence) float64 {
 	return s.Float()
 }
 
-func (m *model) View() tea.View {
-	v := m.ui.View(m.w, m.h, m.layout())
-	v.AltScreen = true
-	// The terminal takes the theme's background, where terminals let
-	// programs set it.
-	v.BackgroundColor = bg
-	// The loops slow down while the terminal is not focused.
-	v.ReportFocus = true
-	return v
-}
-
+// layout places the title bar and the headlines over the watchlist, with
+// the keys at the bottom, and the banner over it all.
 func (m *model) layout() bloom.Child {
-	pulse := blend(muted, good, m.phase(&m.pulse))
+	pulse := blend(m.st.muted, m.st.good, m.phase(&m.pulse))
 	title := bloom.Row(
-		bloom.Fill(bloom.Text("◆ markets").Style(header)),
-		bloom.Text("•").Style(header.Foreground(pulse).Padding(0)),
-		bloom.Text(" live").Style(header.PaddingLeft(0)),
+		bloom.Fill(bloom.Text("◆ markets").Style(m.st.header)),
+		bloom.Text("•").Style(m.st.pulse.Foreground(pulse)),
+		bloom.Text(" live").Style(m.st.live),
 	)
 
 	const sep = "  ◆  "
-	feed := bloom.Marquee(strings.Join(headlines, sep), m.phase(&m.headline)).Gap(sep).Style(bar)
+	feed := bloom.Marquee(strings.Join(headlines, sep), m.phase(&m.headline)).Gap(sep).Style(m.st.bar)
 	news := bloom.Row(
-		bloom.Text("NEWS").Style(badge),
+		bloom.Text("NEWS").Style(m.st.badge),
 		bloom.Fill(feed),
 	)
 
+	list := watchlist{st: &m.st, selected: m.selected, phase: m.phase(&m.name), pick: m.selectItem}
 	base := bloom.Column(
 		title,
 		news,
-		bloom.Fill(bloom.Box(panel, m.watchlist())),
-		bloom.Text("↑↓ select · b banner · space pause · q quit").Style(status).Truncate(),
+		bloom.Fill(bloom.Box(m.st.panel, list)),
+		bloom.Text("↑↓ select · b banner · space pause · q quit").Style(m.st.status).Truncate(),
 	)
 
-	alert := fmt.Sprintf("◆ Alert %d: %s", m.alerts, stocks[m.selected].name)
-	alertLayer := bloom.Layer(bloom.Box(banner, bloom.Text(alert).Style(onPanel))).
-		Anchor(bloom.End, bloom.Start).
-		Offset(0, 3).
-		Margin(1).
-		Presence(m.alert, fx.Slide{From: fx.Right}, fx.Fade{})
-
-	return bloom.Overlay(base, alertLayer)
-}
-
-// watchlist is a row for each stock, which can be clicked. Long names are
-// cut off, except for the selected one, which scrolls.
-func (m *model) watchlist() bloom.Child {
-	rows := make([]bloom.Child, 0, len(stocks)+1)
-	for i, s := range stocks {
-		st, phase := item, 0.0
-		if i == m.selected {
-			st, phase = selected, m.phase(&m.name)
-		}
-		trend := good
-		if s.change < 0 {
-			trend = bad
-		}
-
-		right := st.Align(lipgloss.Right)
-		price := bloom.Text(fmt.Sprintf("%.2f", s.price)).Style(right)
-		change := bloom.Text(fmt.Sprintf("%+.1f%%", s.change)).Style(right.Foreground(trend))
-		rows = append(rows, bloom.Row(
-			bloom.Fill(bloom.Marquee(s.name, phase).Style(st)),
-			bloom.Fixed(11, price),
-			bloom.Fixed(9, change),
-		).On(on.Click(func() tea.Cmd { return m.selectItem(i) })))
-	}
-	rows = append(rows, bloom.Space())
-	return bloom.Column(rows...)
-}
-
-// blend returns the color t of the way from a to b.
-func blend(a, b color.Color, t float64) color.Color {
-	ar, ag, ab, _ := a.RGBA()
-	br, bg, bb, _ := b.RGBA()
-	mix := func(x, y uint32) uint8 { return uint8((float64(x) + (float64(y)-float64(x))*t) / 257) }
-	return color.RGBA{R: mix(ar, br), G: mix(ag, bg), B: mix(ab, bb), A: 255}
+	return bloom.Overlay(base, m.banner.Layer(stocks[m.selected].name))
 }
 
 func main() {

@@ -10,13 +10,13 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
-	"github.com/lrstanley/bubbletint/chromatint/v2"
 )
 
 // tok is a token on a line of source: the bytes it covers, and its type.
 type tok struct {
-	start, end int
-	typ        chroma.TokenType
+	start int
+	end   int
+	typ   chroma.TokenType
 }
 
 // highlight splits Go source into chroma's tokens for each of its lines. The
@@ -43,22 +43,12 @@ func highlight(lines []string) [][]tok {
 	return out
 }
 
-// codeStyle is the chroma style made from the theme by chromatint, without
-// backgrounds, so the code takes its pane's.
-var codeStyle = func() *chroma.Style {
-	s, err := chroma.NewStyle("golens", chromatint.StyleEntry(theme, false))
-	if err != nil {
-		panic(err)
-	}
-	return s
-}()
-
-// token returns the style of a type of token, from codeStyle.
+// token returns the style of a type of token, from st.codeStyle.
 func (st *styles) token(typ chroma.TokenType) lipgloss.Style {
 	if s, ok := st.code[typ]; ok {
 		return s
 	}
-	e := codeStyle.Get(typ)
+	e := st.codeStyle.Get(typ)
 	s := lipgloss.NewStyle()
 	if e.Colour.IsSet() {
 		s = s.Foreground(lipgloss.Color(e.Colour.String()))

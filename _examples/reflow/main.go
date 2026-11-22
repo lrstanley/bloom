@@ -19,24 +19,7 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
-)
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintNord
-
-var (
-	fg     = theme.Fg
-	muted  = theme.BrightBlack
-	accent = theme.Blue
-	good   = theme.Green
-
-	panel         = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	heading       = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	itemStyle     = lipgloss.NewStyle().Padding(0, 1).Foreground(fg)
-	selectedStyle = itemStyle.Background(lipgloss.Lighten(theme.Bg, 0.12))
-	markerStyle   = lipgloss.NewStyle().Foreground(good).Bold(true)
 )
 
 const (
@@ -48,14 +31,21 @@ const (
 var names = []string{"Atlas", "Birch", "Cedar", "Delta", "Ember"}
 
 type model struct {
-	ui                         *bloom.Root
-	w, h                       int
-	sidebar, details, reversed bool
-	ratio, selected            int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
+	sidebar  bool
+	details  bool
+	reversed bool
+	ratio    int
+	selected int
 }
 
 func newModel() *model {
-	return &model{ui: bloom.New(bloom.WithColors(theme.Fg, theme.Bg)), sidebar: true, details: true, ratio: 30}
+	m := &model{st: newStyles(tint.TintNord), sidebar: true, details: true, ratio: 30}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
@@ -68,24 +58,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "b":
-			m.sidebar = !m.sidebar
-		case "s":
-			m.reversed = !m.reversed
-		case "r":
-			m.ratio += 20
-			if m.ratio > 70 {
-				m.ratio = 30
-			}
-		case "d":
-			m.details = !m.details
-		case "up":
-			m.selected = (m.selected + len(names) - 1) % len(names)
-		case "down":
-			m.selected = (m.selected + 1) % len(names)
+		if quit := m.key(msg); quit != nil {
+			return m, quit
 		}
 	}
 	return m, cmd
@@ -96,10 +70,36 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = theme.Bg
+	v.BackgroundColor = m.st.theme.Bg
 	return v
 }
 
+// key handles a key press, returning tea.Quit for the keys that quit.
+func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return tea.Quit
+	case "b":
+		m.sidebar = !m.sidebar
+	case "s":
+		m.reversed = !m.reversed
+	case "r":
+		m.ratio += 20
+		if m.ratio > 70 {
+			m.ratio = 30
+		}
+	case "d":
+		m.details = !m.details
+	case "up":
+		m.selected = (m.selected + len(names) - 1) % len(names)
+	case "down":
+		m.selected = (m.selected + 1) % len(names)
+	}
+	return nil
+}
+
+// layout places the panes, the lines of status and help, and the marker on
+// top of them.
 func (m *model) layout() bloom.Child {
 	sidebarWidth, detailsHeight := 0, 0
 	if m.sidebar {
@@ -111,17 +111,17 @@ func (m *model) layout() bloom.Child {
 
 	// Every pane has an ID and animates, so it glides to its new place and
 	// size, with its content reflowing as it goes.
-	sidebar := bloom.Fixed(sidebarWidth, bloom.Box(panel, bloom.Text(sidebarText))).
+	sidebar := bloom.Fixed(sidebarWidth, bloom.Box(m.st.panel, bloom.Text(sidebarText))).
 		ID("sidebar").
 		Animate(anim.Spring(16, 0.85))
-	list := bloom.Percent(m.ratio, bloom.Box(panel, m.list())).
+	list := bloom.Percent(m.ratio, bloom.Box(m.st.panel, m.list())).
 		ID("list").
 		Animate()
-	preview := bloom.Fill(bloom.Box(panel, bloom.Text(previewText))).
+	preview := bloom.Fill(bloom.Box(m.st.panel, bloom.Text(previewText))).
 		ID("preview").
 		Animate()
 	selection := bloom.Text("Details\nSelected: " + names[m.selected])
-	details := bloom.Fixed(detailsHeight, bloom.Box(panel, selection)).
+	details := bloom.Fixed(detailsHeight, bloom.Box(m.st.panel, selection)).
 		ID("details").
 		Animate()
 	content := bloom.Fill(bloom.Column(bloom.Fill(bloom.Row(list, preview)), details)).
@@ -134,14 +134,14 @@ func (m *model) layout() bloom.Child {
 	)
 
 	base := bloom.Column(
-		bloom.Text("Reflow / automatic layout animations").Style(heading),
+		bloom.Text("Reflow / automatic layout animations").Style(m.st.heading),
 		bloom.Fill(bloom.Row(sidebar, content)),
 		bloom.Text(status).Truncate(),
 		bloom.Text(help).Truncate(),
 	)
 
 	// The marker follows the selected item wherever it moves.
-	marker := bloom.Layer(bloom.Text("< selected").Style(markerStyle)).
+	marker := bloom.Layer(bloom.Text("< selected").Style(m.st.marker)).
 		Size(10, 1).
 		AnchorTo(names[m.selected], bloom.Right).
 		ID("selection").
@@ -160,9 +160,9 @@ func (m *model) list() bloom.Child {
 
 	items := make([]bloom.Child, 0, len(order)+1)
 	for _, i := range order {
-		style := itemStyle
+		style := m.st.item
 		if i == m.selected {
-			style = selectedStyle
+			style = m.st.selected
 		}
 		item := bloom.Text(names[i]).Style(style)
 		items = append(items, bloom.Fixed(2, item).ID(names[i]).Animate())

@@ -73,8 +73,8 @@ func TestLogs(t *testing.T) {
 	h.Key("q")
 	h.WaitFinished()
 
-	if !m.pos.AtEnd() || m.log.Len() <= preloaded {
-		t.Fatalf("finished at %+v with %d lines", m.pos, m.log.Len())
+	if !m.log.pos.AtEnd() || m.log.buf.Len() <= preloaded {
+		t.Fatalf("finished at %+v with %d lines", m.log.pos, m.log.buf.Len())
 	}
 }
 

@@ -23,37 +23,8 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintKanagawaWave
-
-var (
-	ink     = theme.Fg
-	muted   = theme.BrightBlack
-	accent  = theme.Cyan
-	blue    = theme.Blue
-	warn    = theme.Yellow
-	dark    = theme.Bg
-	surface = lipgloss.Lighten(theme.Bg, 0.1)
-	raised  = lipgloss.Lighten(theme.Bg, 0.15)
-
-	card    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	name    = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	rowEven = lipgloss.NewStyle().Foreground(ink).Background(surface)
-	rowOdd  = rowEven.Background(raised)
-	panel   = rowEven.Border(lipgloss.NormalBorder()).BorderForeground(blue).Padding(0, 1)
-	status  = lipgloss.NewStyle().Foreground(muted)
-	button  = lipgloss.NewStyle().Foreground(dark).Background(accent).Padding(0, 1)
-	dialog  = lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(warn).Padding(1, 3)
-)
-
-const sampleText = "The quick brown fox\njumps over the lazy\ndog. 0123456789 ✓\n" +
-	"Wide glyphs: 世界 ✓\nthe border stays whole"
-
-var items = []string{"Inbox", "Drafts", "Sent", "Archive", "Spam", "Trash"}
 
 // buttonID identifies the buttons that open dialogs.
 type buttonID int
@@ -63,41 +34,11 @@ const (
 	buttonUnfold
 )
 
-// gallery is what the cards show. Body is a list instead of a panel when
-// list is set.
-var gallery = []struct {
-	name    string
-	list    bool
-	effects []fx.Effect
-}{
-	{"Unfold", false, []fx.Effect{fx.Unfold{}}},
-	{"Iris", false, []fx.Effect{fx.Iris{}}},
-	{"Shade", false, []fx.Effect{fx.Shade{Seed: 7}}},
-	{"Blinds from the top", false, []fx.Effect{fx.Blinds{From: fx.Top}}},
-	{"Wave from the bottom", false, []fx.Effect{fx.Wave{From: fx.Bottom}}},
-	{"Wave from the left", false, []fx.Effect{fx.Wave{From: fx.Left}}},
-	{"Stagger: Slide, by rows", true, []fx.Effect{
-		fx.Stagger{Effect: fx.Slide{From: fx.Left}, From: fx.Top},
-	}},
-	{"Stagger: Shade, by columns", false, []fx.Effect{
-		fx.Stagger{Effect: fx.Shade{Seed: 3}, From: fx.Left, Spread: 0.7},
-	}},
-	{"Delay: Fade, then Scramble", false, []fx.Effect{
-		fx.Delay{Effect: fx.Fade{}, To: 0.5},
-		fx.Delay{Effect: fx.Scramble{Seed: 5}, From: 0.5},
-	}},
-	{"Reverse: Wipe, leaving", false, []fx.Effect{
-		fx.Reverse{Effect: fx.Wipe{From: fx.Left}},
-	}},
-	{"Ease: Slide with OutBack", false, []fx.Effect{
-		fx.Ease{Effect: fx.Slide{From: fx.Left}, Easing: anim.OutBack},
-	}},
-	{"Blinds from the left", false, []fx.Effect{fx.Blinds{From: fx.Left, Size: 2}}},
-}
-
 type model struct {
-	ui     *bloom.Root
-	w, h   int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
 	t      anim.Sequence // the gallery's progress, in and out
 	iris   anim.Presence
 	unfold anim.Presence
@@ -107,12 +48,14 @@ type model struct {
 
 func newModel() *model {
 	open := []anim.Option{anim.Duration(500 * time.Millisecond), anim.Ease(anim.InOutCubic)}
-	return &model{
-		ui:     bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
+	m := &model{
+		st:     newStyles(tint.TintKanagawaWave),
 		t:      progress(0, false),
 		iris:   anim.NewPresence(open...),
 		unfold: anim.NewPresence(open...),
 	}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	return m
 }
 
 // progress returns the gallery's progress from start: in and out over and
@@ -168,60 +111,28 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// center returns the middle of the node with the given id in frame, or the
-// zero point, which an iris takes to mean the middle of what it reveals.
-func center(f *bloom.Frame, id buttonID) image.Point {
-	r, ok := f.Rect(id)
-	if !ok {
-		return image.Point{}
-	}
-	return image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
-}
-
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = theme.Bg
+	v.BackgroundColor = m.st.theme.Bg
 	return v
 }
 
-// body returns what a card transitions: a bordered panel, or a list.
-func body(list bool) bloom.Child {
-	if !list {
-		return bloom.Box(panel, bloom.Text(sampleText))
-	}
-	rows := make([]bloom.Child, len(items))
-	for i, item := range items {
-		st := rowEven
-		if i%2 == 1 {
-			st = rowOdd
-		}
-		rows[i] = bloom.Text(fmt.Sprintf(" %-*s", 26, item)).Style(st)
-	}
-	return bloom.Column(rows...)
-}
-
+// layout places the gallery over the bar of buttons, and the dialogs over
+// them both.
 func (m *model) layout() bloom.Child {
 	t := m.t.Float()
-	cards := make([]bloom.Child, len(gallery))
-	for i, g := range gallery {
-		cards[i] = bloom.Box(card, bloom.Column(
-			bloom.Text(g.name).Style(name),
-			bloom.Fill(bloom.Column(bloom.Transition(t, body(g.list), g.effects...))),
-		))
-	}
-
 	bar := bloom.Row(
-		bloom.Text("d").Style(button),
+		bloom.Text("d").Style(m.st.button),
 		bloom.Text("Iris dialog").ID(buttonIris),
-		bloom.Text("u").Style(button),
+		bloom.Text("u").Style(m.st.button),
 		bloom.Text("Unfold dialog").ID(buttonUnfold),
-		bloom.Text(fmt.Sprintf("t = %.2f · space: pause · q: quit", t)).Style(status).Truncate(),
+		bloom.Text(fmt.Sprintf("t = %.2f · space: pause · q: quit", t)).Style(m.st.status).Truncate(),
 	).Gap(1)
 	base := bloom.Column(
-		bloom.Fill(bloom.Grid(4, cards...).Gap(1, 0)),
+		bloom.Fill(gallery{st: &m.st, t: t}),
 		bar,
 	)
 
@@ -240,11 +151,21 @@ func (m *model) layout() bloom.Child {
 // dialog returns a modal layer over a dimmed gallery.
 func (m *model) dialog(title, text string) bloom.LayerNode {
 	content := bloom.Column(
-		bloom.Text(title).Style(name),
+		bloom.Text(title).Style(m.st.name),
 		bloom.Text(strings.TrimSpace(text)),
-		bloom.Text("esc closes").Style(status),
+		bloom.Text("esc closes").Style(m.st.status),
 	)
-	return bloom.Layer(bloom.Box(dialog, content)).Modal().Backdrop(fx.Dim{Amount: 0.6})
+	return bloom.Layer(bloom.Box(m.st.dialog, content)).Modal().Backdrop(fx.Dim{Amount: 0.6})
+}
+
+// center returns the middle of the node with the given id in frame, or the
+// zero point, which an iris takes to mean the middle of what it reveals.
+func center(f *bloom.Frame, id buttonID) image.Point {
+	r, ok := f.Rect(id)
+	if !ok {
+		return image.Point{}
+	}
+	return image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
 }
 
 func main() {

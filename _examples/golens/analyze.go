@@ -60,7 +60,11 @@ type fn struct {
 
 // site is where a callee is named in a function's source: a line of src, and
 // the cells of that line.
-type site struct{ line, col, n int }
+type site struct {
+	line int
+	col  int
+	n    int
+}
 
 // local reports whether f has source in the project.
 func (f *fn) local() bool { return f.kind == kindFunc || f.kind == kindMethod }

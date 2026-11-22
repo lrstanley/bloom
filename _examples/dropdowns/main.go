@@ -21,7 +21,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"bloomfx.dev/bloom"
@@ -29,45 +28,8 @@ import (
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintCatppuccinMacchiato
-
-var (
-	fg      = theme.Fg
-	muted   = theme.BrightBlack
-	accent  = theme.Purple
-	dark    = theme.Bg
-	field   = lipgloss.Lighten(theme.Bg, 0.06)
-	fieldOn = lipgloss.Lighten(theme.Bg, 0.16)
-	listBg  = lipgloss.Lighten(theme.Bg, 0.1)
-
-	heading  = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	text     = lipgloss.NewStyle().Foreground(fg)
-	label    = lipgloss.NewStyle().Foreground(muted)
-	panel    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(1, 2)
-	dialog   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent).Padding(1, 2)
-	input    = lipgloss.NewStyle().Foreground(fg).Background(field).Padding(0, 1)
-	inputOn  = input.Background(fieldOn)
-	button   = lipgloss.NewStyle().Foreground(fg).Background(muted).Padding(0, 2)
-	buttonOn = button.Foreground(dark).Background(accent).Bold(true)
-	status   = lipgloss.NewStyle().Foreground(muted)
-	backdrop = fx.Dim{Amount: 0.5}
-
-	// A list's border joins its field's sides, and the edge facing the
-	// field is left open.
-	list         = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(accent).Background(listBg).BorderBackground(listBg)
-	option       = lipgloss.NewStyle().Foreground(fg).Background(listBg).Padding(0, 1)
-	optionPicked = option.Foreground(accent).Bold(true)
-	optionCursor = option.Foreground(dark).Background(accent)
-)
-
-// selectWidth is the width of a select's field and of its list.
-const selectWidth = 22
 
 // control is the ID of a node that can take focus: a select, or a button,
 // which shows its ID as its label.
@@ -87,23 +49,18 @@ const (
 // scopeSettings is the ID of the settings dialog, a focus scope.
 const scopeSettings = "settings"
 
-// selectField is a field that opens a list of options to pick one from.
-type selectField struct {
-	id      control
-	label   string
-	options []string
-	value   int
-	open    bool
-	cursor  int // the option under the cursor while open
-}
-
 type model struct {
-	ui     *bloom.Root
-	w, h   int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
+	theme    *selectField
+	font     *selectField
+	language *selectField
+	profile  *selectField
+
 	focus  bloom.Focus[control]
 	status string
-
-	theme, font, language, profile *selectField
 
 	settings anim.Presence
 	saved    [3]int // what the dialog's selects were when it opened, for cancel
@@ -111,25 +68,43 @@ type model struct {
 
 func newModel() *model {
 	m := &model{
-		theme: &selectField{id: selectTheme, label: "Theme", options: []string{
-			"Macchiato", "Mocha", "Frappé", "Latte",
-		}},
-		font: &selectField{id: selectFont, label: "Font size", options: []string{
-			"12", "13", "14", "16", "18",
-		}, value: 2},
-		language: &selectField{id: selectLanguage, label: "Language", options: []string{
-			"English", "Deutsch", "Español", "Français", "Italiano", "日本語", "Português", "Svenska",
-		}},
-		profile: &selectField{id: selectProfile, label: "Profile", options: []string{
-			"default", "work", "presentation", "focus",
-		}},
+		st:       newStyles(tint.TintCatppuccinMacchiato),
 		settings: anim.NewPresence(anim.Duration(200 * time.Millisecond)),
 		status:   "press s for the settings, or tab to the profile",
 	}
 	// Clicks move the focus, before the handler of what was clicked runs.
-	m.ui = bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithFocus(&m.focus))
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
+	m.theme = m.newSelect(selectTheme, "Theme", 0, []string{
+		"Macchiato", "Mocha", "Frappé", "Latte",
+	})
+	m.font = m.newSelect(selectFont, "Font size", 2, []string{
+		"12", "13", "14", "16", "18",
+	})
+	m.language = m.newSelect(selectLanguage, "Language", 0, []string{
+		"English", "Deutsch", "Español", "Français", "Italiano", "日本語", "Português", "Svenska",
+	})
+	m.profile = m.newSelect(selectProfile, "Profile", 0, []string{
+		"default", "work", "presentation", "focus",
+	})
 	m.focus.Set(buttonSettings)
 	return m
+}
+
+// newSelect makes a select with ID id, showing options[value]. Opening its
+// list closes the others, and picking an option says so in the status line.
+func (m *model) newSelect(id control, label string, value int, options []string) *selectField {
+	return &selectField{
+		st:         m.st,
+		focus:      &m.focus,
+		closeLists: m.closeLists,
+		picked: func(s *selectField) {
+			m.status = fmt.Sprintf("%s: %s", s.label, s.options[s.value])
+		},
+		id:      id,
+		label:   label,
+		options: options,
+		value:   value,
+	}
 }
 
 // Init does not return the root's Init, which asks the terminal for its
@@ -156,8 +131,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+func (m *model) View() tea.View {
+	v := m.ui.View(m.w, m.h, m.layout())
+	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = m.st.theme.Bg
+	return v
+}
+
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
-	open := m.openList()
+	// The open list, if any, takes the keys that move its cursor and close
+	// it.
+	if open := m.openList(); open != nil && open.key(msg) {
+		return nil
+	}
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return tea.Quit
@@ -165,19 +153,7 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 		if m.focus.Scope() == nil {
 			return m.openSettings()
 		}
-	case "up", "k":
-		if open != nil {
-			open.cursor = (open.cursor + len(open.options) - 1) % len(open.options)
-		}
-	case "down", "j":
-		if open != nil {
-			open.cursor = (open.cursor + 1) % len(open.options)
-		}
 	case "esc":
-		if open != nil {
-			open.open = false
-			return nil
-		}
 		return m.closeSettings(false)
 	}
 	return nil
@@ -202,22 +178,6 @@ func (m *model) closeLists() {
 	for _, s := range m.selects() {
 		s.open = false
 	}
-}
-
-// toggle opens the list of s, or picks the option under its cursor and
-// closes it.
-func (m *model) toggle(s *selectField) {
-	if s.open {
-		m.pick(s, s.cursor)
-		return
-	}
-	m.closeLists()
-	s.open, s.cursor = true, s.value
-}
-
-func (m *model) pick(s *selectField, i int) {
-	s.value, s.open = i, false
-	m.status = fmt.Sprintf("%s: %s", s.label, s.options[i])
 }
 
 func (m *model) openSettings() tea.Cmd {
@@ -246,40 +206,33 @@ func (m *model) closeSettings(save bool) tea.Cmd {
 	return m.settings.Hide()
 }
 
-func (m *model) View() tea.View {
-	v := m.ui.View(m.w, m.h, m.layout())
-	v.AltScreen = true
-	// The terminal takes the theme's background, where terminals let
-	// programs set it.
-	v.BackgroundColor = theme.Bg
-	return v
-}
-
+// layout places the about panel, the status line and the bar, with the
+// settings dialog over them.
 func (m *model) layout() bloom.Child {
-	about := bloom.Box(panel, bloom.Column(
-		bloom.Text("Dropdowns").Style(heading),
+	about := bloom.Box(m.st.panel, bloom.Column(
+		bloom.Text("Dropdowns").Style(m.st.heading),
 		bloom.Fixed(1, nil),
 		bloom.Text("Each select keeps its list in an overlay of its own, next to its field. "+
-			"The list floats, so it's drawn whole past the edges of the dialog it's in.").Style(text),
+			"The list floats, so it's drawn whole past the edges of the dialog it's in.").Style(m.st.text),
 		bloom.Fixed(1, nil),
-		bloom.Text("The profile's list opens above the bar, as there's no room below it.").Style(text),
+		bloom.Text("The profile's list opens above the bar, as there's no room below it.").Style(m.st.text),
 	))
 
 	bar := bloom.Row(
 		m.button(buttonSettings, m.openSettings),
 		bloom.Space(),
-		bloom.Text(m.profile.label).Style(label),
-		bloom.Fixed(selectWidth, m.selectNode(m.profile)),
+		bloom.Text(m.profile.label).Style(m.st.label),
+		bloom.Fixed(selectWidth, m.profile),
 	).Gap(1)
 
 	base := bloom.Column(
 		bloom.Fill(bloom.Centered(bloom.Row(bloom.Fixed(56, about)))),
-		bloom.Text(" "+m.status).Style(status).Truncate(),
+		bloom.Text(" "+m.status).Style(m.st.status).Truncate(),
 		bar,
 	)
 
 	body := bloom.Column(
-		bloom.Text("Settings").Style(heading),
+		bloom.Text("Settings").Style(m.st.heading),
 		m.row(m.theme),
 		m.row(m.font),
 		m.row(m.language),
@@ -289,11 +242,11 @@ func (m *model) layout() bloom.Child {
 			m.button(buttonSave, func() tea.Cmd { return m.closeSettings(true) }),
 		).Gap(2),
 	).Gap(1)
-	settings := bloom.Layer(bloom.Box(dialog, body)).
+	settings := bloom.Layer(bloom.Box(m.st.dialog, body)).
 		ID(scopeSettings).
 		Modal().
 		On(on.ClickOutside(func() tea.Cmd { return m.closeSettings(false) })).
-		Backdrop(backdrop).
+		Backdrop(m.st.backdrop).
 		Shadow(1, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.settings, fx.Fade{})
 	return bloom.Overlay(base, settings)
@@ -302,87 +255,16 @@ func (m *model) layout() bloom.Child {
 // row is a select in the dialog, with its label.
 func (m *model) row(s *selectField) bloom.Child {
 	return bloom.Row(
-		bloom.Fixed(12, bloom.Text(s.label).Style(label)),
-		bloom.Fixed(selectWidth, m.selectNode(s)),
+		bloom.Fixed(12, bloom.Text(s.label).Style(m.st.label)),
+		bloom.Fixed(selectWidth, s),
 	)
-}
-
-// selectNode is the field of s, and its list while it is open. Both are in
-// an overlay of their own, with the list in a layer that floats: the list is
-// placed against the whole screen, and drawn over what the select is in,
-// such as the dialog, rather than cut off at its edges.
-//
-// The click outside handler is on what holds both, as a click on the list is
-// inside what the list is declared in, wherever the list is drawn. So a click
-// on the field to close the list doesn't open it again.
-func (m *model) selectNode(s *selectField) bloom.Child {
-	st := input
-	if m.focus.Is(s.id) {
-		st = inputOn
-	}
-	arrow := "▾"
-	if s.open {
-		arrow = "▴"
-	}
-	// The value, then the arrow at the end of the field, inside its padding.
-	value := s.options[s.value]
-	value += strings.Repeat(" ", max(selectWidth-3-ansi.StringWidth(value), 0))
-	in := bloom.Text(value + arrow).Style(st).
-		ID(s.id).Focusable().
-		On(on.Press(func() tea.Cmd {
-			m.toggle(s)
-			return nil
-		}))
-
-	var layers []bloom.LayerNode
-	if s.open {
-		layers = append(layers, bloom.Layer(optionList{m: m, s: s}).
-			AnchorTo(s.id, bloom.Bottom).
-			Float().
-			Shadow(1, 1, fx.Dim{Amount: 0.6}))
-	}
-	return bloom.Row(bloom.Overlay(in, layers...)).On(on.ClickOutside(func() tea.Cmd {
-		s.open = false
-		return nil
-	}))
-}
-
-// optionList is the open list of a select. It is a component, to read
-// from its Context which side of the field it opened on.
-type optionList struct {
-	m *model
-	s *selectField
-}
-
-func (l optionList) Layout(ctx bloom.Context) bloom.Child {
-	rows := make([]bloom.Child, len(l.s.options))
-	for i, o := range l.s.options {
-		st := option
-		switch i {
-		case l.s.cursor:
-			st = optionCursor
-		case l.s.value:
-			st = optionPicked
-		}
-		rows[i] = bloom.Text(o).Style(st).HoverStyle(optionCursor).On(on.Click(func() tea.Cmd {
-			l.m.pick(l.s, i)
-			return nil
-		}))
-	}
-	// The edge facing the field is open: the list hangs from the field
-	// below it, and stands on it above it.
-	box := list.BorderTop(false)
-	if side, _ := ctx.Side(); side == bloom.Top {
-		box = list.BorderBottom(false)
-	}
-	return bloom.Row(bloom.Fixed(selectWidth, bloom.Box(box, bloom.Column(rows...))))
 }
 
 // button is a button labeled with its ID, which runs press when pressed.
 func (m *model) button(id control, press func() tea.Cmd) bloom.Child {
-	st := button
+	st := m.st.button
 	if m.focus.Is(id) {
-		st = buttonOn
+		st = m.st.buttonOn
 	}
 	return bloom.Text(string(id)).Style(st).ID(id).Focusable().On(on.Press(press))
 }

@@ -18,40 +18,13 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"strings"
 	"time"
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
-	"bloomfx.dev/bloom/fig"
 	"bloomfx.dev/bloom/fig/fonts"
-	"bloomfx.dev/bloom/fx"
-	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
-)
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintTokyoNight
-
-var (
-	fg     = theme.Fg
-	muted  = theme.BrightBlack
-	accent = theme.Blue
-	bg     = theme.Bg
-
-	onBg     = lipgloss.NewStyle().Background(bg)
-	panel    = onBg.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Darken(accent, 0.45))
-	stage    = panel.BorderForeground(accent).Padding(0, 2)
-	title    = onBg.Foreground(accent).Bold(true)
-	text     = onBg.Foreground(fg)
-	dim      = onBg.Foreground(muted)
-	item     = text.Padding(0, 1)
-	selected = onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
-	chip     = onBg.Foreground(muted).Padding(0, 1)
-	chipOn   = onBg.Foreground(bg).Background(theme.Purple).Bold(true).Padding(0, 1)
-	keycap   = onBg.Foreground(fg).Background(lipgloss.Lighten(bg, 0.12)).Padding(0, 1)
 )
 
 // gallery is every bundled font, by name. The gallery starts on figlet's
@@ -61,43 +34,25 @@ var (
 	standard = slices.Index(fonts.Names, "standard")
 )
 
-type paint struct {
-	name  string
-	paint fig.Paint
-}
-
-var (
-	pink, peach = lipgloss.Color("#ff6f91"), lipgloss.Color("#ffc29b")
-	sky, violet = theme.Cyan, theme.Purple
-)
-
-// paints are the paints shown, in order.
-var paints = []paint{
-	{"column", fig.Gradient(pink, peach)},
-	{"diagonal", fig.Gradient(sky, violet, pink).By(fig.ByDiagonal)},
-	{"row", fig.Gradient(peach, pink, violet).By(fig.ByRow)},
-	{"glyph", fig.Gradient(sky, pink).By(fig.ByGlyph)},
-	{"palette", fig.Palette(theme.Red, theme.Yellow, theme.Green, theme.Cyan, theme.Blue)},
-	{"rainbow", fig.Rainbow()},
-	{"metal", fig.Metal()},
-	{"filled", fig.Fill(lipgloss.Darken(violet, 0.55), fig.Solid(peach))},
-}
-
 type model struct {
-	ui    *bloom.Root
-	w, h  int
-	font  int
-	paint int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
+	font  int // index into gallery, the font shown
+	paint int // index into st.paints, the paint in use
 
 	reveal anim.Value // 0 to 1, the glyphs of a new font appearing
 }
 
 func newModel() *model {
-	return &model{
-		ui:     bloom.New(bloom.WithColors(fg, bg)),
+	m := &model{
+		st:     newStyles(tint.TintTokyoNight),
 		font:   standard,
 		reveal: anim.NewValue(1, anim.Duration(300*time.Millisecond), anim.Ease(anim.OutCubic), anim.FPS(60)),
 	}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
@@ -110,21 +65,37 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
+		if k := msg.String(); k == "q" || k == "ctrl+c" {
 			return m, tea.Quit
-		case "down", "j":
-			cmds = append(cmds, m.pickFont(m.font+1))
-		case "up", "k":
-			cmds = append(cmds, m.pickFont(m.font-1))
-		case "right", "l":
-			m.paint = (m.paint + 1) % len(paints)
-		case "left", "h":
-			m.paint = (m.paint + len(paints) - 1) % len(paints)
 		}
+		cmds = append(cmds, m.key(msg))
 	}
 	cmds = append(cmds, anim.Update(msg, &m.reveal))
 	return m, tea.Batch(cmds...)
+}
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.w, m.h, m.layout())
+	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = m.st.theme.Bg
+	return v
+}
+
+// key changes the font or the paint.
+func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "down", "j":
+		return m.stepFont(1)
+	case "up", "k":
+		return m.stepFont(-1)
+	case "right", "l":
+		m.paint = (m.paint + 1) % len(m.st.paints)
+	case "left", "h":
+		m.paint = (m.paint + len(m.st.paints) - 1) % len(m.st.paints)
+	}
+	return nil
 }
 
 // pickFont shows font i, wrapping around the gallery, and reveals it.
@@ -133,118 +104,32 @@ func (m *model) pickFont(i int) tea.Cmd {
 	return m.reveal.Play(0, 1)
 }
 
-func (m *model) View() tea.View {
-	v := m.ui.View(m.w, m.h, m.layout())
-	v.AltScreen = true
-	// The terminal takes the theme's background, where terminals let
-	// programs set it.
-	v.BackgroundColor = bg
-	return v
+// stepFont shows the font by fonts on from the one shown.
+func (m *model) stepFont(by int) tea.Cmd { return m.pickFont(m.font + by) }
+
+// pickPaint uses paint i.
+func (m *model) pickPaint(i int) tea.Cmd {
+	m.paint = i
+	return nil
 }
 
+// layout places the font list beside the stage, with the paints under the
+// stage and the keys at the bottom.
 func (m *model) layout() bloom.Child {
-	font, p := gallery[m.font], paints[m.paint]
-	info := font.Info()
-
-	sample := fig.Text("Bloom!").
-		Font(font).
-		Paint(p.paint).
-		Each(m.reveal.Float(), fx.Decode{Seed: uint32(m.font)}, fx.Fade{}). //nolint:gosec // a font's index.
-		Spread(0.5, fig.Forward).
-		Fallback(bloom.Text("too large for the window: make it bigger").Style(dim))
-
-	shown := bloom.Box(stage, bloom.Centered(sample)).
-		Edge(bloom.Top, bloom.Start, bloom.Text(" "+font.Name()+" ").Style(title)).
-		Edge(bloom.Top, bloom.End, bloom.Text(fmt.Sprintf(" %d rows · %s · %s paint ", info.Height, layoutName(info.Horizontal), p.name)).Style(dim)).
-		Edge(bloom.Bottom, bloom.Center, bloom.Text(" "+credit(info.Comments)+" ").Style(dim).Truncate())
-
-	list := bloom.Box(panel, fontList{m: m}).
-		Edge(bloom.Top, bloom.Start, bloom.Text(" fonts ").Style(title)).
-		Edge(bloom.Bottom, bloom.End, bloom.Text(fmt.Sprintf(" %d/%d ", m.font+1, len(gallery))).Style(dim)).
-		On(on.Scroll(func(_, dy int) tea.Cmd { return m.pickFont(m.font + dy) }))
+	list := fontList{st: &m.st, font: m.font, pick: m.pickFont, step: m.stepFont}
+	shown := stage{st: &m.st, font: m.font, paint: m.st.paints[m.paint], reveal: m.reveal.Float()}
+	paints := paintBar{st: &m.st, paint: m.paint, pick: m.pickPaint}
 
 	return bloom.Column(
 		bloom.Fill(bloom.Row(
 			bloom.Fixed(30, list).Collapsible(1),
 			bloom.Fill(bloom.Column(
 				bloom.Fill(shown),
-				bloom.Row(bloom.Text("paint").Style(title.PaddingRight(1)), bloom.Fill(m.chips())),
+				paints,
 			)).Min(40),
 		)),
-		keys("↑↓", "font", "←→", "paint", "click", "pick", "q", "quit"),
+		m.st.keys("↑↓", "font", "←→", "paint", "click", "pick", "q", "quit"),
 	)
-}
-
-// chips are the paints, the one in use highlighted, each picked by a click.
-func (m *model) chips() bloom.Child {
-	chips := make([]bloom.Child, len(paints))
-	for i, p := range paints {
-		st := chip
-		if i == m.paint {
-			st = chipOn
-		}
-		chips[i] = bloom.Text(p.name).Style(st).On(on.Click(func() tea.Cmd {
-			m.paint = i
-			return nil
-		}))
-	}
-	return bloom.Wrap(chips...).Gap(1, 0)
-}
-
-// fontList is the fonts' names, scrolled to keep the one shown in the
-// middle, as tall as it is given.
-type fontList struct {
-	m *model
-}
-
-func (l fontList) Layout(ctx bloom.Context) bloom.Child {
-	n := min(ctx.Height(), len(gallery))
-	first := min(max(l.m.font-n/2, 0), len(gallery)-n)
-	rows := make([]bloom.Child, 0, n)
-	for i := first; i < first+n; i++ {
-		st, name := item, fonts.Names[i]
-		if i == l.m.font {
-			st, name = selected, "› "+name
-		}
-		rows = append(rows, bloom.Text(name).Style(st).Truncate().On(on.Click(func() tea.Cmd {
-			return l.m.pickFont(i)
-		})))
-	}
-	return bloom.Column(rows...)
-}
-
-// keys is a footer of keys and what they do, as pairs.
-func keys(pairs ...string) bloom.Child {
-	parts := make([]bloom.Child, 0, len(pairs))
-	for i := 0; i+1 < len(pairs); i += 2 {
-		parts = append(parts, bloom.Row(
-			bloom.Text(pairs[i]).Style(keycap),
-			bloom.Text(" "+pairs[i+1]).Style(dim),
-		))
-	}
-	return bloom.Wrap(parts...).Gap(2, 0)
-}
-
-// layoutName describes how a font's glyphs are put side by side.
-func layoutName(m fig.Mode) string {
-	switch m { //nolint:exhaustive // A font's own layout is never Default.
-	case fig.Smushed, fig.Universal:
-		return "smushed"
-	case fig.Fitted:
-		return "fitted"
-	}
-	return "full width"
-}
-
-// credit returns the first line of a font's comments that says who made it.
-func credit(comments []string) string {
-	for _, c := range comments {
-		c = strings.TrimSpace(c)
-		if strings.ContainsFunc(c, func(r rune) bool { return r >= 'A' && r <= 'z' }) && !strings.HasPrefix(c, "SPDX") {
-			return c
-		}
-	}
-	return "no credit given"
 }
 
 func main() {

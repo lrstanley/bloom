@@ -5,59 +5,70 @@
 package main
 
 import (
-	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
+	"github.com/lrstanley/bubbletint/chromatint/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// theme is the bubbletint tint the colors come from.
-var theme = tint.TintKanagawaDragon
-
-// palette is the colors the styles are made from.
-type palette struct {
-	fg, bright, muted, faint, accent color.Color
-	call, method, iface, external    color.Color
-}
-
-var colors = palette{
-	fg:       theme.Fg,
-	bright:   lipgloss.Lighten(theme.Fg, 0.25),
-	muted:    lipgloss.Darken(theme.BrightBlack, 0.3),
-	faint:    lipgloss.Lighten(theme.Bg, 0.22),
-	accent:   theme.BrightRed,
-	call:     theme.BrightYellow,
-	method:   theme.BrightBlue,
-	iface:    theme.BrightCyan,
-	external: lipgloss.Darken(theme.BrightBlack, 0.2),
-}
-
-// The backgrounds, from the screen's up.
-var (
-	bgPanel   = lipgloss.Lighten(theme.Bg, 0.03)
-	bgItem    = lipgloss.Lighten(theme.Bg, 0.05)
-	bgPath    = lipgloss.Lighten(theme.Bg, 0.1)
-	bgHover   = lipgloss.Lighten(theme.Bg, 0.13)
-	bgSel     = lipgloss.Lighten(theme.Bg, 0.16)
-	bgMarked  = lipgloss.Darken(theme.BrightRed, 0.55)
-	bgDialog  = lipgloss.Lighten(theme.Bg, 0.06)
-	bgPreview = lipgloss.Lighten(theme.Bg, 0.025)
-)
-
+// styles are the example's colors and styles, all made from one bubbletint
+// tint by newStyles, so that nothing is a package global. The model keeps
+// them, and gives a copy to each component it keeps. A component built
+// afresh each frame borrows the styles of whatever builds it, by pointer,
+// rather than copying them into every frame.
 type styles struct {
-	text, muted, faint, bright, accent lipgloss.Style
+	theme *tint.Tint // the bubbletint tint the colors come from
 
-	item, itemPath, itemSel, itemPreview, itemHover lipgloss.Style
-	bar                                             lipgloss.Style
-	name, nameSel, nameExternal, meta               lipgloss.Style
-	iconFunc, iconMethod, iconIface, iconExternal   lipgloss.Style
-	wire, wireHot                                   lipgloss.Style
+	text   lipgloss.Style
+	muted  lipgloss.Style
+	faint  lipgloss.Style
+	bright lipgloss.Style
+	accent lipgloss.Style
 
-	panel, dialog, row, rowSel, rowSelBlur lipgloss.Style
-	code                                   map[chroma.TokenType]lipgloss.Style
-	mark, lineNo, lineNoMarked             lipgloss.Style
+	item         lipgloss.Style
+	itemPath     lipgloss.Style
+	itemSel      lipgloss.Style
+	itemPreview  lipgloss.Style
+	itemHover    lipgloss.Style
+	bar          lipgloss.Style
+	name         lipgloss.Style
+	nameSel      lipgloss.Style
+	nameExternal lipgloss.Style
+	meta         lipgloss.Style
+	iconFunc     lipgloss.Style
+	iconMethod   lipgloss.Style
+	iconIface    lipgloss.Style
+	iconExternal lipgloss.Style
+	wire         lipgloss.Style
+	wireHot      lipgloss.Style
+
+	screen       lipgloss.Style
+	panel        lipgloss.Style
+	dialog       lipgloss.Style
+	row          lipgloss.Style
+	rowSel       lipgloss.Style
+	rowSelBlur   lipgloss.Style
+	code         map[chroma.TokenType]lipgloss.Style
+	mark         lipgloss.Style
+	lineNo       lipgloss.Style
+	lineNoMarked lipgloss.Style
+
+	// The lists of the code view, and the results of search, which are rows
+	// without padding, and how each row looks under the pointer.
+	callsPanel      lipgloss.Style
+	rowHover        lipgloss.Style
+	rowSelHover     lipgloss.Style
+	rowSelBlurHover lipgloss.Style
+	result          lipgloss.Style
+	resultSel       lipgloss.Style
+	resultHover     lipgloss.Style
+	resultSelHover  lipgloss.Style
+
+	// codeStyle is the chroma style made from the theme by chromatint,
+	// without backgrounds, so the code takes its pane's.
+	codeStyle *chroma.Style
 
 	// painted caches highlighted lines of code: they are drawn every frame
 	// while anything animates.
@@ -67,50 +78,98 @@ type styles struct {
 // paintKey is a line of a function's code, with the callee whose call sites
 // are marked on it.
 type paintKey struct {
-	f, marked *fn
-	line      int
+	f      *fn
+	marked *fn
+	line   int
 }
 
-func newStyles() *styles {
+// newStyles makes the example's styles from tint t.
+func newStyles(t *tint.Tint) styles {
+	// The colors the styles are made from.
+	var (
+		fg       = t.Fg
+		bright   = lipgloss.Lighten(t.Fg, 0.25)
+		muted    = lipgloss.Darken(t.BrightBlack, 0.3)
+		faint    = lipgloss.Lighten(t.Bg, 0.22)
+		accent   = t.BrightRed
+		call     = t.BrightYellow
+		method   = t.BrightBlue
+		iface    = t.BrightCyan
+		external = lipgloss.Darken(t.BrightBlack, 0.2)
+	)
+
+	// The backgrounds, from the screen's up.
+	var (
+		bgPanel   = lipgloss.Lighten(t.Bg, 0.03)
+		bgItem    = lipgloss.Lighten(t.Bg, 0.05)
+		bgPath    = lipgloss.Lighten(t.Bg, 0.1)
+		bgHover   = lipgloss.Lighten(t.Bg, 0.13)
+		bgSel     = lipgloss.Lighten(t.Bg, 0.16)
+		bgMarked  = lipgloss.Darken(t.BrightRed, 0.55)
+		bgDialog  = lipgloss.Lighten(t.Bg, 0.06)
+		bgPreview = lipgloss.Lighten(t.Bg, 0.025)
+	)
+
+	codeStyle, err := chroma.NewStyle("golens", chromatint.StyleEntry(t, false))
+	if err != nil {
+		panic(err)
+	}
+
 	s := lipgloss.NewStyle()
 	item := s.Background(bgItem).PaddingRight(1)
-	row := s.Foreground(colors.fg).Padding(0, 1)
-	return &styles{
-		text:   s.Foreground(colors.fg),
-		muted:  s.Foreground(colors.muted),
-		faint:  s.Foreground(colors.faint),
-		bright: s.Foreground(colors.bright).Bold(true),
-		accent: s.Foreground(colors.accent),
+	panel := s.Background(bgPanel).Padding(0, 1)
+	row := s.Foreground(fg).Padding(0, 1)
+	rowSel := row.Background(bgSel).Foreground(bright)
+	rowSelBlur := row.Background(bgPath)
+	return styles{
+		theme: t,
+
+		text:   s.Foreground(fg),
+		muted:  s.Foreground(muted),
+		faint:  s.Foreground(faint),
+		bright: s.Foreground(bright).Bold(true),
+		accent: s.Foreground(accent),
 
 		item:         item,
 		itemPath:     item.Background(bgPath),
 		itemSel:      item.Background(bgSel),
 		itemPreview:  item.Background(bgPreview),
 		itemHover:    item.Background(bgHover),
-		bar:          s.Foreground(colors.accent),
-		name:         s.Foreground(colors.fg),
-		nameSel:      s.Foreground(colors.bright).Bold(true),
-		nameExternal: s.Foreground(colors.external).Italic(true),
-		meta:         s.Foreground(colors.muted),
-		iconFunc:     s.Foreground(colors.call),
-		iconMethod:   s.Foreground(colors.method),
-		iconIface:    s.Foreground(colors.iface),
-		iconExternal: s.Foreground(colors.external),
-		wire:         s.Foreground(colors.faint),
-		wireHot:      s.Foreground(colors.accent),
+		bar:          s.Foreground(accent),
+		name:         s.Foreground(fg),
+		nameSel:      s.Foreground(bright).Bold(true),
+		nameExternal: s.Foreground(external).Italic(true),
+		meta:         s.Foreground(muted),
+		iconFunc:     s.Foreground(call),
+		iconMethod:   s.Foreground(method),
+		iconIface:    s.Foreground(iface),
+		iconExternal: s.Foreground(external),
+		wire:         s.Foreground(faint),
+		wireHot:      s.Foreground(accent),
 
-		panel:      s.Background(bgPanel).Padding(0, 1),
-		dialog:     s.Background(bgDialog).Border(lipgloss.RoundedBorder()).BorderForeground(colors.faint).BorderBackground(bgDialog).Padding(0, 1),
+		screen:     s.Background(t.Bg),
+		panel:      panel,
+		dialog:     s.Background(bgDialog).Border(lipgloss.RoundedBorder()).BorderForeground(faint).BorderBackground(bgDialog).Padding(0, 1),
 		row:        row,
-		rowSel:     row.Background(bgSel).Foreground(colors.bright),
-		rowSelBlur: row.Background(bgPath),
+		rowSel:     rowSel,
+		rowSelBlur: rowSelBlur,
 
 		code:         make(map[chroma.TokenType]lipgloss.Style),
-		mark:         s.Foreground(colors.bright).Background(bgMarked).Bold(true),
-		lineNo:       s.Foreground(colors.faint),
-		lineNoMarked: s.Foreground(colors.accent),
+		mark:         s.Foreground(bright).Background(bgMarked).Bold(true),
+		lineNo:       s.Foreground(faint),
+		lineNoMarked: s.Foreground(accent),
 
-		painted: make(map[paintKey]string),
+		callsPanel:      panel.Padding(0),
+		rowHover:        row.Background(bgHover),
+		rowSelHover:     rowSel.Background(bgHover),
+		rowSelBlurHover: rowSelBlur.Background(bgHover),
+		result:          row.Padding(0),
+		resultSel:       rowSel.Padding(0),
+		resultHover:     row.Padding(0).Background(bgHover),
+		resultSelHover:  rowSel.Padding(0).Background(bgHover),
+
+		codeStyle: codeStyle,
+		painted:   make(map[paintKey]string),
 	}
 }
 

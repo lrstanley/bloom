@@ -11,14 +11,21 @@
 // on the taskbar to open apps from and to log out, which shuts it down behind
 // the splash again, and a settings app that changes its theme.
 //
-// Each window is a layer of one overlay, put at a rectangle in the model
-// with Place, so where a window was dropped is only state: the tree is built
-// again from the model each frame. The layers are in the order
-// the windows stack in, and the window on top has the focus. Windows glide
-// with Animate when they are maximized, snapped, or moved with the keyboard,
-// and follow the pointer cell for cell while dragged, leaving Animate off
-// then: it carries on from there once the window is dropped, so a window let
-// go against an edge glides into its half of the screen.
+// Each part of the desktop is a component of its own, in internal:
+//
+//   - theme: the colors and styles, made from a tint. The model and every
+//     component keep a copy, and a theme.ChangeMsg, passed down through
+//     Update, gives each the new ones.
+//   - wm: the window manager, which keeps the windows, draws each as a layer
+//     of the desktop's overlay, and moves, resizes, and snaps them.
+//   - apps: the apps the windows show, and the desktop's icons.
+//   - calc: the calculator app.
+//   - taskbar and startmenu: the bar along the bottom, and its start menu.
+//   - splash: the splash, and the desktop turning on and off behind it.
+//
+// This file has the model, which keeps the components, places them in
+// View, and handles what they ask for with messages, such as an app to
+// launch or a theme to change to.
 //
 // Keys: tab brings the next window to the front; the arrows move the window
 // in front, and shift with the arrows resizes it; f maximizes it, m minimizes
@@ -27,152 +34,123 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"os"
-	"slices"
+	"strings"
 	"time"
 
 	"bloomfx.dev/bloom"
-	"bloomfx.dev/bloom/anim"
+	"bloomfx.dev/bloom/_examples/desktop/internal/apps"
+	"bloomfx.dev/bloom/_examples/desktop/internal/calc"
+	"bloomfx.dev/bloom/_examples/desktop/internal/splash"
+	"bloomfx.dev/bloom/_examples/desktop/internal/startmenu"
+	"bloomfx.dev/bloom/_examples/desktop/internal/taskbar"
+	"bloomfx.dev/bloom/_examples/desktop/internal/theme"
+	"bloomfx.dev/bloom/_examples/desktop/internal/wm"
 	tea "charm.land/bubbletea/v2"
-	tint "github.com/lrstanley/bubbletint/v2"
 )
-
-// theme is the bubbletint tint the desktop's colors come from, which the
-// settings app changes.
-var theme *tint.Tint
-
-// snap is where a window is held, rather than at its own rectangle.
-type snap int
-
-const (
-	snapNone  snap = iota
-	snapMax        // the whole desktop
-	snapLeft       // the left half of the desktop
-	snapRight      // the right half
-)
-
-// window is a window on the desktop. Its rectangle is relative to the
-// desktop, which is the screen less the taskbar, and is where it goes back
-// to when it is no longer maximized or snapped.
-type window struct {
-	id    int
-	app   app
-	title string
-	rect  image.Rectangle
-	snap  snap
-	shut  bool          // closing, and removed once it has faded out
-	slide bool          // it minimizes and comes back by sliding to and from the taskbar
-	pres  anim.Presence // hidden when closing, or minimized to its taskbar button
-
-	// What the window's app shows.
-	file     string            // the file a notes window has open
-	text     *bloom.Buffer     // its text
-	at       bloom.ViewportPos // where it is scrolled to
-	selected int               // the file selected in the files window
-}
-
-// grab is a window being dragged by its title bar, or resized by its corner.
-type grab struct {
-	win   *window
-	from  image.Rectangle // where the window was when the button went down
-	at    image.Point     // where the pointer was last seen
-	moved bool            // the pointer has moved since
-	zone  snap            // where the window goes if dropped now
-}
 
 type model struct {
-	ui      *bloom.Root
-	w, h    int
-	windows []*window // bottom to top: the last one is in front, with the focus
-	nextID  int
-	icon    app // the desktop icon selected, or -1 for none
-	grab    *grab
-	preview anim.Presence   // the outline of where a dragged window would snap
-	target  image.Rectangle // where the preview is, kept as it fades out
-	calc    calc
-	paper   string // the wallpaper, drawn for the desktop's size
-	status  string
-	start   tea.Cmd       // opens the first windows
-	menu    anim.Presence // the start menu
+	ui   *bloom.Root
+	st   theme.Styles
+	w, h int
 
-	// power runs from 0 to 1 as the splash starts up, and on to poweredOn as
-	// the desktop turns on, and back down to 0 once off, to shut down.
-	power anim.Value
+	splash *splash.Splash
+	wm     *wm.Manager
+	icons  *apps.Icons
+	menu   *startmenu.Menu
+	bar    *taskbar.Taskbar
+	// calc is the one calculator, which keeps its sum while its window is
+	// closed.
+	calc *calc.Calc
 
-	now func() time.Time // the time the taskbar's clock shows
+	paper string  // the wallpaper, drawn for the desktop's size
+	start tea.Cmd // opens the first windows
 }
 
-// poweredOn is where power rests while the desktop is on. Past 1, the
-// desktop turns on, which takes a fifth of the time power takes to get here.
-const poweredOn = 1.25
-
-// clockMsg redraws the taskbar's clock, as the minute it shows turns over.
-type clockMsg struct{}
-
-// themeMsg tells the root the colors of the theme, once it has changed, for
-// the effects that blend them.
-type themeMsg struct{}
-
-// tick returns the command for the next clockMsg, at the start of the next
-// minute.
-func (m *model) tick() tea.Cmd {
-	now := m.now()
-	return tea.Tick(now.Truncate(time.Minute).Add(time.Minute).Sub(now), func(time.Time) tea.Msg { return clockMsg{} })
+// windowKey tells the windows apart, for an app, or a file, to open in one
+// window only.
+type windowKey struct {
+	app  apps.App
+	file string // the file a notes window has open
 }
 
 func newModel() *model {
-	setTheme(tint.TintRosePineMoon)
-	m := &model{
-		ui:      bloom.New(bloom.WithColors(theme.Fg, theme.Bg)),
-		preview: anim.NewPresence(anim.Duration(120 * time.Millisecond)),
-		menu:    anim.NewPresence(anim.Duration(150 * time.Millisecond)),
-		power:   anim.NewValue(0, anim.Duration(2*time.Second), anim.Ease(anim.Linear)),
-		now:     time.Now,
-		icon:    -1,
-		calc:    newCalc(),
-	}
-	m.start = tea.Batch(m.open(appFiles, ""), m.open(appNotes, "README.md"), m.open(appCalc, ""))
-	m.raise(m.windows[1])
-	m.status = "drag a title to move a window, or its ◢ to resize it; tab cycles; q logs out"
+	m := &model{st: theme.NewStyles(theme.Tints[0])}
+	m.ui = bloom.New(bloom.WithColors(m.st.Tint.Fg, m.st.Tint.Bg))
+	m.splash = splash.New().SetStyles(m.st)
+	m.wm = wm.New(m.ui.Frame, m.say).SetStyles(m.st)
+	m.icons = apps.NewIcons().SetStyles(m.st)
+	m.menu = startmenu.New().SetStyles(m.st)
+	m.bar = taskbar.New(m.wm, m.menu).SetStyles(m.st)
+	m.calc = calc.New() // given its styles as its window opens
+
+	m.start = tea.Batch(m.open(apps.Files, ""), m.open(apps.Notes, "README.md"), m.open(apps.Calc, ""))
+	m.wm.Raise(m.wm.Windows()[1])
+	m.say("drag a title to move a window, or its ◢ to resize it; tab cycles; q logs out")
 	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
 // colors: the theme's are used instead.
-func (m *model) Init() tea.Cmd { return tea.Batch(m.start, m.power.To(poweredOn), m.tick()) }
+func (m *model) Init() tea.Cmd { return tea.Batch(m.start, m.splash.Start(), m.bar.Tick()) }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.ui.Update(msg)}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-		d := m.desk()
-		m.paper = wallpaper(d.Dx(), d.Dy())
+		// The desktop is the screen above the taskbar.
+		dw, dh := m.w, max(m.h-1, 0)
+		m.wm.Resize(dw, dh)
+		m.paper = wallpaper(dw, dh)
 	case tea.KeyPressMsg:
 		cmds = append(cmds, m.key(msg))
-	case clockMsg:
-		cmds = append(cmds, m.tick())
-	case themeMsg:
-		cmds = append(cmds, m.ui.Update(tea.BackgroundColorMsg{Color: theme.Bg}), m.ui.Update(tea.ForegroundColorMsg{Color: theme.Fg}))
+	case apps.LaunchMsg:
+		cmds = append(cmds, m.launch(msg.App))
+	case apps.OpenMsg:
+		cmds = append(cmds, m.open(apps.Notes, msg.File))
+	case theme.ChangeMsg:
+		cmds = append(cmds, m.setTheme(*msg.Styles))
+	case startmenu.LogoutMsg:
+		cmds = append(cmds, m.logout())
 	}
 
-	anims := []anim.Animation{&m.preview, &m.menu, &m.power}
-	for _, w := range m.windows {
-		anims = append(anims, &w.pres)
-	}
-	cmds = append(cmds, anim.Update(msg, anims...))
-
-	// A closed window goes once it has faded out.
-	m.windows = slices.DeleteFunc(m.windows, func(w *window) bool { return w.shut && !w.pres.Visible() })
-	if m.off() && m.power.Float() <= 0 {
+	// Each component takes every message too, for its animations, and for
+	// the styles of a new theme.
+	cmds = append(cmds,
+		m.splash.Update(msg), m.wm.Update(msg), m.icons.Update(msg), m.menu.Update(msg), m.bar.Update(msg),
+	)
+	if m.splash.Done() {
 		return m, tea.Quit
 	}
 	return m, tea.Batch(cmds...)
 }
 
+func (m *model) View() tea.View {
+	// The desktop, its icons and windows over the wallpaper, above the
+	// taskbar, behind the splash.
+	v := m.ui.View(
+		m.w, m.h,
+		m.splash.Screen(func() bloom.Child {
+			return bloom.Column(
+				bloom.Fill(bloom.Overlay(
+					bloom.Text(m.paper).Style(m.st.Paper),
+					append([]bloom.LayerNode{m.icons.Layer()}, m.wm.Layers()...)...,
+				)),
+				bloom.Fixed(1, m.bar),
+			)
+		}),
+	)
+	v.AltScreen = true
+	v.WindowTitle = "desktop"
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = m.st.Tint.Bg
+	return v
+}
+
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
-	if m.off() && msg.String() != "ctrl+c" {
+	if m.splash.Off() && msg.String() != "ctrl+c" {
 		return nil
 	}
 	switch msg.String() {
@@ -180,51 +158,82 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return tea.Quit
 	case "q":
 		return m.logout()
-	case "tab":
-		return m.cycle()
 	case "1", "2", "3", "4":
-		return m.launch(apps[msg.String()[0]-'1'])
+		return m.launch(apps.All[msg.String()[0]-'1'])
 	}
-
-	w := m.top()
-	if w == nil {
-		return nil
-	}
-	switch msg.String() {
-	case "left":
-		m.nudge(w, image.Pt(-2, 0), false)
-	case "right":
-		m.nudge(w, image.Pt(2, 0), false)
-	case "up":
-		m.nudge(w, image.Pt(0, -1), false)
-	case "down":
-		m.nudge(w, image.Pt(0, 1), false)
-	case "shift+left":
-		m.nudge(w, image.Pt(-2, 0), true)
-	case "shift+right":
-		m.nudge(w, image.Pt(2, 0), true)
-	case "shift+up":
-		m.nudge(w, image.Pt(0, -1), true)
-	case "shift+down":
-		m.nudge(w, image.Pt(0, 1), true)
-	case "f":
-		m.toggleMax(w)
-	case "m":
-		return m.minimize(w)
-	case "w":
-		return m.close(w)
-	}
-	return nil
+	return m.wm.Key(msg)
 }
 
-func (m *model) View() tea.View {
-	v := m.ui.View(m.w, m.h, m.screen())
-	v.AltScreen = true
-	v.WindowTitle = "desktop"
-	// The terminal takes the theme's background, where terminals let
-	// programs set it.
-	v.BackgroundColor = theme.Bg
-	return v
+// say shows what was done last on the taskbar.
+func (m *model) say(status string) { m.bar.Status = status }
+
+// launch opens app a, and the README for notes.
+func (m *model) launch(a apps.App) tea.Cmd {
+	if a == apps.Notes {
+		return m.open(a, "README.md")
+	}
+	return m.open(a, "")
+}
+
+// open opens a window of app a, showing file f for notes, or brings the one
+// already open to the front.
+func (m *model) open(a apps.App, f string) tea.Cmd {
+	key := windowKey{app: a, file: f}
+	if w := m.wm.Find(key); w != nil {
+		return m.wm.Restore(w)
+	}
+	w := &wm.Window{Key: key, Title: a.Name(), Glyph: a.Glyph(), Rect: a.Place(), Min: a.Min()}
+	switch a {
+	case apps.Files:
+		w.Content = apps.NewFileList().SetStyles(m.st)
+	case apps.Notes:
+		notes := apps.NewNotepad(f).SetStyles(m.st)
+		w.Title, w.Content, w.Scroll, w.Cascade = f, notes, notes.ScrollID(), true
+	case apps.Calc:
+		// The calculator is given the styles each time its window opens, as it
+		// misses any theme change while its window is closed.
+		w.Content = m.calc.SetStyles(m.st)
+	case apps.Settings:
+		w.Content = apps.NewSettings().SetStyles(m.st)
+	}
+	return m.wm.Open(w)
+}
+
+// setTheme takes the styles of a new theme, which Update then gives each
+// component too, and tells the root the theme's colors, for the effects that
+// blend them.
+func (m *model) setTheme(st theme.Styles) tea.Cmd {
+	m.st = st
+	t := st.Tint
+	m.say("changed the theme to " + t.DisplayName)
+	return tea.Batch(m.ui.Update(tea.BackgroundColorMsg{Color: t.Bg}), m.ui.Update(tea.ForegroundColorMsg{Color: t.Fg}))
+}
+
+// logout shuts the desktop down: it shades out to the splash, which runs
+// back down, and the program quits once it has.
+func (m *model) logout() tea.Cmd {
+	if m.splash.Off() {
+		return nil
+	}
+	return tea.Batch(m.menu.Hide(), m.splash.Shutdown())
+}
+
+// wallpaper is a w×h field of dots, for the desktop's background.
+func wallpaper(w, h int) string {
+	var b strings.Builder
+	for y := range h {
+		for x := range w {
+			if (x+y*3)%8 == 0 && y%2 == 0 {
+				b.WriteString("·")
+			} else {
+				b.WriteByte(' ')
+			}
+		}
+		if y < h-1 {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
 
 func main() {

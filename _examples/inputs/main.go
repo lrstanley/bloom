@@ -24,15 +24,6 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintEverforestDarkMed
-
-var (
-	panel   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(theme.BrightBlack).Padding(0, 1)
-	focused = panel.BorderForeground(theme.Green)
-	hint    = lipgloss.NewStyle().Foreground(theme.BrightBlack).Padding(0, 1)
-)
-
 // pane is the ID of a box that takes focus.
 type pane string
 
@@ -44,10 +35,12 @@ const (
 var panes = []pane{paneLeft, paneRight}
 
 type model struct {
-	ui     *bloom.Root
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
 	focus  bloom.Focus[pane]
 	inputs map[pane]*textinput.Model
-	w, h   int
 }
 
 // newInput returns the input in the box with ID id.
@@ -64,12 +57,13 @@ func newInput(id pane) *textinput.Model {
 }
 
 func newModel() *model {
-	m := &model{inputs: map[pane]*textinput.Model{
+	m := &model{st: newStyles(tint.TintEverforestDarkMed)}
+	// Clicks move the focus.
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
+	m.inputs = map[pane]*textinput.Model{
 		paneLeft:  newInput(paneLeft),
 		paneRight: newInput(paneRight),
-	}}
-	// Clicks move the focus.
-	m.ui = bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithFocus(&m.focus))
+	}
 	m.focus.Set(paneLeft)
 	return m
 }
@@ -77,38 +71,6 @@ func newModel() *model {
 // Init does not return the root's Init, which asks the terminal for its
 // colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd { return nil }
-
-func (m *model) layout() bloom.Child {
-	boxes := make([]bloom.Child, 0, len(panes))
-	for _, id := range panes {
-		st := panel
-		if m.focus.Is(id) {
-			st = focused
-		}
-		in := m.inputs[id]
-		// The text with the cursor needs no ID: the box around it is what
-		// takes the focus.
-		field := bloom.Text(in.View()).Cursor(in.Cursor())
-		boxes = append(boxes, bloom.Fill(bloom.Box(st, field)).ID(id).Focusable())
-	}
-	cur, _ := m.focus.Current()
-	return bloom.Column(
-		bloom.Auto(bloom.Row(boxes...)),
-		bloom.Auto(bloom.Text(fmt.Sprintf("focus: %s · tab or click to move it · esc quits", cur)).Style(hint)),
-	)
-}
-
-// resize gives each input the width of its box, inside the border and
-// padding, less its prompt and a cell for the cursor after the text.
-func (m *model) resize() {
-	frame := bloom.Solve(m.w, m.h, m.layout())
-	for _, id := range panes {
-		if r, ok := frame.Rect(id); ok {
-			in := m.inputs[id]
-			in.SetWidth(max(0, r.Dx()-panel.GetHorizontalFrameSize()-lipgloss.Width(in.Prompt)-1))
-		}
-	}
-}
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -139,8 +101,41 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = theme.Bg
+	v.BackgroundColor = m.st.theme.Bg
 	return v
+}
+
+// layout places a box for each input, and the line of help under them.
+func (m *model) layout() bloom.Child {
+	boxes := make([]bloom.Child, 0, len(panes))
+	for _, id := range panes {
+		st := m.st.panel
+		if m.focus.Is(id) {
+			st = m.st.focused
+		}
+		in := m.inputs[id]
+		// The text with the cursor needs no ID: the box around it is what
+		// takes the focus.
+		field := bloom.Text(in.View()).Cursor(in.Cursor())
+		boxes = append(boxes, bloom.Fill(bloom.Box(st, field)).ID(id).Focusable())
+	}
+	cur, _ := m.focus.Current()
+	return bloom.Column(
+		bloom.Auto(bloom.Row(boxes...)),
+		bloom.Auto(bloom.Text(fmt.Sprintf("focus: %s · tab or click to move it · esc quits", cur)).Style(m.st.hint)),
+	)
+}
+
+// resize gives each input the width of its box, inside the border and
+// padding, less its prompt and a cell for the cursor after the text.
+func (m *model) resize() {
+	frame := bloom.Solve(m.w, m.h, m.layout())
+	for _, id := range panes {
+		if r, ok := frame.Rect(id); ok {
+			in := m.inputs[id]
+			in.SetWidth(max(0, r.Dx()-m.st.panel.GetHorizontalFrameSize()-lipgloss.Width(in.Prompt)-1))
+		}
+	}
 }
 
 func main() {

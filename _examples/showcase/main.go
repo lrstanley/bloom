@@ -18,12 +18,11 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"slices"
 	"time"
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
-	"bloomfx.dev/bloom/on"
+	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
@@ -49,43 +48,31 @@ const (
 	paneServices paneID = "Services"
 )
 
-// tourSteps are what the tour says, about the pane it spotlights.
-var tourSteps = []struct {
-	pane        paneID
-	title, text string
-}{
-	{paneTints, "Tints", "Every color is from a bubbletint theme. Click one to switch."},
-	{paneActivity, "Panes", "Drag a title to move a pane. Double click to zoom."},
-	{paneServices, "Responsive", "Narrow the terminal and panes collapse, lowest priority first."},
-}
+const hints = "drag a title to move a pane · double click it to zoom · t tint · ? tour · q quit"
 
 type model struct {
 	ui   *bloom.Root
-	w, h int
-	tint int
 	st   styles
+	w, h int
+	tint int // the tint in use, an index of tints.
 
-	order    []paneID // the panes right of the sidebar, left to right.
-	zoomed   paneID   // the pane taking the full width, if any.
-	zooming  bool     // the panes glide, through a zoom, rather than fly.
-	selected int      // the selected service.
+	order   []paneID // the panes right of the sidebar, left to right.
+	zoomed  paneID   // the pane taking the full width, if any.
+	zooming bool     // the panes glide, through a zoom, rather than fly.
 
 	// The pane being dragged by its title, if any: where it was grabbed,
 	// its size when picked up, and where the pointer is.
-	dragging       paneID
-	grab, size, at image.Point
+	dragging paneID
+	grab     image.Point
+	size     image.Point
+	at       image.Point
 
-	bars anim.Sequence // loops, moving the activity bars.
-	wave anim.Value    // the panes' entrance, played again for each tint.
+	wave anim.Value // the panes' entrance, played again for each tint.
 
-	toast     anim.Presence
-	toastText anim.Value // decodes the toast's text.
-	note      string
-	notes     uint32 // how many toasts there have been, to vary the decode.
-
-	step     int // the tour step, from 1, kept while the tour fades out.
-	tourOn   anim.Presence
-	tourText anim.Value
+	activity activity
+	services serviceList
+	toast    toast
+	tour     tour
 }
 
 func newModel() *model {
@@ -95,23 +82,22 @@ func newModel() *model {
 		return anim.NewValue(1, anim.Duration(d), anim.Ease(anim.Linear))
 	}
 	m := &model{
-		order:     []paneID{paneActivity, panePalette, paneServices},
-		bars:      anim.NewLoop(6 * time.Second),
-		wave:      effect(500 * time.Millisecond),
-		toast:     anim.NewPresence(anim.Spring(9, 0.6)),
-		toastText: effect(700 * time.Millisecond),
-		tourOn:    anim.NewPresence(anim.Duration(250 * time.Millisecond)),
-		tourText:  effect(800 * time.Millisecond),
+		st:    newStyles(tints[0]),
+		order: []paneID{paneActivity, panePalette, paneServices},
+		wave:  effect(500 * time.Millisecond),
 	}
-	m.ui = bloom.New(bloom.WithColors(tints[0].Fg, tints[0].Bg))
-	m.st = newStyles(tints[0])
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.activity = activity{st: m.st, bars: anim.NewLoop(6 * time.Second)}
+	m.services = serviceList{st: m.st}
+	m.toast = toast{st: m.st, shown: anim.NewPresence(anim.Spring(9, 0.6)), text: effect(700 * time.Millisecond)}
+	m.tour = tour{st: m.st, shown: anim.NewPresence(anim.Duration(250 * time.Millisecond)), text: effect(800 * time.Millisecond)}
 	return m
 }
 
 // Init does not return the root's Init, which asks the terminal for its
 // colors: the tint's colors are used instead.
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(m.bars.Loop(), m.wave.Play(0, 1))
+	return tea.Batch(m.activity.bars.Loop(), m.wave.Play(0, 1))
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -122,8 +108,26 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		cmds = append(cmds, m.key(msg))
 	}
-	cmds = append(cmds, anim.Update(msg, &m.bars, &m.wave, &m.toast, &m.toastText, &m.tourOn, &m.tourText))
+	cmds = append(cmds, m.updateComponents(msg), anim.Update(msg, &m.wave))
 	return m, tea.Batch(cmds...)
+}
+
+// updateComponents gives msg to each component: its animations move along,
+// and a themeMsg gives it the new styles.
+func (m *model) updateComponents(msg tea.Msg) tea.Cmd {
+	m.services.Update(msg)
+	return tea.Batch(m.activity.Update(msg), m.toast.Update(msg), m.tour.Update(msg))
+}
+
+func (m *model) View() tea.View {
+	v := m.ui.View(m.w, m.h, m.layout())
+	v.AltScreen = true
+	// The terminal takes the tint's background too, around and beneath the
+	// layout, where terminals let programs set it.
+	v.BackgroundColor = m.st.theme.Bg
+	// The bars slow down while the terminal is not focused.
+	v.ReportFocus = true
+	return v
 }
 
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
@@ -135,91 +139,74 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case "T", "shift+t":
 		return m.switchTint(m.tint - 1)
 	case "?":
-		if !m.tourOn.Shown() {
-			m.step = 0
-		}
-		m.step++
-		if m.step > len(tourSteps) {
-			return m.tourOn.Hide()
-		}
-		return tea.Batch(m.tourOn.Show(), m.tourText.Play(0, 1))
+		return m.tour.next()
 	case "esc":
-		return m.tourOn.Hide()
+		return m.tour.shown.Hide()
 	}
 	return nil
 }
 
 // switchTint changes to tint i, wrapping around, waving the panes back in
-// with its colors.
+// with its colors. It changes the theme at once, rather than with a command,
+// so that presses of t that arrive together each move on a tint.
 func (m *model) switchTint(i int) tea.Cmd {
 	m.tint = (i + len(tints)) % len(tints)
-	t := tints[m.tint]
-	m.st = newStyles(t)
+	m.st = newStyles(tints[m.tint])
+	t := m.st.theme
+
+	// Each component keeps a copy of the styles of its own, and takes the new
+	// ones from a themeMsg.
+	themed := m.updateComponents(themeMsg{st: &m.st})
+
 	// The view gives the terminal the tint's colors. The root is told, as
 	// the terminal would tell it, for effects such as the tour's spotlight
 	// that blend toward them.
 	return tea.Batch(
+		themed,
 		m.ui.Update(tea.ForegroundColorMsg{Color: t.Fg}),
 		m.ui.Update(tea.BackgroundColorMsg{Color: t.Bg}),
 		m.wave.Play(0, 1),
-		m.notify("✦ "+t.DisplayName),
+		m.toast.notify("✦ "+t.DisplayName),
 	)
 }
 
-// notify shows text in the toast, decoding it into place.
-func (m *model) notify(text string) tea.Cmd {
-	m.note = text
-	m.notes++
-	return tea.Batch(m.toast.ShowFor(2*time.Second), m.toastText.Play(0, 1))
-}
+// themeMsg gives a component the styles of a new theme, which it copies.
+// They are held by pointer so that the message stays small, as each
+// component checks every message for it.
+type themeMsg struct{ st *styles }
 
-// drag lifts pane id out of the row once its title is dragged, to float
-// under the pointer, and moves its place in the row to wherever the pointer
-// is. The other panes glide out of the way, and when it is dropped, it
-// glides into its place.
-func (m *model) drag(id paneID, e on.Event) tea.Cmd {
-	if e.Done {
-		m.dragging = ""
-		return nil
+// layout places the panes in a row under the header, with the toast and the
+// tour over them, and the dragged pane, if any, over those.
+func (m *model) layout() bloom.Child {
+	row := []bloom.Child{m.slot(paneTints)}
+	for _, id := range m.order {
+		row = append(row, m.slot(id))
 	}
-	if m.dragging == "" {
-		// A press is not a drag until the pointer moves.
-		r, ok := m.ui.Frame().Rect(id)
-		if !ok || m.zoomed != "" || e.Screen == e.Start {
-			return nil
-		}
-		m.dragging, m.grab, m.size, m.zooming = id, e.Start.Sub(r.Min), r.Size(), false
-	}
-	m.at = e.Screen
 
-	// The pane goes after the last of the others on screen whose middle the
-	// pointer is past, or before the first on screen if it is past none, so
-	// panes collapsed out of sight keep their places around it.
-	others := slices.DeleteFunc(slices.Clone(m.order), func(p paneID) bool { return p == id })
-	i, placed := slices.Index(m.order, id), false
-	for j, p := range others {
-		r, ok := m.ui.Frame().Rect(p)
-		switch {
-		case !ok:
-		case (r.Min.X+r.Max.X)/2 < e.Screen.X:
-			i, placed = j+1, true
-		case !placed:
-			i, placed = j, true
-		}
+	// Each tint's colors wave in. A transition's cells replace what is
+	// beneath them, background and all, so the body brings its own.
+	body := bloom.Child(bloom.Box(m.st.base, bloom.Row(row...).Gap(1)))
+	if m.wave.Animating() {
+		body = bloom.Transition(m.wave.Float(), body, fx.Wave{From: fx.Left})
 	}
-	m.order = slices.Insert(others, i, id)
-	return nil
-}
 
-// zoom gives pane id the full width, or gives the others theirs back.
-func (m *model) zoom(id paneID) tea.Cmd {
-	m.zooming = true
-	if m.zoomed == id {
-		m.zoomed = ""
-		return nil
+	header := bloom.Row(
+		bloom.Text("❀ bloom").Style(m.st.logo),
+		bloom.Text("showcase").Style(m.st.muted),
+		bloom.Space(),
+		bloom.Text(m.st.theme.DisplayName).Style(m.st.badge),
+	).Gap(1)
+
+	screen := bloom.Box(m.st.screen, bloom.Column(
+		header,
+		bloom.Fill(body),
+		bloom.Text(hints).Style(m.st.muted).Truncate(),
+	))
+	layers := []bloom.LayerNode{m.toast.Layer(), m.tour.Layer(m.ui.Frame())}
+	if m.dragging != "" {
+		layers = append([]bloom.LayerNode{m.dragLayer()}, layers...)
 	}
-	m.zoomed = id
-	return m.notify("⤢ " + string(id))
+	return bloom.Overlay(screen, layers...)
 }
 
 func main() {

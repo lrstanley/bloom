@@ -21,7 +21,7 @@ func TestFonts(t *testing.T) {
 	h.Wait("› standard").Wait("column paint").Sleep(demo.Hold(900 * time.Millisecond))
 
 	// The paints, on the standard font.
-	for _, p := range paints[1:] {
+	for _, p := range m.st.paints[1:] {
 		h.Key("right").Wait(p.name + " paint").Sleep(demo.Hold(450 * time.Millisecond))
 	}
 	// Back to coloring each glyph on its own.
@@ -45,7 +45,7 @@ func TestFonts(t *testing.T) {
 	h.Key("up").Wait("› smslant").Sleep(demo.Hold(600 * time.Millisecond))
 	h.Key("q")
 	h.WaitFinished()
-	if m.font != standard-1 || m.paint != len(paints)-1 {
-		t.Fatalf("font %d, paint %d, want %d and %d", m.font, m.paint, standard-1, len(paints)-1)
+	if m.font != standard-1 || m.paint != len(m.st.paints)-1 {
+		t.Fatalf("font %d, paint %d, want %d and %d", m.font, m.paint, standard-1, len(m.st.paints)-1)
 	}
 }

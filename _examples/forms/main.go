@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 	"time"
 
 	"bloomfx.dev/bloom"
@@ -28,40 +27,7 @@ import (
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 	tint "github.com/lrstanley/bubbletint/v2"
-)
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintRosePine
-
-var (
-	fg      = theme.Fg
-	muted   = theme.BrightBlack
-	accent  = theme.Purple
-	warn    = theme.Red
-	good    = theme.Cyan
-	dark    = theme.Bg
-	field   = lipgloss.Lighten(theme.Bg, 0.05)
-	fieldOn = lipgloss.Lighten(theme.Bg, 0.16)
-
-	rounded   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
-	panel     = rounded.BorderForeground(muted).Padding(1, 2)
-	heading   = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	label     = lipgloss.NewStyle().Foreground(muted)
-	input     = lipgloss.NewStyle().Foreground(fg).Background(field).Padding(0, 1)
-	inputOn   = input.Background(fieldOn)
-	hint      = input.Foreground(muted)
-	button    = lipgloss.NewStyle().Foreground(fg).Background(muted).Padding(0, 2)
-	buttonOn  = button.Foreground(dark).Background(accent).Bold(true)
-	dropdown  = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(accent)
-	option    = lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
-	dialog    = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(accent).Padding(1, 3)
-	danger    = dialog.BorderForeground(warn)
-	toastBox  = rounded.BorderForeground(good).Padding(0, 1)
-	statusBar = lipgloss.NewStyle().Foreground(muted)
-	backdrop  = fx.Recolor{Fg: lipgloss.Lighten(theme.Bg, 0.15), Bg: lipgloss.Darken(theme.Bg, 0.3)}
 )
 
 // control is the ID of a node that can take focus: an input, or a button,
@@ -82,19 +48,6 @@ const (
 	buttonOverwrite control = "overwrite"
 )
 
-// fields are the labels and placeholders of the form's inputs.
-var fields = map[control]struct{ label, placeholder string }{ //nolint:exhaustive // Only inputs have labels.
-	fieldName:     {"Name", "Ada Lovelace"},
-	fieldEmail:    {"Email", "ada@example.com"},
-	fieldLanguage: {"Language", "start typing…"},
-}
-
-// isField reports whether c is an input, rather than a button.
-func isField(c control) bool {
-	_, ok := fields[c]
-	return ok
-}
-
 // scopeID is the ID of a focus scope.
 type scopeID string
 
@@ -104,34 +57,33 @@ const (
 	scopeOverwrite scopeID = "overwrite"
 )
 
-var languages = []string{
-	"Go", "Rust", "Python", "TypeScript", "Zig",
-	"Haskell", "OCaml", "Elixir", "Gleam", "Kotlin",
-}
-
 type model struct {
-	ui     *bloom.Root
-	w, h   int
-	focus  bloom.Focus[control]
-	values map[control]string
-	saved  int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
+	form  form
+	toast toast
+
+	focus bloom.Focus[control]
+	saved int
 
 	confirm   anim.Presence
 	overwrite anim.Presence // fades the overwrite dialog and its backdrop
 	drop      anim.Presence // a spring, so it overshoots, for where it sits
-	toast     anim.Presence
 }
 
 func newModel() *model {
 	m := &model{
-		values:    make(map[control]string),
+		st:        newStyles(tint.TintRosePine),
 		confirm:   anim.NewPresence(anim.Duration(200 * time.Millisecond)),
 		overwrite: anim.NewPresence(anim.Duration(200 * time.Millisecond)),
 		drop:      anim.NewPresence(anim.Spring(9, 0.35)),
-		toast:     anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear)),
 	}
 	// Clicks move the focus, before the handler of what was clicked runs.
-	m.ui = bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithFocus(&m.focus))
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
+	m.form = form{st: m.st, focus: &m.focus, values: make(map[control]string), save: m.askToSave}
+	m.toast = toast{st: m.st, presence: anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear))}
 	m.focus.Set(fieldName)
 	return m
 }
@@ -153,39 +105,27 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, cmd)
 	}
-	cmds = append(cmds, anim.Update(msg, &m.confirm, &m.overwrite, &m.drop, &m.toast))
+	cmds = append(cmds, anim.Update(msg, &m.confirm, &m.overwrite, &m.drop, &m.toast.presence))
 	return m, tea.Batch(cmds...)
 }
 
+func (m *model) View() tea.View {
+	v := m.ui.View(m.w, m.h, m.layout())
+	v.AltScreen = true
+	// The terminal takes the theme's background, where terminals let
+	// programs set it.
+	v.BackgroundColor = m.st.theme.Bg
+	return v
+}
+
 func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
-	c, _ := m.focus.Current()
 	switch msg.String() {
 	case "ctrl+c":
 		return tea.Quit
 	case "esc":
 		return m.closeTop()
-	case "enter":
-		if s := m.suggestions(); c == fieldLanguage && len(s) > 0 {
-			m.values[fieldLanguage] = s[0]
-		}
-	case "backspace":
-		if isField(c) {
-			v := []rune(m.values[c])
-			m.values[c] = string(v[:max(len(v)-1, 0)])
-		}
-	default:
-		if isField(c) && msg.Text != "" {
-			m.values[c] += msg.Text
-		}
 	}
-	return nil
-}
-
-// reset empties the form.
-func (m *model) reset() tea.Cmd {
-	clear(m.values)
-	m.focus.Set(fieldName)
-	return nil
+	return m.form.key(msg)
 }
 
 // askToSave opens the dialog that confirms saving.
@@ -221,78 +161,7 @@ func (m *model) closeTop() tea.Cmd {
 
 func (m *model) save() tea.Cmd {
 	m.saved++
-	return tea.Batch(m.closeTop(), m.closeTop(), m.toast.ShowFor(2*time.Second))
-}
-
-func (m *model) suggestions() []string {
-	q := strings.ToLower(m.values[fieldLanguage])
-	var out []string
-	for _, l := range languages {
-		if q != "" && strings.Contains(strings.ToLower(l), q) && !strings.EqualFold(l, q) {
-			out = append(out, l)
-		}
-	}
-	return out
-}
-
-func (m *model) View() tea.View {
-	v := m.ui.View(m.w, m.h, m.layout())
-	v.AltScreen = true
-	// The terminal takes the theme's background, where terminals let
-	// programs set it.
-	v.BackgroundColor = theme.Bg
-	return v
-}
-
-func (m *model) field(id control) bloom.Child {
-	text, st := m.values[id], input
-	if text == "" {
-		text, st = fields[id].placeholder, hint
-	}
-	in := bloom.Text(text).Style(st).ID(id).Focusable()
-	if m.focus.Is(id) {
-		if m.values[id] == "" {
-			st = inputOn.Foreground(muted)
-		} else {
-			st = inputOn
-		}
-		in = in.Style(st).Cursor(tea.NewCursor(1+ansi.StringWidth(m.values[id]), 0))
-	}
-	return bloom.Row(
-		bloom.Fixed(10, bloom.Text(fields[id].label).Style(label)),
-		bloom.Fill(in),
-	)
-}
-
-// button is a button labeled with its ID, which runs press when pressed.
-func (m *model) button(id control, press func() tea.Cmd) bloom.Child {
-	st := button
-	if m.focus.Is(id) {
-		st = buttonOn
-	}
-	return bloom.Text(string(id)).Style(st).ID(id).Focusable().On(on.Press(press))
-}
-
-func (m *model) layout() bloom.Child {
-	form := bloom.Box(panel, bloom.Column(
-		bloom.Text("Profile").Style(heading),
-		m.field(fieldName),
-		m.field(fieldEmail),
-		m.field(fieldLanguage),
-		bloom.Row(bloom.Space(), m.button(buttonReset, m.reset), m.button(buttonSave, m.askToSave)).Gap(2),
-	).Gap(1))
-
-	focused, _ := m.focus.Current()
-	status := fmt.Sprintf(
-		" focus: %s · in the form: %v · dialogs open: %d · saved %d times",
-		focused, m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
-	)
-
-	base := bloom.Column(
-		bloom.Fill(bloom.Centered(bloom.Row(bloom.Fixed(60, form).ID(scopeForm).Scope()))),
-		bloom.Fixed(1, bloom.Text(status).Style(statusBar)),
-	)
-	return bloom.Overlay(base, m.layers()...)
+	return tea.Batch(m.closeTop(), m.closeTop(), m.toast.show())
 }
 
 func (m *model) dialogs() int {
@@ -306,37 +175,48 @@ func (m *model) dialogs() int {
 	return n
 }
 
+// layout places the form, with the status line below it, and the layers
+// over them.
+func (m *model) layout() bloom.Child {
+	focused, _ := m.focus.Current()
+	status := fmt.Sprintf(
+		" focus: %s · in the form: %v · dialogs open: %d · saved %d times",
+		focused, m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
+	)
+
+	base := bloom.Column(
+		bloom.Fill(bloom.Centered(bloom.Row(bloom.Fixed(60, &m.form).ID(scopeForm).Scope()))),
+		bloom.Fixed(1, bloom.Text(status).Style(m.st.statusBar)),
+	)
+	return bloom.Overlay(base, m.layers()...)
+}
+
 func (m *model) layers() []bloom.LayerNode {
 	var layers []bloom.LayerNode
 
 	// The dropdown is a plain layer under the language input, not modal.
-	if s := m.suggestions(); m.focus.Is(fieldLanguage) && len(s) > 0 {
-		opts := make([]bloom.Child, len(s))
-		for i, l := range s {
-			opts[i] = bloom.Text(l).Style(option).On(on.Click(func() tea.Cmd {
-				m.values[fieldLanguage] = l
-				return nil
-			}))
-		}
-		menu := bloom.Layer(bloom.Box(dropdown, bloom.Column(opts...))).
-			AnchorTo(fieldLanguage, bloom.Bottom)
+	if menu, ok := m.form.dropdown(); ok {
 		layers = append(layers, menu)
 	}
 
 	profile := fmt.Sprintf("%s <%s>, %s",
-		m.values[fieldName], m.values[fieldEmail], m.values[fieldLanguage])
+		m.form.values[fieldName], m.form.values[fieldEmail], m.form.values[fieldLanguage])
 	confirmBody := bloom.Column(
-		bloom.Text("Save profile?").Style(heading),
+		bloom.Text("Save profile?").Style(m.st.heading),
 		bloom.Text(profile),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), m.button(buttonCancel, m.closeTop), m.button(buttonConfirm, m.confirmSave)).Gap(2),
+		bloom.Row(
+			bloom.Space(),
+			button(&m.st, &m.focus, buttonCancel, m.closeTop),
+			button(&m.st, &m.focus, buttonConfirm, m.confirmSave),
+		).Gap(2),
 	)
 
-	confirm := bloom.Layer(bloom.Box(dialog, confirmBody)).
+	confirm := bloom.Layer(bloom.Box(m.st.dialog, confirmBody)).
 		ID(scopeConfirm).
 		Modal().
 		On(on.ClickOutside(m.closeTop)).
-		Backdrop(backdrop).
+		Backdrop(m.st.backdrop).
 		Shadow(1, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.confirm, fx.Fade{}, fx.Slide{From: fx.Bottom})
 
@@ -344,26 +224,35 @@ func (m *model) layers() []bloom.LayerNode {
 	// only moves the dialog: its fade and backdrop follow an eased presence.
 	drop := int(math.Round((1 - m.drop.Float()) * -10))
 	overwriteBody := bloom.Column(
-		bloom.Text("Overwrite the saved profile?").Style(heading.Foreground(warn)),
+		bloom.Text("Overwrite the saved profile?").Style(m.st.headingWarn),
 		bloom.Text(fmt.Sprintf("It was saved %d time(s) before.", m.saved)),
 		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Space(), m.button(buttonBack, m.closeTop), m.button(buttonOverwrite, m.save)).Gap(2),
+		bloom.Row(
+			bloom.Space(),
+			button(&m.st, &m.focus, buttonBack, m.closeTop),
+			button(&m.st, &m.focus, buttonOverwrite, m.save),
+		).Gap(2),
 	)
-	overwrite := bloom.Layer(bloom.Box(danger, overwriteBody)).
+	overwrite := bloom.Layer(bloom.Box(m.st.danger, overwriteBody)).
 		ID(scopeOverwrite).
 		Modal().
 		On(on.ClickOutside(m.closeTop)).
 		Offset(0, drop).
-		Backdrop(backdrop).
+		Backdrop(m.st.backdrop).
 		Shadow(2, 1, fx.Dim{Amount: 0.7}).
 		Presence(m.overwrite, fx.Fade{})
 
-	toast := bloom.Layer(bloom.Box(toastBox, bloom.Text("✓ Profile saved"))).
-		Anchor(bloom.End, bloom.End).
-		Margin(1).
-		Presence(m.toast, fx.Typewriter{}, fx.Fade{})
+	return append(layers, confirm, overwrite, m.toast.Layer())
+}
 
-	return append(layers, confirm, overwrite, toast)
+// button is a button labeled with its ID, which runs press when pressed. It
+// is highlighted while it has focus.
+func button(st *styles, focus *bloom.Focus[control], id control, press func() tea.Cmd) bloom.Child {
+	s := st.button
+	if focus.Is(id) {
+		s = st.buttonOn
+	}
+	return bloom.Text(string(id)).Style(s).ID(id).Focusable().On(on.Press(press))
 }
 
 func main() {

@@ -44,10 +44,10 @@ func TestLetters(t *testing.T) {
 
 	h.Key("q")
 	h.WaitFinished()
-	if m.word != 3 || m.clicks != 1 || !m.paused {
-		t.Fatalf("word %d, clicks %d, paused %v, want 3, 1, and paused", m.word, m.clicks, m.paused)
+	if m.anagram.word != 3 || m.anagram.clicks != 1 || !m.clock.paused {
+		t.Fatalf("word %d, clicks %d, paused %v, want 3, 1, and paused", m.anagram.word, m.anagram.clicks, m.clock.paused)
 	}
-	if m.now.Hour() != 10 {
-		t.Fatalf("the clock is at %s, not past the hour", m.now.Format("15:04:05"))
+	if m.clock.now.Hour() != 10 {
+		t.Fatalf("the clock is at %s, not past the hour", m.clock.now.Format("15:04:05"))
 	}
 }

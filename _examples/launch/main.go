@@ -19,50 +19,13 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"strconv"
 	"time"
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
-	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 	tint "github.com/lrstanley/bubbletint/v2"
-)
-
-const service = "payments"
-
-// theme is the bubbletint tint the example's colors come from.
-var theme = tint.TintAyuMirage
-
-var (
-	fg     = theme.Fg
-	muted  = theme.BrightBlack
-	accent = theme.Blue
-	good   = theme.Green
-	warn   = theme.Red
-	dark   = theme.Bg
-
-	field   = lipgloss.Lighten(theme.Bg, 0.05)
-	fieldOn = lipgloss.Lighten(theme.Bg, 0.16)
-
-	card     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(0, 2)
-	heading  = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	label    = lipgloss.NewStyle().Foreground(muted)
-	big      = lipgloss.NewStyle().Bold(true).Foreground(fg)
-	input    = lipgloss.NewStyle().Foreground(fg).Background(field).Padding(0, 1)
-	inputOn  = input.Background(fieldOn)
-	hint     = input.Foreground(muted)
-	button   = lipgloss.NewStyle().Foreground(fg).Background(muted).Padding(0, 2)
-	buttonOn = button.Foreground(dark).Background(accent).Bold(true)
-	staged   = lipgloss.NewStyle().Foreground(muted).Padding(0, 1)
-	live     = lipgloss.NewStyle().Foreground(dark).Background(good).Bold(true).Padding(0, 1)
-	failure  = lipgloss.NewStyle().Foreground(warn)
-	success  = lipgloss.NewStyle().Foreground(good)
-	tour     = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(accent).Padding(0, 2)
-	status   = lipgloss.NewStyle().Foreground(muted)
 )
 
 // The IDs nodes are given.
@@ -77,74 +40,16 @@ const (
 	buttonDeploy formID = "deploy"
 )
 
-// cards describe the statistics shown, with their values at the start, and
-// next, their values after n updates.
-var cards = [...]struct {
-	title, unit string
-	start       int
-	next        func(n int) int
-}{
-	{
-		title: "Requests", unit: "per minute", start: 1021,
-		next: func(n int) int { return 1021 + n*37 + (n*n*11)%53 },
-	},
-	{
-		title: "p95 latency", unit: "milliseconds", start: 148,
-		next: func(n int) int { return 120 + (n*37)%61 },
-	},
-	{
-		title: "Errors", unit: "per hour", start: 7,
-		next: func(n int) int { return 3 + (n*5)%9 },
-	},
-}
-
-// tourSteps are what the tour says about each card.
-var tourSteps = [...][2]string{
-	{"Traffic", "Requests served each minute, live."},
-	{"Latency", "How long the slowest 5% of requests take."},
-	{"Errors", "Failed requests in the past hour."},
-}
-
-const (
-	shimmerPeriod = 1400 * time.Millisecond
-	loadDelay     = 1500 * time.Millisecond
-)
-
-type (
-	loadedMsg struct{}
-	statsMsg  int // the generation of the ticker that sent it.
-)
-
 type model struct {
-	ui    *bloom.Root
-	w, h  int
+	ui   *bloom.Root
+	st   styles
+	w, h int
+
+	stats stats
+	form  form
+	tour  tour
+
 	focus bloom.Focus[formID]
-
-	loaded  bool
-	shimmer anim.Sequence // loops until the data arrives.
-
-	// every is how often the numbers change. Each change rolls from the
-	// previous values to the new ones.
-	every   time.Duration
-	paused  bool
-	gen     int
-	updates int
-	vals    [len(cards)]int
-	prev    [len(cards)]int
-	roll    anim.Value
-
-	text  string // what was typed into the input.
-	err   string
-	shake anim.Value
-
-	deployed bool
-	burst    anim.Value
-	badge    anim.Value
-	bursts   uint32
-
-	step     int // the tour step: 0 is off, then 1 for the first card.
-	tourOn   anim.Presence
-	tourText anim.Value
 }
 
 func newModel() *model {
@@ -153,20 +58,29 @@ func newModel() *model {
 	effect := func(d time.Duration) anim.Value {
 		return anim.NewValue(1, anim.Duration(d), anim.Ease(anim.Linear))
 	}
-	m := &model{
-		shimmer:  anim.NewLoop(shimmerPeriod),
-		every:    time.Second,
-		roll:     effect(700 * time.Millisecond),
-		shake:    effect(450 * time.Millisecond),
-		burst:    effect(1800 * time.Millisecond),
-		badge:    effect(700 * time.Millisecond),
-		tourOn:   anim.NewPresence(anim.Duration(250 * time.Millisecond)),
-		tourText: effect(800 * time.Millisecond),
+	m := &model{st: newStyles(tint.TintAyuMirage)}
+	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
+	m.stats = stats{
+		st:      m.st,
+		shimmer: anim.NewLoop(shimmerPeriod),
+		every:   time.Second,
+		roll:    effect(700 * time.Millisecond),
 	}
 	for i, c := range cards {
-		m.vals[i], m.prev[i] = c.start, c.start
+		m.stats.vals[i], m.stats.prev[i] = c.start, c.start
 	}
-	m.ui = bloom.New(bloom.WithColors(theme.Fg, theme.Bg), bloom.WithFocus(&m.focus))
+	m.form = form{
+		st:    m.st,
+		focus: &m.focus,
+		shake: effect(450 * time.Millisecond),
+		burst: effect(1800 * time.Millisecond),
+		badge: effect(700 * time.Millisecond),
+	}
+	m.tour = tour{
+		st:       m.st,
+		presence: anim.NewPresence(anim.Duration(250 * time.Millisecond)),
+		text:     effect(800 * time.Millisecond),
+	}
 	m.focus.Set(inputConfirm)
 	return m
 }
@@ -174,18 +88,7 @@ func newModel() *model {
 // Init does not return the root's Init, which asks the terminal for its
 // colors: the theme's are used instead.
 func (m *model) Init() tea.Cmd {
-	return tea.Batch(
-		m.shimmer.Loop(),
-		tea.Tick(loadDelay, func(time.Time) tea.Msg { return loadedMsg{} }),
-	)
-}
-
-// schedule returns the command for the next change of the numbers, which
-// replaces any earlier one still waiting.
-func (m *model) schedule() tea.Cmd {
-	m.gen++
-	gen := m.gen
-	return tea.Tick(m.every, func(time.Time) tea.Msg { return statsMsg(gen) })
+	return m.stats.load()
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -193,19 +96,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-	case loadedMsg:
-		m.loaded = true
-		m.shimmer.Stop()
-		cmds = append(cmds, m.schedule())
-	case statsMsg:
-		if int(msg) == m.gen && !m.paused {
-			m.updates++
-			m.prev = m.vals
-			for i, c := range cards {
-				m.vals[i] = c.next(m.updates)
-			}
-			cmds = append(cmds, m.roll.Play(0, 1), m.schedule())
-		}
+	case loadedMsg, statsMsg:
+		cmds = append(cmds, m.stats.Update(msg))
 	case tea.KeyPressMsg:
 		cmd, ok := m.focus.Update(msg, m.ui.Frame())
 		if !ok {
@@ -213,71 +105,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmds = append(cmds, cmd)
 	}
-	cmds = append(cmds, anim.Update(msg, &m.shimmer, &m.roll, &m.shake, &m.burst, &m.badge, &m.tourOn, &m.tourText))
+	cmds = append(cmds, anim.Update(msg,
+		&m.stats.shimmer, &m.stats.roll,
+		&m.form.shake, &m.form.burst, &m.form.badge,
+		&m.tour.presence, &m.tour.text,
+	))
 	return m, tea.Batch(cmds...)
-}
-
-func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "ctrl+c":
-		return tea.Quit
-	case "enter":
-		return m.deploy()
-	case "esc":
-		return m.endTour()
-	case "ctrl+t":
-		return m.nextStep()
-	case "ctrl+p":
-		m.paused = !m.paused
-		if !m.paused && m.loaded {
-			return m.schedule()
-		}
-	case "ctrl+r":
-		m.text, m.err, m.deployed = "", "", false
-		m.focus.Set(inputConfirm)
-		m.burst.Set(1)
-		m.badge.Set(1)
-	case "backspace":
-		if m.focus.Is(inputConfirm) && !m.deployed {
-			r := []rune(m.text)
-			m.text = string(r[:max(len(r)-1, 0)])
-		}
-	default:
-		if m.focus.Is(inputConfirm) && !m.deployed && msg.Text != "" {
-			m.text += msg.Text
-			m.err = ""
-		}
-	}
-	return nil
-}
-
-// deploy deploys the service if its name was typed in, and shakes the input
-// if not.
-func (m *model) deploy() tea.Cmd {
-	if m.deployed {
-		return nil
-	}
-	if m.text != service {
-		m.err = fmt.Sprintf("✗ type %q to confirm", service)
-		return m.shake.Play(0, 1)
-	}
-	m.deployed, m.err = true, ""
-	m.bursts++
-	return tea.Batch(m.burst.Play(0, 1), m.badge.Play(0, 1))
-}
-
-// nextStep moves the tour on to the next card, or ends it after the last.
-func (m *model) nextStep() tea.Cmd {
-	m.step++
-	if m.step > len(cards) {
-		return m.endTour()
-	}
-	return tea.Batch(m.tourOn.Show(), m.tourText.Play(0, 1))
-}
-
-func (m *model) endTour() tea.Cmd {
-	m.step = 0
-	return m.tourOn.Hide()
 }
 
 func (m *model) View() tea.View {
@@ -285,158 +118,62 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = theme.Bg
+	v.BackgroundColor = m.st.theme.Bg
 	return v
 }
 
-// number formats n with a comma between each group of thousands.
-func number(n int) string {
-	s := strconv.Itoa(n)
-	for i := len(s) - 3; i > 0; i -= 3 {
-		s = s[:i] + "," + s[i:]
+func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "ctrl+c":
+		return tea.Quit
+	case "esc":
+		return m.tour.end()
+	case "ctrl+t":
+		return m.tour.next()
+	case "ctrl+p":
+		return m.stats.pause()
 	}
-	return s
+	return m.form.key(msg)
 }
 
-// card is the card for statistic i: a placeholder that shimmers until the
-// data arrives, then its number, rolling from the previous one while it
-// changes.
-func (m *model) card(i int) bloom.Child {
-	if !m.loaded {
-		// A line for each of the card's below, so nothing moves when the
-		// data arrives.
-		return bloom.Box(card, bloom.Skeleton(8, 0, 5, 11).Shimmer(m.shimmer.Float()))
-	}
-
-	c := cards[i]
-	num := bloom.Child(bloom.Text(number(m.vals[i])).Style(big))
-	if m.roll.Animating() {
-		num = bloom.Transition(m.roll.Float(), num, fx.Roll{From: number(m.prev[i])})
-	}
-	return bloom.Box(card, bloom.Column(
-		bloom.Text(c.title).Style(heading),
-		bloom.Fixed(1, nil),
-		num,
-		bloom.Text(c.unit).Style(label),
-	))
-}
-
-func (m *model) badgeNode() bloom.Child {
-	if !m.deployed {
-		return bloom.Text("STAGED").Style(staged)
-	}
-	b := bloom.Child(bloom.Text("LIVE").Style(live))
-	if m.badge.Animating() {
-		b = bloom.Transition(m.badge.Float(), b, fx.Glitch{Seed: m.bursts})
-	}
-	return b
-}
-
-func (m *model) form() bloom.Child {
-	text, st := m.text, input
-	if text == "" {
-		text, st = service, hint
-	}
-	in := bloom.Text(text).Style(st).ID(inputConfirm).Focusable()
-	if m.focus.Is(inputConfirm) {
-		if m.text == "" {
-			st = inputOn.Foreground(muted)
-		} else {
-			st = inputOn
-		}
-		in = in.Style(st).Cursor(tea.NewCursor(1+ansi.StringWidth(m.text), 0))
-	}
-	field := bloom.Child(in)
-	if m.shake.Animating() {
-		field = bloom.Transition(m.shake.Float(), field, fx.Shake{Amount: 3, Times: 3})
-	}
-
-	btn := button
-	if m.focus.Is(buttonDeploy) {
-		btn = buttonOn
-	}
-	msg := bloom.Text(" ")
-	switch {
-	case m.deployed:
-		msg = bloom.Text("✓ " + service + " is live").Style(success)
-	case m.err != "":
-		msg = bloom.Text(m.err).Style(failure)
-	}
-	deploy := bloom.Text("deploy").Style(btn).ID(buttonDeploy).Focusable().On(on.Press(m.deploy))
-
-	return bloom.Column(
-		bloom.Text("Deploy "+service+" to production").Style(heading),
-		bloom.Text("Type the service name to confirm.").Style(label),
-		bloom.Fixed(1, nil),
-		bloom.Row(bloom.Fill(field), deploy).Gap(2),
-		msg,
-	)
-}
-
+// layout places the header, the cards, the form and the keys, with the
+// tour over them.
 func (m *model) layout() bloom.Child {
-	slots := make([]bloom.Child, len(cards))
-	for i := range cards {
-		slots[i] = bloom.Fill(m.card(i)).ID(cardID(i))
-	}
-
 	header := bloom.Row(
-		bloom.Text("◆ deploy").Style(heading),
-		bloom.Text("· production").Style(label),
+		bloom.Text("◆ deploy").Style(m.st.heading),
+		bloom.Text("· production").Style(m.st.label),
 		bloom.Space(),
-		m.badgeNode(),
+		m.form.badgeNode(),
 	).Gap(1)
 
 	paused := ""
-	if m.paused {
+	if m.stats.paused {
 		paused = " (paused)"
 	}
 	hints := fmt.Sprintf(
 		"ctrl+t tour · ctrl+p pause · ctrl+r reset · updates: %d%s · tour: %d",
-		m.updates, paused, m.step,
+		m.stats.updates, paused, m.tour.step,
 	)
 
 	base := bloom.Child(bloom.Column(
 		header,
 		bloom.Fixed(1, nil),
-		bloom.Row(slots...).Gap(2),
+		&m.stats,
 		bloom.Fixed(1, nil),
-		m.form(),
+		&m.form,
 		bloom.Space(),
-		bloom.Text(hints).Style(status),
+		bloom.Text(hints).Style(m.st.status),
 	))
 
 	// Confetti bursts from the middle of the button, over everything.
-	if m.deployed && m.burst.Animating() {
+	if m.form.deployed && m.form.burst.Animating() {
 		if r, ok := m.ui.Frame().Rect(buttonDeploy); ok {
 			center := image.Pt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2)
-			burst := fx.Burst{At: center, Count: 90, Seed: m.bursts}
-			base = bloom.Transition(m.burst.Float(), base, burst)
+			burst := fx.Burst{At: center, Count: 90, Seed: m.form.bursts}
+			base = bloom.Transition(m.form.burst.Float(), base, burst)
 		}
 	}
-	return bloom.Overlay(base, m.tourLayer())
-}
-
-// tourLayer is the tour's: a note at the bottom, over a backdrop that
-// leaves only the card it explains lit.
-func (m *model) tourLayer() bloom.LayerNode {
-	// While the last note animates out, it stays on the last card.
-	step := min(max(m.step, 1), len(cards))
-	title, text := tourSteps[step-1][0], tourSteps[step-1][1]
-
-	note := bloom.Column(
-		bloom.Text(title).Style(heading),
-		bloom.Text(text),
-	)
-	decode := fx.Decode{Seed: uint32(step)} //nolint:gosec // step is small.
-
-	l := bloom.Layer(bloom.Box(tour, bloom.Transition(m.tourText.Float(), note, decode))).
-		Anchor(bloom.Center, bloom.End).
-		Margin(2).
-		Presence(m.tourOn, fx.Fade{})
-	if r, ok := m.ui.Frame().Rect(cardID(step - 1)); ok {
-		l = l.Backdrop(fx.Spotlight{Rect: r.Inset(-1), Soft: 5})
-	}
-	return l
+	return bloom.Overlay(base, m.tour.Layer(m.ui.Frame()))
 }
 
 func main() {
