@@ -1,0 +1,228 @@
+---
+title: Best practices
+description: Habits that keep a bloom program easy to read, test, and change, from how to split it into components and keep its styles, to building layouts, finding sizes, using IDs, handling input, and keeping frames cheap.
+---
+
+This page collects, in one place, the habits the rest of the docs teach one at a time. Each is a sentence or two,
+with a link to the page that explains it in full. The [examples](/resources/examples) all follow them, so any one of
+them is a working reference.
+
+## Structure the program
+
+- **Keep one root, and give it every message.** Keep a `*bloom.Root` in the model for as long as the program runs,
+  pass every message to `m.ui.Update` and return its command, and keep the size from `tea.WindowSizeMsg` for
+  `m.ui.View`. The root keeps hover, drag, and animation state from one frame to the next, and draws nothing until
+  it knows the size. See [How a bloom program runs](/concepts/how-a-program-runs#what-the-root-keeps-and-what-you-keep).
+- **Use pointer receivers on the model, `View` included.** Handlers are closures made as the layout is built. With
+  a value receiver, they change a copy of the model, and the change is lost without an error. See
+  [Change state, or send a message](/input/mouse#change-state-or-send-a-message).
+- **Split the screen into components.** Give each part of the screen with state of its own, such as a sidebar, a
+  list, a status bar, or a dialog, a type of its own in a file of its own. The model keeps the components, places
+  them, and handles what they ask for. Each can then be read, changed, and tested on its own, and `main.go` reads as
+  a summary of the screen. The [desktop example](https://github.com/lrstanley/bloom/tree/master/_examples/desktop)
+  goes further, with a package for each part under `internal`.
+- **Keep `main` small.** It makes the model and runs the program. The model, with `Init`, `Update`, and `View`, comes
+  first in `main.go`, and the components and styles each go in a file of their own.
+
+## Build the layout
+
+- **Build the tree again every frame, from the model.** Nodes are values to throw away, and bloom caches the parts
+  that cost something. Keep state in the model, never in nodes. See
+  [A tree, rebuilt every frame](/concepts/how-layout-works#a-tree-rebuilt-every-frame).
+- **Don't change state while building the layout.** `View`, a layout method, and a component's `Layout` only read
+  state and return nodes. A component's `Layout` can run more than once a frame, while bloom measures, so a change
+  made there happens an unknown number of times. Change state in `Update`, or in a handler, which runs once for each
+  event. See [Lay out for the space you're given](/bubble-tea/writing-components#lay-out-for-the-space-youre-given).
+- **Build a simple layout in `View`, and a larger one in a method.** When the layout is one expression, build it
+  where it's drawn:
+
+  ```go
+  func (m *model) View() tea.View {
+  	v := m.ui.View(m.w, m.h, bloom.Column(
+  		bloom.Fill(bloom.Row(
+  			bloom.Fixed(20, m.sidebar).Collapsible(1),
+  			bloom.Fill(bloom.Box(m.st.page, bloom.View(&m.reader))).Min(30),
+  		)),
+  		m.status,
+  	))
+  	v.AltScreen = true
+  	return v
+  }
+  ```
+
+  Once it has variables, loops, or layers, or `Update` and tests need it too, move it to a `layout` method that
+  `View`, [`Solve`](https://pkg.go.dev/bloomfx.dev/bloom#Solve), and tests all call, so they all lay out the same
+  tree.
+- **Let the parent decide a component's size.** The slot a component is placed in sizes it, so the same component
+  can be a fixed sidebar on one screen and fill another. Don't give components size options of their own. See
+  [The slot belongs to the parent](/concepts/how-layout-works#the-slot-belongs-to-the-parent).
+- **Style with boxes and text, rather than rendered strings.** Pass a style to `bloom.Box` or `Text(...).Style(...)`
+  instead of `style.Width(n).Render(...)`. A rendered string keeps the size it was rendered at, while a box knows its
+  frame and sizes its child to whatever space it's given. See [Draw a box around a node](/content/borders#draw-a-box-around-a-node).
+- **Plan for small terminals.** Give slots that must stay usable a `Min`, mark panels that can go with
+  `Collapsible`, lowest priority first, and wrap the screen in `MinSize` to show a note when the window is too small
+  to use. See [Responsive layouts](/layout/responsive).
+
+## Write components
+
+- **Return nodes from `Layout`, and read only the sizes you use.** A component built for bloom has a `Layout`
+  method that reads its space from the `Context`, and needs no `View`. bloom lays it out again only when a size it
+  read changes, so read the width only if the layout depends on it. See
+  [Writing components](/bubble-tea/writing-components#read-only-the-sizes-you-use).
+- **Place a component that changes itself as a pointer.** A component whose handlers change it has pointer
+  receivers, and goes in the tree as `&m.list`. Placed by value, a click changes a copy. See
+  [Handle the mouse inside the component](/bubble-tea/writing-components#handle-the-mouse-inside-the-component).
+- **Tell the parent with a message, or a callback when it can't wait.** A component that needs the model to act,
+  such as to open a window, sends a message with `on.Msg`, which the model handles in `Update`. A message arrives in a
+  later update, and Bubble Tea runs commands at the same time, so two messages from one gesture can arrive in either
+  order. When the model must act within the same update, such as a select that closes the others before the next
+  key arrives, give the component a function from the model to call instead.
+- **Give each instance its own IDs.** Have the parent give a component an ID, and build the IDs of its parts from
+  it, so two instances on one screen don't clash. See
+  [Give each instance its own IDs](/bubble-tea/writing-components#give-each-instance-its-own-ids).
+- **Route keys to components yourself.** bloom routes the mouse to nodes, but keys only reach the model's `Update`.
+  Give a component an `Update` of its own, and call it while the component has the focus. See
+  [Take keys from the parent](/bubble-tea/writing-components#take-keys-from-the-parent).
+- **Place Bubbles components with `bloom.View`.** A component with only `View() string` goes in the tree as
+  `bloom.View(&m.input)`, by pointer, so it isn't copied every frame. See
+  [Using Bubbles components](/bubble-tea/bubbles-components).
+- **Say what size you are, when you know.** A component that knows its size without being drawn, such as a status
+  bar one row tall, implements [`Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer), and returns the size it
+  needs, not the space it's offered. See [Report a natural size](/bubble-tea/writing-components#report-a-natural-size).
+
+## Keep styles in one place
+
+- **Make the styles once, from a theme.** Build every style in one function, from one set of colors, such as a
+  [bubbletint](https://github.com/lrstanley/bubbletint) tint, and keep the result on the model. Styles made in `View`
+  or `Layout` are made again every frame, and styles kept in package variables can't change with the theme and are
+  shared by every test. Put them in a package of their own, such as `internal/theme`, which the model and every
+  component import:
+
+  ```go title="internal/theme/theme.go"
+  // Package theme has the program's styles, all made from one tint.
+  package theme
+
+  // Styles are the program's styles.
+  type Styles struct {
+  	Tint     *tint.Tint // the tint the styles are made from
+  	Panel    lipgloss.Style
+  	Item     lipgloss.Style
+  	Selected lipgloss.Style
+  }
+
+  // NewStyles makes the program's styles from tint t.
+  func NewStyles(t *tint.Tint) Styles {
+  	item := lipgloss.NewStyle().Padding(0, 1)
+  	return Styles{
+  		Tint:     t,
+  		Panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BrightBlack),
+  		Item:     item,
+  		Selected: item.Foreground(t.Bg).Background(t.Green),
+  	}
+  }
+  ```
+
+  A small program with all of its components in `main` can keep the same thing unexported, as `styles` and
+  `newStyles`, in a `styles.go` beside them.
+
+- **Give each component a copy of the styles.** Build a component without its styles, and set them with a method
+  that returns it, such as `sidebar.New().SetStyles(m.st)`. The component keeps a copy of its own, as Bubbles
+  components do, so it depends on nothing outside itself and can be tested with any styles.
+- **Send a new theme down the tree as a message.** To change the theme, send a message that carries the new styles.
+  The model takes them, and passes the message on to each component's `Update`, as it does every message, and each
+  component takes them too:
+
+  ```go
+  // ChangeMsg changes the theme to the one Styles are made from. The styles
+  // are held by pointer, so the message stays small, as every component
+  // checks every message for it.
+  type ChangeMsg struct{ Styles *Styles }
+
+  // Change returns the command that changes the theme to tint t.
+  func Change(t *tint.Tint) tea.Cmd {
+  	return func() tea.Msg {
+  		st := NewStyles(t)
+  		return ChangeMsg{Styles: &st}
+  	}
+  }
+
+  // in a component's Update
+  if msg, ok := msg.(theme.ChangeMsg); ok {
+  	s.st = *msg.Styles
+  }
+  ```
+
+  A component the model keeps but stops passing messages to, such as one whose window was closed, misses the change,
+  so set its styles again when it's put back. Give the root the theme's colors with `bloom.WithColors(t.Fg, t.Bg)`,
+  and when the theme changes, tell it the new ones with `m.ui.Update(tea.ForegroundColorMsg{Color: t.Fg})` and
+  `m.ui.Update(tea.BackgroundColorMsg{Color: t.Bg})`, for the effects that blend toward them. Return both commands,
+  such as in a `tea.Batch`, as you would any of the root's. See
+  [Colors and the terminal](/concepts/rendering#colors-and-the-terminal).
+- **Let a component made each frame borrow the styles.** A small component built in `View` from the model's state,
+  such as a status bar, lives for one frame, so it can hold a pointer to the model's styles rather than a copy. A
+  styles struct with dozens of styles is many kilobytes, and copying it into each frame's tree would allocate it
+  again every frame.
+
+## Find sizes and positions
+
+- **Don't work out sizes by hand.** Arithmetic in `Update`, such as the width less a sidebar and two borders,
+  breaks as soon as the layout changes. Give a component that needs its size a `Layout` that reads it from the
+  `Context`. Where a component can't, such as a Bubbles component, `Solve` the same layout, read its slot's rectangle
+  by ID, and take off the frame of its box with `GetHorizontalFrameSize`. See
+  [Sizes and positions in Update](/bubble-tea/sizes-in-update).
+- **Solve for what's next, and read the frame for what was seen.** `Solve` lays out the model as it is now, for
+  sizes after a change. `m.ui.Frame()` is what was last drawn, which is where a click landed. A node that collapsed
+  or scrolled away has no rectangle, so check the `ok` that `Rect` returns. See [Solve or Frame?](/bubble-tea/sizes-in-update#solve-or-frame)
+
+## Use IDs where something needs to find a node
+
+- **Use a type of your own for IDs.** IDs compare by type and value, so `"save"` and `control("save")` are
+  different IDs, and a `Focus` moves only between nodes whose IDs have its type. Give each node a constant. See
+  [IDs](/concepts/how-a-program-runs#ids).
+- **Keep IDs unique within a frame.** Lookups find the first match, and focus, layout animation, and the mouse
+  can't tell two nodes with one ID apart. `bloom.Debug` marks a repeated ID as `duplicate`.
+- **Give an ID only where it's needed.** A node needs one to take focus, to be found with `Rect`, to animate, to be
+  anchored to, or to have a scrollbar follow it. Handlers don't need one. Tie the ID to the item, not to its
+  position, so it follows the item when the list is sorted.
+
+## Handle input
+
+- **Don't block in handlers.** Handlers run in the Bubble Tea event loop, as `Update` does. Do I/O and waiting in
+  the command a handler returns. See [The screen freezes after a click](/resources/troubleshooting#the-screen-freezes-after-a-click).
+- **Handle each mouse event once.** The message a handler ran for still reaches `Update`, so code there that handles
+  the same `tea.MouseMsg` acts on it a second time. See [Handle raw events yourself](/input/mouse#handle-raw-events-yourself).
+- **Keep keys out of dialogs that are closing.** While a dialog is open, check its presence's `Shown()` before
+  handling keys, and push and pop its focus scope as it opens and closes. See
+  [Keep focus inside a dialog](/input/focus#keep-focus-inside-a-dialog).
+- **Make only text people read selectable.** A click inside selectable text waits to rule out a double click, so
+  mark the text, not the whole screen. See
+  [Clicks are slow inside selectable text](/resources/troubleshooting#clicks-are-slow-inside-selectable-text).
+
+## Keep frames cheap
+
+- **Use a viewport for long text, and a list for many rows.** `Viewport` and `List` lay out only what's in sight,
+  while `Scroll` lays out all of its child. Keep a `Buffer` in the model and change it in `Update`, rather than
+  building a long string every frame. See [What's cached](/concepts/rendering#whats-cached).
+- **Keep effects comparable, and transitions short lived.** bloom skips frames that didn't change by comparing
+  effects with `==`, so prefer plain structs to functions or pointers, and wrap a node in a `Transition` only while
+  its value is animating. See [Keep frames cheap to compare](/concepts/rendering#keep-frames-cheap-to-compare).
+- **Give animations every message.** Make values with their constructors, return the command from `Show`, `To`,
+  `Play`, or `Loop`, and pass every message through `anim.Update`. A dropped command or message stops an animation
+  partway. See [How animations run](/motion/animating-values#how-animations-run).
+- **Raise frame rates together.** A faster `anim.FPS` or `bloom.WithFPS` needs a faster `tea.WithFPS` too, or the
+  extra frames aren't drawn. Set `ReportFocus` on the view for animations to slow down while the terminal isn't
+  focused, and filter floods of motion and wheel events with `bloom.ThrottleMouse`. See
+  [Frame rate](/concepts/rendering#frame-rate).
+
+## Test the pieces
+
+- **Test components, layouts, and programs.** Small components are simple to test alone. Test where things go with
+  `Solve` rather than what's drawn, give animations a clock you control, and drive the whole program with
+  [steep](/resources/related-libraries#steep) for what a person sees. See [Testing](/bubble-tea/testing).
+
+## Related
+
+- [Examples](/resources/examples), which follow these practices
+- [Writing components](/bubble-tea/writing-components)
+- [How layout works](/concepts/how-layout-works)
+- [Troubleshooting](/resources/troubleshooting)
