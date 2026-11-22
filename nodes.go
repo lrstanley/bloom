@@ -7,6 +7,7 @@ package bloom
 //go:generate go run ./internal/gen
 
 import (
+	"cmp"
 	"image"
 	"slices"
 
@@ -446,8 +447,8 @@ type LayerNode struct {
 	offsetY   int
 	margin    int
 	w, h      int
-	anchor    any
-	side      Direction
+	anchor    ID
+	side      Direction // the side anchored to, or zero for a layer not anchored to a node
 	modal     bool
 	float     bool
 	absent    bool
@@ -490,7 +491,7 @@ func (n LayerNode) Size(w, h int) LayerNode { n.w, n.h = w, h; return n }
 // r.Min, and Size of r's, which a zero width or height of r leaves to the
 // child as Size does, and it undoes AnchorTo.
 func (n LayerNode) Place(r image.Rectangle) LayerNode {
-	n.x, n.y, n.anchor = Start, Start, nil
+	n.x, n.y, n.anchor, n.side = Start, Start, "", 0
 	n.offsetX, n.offsetY = r.Min.X, r.Min.Y
 	n.w, n.h = r.Dx(), r.Dy()
 	return n
@@ -512,8 +513,8 @@ func (n LayerNode) Place(r image.Rectangle) LayerNode {
 // The node can be anywhere laid out before the layer: in the overlay's base,
 // or, for a layer that floats, anywhere on screen. The layer is hidden while
 // no such node is on screen.
-func (n LayerNode) AnchorTo[K comparable](id K, side Direction) LayerNode {
-	n.anchor, n.side = id, side
+func (n LayerNode) AnchorTo(id ID, side Direction) LayerNode {
+	n.anchor, n.side = id, cmp.Or(side, Bottom)
 	return n
 }
 

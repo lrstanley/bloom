@@ -21,7 +21,7 @@ import (
 
 var rounded = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 
-func expectRect(t *testing.T, f *Frame, id string, want image.Rectangle) {
+func expectRect(t *testing.T, f *Frame, id ID, want image.Rectangle) {
 	t.Helper()
 	if got, ok := f.Rect(id); !ok || got != want {
 		t.Fatalf("%s rect = %v, %v; want %v", id, got, ok, want)
@@ -175,7 +175,7 @@ func TestLayerPresence(t *testing.T) {
 	if got := r.Render(12, 3, tree()); got != base {
 		t.Fatalf("hidden layer changed rendering: %q", got)
 	}
-	for _, id := range []string{"child", "layer"} {
+	for _, id := range []ID{"child", "layer"} {
 		if _, ok := r.Frame().Rect(id); ok {
 			t.Fatalf("hidden %s has entry", id)
 		}
@@ -310,6 +310,18 @@ func TestGridRowHeights(t *testing.T) {
 	}
 	if got := Render(1, 5, grid); !strings.Contains(got, "d") {
 		t.Fatalf("height 5 lost a line:\n%s", got)
+	}
+}
+
+// TestAnchorToEmptyID checks that a layer anchored to the empty ID, such as
+// to the focus while nothing is focused, is hidden as for any node not on
+// screen, rather than placed as if it were not anchored.
+func TestAnchorToEmptyID(t *testing.T) {
+	t.Parallel()
+
+	got := Debug(10, 3, Overlay(Text("base"), Layer(Text("pop")).AnchorTo("", Bottom)))
+	if !strings.Contains(got, "Layer hidden") {
+		t.Fatalf("the layer anchored to the empty ID was shown:\n%s", got)
 	}
 }
 
@@ -813,13 +825,12 @@ func TestFloatInDialog(t *testing.T) {
 		expect(t, &l, "close dialog", "close menu")
 
 		// Focus inside the dialog's scope reaches the menu.
-		var focus Focus[string]
+		var focus Focus
 		focus.Push("dialog")
 		var order []string
 		for range 4 {
 			focus.Next(f)
-			id, _ := focus.Current()
-			order = append(order, id)
+			order = append(order, string(focus.Current()))
 		}
 		if want := []string{"input", "opt1", "opt2", "opt3"}; strings.Join(order, ",") != strings.Join(want, ",") {
 			t.Fatalf("effects %v: focus went %v, want %v", effects, order, want)

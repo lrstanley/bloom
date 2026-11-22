@@ -155,9 +155,7 @@ as Bubbles' viewport and list, still need to be told their size in `Update`. Rat
 arithmetic, give the slot an ID and ask bloom where it went:
 
 ```go
-type pane int
-
-const paneReader pane = iota
+const paneReader bloom.ID = "reader"
 
 // in layout
 bloom.Fill(bloom.Box(panel, bloom.View(&m.reader))).ID(paneReader)

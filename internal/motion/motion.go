@@ -40,7 +40,7 @@ func (s *state) gliding() bool {
 // [Tracker.Begin] before laying out a frame and [Tracker.End] after it.
 type Tracker struct {
 	now           func() time.Time
-	states        map[any]*state
+	states        map[string]*state
 	at            time.Time
 	size          image.Point
 	snap, running bool
@@ -48,7 +48,7 @@ type Tracker struct {
 
 // New returns a Tracker that reads the time from now.
 func New(now func() time.Time) *Tracker {
-	return &Tracker{now: now, states: make(map[any]*state)}
+	return &Tracker{now: now, states: make(map[string]*state)}
 }
 
 // Begin starts a w×h frame. When the size differs from the last frame's,
@@ -80,7 +80,7 @@ func (m *Tracker) Len() int { return len(m.states) }
 // Values returns the current x, y, width, and height values of the box with
 // ID id as it glides, before rounding to cells, for tests that check
 // progress finer than a cell.
-func (m *Tracker) Values(id any) (v [4]float64) {
+func (m *Tracker) Values(id string) (v [4]float64) {
 	if s := m.states[id]; s != nil {
 		for i := range s.values {
 			v[i] = s.values[i].Float()
@@ -91,7 +91,7 @@ func (m *Tracker) Values(id any) (v [4]float64) {
 
 // Has reports whether the box with ID id has animation state, kept from the
 // last frame.
-func (m *Tracker) Has(id any) bool { return m.states[id] != nil }
+func (m *Tracker) Has(id string) bool { return m.states[id] != nil }
 
 // Start has the box with ID id, which has no animation state, start from at,
 // where it was laid out last without an animation, relative to origin, as
@@ -99,7 +99,7 @@ func (m *Tracker) Has(id any) bool { return m.states[id] != nil }
 // finished moving there with effects, so it glides from there, or moves
 // from there with effects, rather than starting where it goes. opts
 // configure its progress, as for Move.
-func (m *Tracker) Start(id any, opts []anim.Option, at image.Rectangle, origin image.Point) {
+func (m *Tracker) Start(id string, opts []anim.Option, at image.Rectangle, origin image.Point) {
 	if m.states[id] == nil {
 		m.states[id] = &state{moving: true, at: at.Sub(origin), progress: anim.NewValue(1, opts...)}
 	}
@@ -109,7 +109,7 @@ func (m *Tracker) Start(id any, opts []anim.Option, at image.Rectangle, origin i
 // target. Its position animates relative to origin, where the nearest
 // animated box it is in is on screen, so that it moves with that box rather
 // than trailing behind it. opts configure its values when it starts gliding.
-func (m *Tracker) Rect(id any, opts []anim.Option, target image.Rectangle, origin image.Point) image.Rectangle {
+func (m *Tracker) Rect(id string, opts []anim.Option, target image.Rectangle, origin image.Point) image.Rectangle {
 	m.clock()
 	rel := target.Min.Sub(origin)
 	coords := [4]int{rel.X, rel.Y, max(target.Dx(), 0), max(target.Dy(), 0)}
@@ -157,7 +157,7 @@ func (m *Tracker) Rect(id any, opts []anim.Option, target image.Rectangle, origi
 // moving with a gliding ancestor has not moved. A box still gliding, as Rect
 // left it, is not moving with effects; the caller glides it on with Rect.
 // opts configure its progress when it starts moving with effects.
-func (m *Tracker) Move(id any, opts []anim.Option, target image.Rectangle, origin image.Point) (from image.Rectangle, t float64, ok bool) {
+func (m *Tracker) Move(id string, opts []anim.Option, target image.Rectangle, origin image.Point) (from image.Rectangle, t float64, ok bool) {
 	m.clock()
 	rel := target.Sub(origin)
 	s := m.states[id]
@@ -200,7 +200,7 @@ func (m *Tracker) clock() {
 
 // Gliding reports whether the box with ID id is gliding, as [Tracker.Rect]
 // moves it.
-func (m *Tracker) Gliding(id any) bool {
+func (m *Tracker) Gliding(id string) bool {
 	s := m.states[id]
 	return s != nil && !s.moving && s.gliding()
 }

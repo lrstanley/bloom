@@ -11,31 +11,22 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// Focus is which node has the keyboard focus, by its ID, of type K. Keep it
-// in the model: the layout only says which nodes can be focused, with
-// Focusable, and where focus scopes are.
-//
-// Focus moves between focusable nodes whose IDs are Ks, and passes over
-// those with IDs of other types, so give everything that takes focus the
-// same ID type:
-//
-//	type control int
+// Focus is which node has the keyboard focus, by its [ID]. Keep it in the
+// model: the layout only says which nodes can be focused, with Focusable, and
+// where focus scopes are.
 //
 //	const (
-//		fieldName control = iota
-//		fieldEmail
-//		buttonSave
+//		fieldName  bloom.ID = "name"
+//		fieldEmail bloom.ID = "email"
+//		buttonSave bloom.ID = "save"
 //	)
 //
 //	type model struct {
-//		focus bloom.Focus[control]
+//		focus bloom.Focus
 //	}
 //
-// For nodes of different kinds, K can be an interface that their ID types
-// implement, and a Focus[any] moves between every focusable node.
-//
 // [Focus.Push] confines focus to a scope, such as a modal [Layer], until
-// [Focus.Pop] puts it back where it was. A scope's ID can be of any type:
+// [Focus.Pop] puts it back where it was:
 //
 //	case openConfirmMsg:
 //		m.focus.Push(dialogConfirm)
@@ -46,81 +37,57 @@ import (
 //		if msg.String() == "tab" {
 //			m.focus.Next(m.ui.Frame())
 //		}
-type Focus[K comparable] struct {
-	current K
-	focused bool
-	scopes  []focusScope[K]
+type Focus struct {
+	current ID
+	scopes  []focusScope
 }
 
-type focusScope[K comparable] struct {
-	id      any
-	prev    K
-	focused bool
+type focusScope struct {
+	id, prev ID
 }
 
-// Current returns the ID of the focused node, and whether a node is focused.
-func (f *Focus[K]) Current() (K, bool) { return f.current, f.focused }
-
-// focusedID returns the ID of the focused node, and whether a node is
-// focused, for the Root of [WithFocus].
-func (f *Focus[K]) focusedID() (any, bool) {
-	if !f.focused {
-		return nil, false
-	}
-	return f.current, true
-}
-
-// focuses reports whether f moves to a focusable node with ID id, which it
-// does when id is a K, and whether that node is focused, for the Root of
-// [WithFocus].
-func (f *Focus[K]) focuses(id any) (moves, focused bool) {
-	k, ok := id.(K)
-	return ok, ok && f.Is(k)
-}
+// Current returns the ID of the focused node, or "" when no node is focused.
+func (f *Focus) Current() ID { return f.current }
 
 // Is reports whether the node with ID id is focused.
-func (f *Focus[K]) Is(id K) bool { return f.focused && f.current == id }
+func (f *Focus) Is(id ID) bool { return id != "" && f.current == id }
 
-// Set focuses the node with ID id.
-func (f *Focus[K]) Set(id K) { f.current, f.focused = id, true }
+// Set focuses the node with ID id. Setting "" clears the focus.
+func (f *Focus) Set(id ID) { f.current = id }
 
 // Clear removes the focus.
-func (f *Focus[K]) Clear() {
-	var zero K
-	f.current, f.focused = zero, false
-}
+func (f *Focus) Clear() { f.current = "" }
 
 // Push confines focus to the scope with ID scope, clearing it until a node
 // there is focused, and remembers the focus to go back to on [Focus.Pop].
-func (f *Focus[K]) Push[S comparable](scope S) {
+func (f *Focus) Push(scope ID) {
 	// Clipping makes append copy, so a copy of the model that still holds
 	// the old scopes is not changed by this one.
-	f.scopes = append(slices.Clip(f.scopes), focusScope[K]{id: scope, prev: f.current, focused: f.focused})
+	f.scopes = append(slices.Clip(f.scopes), focusScope{id: scope, prev: f.current})
 	f.Clear()
 }
 
 // Pop leaves the innermost scope, focusing what was focused when it was
 // pushed.
-func (f *Focus[K]) Pop() {
+func (f *Focus) Pop() {
 	if n := len(f.scopes); n > 0 {
-		s := f.scopes[n-1]
-		f.current, f.focused = s.prev, s.focused
+		f.current = f.scopes[n-1].prev
 		f.scopes = f.scopes[:n-1]
 	}
 }
 
-// Scope returns the ID of the innermost scope pushed, or nil.
-func (f *Focus[K]) Scope() any {
+// Scope returns the ID of the innermost scope pushed, or "".
+func (f *Focus) Scope() ID {
 	if n := len(f.scopes); n > 0 {
 		return f.scopes[n-1].id
 	}
-	return nil
+	return ""
 }
 
 // Within reports whether the focused node is inside the scope with ID scope
 // in frame.
-func (f *Focus[K]) Within[S comparable](frame *Frame, scope S) bool {
-	if !f.focused {
+func (f *Focus) Within(frame *Frame, scope ID) bool {
+	if f.current == "" {
 		return false
 	}
 	i := frame.index(f.current)
@@ -130,19 +97,20 @@ func (f *Focus[K]) Within[S comparable](frame *Frame, scope S) bool {
 // Next focuses the next node that can be focused, in the order of frame,
 // inside the innermost scope pushed, wrapping around. It reports whether
 // there was one.
-func (f *Focus[K]) Next(frame *Frame) bool { return f.step(frame, 1) }
+func (f *Focus) Next(frame *Frame) bool { return f.step(frame, 1) }
 
 // Prev focuses the previous node that can be focused, as [Focus.Next] does.
-func (f *Focus[K]) Prev(frame *Frame) bool { return f.step(frame, -1) }
+func (f *Focus) Prev(frame *Frame) bool { return f.step(frame, -1) }
 
-func (f *Focus[K]) step(frame *Frame, dir int) bool {
+func (f *Focus) step(frame *Frame, dir int) bool {
 	if frame == nil {
 		return false
 	}
-	var order []K
+	var order []ID
 	at := -1
 	for i := range frame.entries {
-		if id, ok := f.focusable(frame, i); ok {
+		if f.focusable(frame, i) {
+			id := frame.entries[i].id
 			if f.Is(id) {
 				at = len(order)
 			}
@@ -166,26 +134,24 @@ func (f *Focus[K]) step(frame *Frame, dir int) bool {
 
 // click focuses the innermost node of chain that can be focused, for
 // [WithFocus].
-func (f *Focus[K]) click(frame *Frame, chain []int) {
+func (f *Focus) click(frame *Frame, chain []int) {
 	for _, i := range chain {
-		if id, ok := f.focusable(frame, i); ok {
-			f.Set(id)
+		if f.focusable(frame, i) {
+			f.Set(frame.entries[i].id)
 			return
 		}
 	}
 }
 
-// focusable returns the ID of entry i of frame, if it can take focus now: it
-// can be focused, has an ID of type K, is on screen, and is inside the
-// innermost scope pushed.
-func (f *Focus[K]) focusable(frame *Frame, i int) (K, bool) {
+// focusable reports whether entry i of frame can take focus now: it can be
+// focused, has an ID, is on screen, and is inside the innermost scope pushed.
+func (f *Focus) focusable(frame *Frame, i int) bool {
 	e := &frame.entries[i]
-	id, ok := e.id.(K)
-	if !ok || !e.focusable || e.vis.Empty() {
-		return id, false
+	if e.id == "" || !e.focusable || e.vis.Empty() {
+		return false
 	}
 	scope := f.Scope()
-	return id, scope == nil || frame.inScope(i, scope)
+	return scope == "" || frame.inScope(i, scope)
 }
 
 // Update handles tab and shift+tab, which move the focus, and enter and
@@ -195,7 +161,7 @@ func (f *Focus[K]) focusable(frame *Frame, i int) (K, bool) {
 // when the focused node has a Press handler that takes the key, rather than
 // passing it on with [on.Pass], such as a button that is disabled leaving
 // enter to the form. Clicks move the focus with [WithFocus].
-func (f *Focus[K]) Update(msg tea.Msg, frame *Frame) (tea.Cmd, bool) {
+func (f *Focus) Update(msg tea.Msg, frame *Frame) (tea.Cmd, bool) {
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return nil, false
@@ -208,14 +174,11 @@ func (f *Focus[K]) Update(msg tea.Msg, frame *Frame) (tea.Cmd, bool) {
 		f.Prev(frame)
 		return nil, true
 	case "enter", "space":
-		i := -1
-		if f.focused {
-			i = frame.index(f.current)
-		}
+		i := frame.index(f.current)
 		if i < 0 || !has(frame.handlers[i], kindsOf(on.KindPress)) {
 			return nil, false
 		}
-		if _, can := f.focusable(frame, i); !can {
+		if !f.focusable(frame, i) {
 			// It can't take focus now, such as from outside the scope pushed.
 			return nil, false
 		}

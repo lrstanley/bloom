@@ -537,7 +537,7 @@ func TestTooltipUnderModalLayer(t *testing.T) {
 // focusTips is a model with focus over three nodes with tooltips and a field
 // without one, which moves the focus with tab.
 type focusTips struct {
-	f Focus[string]
+	f Focus
 	g *tipRig
 }
 
@@ -910,7 +910,7 @@ func TestTooltipAndCursor(t *testing.T) {
 
 	// With a focus, the focused input's cursor under the unfolded text
 	// gives way to one in sight.
-	var f Focus[string]
+	var f Focus
 	f.Set("a")
 	tree = Column(
 		Row(Fixed(6, Text("> abcdefgh").Truncate().Cursor(tea.NewCursor(2, 0)).ID("a").Focusable()), Fill(Text(" "))),
@@ -1388,7 +1388,7 @@ func TestTooltipPlacedOverContent(t *testing.T) {
 func TestUnfoldOnFocus(t *testing.T) {
 	t.Parallel()
 
-	var f Focus[string]
+	var f Focus
 	const full = "abcdefghijkl"
 	tree := func() Child {
 		return Column(Text(" "), Row(Fixed(6, Text(full).Truncate().ID("cut").Focusable()), Fill(Text(" "))))

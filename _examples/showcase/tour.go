@@ -13,7 +13,7 @@ import (
 
 // tourSteps are what the tour says, about the pane it spotlights.
 var tourSteps = []struct {
-	pane  paneID
+	pane  bloom.ID
 	title string
 	text  string
 }{

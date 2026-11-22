@@ -303,7 +303,7 @@ the IDs of the nodes there, outermost first. See [IDs](/concepts/how-a-program-r
 
 ```go
 	case tea.MouseClickMsg:
-		if path := m.ui.Frame().Hit(msg.X, msg.Y); slices.Contains(path, any(paneLog)) {
+		if path := m.ui.Frame().Hit(msg.X, msg.Y); slices.Contains(path, paneLog) {
 			m.follow = false
 		}
 ```

@@ -155,14 +155,14 @@ collapsed slot, which you can use to tell the user the panel is hidden.
 
 ## Rect, Click, or focus can't find a node
 
-IDs are compared by value and type. A node given `.ID(paneSidebar)`, where `paneSidebar` is a `pane`, isn't found
-with `Rect("sidebar")`, and a `Focus[control]` passes over nodes whose IDs aren't `control`s. Use the same typed
-constants in the layout and where you look the node up. A node in a [collapsed slot](#a-panel-disappears), or not in
+Look the node up with the ID you gave it. An ID from `bloom.NewID("sidebar")` is `"sidebar#1"` or the like, not
+`"sidebar"`, so keep the one `NewID` returned and use it in the layout and the lookup, rather than calling `NewID`
+again. Calling it in `Layout` makes a new ID every frame. A node in a [collapsed slot](#a-panel-disappears), or not in
 the last frame drawn, isn't found either. See [IDs](/concepts/how-a-program-runs#ids).
 
 ## Tab doesn't move focus
 
-The node needs `Focusable()` and an ID of the type your `Focus` holds, and `Update` has to pass key presses to
+The node needs `Focusable()` and an ID, and `Update` has to pass key presses to
 `m.focus.Update(msg, m.ui.Frame())`. While a dialog's scope is pushed, focus stays inside it. See
 [Focus and keyboard navigation](/input/focus).
 

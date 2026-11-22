@@ -348,7 +348,7 @@ func TestMoveWith(t *testing.T) {
 
 	now := time.Unix(1, 0)
 	r := New(WithClock(func() time.Time { return now }))
-	pane := func(id, text string, move bool) SlotNode {
+	pane := func(id ID, text string, move bool) SlotNode {
 		s := Fixed(6, Text(text)).ID(id).Animate(linear...)
 		if move {
 			s = s.MoveWith(fx.Fly{Seed: 1})
@@ -556,7 +556,7 @@ func TestLayoutAnimationCarriesOn(t *testing.T) {
 	many := func(x int, animate bool) Child {
 		ls := make([]LayerNode, 10)
 		for i := range ls {
-			ls[i] = Layer(Text("w")).ID(strconv.Itoa(i)).Anchor(Start, Start).Offset(x, i).Size(6, 1)
+			ls[i] = Layer(Text("w")).ID(ID(strconv.Itoa(i))).Anchor(Start, Start).Offset(x, i).Size(6, 1)
 			if animate {
 				ls[i] = ls[i].Animate(linear...)
 			}
@@ -567,7 +567,7 @@ func TestLayoutAnimationCarriesOn(t *testing.T) {
 	r.View(100, 10, many(20, false))
 	r.View(100, 10, many(40, true))
 	for i := range 10 {
-		expectRect(t, r.Frame(), strconv.Itoa(i), image.Rect(20, i, 26, i+1))
+		expectRect(t, r.Frame(), ID(strconv.Itoa(i)), image.Rect(20, i, 26, i+1))
 	}
 
 	// Nor does one moving with effects jump: it moves from there.

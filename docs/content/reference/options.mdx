@@ -253,7 +253,9 @@ Options for one tooltip, for `Tooltip(text, opts...)`:
 | `frame.Truncated(id)` | whether a `Truncate()` text node was cut short, with or without tooltips |
 | `frame.Viewport(id)`, `frame.List(id)` | where a [viewport](/content/viewports) or [list](/content/lists) was scrolled to, and how much it showed |
 | [`ThrottleMouse(every)`](https://pkg.go.dev/bloomfx.dev/bloom#ThrottleMouse) | a `tea.WithFilter` filter that drops wheel and motion events that come too fast |
-| `Focus[K]` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within`; `K` is the type of the IDs focus moves between |
+| `Focus` methods | `Set`, `Clear`, `Is`, `Current`, `Next`, `Prev`, `Update`, `Push`, `Pop`, `Scope`, `Within` |
+| [`NewID(name)`](https://pkg.go.dev/bloomfx.dev/bloom#NewID) | an `ID` no other call returns, shown as the name and a number |
+| [`id.Sub(part)`](https://pkg.go.dev/bloomfx.dev/bloom#ID.Sub) | the ID of a part of the node with ID `id`, named by a string or an index |
 
 ## Mouse handlers
 

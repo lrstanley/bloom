@@ -29,29 +29,29 @@ func focusTree(dialog bool) Child {
 func TestFocus(t *testing.T) {
 	t.Parallel()
 
-	var f Focus[string]
+	var f Focus
 	r := New(WithFocus(&f))
 	r.Render(20, 5, focusTree(false))
-	for _, want := range []string{"a", "b", "a"} {
+	for _, want := range []ID{"a", "b", "a"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
-			t.Fatalf("Next focused %v, want %v", focused(&f), want)
+			t.Fatalf("Next focused %v, want %v", f.Current(), want)
 		}
 	}
 	f.Prev(r.Frame())
 	if !f.Is("b") {
-		t.Fatalf("Prev focused %v", focused(&f))
+		t.Fatalf("Prev focused %v", f.Current())
 	}
 
 	r.Render(20, 5, focusTree(true))
 	f.Push("dialog")
-	if _, ok := f.Current(); ok || f.Scope() != "dialog" {
+	if f.Current() != "" || f.Scope() != "dialog" {
 		t.Fatal("Push did not clear the focus")
 	}
-	for _, want := range []string{"ok", "cancel", "ok"} {
+	for _, want := range []ID{"ok", "cancel", "ok"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
-			t.Fatalf("Next inside the dialog focused %v, want %v", focused(&f), want)
+			t.Fatalf("Next inside the dialog focused %v, want %v", f.Current(), want)
 		}
 	}
 	if !f.Within(r.Frame(), "dialog") {
@@ -61,72 +61,68 @@ func TestFocus(t *testing.T) {
 	r.Render(20, 5, focusTree(true))
 	r.ClickAt(0, 0)
 	if !f.Is("ok") {
-		t.Fatalf("a click outside the dialog focused %v", focused(&f))
+		t.Fatalf("a click outside the dialog focused %v", f.Current())
 	}
 
 	f.Pop()
 	if !f.Is("b") || f.Within(r.Frame(), "dialog") {
-		t.Fatalf("Pop focused %v, want b", focused(&f))
+		t.Fatalf("Pop focused %v, want b", f.Current())
 	}
 
 	r.Render(20, 5, focusTree(false))
 	r.ClickAt(0, 0)
 	if !f.Is("a") {
-		t.Fatalf("clicking a focused %v", focused(&f))
+		t.Fatalf("clicking a focused %v", f.Current())
 	}
 }
 
-// TestFocusType checks that focus only moves between nodes with IDs of its
-// type, and that untyped constants convert to it.
-func TestFocusType(t *testing.T) {
+// TestFocusAll checks that focus moves between every focusable node with an
+// ID, passing over one without, and that Current is "" with none focused.
+func TestFocusAll(t *testing.T) {
 	t.Parallel()
 
-	type field int
-	type button string
 	tree := Row(
-		Text("name").ID(field(0)).Focusable(),
-		Text("x").ID("other").Focusable(),
-		Text("ok").ID(button("ok")).Focusable(),
-		Text("email").ID(field(1)).Focusable(),
+		Text("name").ID("name").Focusable(),
+		Text("x").Focusable(),
+		Text("ok").ID("ok").Focusable(),
+		Text("email").ID("email").Focusable(),
 	)
 	r := New()
 	r.Render(30, 1, tree)
 
-	var f Focus[field]
-	if id, ok := f.Current(); ok || f.Is(0) {
-		t.Fatalf("a zero Focus has %v focused", id)
+	var f Focus
+	if id := f.Current(); id != "" || f.Is("") {
+		t.Fatalf("a zero Focus has %q focused", id)
 	}
-	for _, want := range []field{0, 1, 0} {
+	for _, want := range []ID{"name", "ok", "email", "name"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
-			t.Fatalf("Next focused %v, want %v", focused(&f), want)
+			t.Fatalf("Next focused %q, want %q", f.Current(), want)
 		}
 	}
-
-	var buttons Focus[button]
-	buttons.Set("ok")
-	if id, ok := buttons.Current(); !ok || id != "ok" {
-		t.Fatalf("Set an untyped constant: %v, %v", id, ok)
-	}
-
-	var all Focus[any]
-	for _, want := range []any{field(0), "other", button("ok"), field(1)} {
-		all.Next(r.Frame())
-		if !all.Is(want) {
-			t.Fatalf("Focus[any] focused %v, want %v", focused(&all), want)
-		}
+	f.Set("")
+	if f.Current() != "" {
+		t.Fatalf("Set(\"\") left %q focused", f.Current())
 	}
 }
 
-// focused returns the ID of the node f has focused, for test messages.
-func focused[K comparable](f *Focus[K]) K {
-	id, _ := f.Current()
-	return id
+// TestNewID checks that NewID never returns the same ID twice, even for the
+// same name, and that Sub makes the IDs of parts.
+func TestNewID(t *testing.T) {
+	t.Parallel()
+
+	a, b := NewID("select"), NewID("select")
+	if a == b || a == "select" {
+		t.Fatalf("NewID returned %q and %q", a, b)
+	}
+	if got := ID("tabs").Sub(2); got != "tabs/2" {
+		t.Fatalf("Sub(2) = %q", got)
+	}
 }
 
 func TestFocusUpdate(t *testing.T) {
 	t.Parallel()
-	var f Focus[string]
+	var f Focus
 	pressed := 0
 	r := New(WithFocus(&f))
 	r.Render(10, 2, Row(
@@ -136,7 +132,7 @@ func TestFocusUpdate(t *testing.T) {
 	for _, tt := range []struct {
 		msg     tea.Msg
 		handled bool
-		want    string
+		want    ID
 	}{
 		{tea.KeyPressMsg{Code: tea.KeyTab}, true, "a"},
 		{tea.KeyPressMsg{Code: tea.KeyEnter}, false, "a"}, // a has no Press handler
@@ -150,7 +146,7 @@ func TestFocusUpdate(t *testing.T) {
 	} {
 		r.Update(tt.msg)
 		if _, got := f.Update(tt.msg, r.Frame()); got != tt.handled || !f.Is(tt.want) {
-			t.Fatalf("%T %v: handled %v, focus %v; want %v, %s", tt.msg, tt.msg, got, focused(&f), tt.handled, tt.want)
+			t.Fatalf("%T %v: handled %v, focus %v; want %v, %s", tt.msg, tt.msg, got, f.Current(), tt.handled, tt.want)
 		}
 	}
 	if pressed != 2 {
@@ -190,7 +186,7 @@ func TestFocusUpdate(t *testing.T) {
 // [on.Pass] is left to the program.
 func TestFocusPressPasses(t *testing.T) {
 	t.Parallel()
-	var f Focus[string]
+	var f Focus
 	disabled, pressed := true, 0
 	r := New(WithFocus(&f))
 	r.Render(10, 1, Text("save").ID("save").Focusable().On(on.Press(func() tea.Cmd {
@@ -226,18 +222,18 @@ func TestFocusEveryNode(t *testing.T) {
 		Centered(Text("c")).ID("center").Focusable(),
 		Marquee("m", 0).ID("marquee").Focusable(),
 	)
-	var f Focus[string]
+	var f Focus
 	r := New(WithFocus(&f))
 	r.Render(10, 7, tree)
-	for _, want := range []string{"row", "box", "list", "viewport", "center", "marquee", "row"} {
+	for _, want := range []ID{"row", "box", "list", "viewport", "center", "marquee", "row"} {
 		f.Next(r.Frame())
 		if !f.Is(want) {
-			t.Fatalf("Next focused %v, want %v", focused(&f), want)
+			t.Fatalf("Next focused %v, want %v", f.Current(), want)
 		}
 	}
 	r.ClickAt(0, 5)
 	if !f.Is("center") {
-		t.Fatalf("a click on the centered node focused %v", focused(&f))
+		t.Fatalf("a click on the centered node focused %v", f.Current())
 	}
 }
 
@@ -250,21 +246,20 @@ func TestFocusPicksCursor(t *testing.T) {
 
 	panel := lipgloss.NewStyle()
 	cur := tea.NewCursor(2, 0)
-	input := func(id string) Child {
+	input := func(id ID) Child {
 		// The cursor's own node has no ID: the box around it is what
 		// takes the focus, as with a Bubbles text input.
-		return Box(panel, Text("> "+id).Cursor(cur)).ID(id).Focusable()
+		return Box(panel, Text("> "+string(id)).Cursor(cur)).ID(id).Focusable()
 	}
 	viewport := func() Child {
 		// Each test gets its own buffer and range, as they run in parallel.
 		sel := Range{Anchor: Pos{Col: 1}, Head: Pos{Col: 1}}
 		return Viewport(NewBuffer("text")).Caret(&sel).Cursor(cur).ID("vp").Focusable()
 	}
-	type other string
 	tests := []struct {
 		name  string
 		tree  Child
-		focus string // "" for none
+		focus ID // "" for none
 		want  *image.Point
 	}{
 		{"the focused input", Column(input("a"), input("b")), "a", &image.Point{2, 0}},
@@ -273,7 +268,7 @@ func TestFocusPicksCursor(t *testing.T) {
 		{"focus on a node without a cursor", Column(Text("a").ID("a").Focusable(), input("b")), "a", nil},
 		{"a cursor outside focusable nodes", Column(input("a"), Text("> c").Cursor(cur)), "", &image.Point{2, 1}},
 		{"the focused cursor over a free one drawn later", Column(input("a"), Text("> c").Cursor(cur)), "a", &image.Point{2, 0}},
-		{"a node of another ID type", Column(input("a"), Box(panel, Text("> c").Cursor(cur)).ID(other("c")).Focusable()), "", &image.Point{2, 1}},
+		{"a focusable node without an ID", Column(input("a"), Box(panel, Text("> c").Cursor(cur)).Focusable()), "", &image.Point{2, 1}},
 		{"an unfocused input inside the focused panel", Column(input("a"), Column(input("b")).ID("panel").Focusable()), "panel", nil},
 		{"text inside the focused panel", Column(input("a"), Column(Text("> b").Cursor(cur)).ID("panel").Focusable()), "panel", &image.Point{2, 1}},
 		{"a focused viewport's caret", Column(input("a"), viewport()), "vp", &image.Point{1, 1}},
@@ -282,7 +277,7 @@ func TestFocusPicksCursor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var f Focus[string]
+			var f Focus
 			if tt.focus != "" {
 				f.Set(tt.focus)
 			}
@@ -308,7 +303,7 @@ func TestFocusCursorFollowsClick(t *testing.T) {
 		Text("> a").Cursor(cur).ID("a").Focusable(),
 		Text("> b").Cursor(cur).ID("b").Focusable(),
 	)
-	var f Focus[string]
+	var f Focus
 	f.Set("b")
 	r := New(WithFocus(&f))
 	if c := r.View(10, 2, tree).Cursor; c == nil || c.Y != 1 {
@@ -316,7 +311,7 @@ func TestFocusCursorFollowsClick(t *testing.T) {
 	}
 	r.ClickAt(0, 0)
 	if c := r.View(10, 2, tree).Cursor; !f.Is("a") || c == nil || c.Y != 0 {
-		t.Fatalf("after clicking a, focus %v and cursor %+v, want on a", focused(&f), c)
+		t.Fatalf("after clicking a, focus %v and cursor %+v, want on a", f.Current(), c)
 	}
 
 	if c := New().View(10, 2, tree).Cursor; c == nil || c.Y != 1 {
@@ -336,9 +331,9 @@ func TestFocusCursorUnderEffects(t *testing.T) {
 		Fixed(5, Text("a").Cursor(c).ID("a").Focusable()),
 		Fixed(5, Text("b").Cursor(c).ID("b").Focusable()),
 	), fx.Wipe{From: fx.Left})
-	var f Focus[string]
+	var f Focus
 	r := New(WithFocus(&f))
-	for _, id := range []string{"b", "a", "b", "a"} {
+	for _, id := range []ID{"b", "a", "b", "a"} {
 		f.Set(id)
 		got := r.View(10, 1, tree).Cursor
 		if id == "a" && (got == nil || got.X != 0) {
@@ -359,7 +354,7 @@ func TestFocusCoveredCursorGivesWay(t *testing.T) {
 		Text("> a").Cursor(tea.NewCursor(2, 0)).ID("a").Focusable(),
 		Layer(Text("dialog > ").Cursor(tea.NewCursor(8, 0))).Anchor(Start, Start),
 	)
-	var f Focus[string]
+	var f Focus
 	f.Set("a")
 	if got := New(WithFocus(&f)).View(10, 1, tree).Cursor; got == nil || got.X != 8 {
 		t.Fatalf("cursor %+v, want the layer's, at 8,0", got)
@@ -376,8 +371,8 @@ func TestFocusLeavingCursor(t *testing.T) {
 		Present(leaving, Text("> a").Cursor(tea.NewCursor(2, 0)).ID("a").Focusable()),
 		Text("ok").ID("ok").Focusable(),
 	)
-	for _, id := range []string{"ok", "a"} {
-		var f Focus[string]
+	for _, id := range []ID{"ok", "a"} {
+		var f Focus
 		f.Set(id)
 		if got := New(WithFocus(&f)).View(10, 2, tree).Cursor; got != nil {
 			t.Fatalf("focus on %s: cursor of the input animating out shown at %v", id, got.Position)
@@ -421,7 +416,7 @@ func TestFocusCursorPickedOnScreen(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var f Focus[string]
+			var f Focus
 			f.Set("a")
 			if got := New(WithFocus(&f)).View(10, 2, tt.tree).Cursor; got == nil || got.X != tt.want {
 				t.Fatalf("cursor = %+v, want at column %d", got, tt.want)

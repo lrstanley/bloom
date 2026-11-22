@@ -30,15 +30,13 @@ var services = []string{
 	"ingest", "mailer", "search", "storage", "worker",
 }
 
-// paneID is the ID of a pane, for focus and layout animation.
-type paneID string
-
+// The IDs of the panes, for focus and layout animation.
 const (
-	paneSidebar paneID = "sidebar"
-	paneMain    paneID = "main"
-	paneTable   paneID = "table"
-	paneLogs    paneID = "logs"
-	paneDialog  paneID = "dialog"
+	paneSidebar bloom.ID = "sidebar"
+	paneMain    bloom.ID = "main"
+	paneTable   bloom.ID = "table"
+	paneLogs    bloom.ID = "logs"
+	paneDialog  bloom.ID = "dialog"
 )
 
 type tickMsg time.Time
@@ -48,7 +46,7 @@ type model struct {
 	st   styles
 	w, h int
 
-	focus bloom.Focus[paneID]
+	focus bloom.Focus
 	frame int
 	drawn time.Duration // time the last frame took to lay out and draw
 
@@ -196,7 +194,7 @@ func (m *model) layout() bloom.Child {
 }
 
 // panel is the frame of pane id, which shows whether it has focus.
-func (m *model) panel(id paneID) lipgloss.Style {
+func (m *model) panel(id bloom.ID) lipgloss.Style {
 	if m.focus.Is(id) {
 		return m.st.focused
 	}

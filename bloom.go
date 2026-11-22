@@ -226,7 +226,7 @@ func (a Align) offset(n, avail int) int {
 // style it has while hovered, its tooltip, whether its tooltip is pinned
 // open, and whether the text cut to fit inside it shows none.
 type meta struct {
-	id         any
+	id         ID
 	focusable  bool
 	scope      bool
 	selectable bool

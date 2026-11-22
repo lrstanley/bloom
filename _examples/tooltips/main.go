@@ -41,7 +41,7 @@ type model struct {
 
 	table table
 
-	focus bloom.Focus[action]
+	focus bloom.Focus
 	tips  bloom.Tooltips
 	sink  bool // tooltips go to the status line
 	note  string
@@ -118,7 +118,7 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 }
 
 // press runs the toolbar button with ID id.
-func (m *model) press(id action) tea.Cmd {
+func (m *model) press(id bloom.ID) tea.Cmd {
 	name := "every service"
 	if m.table.selected >= 0 {
 		name = deployments[m.table.selected].service

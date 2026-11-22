@@ -44,7 +44,7 @@ var nodes = []node{
 var builders = []builder{
 	{
 		Name:   "ID",
-		Params: "[K comparable](id K)",
+		Params: "(id ID)",
 		Body:   "n.id = id",
 		Doc:    "ID sets the ID that focus and [Frame.Rect] refer to the {{.Noun}} by.",
 		Docs: map[string]string{
@@ -174,7 +174,7 @@ var builders = []builder{
 		Only:    []string{"TextNode"},
 		Doc: "Cursor shows the terminal cursor at c, relative to the {{.Noun}}'s top-left cell, " +
 			"while that cell is on screen and not covered by a later layer. A terminal has one cursor: " +
-			"with [WithFocus], a cursor inside a focusable node whose ID is of the focus's type is shown " +
+			"with [WithFocus], a cursor inside a focusable node with an ID is shown " +
 			"only while the nearest such node, which may be the {{.Noun}} itself, is focused, and is shown " +
 			"over one in no such node. Otherwise the cursor drawn last is shown.",
 	},

@@ -25,19 +25,19 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 	defer func(side Direction) { e.side = side }(e.side)
 	e.side = 0
 	var target image.Rectangle
-	if n.anchor != nil {
+	if n.side != 0 {
 		var ok bool
 		if target, ok = e.rectOf(n.anchor); !ok {
 			e.boxes[i].hidden = true
 			return
 		}
-		e.side = cmp.Or(n.side, Bottom)
+		e.side = n.side
 	}
 
 	built := len(e.boxes)
 	w, h := e.layerSize(n, kid, area)
 	at := area.Min.Add(image.Pt(n.x.offset(w, area.Dx()), n.y.offset(h, area.Dy())))
-	if n.anchor != nil {
+	if n.side != 0 {
 		var side Direction
 		off := image.Pt(n.offsetX, n.offsetY)
 		at, side = anchor.Place(target, area, image.Pt(w, h), e.side, off)
@@ -62,7 +62,7 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 	}
 
 	lr := image.Rectangle{Min: at, Max: at.Add(image.Pt(w, h))}
-	if e.motion != nil && n.id != nil && n.animation != nil {
+	if e.motion != nil && n.id != "" && n.animation != nil {
 		lr = e.animate(i, n.id, n.animation, n.moves, lr)
 		defer func(at image.Point) { e.moved = at }(e.moved)
 		e.moved = lr.Min
@@ -86,7 +86,7 @@ func (e *engine) layerSize(n LayerNode, kid int, area image.Rectangle) (w, h int
 
 // rectOf returns the rectangle of the box with ID id, if some of it is on
 // screen: laid out, and not clipped away by the boxes it is in.
-func (e *engine) rectOf(id any) (image.Rectangle, bool) {
+func (e *engine) rectOf(id ID) (image.Rectangle, bool) {
 	if i := e.shown(id); i >= 0 {
 		return e.boxes[i].rect, true
 	}
@@ -94,8 +94,11 @@ func (e *engine) rectOf(id any) (image.Rectangle, bool) {
 }
 
 // shown returns the index of the box with ID id, if some of it is on screen,
-// or -1.
-func (e *engine) shown(id any) int {
+// or -1, as for the empty ID, which is no box's.
+func (e *engine) shown(id ID) int {
+	if id == "" {
+		return -1
+	}
 	for i := range e.boxes {
 		b := &e.boxes[i]
 		if b.meta.id != id || b.hidden {

@@ -122,11 +122,9 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-type pane string
-
 const (
-	paneLog   pane = "log"
-	paneInput pane = "input"
+	paneLog   bloom.ID = "log"
+	paneInput bloom.ID = "input"
 )
 
 var panel = lipgloss.NewStyle().

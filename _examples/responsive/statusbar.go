@@ -30,7 +30,7 @@ func (s statusbar) text() string {
 		return ""
 	}
 	var panes []string
-	for _, p := range []paneID{paneNav, paneReader, paneDetails} {
+	for _, p := range []bloom.ID{paneNav, paneReader, paneDetails} {
 		if _, ok := s.frame.Rect(p); ok {
 			panes = append(panes, string(p))
 		}

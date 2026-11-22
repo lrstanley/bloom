@@ -642,7 +642,7 @@ func TestViewRoutesItsOwnFrame(t *testing.T) {
 func TestFocusMovesBeforeHandlers(t *testing.T) {
 	t.Parallel()
 
-	var f Focus[string]
+	var f Focus
 	r := New(WithFocus(&f))
 	r.Render(20, 1, Row(
 		Text("field").ID("field").Focusable(),
@@ -655,7 +655,7 @@ func TestFocusMovesBeforeHandlers(t *testing.T) {
 		})),
 	))
 	if _, ok := r.Click("next"); !ok || !f.Is("field") {
-		t.Fatalf("focus is %v, want field, where the handler moved it", focused(&f))
+		t.Fatalf("focus is %v, want field, where the handler moved it", f.Current())
 	}
 }
 
@@ -710,13 +710,11 @@ func TestThrottleMouse(t *testing.T) {
 	}
 }
 
-type itemID int
-
 func mouseTree(modal bool) Child {
 	items := Column(
-		Text("zero").ID(itemID(0)),
-		Text("one").ID(itemID(1)),
-		Text("two").ID(itemID(2)),
+		Text("zero").ID("item0"),
+		Text("one").ID("item1"),
+		Text("two").ID("item2"),
 	)
 	base := Row(Fixed(10, items).ID("list"), Fill(Text("main")).ID("main"))
 	if !modal {
@@ -729,10 +727,10 @@ func TestHit(t *testing.T) {
 	t.Parallel()
 
 	f := Solve(20, 4, mouseTree(false))
-	if got := f.Hit(2, 1); !slices.Equal(got, []any{"list", itemID(1)}) {
+	if got := f.Hit(2, 1); !slices.Equal(got, []ID{"list", "item1"}) {
 		t.Fatalf("Hit on item 1 = %v", got)
 	}
-	if got := f.Hit(2, 3); !slices.Equal(got, []any{"list"}) {
+	if got := f.Hit(2, 3); !slices.Equal(got, []ID{"list"}) {
 		t.Fatalf("Hit on the list below its items = %v", got)
 	}
 
@@ -740,17 +738,17 @@ func TestHit(t *testing.T) {
 	if got := f.Hit(2, 1); got != nil {
 		t.Fatalf("Hit outside a modal = %v, want nil", got)
 	}
-	if got := f.Hit(18, 3); !slices.Equal(got, []any{"modal"}) {
+	if got := f.Hit(18, 3); !slices.Equal(got, []ID{"modal"}) {
 		t.Fatalf("Hit on a modal = %v", got)
 	}
 }
 
 // topHit returns the ID of the topmost node at x, y, or nil.
-func topHit(f *Frame, x, y int) any {
+func topHit(f *Frame, x, y int) ID {
 	if path := f.Hit(x, y); len(path) > 0 {
 		return path[len(path)-1]
 	}
-	return nil
+	return ""
 }
 
 func TestSlideMovesHits(t *testing.T) {
@@ -892,12 +890,12 @@ func TestEveryNodeTakesHandlers(t *testing.T) {
 	r := New()
 	r.Render(10, len(nodes), Column(slots...))
 	for y, n := range nodes {
-		expectRect(t, r.Frame(), n.name, image.Rect(0, y, 10, y+1))
+		expectRect(t, r.Frame(), ID(n.name), image.Rect(0, y, 10, y+1))
 		r.ClickAt(0, y)
 	}
 	expect(t, &l, names...)
 	for _, n := range nodes {
-		if _, ok := r.Click(n.name); !ok {
+		if _, ok := r.Click(ID(n.name)); !ok {
 			t.Fatalf("Click(%q) found no node", n.name)
 		}
 	}
@@ -997,10 +995,10 @@ func TestLeavingLayerIsNotFocusable(t *testing.T) {
 		Text("base").ID("base").Focusable(),
 		Layer(Text("ok").ID("ok").Focusable()).Presence(p),
 	))
-	var focus Focus[string]
+	var focus Focus
 	focus.Next(f)
 	focus.Next(f)
-	if id, _ := focus.Current(); id != "base" {
+	if id := focus.Current(); id != "base" {
 		t.Fatalf("focused %q, want only base to be focusable", id)
 	}
 }
@@ -1185,7 +1183,7 @@ func TestNodesFollowTheirNearestID(t *testing.T) {
 					return nil
 				}),
 			)
-			layers = append(layers, Layer(Row(button, Space())).ID(name).
+			layers = append(layers, Layer(Row(button, Space())).ID(ID(name)).
 				Anchor(Start, Start).Offset(x, 0).Size(5, 1).On(raise))
 		}
 		return Overlay(Text(""), layers...)

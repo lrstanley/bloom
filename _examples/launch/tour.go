@@ -59,7 +59,7 @@ func (t *tour) Layer(frame *bloom.Frame) bloom.LayerNode {
 		Anchor(bloom.Center, bloom.End).
 		Margin(2).
 		Presence(t.presence, fx.Fade{})
-	if r, ok := frame.Rect(cardID(step - 1)); ok {
+	if r, ok := frame.Rect(cardID.Sub(step - 1)); ok {
 		l = l.Backdrop(fx.Spotlight{Rect: r.Inset(-1), Soft: 5})
 	}
 	return l

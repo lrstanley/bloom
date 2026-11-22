@@ -171,19 +171,20 @@ animated modal dialog:
 ### Move focus into the dialog
 
 The buttons should respond to <kbd>tab</kbd> and <kbd>enter</kbd>, and focus shouldn't escape to the screen
-behind while the dialog is open. Add a button ID type:
+behind while the dialog is open. Add an ID for the dialog's layer:
 
 ```go
-type buttonID string
-
 // confirmDialog is the ID of the dialog's layer, which is also its focus scope.
-const confirmDialog = "confirm"
+var confirmDialog = bloom.NewID("confirm")
 ```
 
-And a [`bloom.Focus`](/input/focus) to the model. It moves between nodes whose IDs are `buttonID`:
+[`bloom.NewID`](/concepts/how-a-program-runs#keep-ids-apart) makes an ID that no other node has, whatever it's
+called. The buttons' IDs are plain strings, `"cancel"` and `"delete"`.
+
+Add a [`bloom.Focus`](/input/focus) to the model. It moves between the focusable nodes with IDs:
 
 ```go
-	focus bloom.Focus[buttonID]
+	focus bloom.Focus
 ```
 
 A button is text with an ID that's marked `Focusable`, styled by whether it has focus. `on.Press` (from
@@ -191,7 +192,7 @@ A button is text with an ID that's marked `Focusable`, styled by whether it has 
 pressed while it has focus:
 
 ```go
-func (m *model) button(id buttonID, label string) bloom.Child {
+func (m *model) button(id bloom.ID, label string) bloom.Child {
 	style := btn
 	if m.focus.Is(id) {
 		style = btnOn
@@ -205,7 +206,7 @@ func (m *model) button(id buttonID, label string) bloom.Child {
 the next step:
 
 ```go
-func (m *model) press(id buttonID) tea.Cmd {
+func (m *model) press(id bloom.ID) tea.Cmd {
 	return m.closeDialog()
 }
 ```
@@ -333,7 +334,7 @@ second click that comes before the closing dialog is drawn again still lands on 
 the dialog is no longer shown:
 
 ```go
-func (m *model) press(id buttonID) tea.Cmd {
+func (m *model) press(id bloom.ID) tea.Cmd {
 	if !m.confirm.Shown() {
 		return nil // the dialog is closing
 	}
@@ -388,11 +389,8 @@ type note struct {
 	title, body string
 }
 
-// buttonID identifies a button in the dialog.
-type buttonID string
-
 // confirmDialog is the ID of the dialog's layer, which is also its focus scope.
-const confirmDialog = "confirm"
+var confirmDialog = bloom.NewID("confirm")
 
 var (
 	muted   = lipgloss.Color("#6e6a86")
@@ -421,7 +419,7 @@ type model struct {
 	notes         []note
 	selected      int
 
-	focus   bloom.Focus[buttonID]
+	focus   bloom.Focus
 	confirm anim.Presence
 	toast   anim.Presence
 	deleted string
@@ -499,7 +497,7 @@ func (m *model) closeDialog() tea.Cmd {
 	return m.confirm.Hide()
 }
 
-func (m *model) press(id buttonID) tea.Cmd {
+func (m *model) press(id bloom.ID) tea.Cmd {
 	if !m.confirm.Shown() {
 		return nil // the dialog is closing
 	}
@@ -512,7 +510,7 @@ func (m *model) press(id buttonID) tea.Cmd {
 	return m.closeDialog()
 }
 
-func (m *model) button(id buttonID, label string) bloom.Child {
+func (m *model) button(id bloom.ID, label string) bloom.Child {
 	style := btn
 	if m.focus.Is(id) {
 		style = btnOn

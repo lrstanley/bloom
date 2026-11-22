@@ -37,15 +37,13 @@ var tints = []*tint.Tint{
 	tint.TintNord,
 }
 
-// paneID is the ID of a pane, for layout animation, the tour, and telling
-// which pane a dragged title is over.
-type paneID string
-
+// The IDs of the panes, for layout animation, the tour, and telling which
+// pane a dragged title is over.
 const (
-	paneTints    paneID = "Tints"
-	paneActivity paneID = "Activity"
-	panePalette  paneID = "Palette"
-	paneServices paneID = "Services"
+	paneTints    bloom.ID = "Tints"
+	paneActivity bloom.ID = "Activity"
+	panePalette  bloom.ID = "Palette"
+	paneServices bloom.ID = "Services"
 )
 
 const hints = "drag a title to move a pane · double click it to zoom · t tint · ? tour · q quit"
@@ -56,13 +54,13 @@ type model struct {
 	w, h int
 	tint int // the tint in use, an index of tints.
 
-	order   []paneID // the panes right of the sidebar, left to right.
-	zoomed  paneID   // the pane taking the full width, if any.
-	zooming bool     // the panes glide, through a zoom, rather than fly.
+	order   []bloom.ID // the panes right of the sidebar, left to right.
+	zoomed  bloom.ID   // the pane taking the full width, if any.
+	zooming bool       // the panes glide, through a zoom, rather than fly.
 
 	// The pane being dragged by its title, if any: where it was grabbed,
 	// its size when picked up, and where the pointer is.
-	dragging paneID
+	dragging bloom.ID
 	grab     image.Point
 	size     image.Point
 	at       image.Point
@@ -83,7 +81,7 @@ func newModel() *model {
 	}
 	m := &model{
 		st:    newStyles(tints[0]),
-		order: []paneID{paneActivity, panePalette, paneServices},
+		order: []bloom.ID{paneActivity, panePalette, paneServices},
 		wave:  effect(500 * time.Millisecond),
 	}
 	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))

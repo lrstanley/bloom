@@ -14,7 +14,7 @@ import (
 )
 
 // fields are the labels and placeholders of the form's inputs.
-var fields = map[control]struct { //nolint:exhaustive // Only inputs have labels.
+var fields = map[bloom.ID]struct { //nolint:exhaustive // Only inputs have labels.
 	label       string
 	placeholder string
 }{
@@ -24,7 +24,7 @@ var fields = map[control]struct { //nolint:exhaustive // Only inputs have labels
 }
 
 // isField reports whether c is an input, rather than a button.
-func isField(c control) bool {
+func isField(c bloom.ID) bool {
 	_, ok := fields[c]
 	return ok
 }
@@ -38,8 +38,8 @@ var languages = []string{
 // the language input's suggestions, and its buttons.
 type form struct {
 	st     styles
-	focus  *bloom.Focus[control] // the model's, which moves between the inputs and buttons
-	values map[control]string
+	focus  *bloom.Focus // the model's, which moves between the inputs and buttons
+	values map[bloom.ID]string
 	save   func() tea.Cmd // runs when the save button is pressed
 }
 
@@ -60,7 +60,7 @@ func (f *form) Layout(bloom.Context) bloom.Child {
 // key edits the focused input, and enter in the language input picks the
 // first suggestion.
 func (f *form) key(msg tea.KeyPressMsg) tea.Cmd {
-	c, _ := f.focus.Current()
+	c := f.focus.Current()
 	switch msg.String() {
 	case "enter":
 		if s := f.suggestions(); c == fieldLanguage && len(s) > 0 {
@@ -97,7 +97,7 @@ func (f *form) suggestions() []string {
 	return out
 }
 
-func (f *form) field(id control) bloom.Child {
+func (f *form) field(id bloom.ID) bloom.Child {
 	text, st := f.values[id], f.st.input
 	if text == "" {
 		text, st = fields[id].placeholder, f.st.hint

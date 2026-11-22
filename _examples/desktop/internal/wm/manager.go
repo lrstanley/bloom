@@ -43,7 +43,7 @@ type Manager struct {
 
 	w, h    int       // the size of the desktop
 	windows []*Window // bottom to top: the last one is in front, with the focus
-	nextID  WindowID
+	nextSeq int
 	grab    *grab
 	preview anim.Presence   // the outline of where a dragged window would snap
 	target  image.Rectangle // where the preview is, kept as it fades out
@@ -157,12 +157,12 @@ func (m *Manager) Find(key any) *Window {
 
 // Open opens window w in front of the others.
 func (m *Manager) Open(w *Window) tea.Cmd {
-	w.id = m.nextID
+	w.id, w.seq = bloom.NewID("window"), m.nextSeq
 	w.pres = anim.NewPresence(anim.Duration(180 * time.Millisecond))
-	m.nextID++
+	m.nextSeq++
 	if w.Cascade {
 		// Each opens a step down and to the right of the last.
-		w.Rect = w.Rect.Add(image.Pt(3, 1).Mul(int(m.nextID) % 4))
+		w.Rect = w.Rect.Add(image.Pt(3, 1).Mul(m.nextSeq % 4))
 	}
 	m.windows = append(m.windows, w)
 	m.status("opened " + w.Title)

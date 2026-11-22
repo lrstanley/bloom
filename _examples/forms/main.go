@@ -30,31 +30,27 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// control is the ID of a node that can take focus: an input, or a button,
-// which shows its ID as its label.
-type control string
-
-// The form's inputs and buttons.
+// The IDs of the form's inputs and buttons, the nodes that can take focus. A
+// button shows its ID as its label.
 const (
-	fieldName     control = "name"
-	fieldEmail    control = "email"
-	fieldLanguage control = "language"
+	fieldName     bloom.ID = "name"
+	fieldEmail    bloom.ID = "email"
+	fieldLanguage bloom.ID = "language"
 
-	buttonReset     control = "reset"
-	buttonSave      control = "save"
-	buttonCancel    control = "cancel"
-	buttonConfirm   control = "confirm"
-	buttonBack      control = "back"
-	buttonOverwrite control = "overwrite"
+	buttonReset     bloom.ID = "reset"
+	buttonSave      bloom.ID = "save"
+	buttonCancel    bloom.ID = "cancel"
+	buttonConfirm   bloom.ID = "confirm"
+	buttonBack      bloom.ID = "back"
+	buttonOverwrite bloom.ID = "overwrite"
 )
 
-// scopeID is the ID of a focus scope.
-type scopeID string
-
-const (
-	scopeForm      scopeID = "form"
-	scopeConfirm   scopeID = "confirm"
-	scopeOverwrite scopeID = "overwrite"
+// The IDs of the focus scopes, which are never shown. NewID keeps them apart
+// from the buttons', although a dialog and its button share a name.
+var (
+	scopeForm      = bloom.NewID("form")
+	scopeConfirm   = bloom.NewID("confirm")
+	scopeOverwrite = bloom.NewID("overwrite")
 )
 
 type model struct {
@@ -65,7 +61,7 @@ type model struct {
 	form  form
 	toast toast
 
-	focus bloom.Focus[control]
+	focus bloom.Focus
 	saved int
 
 	confirm   anim.Presence
@@ -82,7 +78,7 @@ func newModel() *model {
 	}
 	// Clicks move the focus, before the handler of what was clicked runs.
 	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
-	m.form = form{st: m.st, focus: &m.focus, values: make(map[control]string), save: m.askToSave}
+	m.form = form{st: m.st, focus: &m.focus, values: make(map[bloom.ID]string), save: m.askToSave}
 	m.toast = toast{st: m.st, presence: anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear))}
 	m.focus.Set(fieldName)
 	return m
@@ -178,10 +174,9 @@ func (m *model) dialogs() int {
 // layout places the form, with the status line below it, and the layers
 // over them.
 func (m *model) layout() bloom.Child {
-	focused, _ := m.focus.Current()
 	status := fmt.Sprintf(
 		" focus: %s · in the form: %v · dialogs open: %d · saved %d times",
-		focused, m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
+		m.focus.Current(), m.focus.Within(m.ui.Frame(), scopeForm), m.dialogs(), m.saved,
 	)
 
 	base := bloom.Column(
@@ -247,7 +242,7 @@ func (m *model) layers() []bloom.LayerNode {
 
 // button is a button labeled with its ID, which runs press when pressed. It
 // is highlighted while it has focus.
-func button(st *styles, focus *bloom.Focus[control], id control, press func() tea.Cmd) bloom.Child {
+func button(st *styles, focus *bloom.Focus, id bloom.ID, press func() tea.Cmd) bloom.Child {
 	s := st.button
 	if focus.Is(id) {
 		s = st.buttonOn

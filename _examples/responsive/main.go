@@ -25,14 +25,12 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// paneID is the ID of a pane, for finding it in a frame.
-type paneID string
-
+// The IDs of the panes, for finding them in a frame.
 const (
-	paneNav     paneID = "nav"
-	paneReader  paneID = "reader"
-	paneDetails paneID = "details"
-	paneText    paneID = "text" // the reader's viewport, to scroll it
+	paneNav     bloom.ID = "nav"
+	paneReader  bloom.ID = "reader"
+	paneDetails bloom.ID = "details"
+	paneText    bloom.ID = "text" // the reader's viewport, to scroll it
 )
 
 // minWidth and minHeight are the smallest window the reader can be used in:

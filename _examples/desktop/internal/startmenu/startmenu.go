@@ -24,12 +24,14 @@ import (
 // LogoutMsg logs out, which shuts the desktop down.
 type LogoutMsg struct{}
 
-// startID is the ID of the start button, which the start menu opens above.
-type startID struct{}
-
-// menuID is the ID of the start menu, so that a press on any of it, its
-// banner too, is on it rather than on the desktop beneath.
-type menuID struct{}
+var (
+	// startID is the ID of the start button, which the start menu opens
+	// above.
+	startID = bloom.NewID("start")
+	// menuID is the ID of the start menu, so that a press on any of it, its
+	// banner too, is on it rather than on the desktop beneath.
+	menuID = bloom.NewID("start-menu")
+)
 
 // Menu is the start button and its menu.
 type Menu struct {
@@ -62,7 +64,7 @@ func (m *Menu) Update(msg tea.Msg) tea.Cmd {
 func (m *Menu) Hide() tea.Cmd { return m.open.Hide() }
 
 func (m *Menu) Layout(bloom.Context) bloom.Child {
-	menu := bloom.Layer(m.panel()).ID(menuID{}).AnchorTo(startID{}, bloom.Top).Float().
+	menu := bloom.Layer(m.panel()).ID(menuID).AnchorTo(startID, bloom.Top).Float().
 		Presence(m.open, fx.Wipe{From: bloom.Bottom})
 
 	st := m.st.Start
@@ -71,7 +73,7 @@ func (m *Menu) Layout(bloom.Context) bloom.Child {
 	}
 	// The menu is declared in the button, so a click on either isn't outside
 	// it, and a click anywhere else closes it.
-	return bloom.Overlay(bloom.Text(" ❀ bloom ").Style(st).ID(startID{}).On(on.Click(m.open.Toggle)), menu).
+	return bloom.Overlay(bloom.Text(" ❀ bloom ").Style(st).ID(startID).On(on.Click(m.open.Toggle)), menu).
 		On(on.ClickOutside(func() tea.Cmd {
 			if m.open.Shown() {
 				return m.open.Hide()

@@ -62,7 +62,7 @@ What you give up:
 | `zone.Get(id).InBounds(msg)` in `Update` | A handler on the node, such as `on.Click(fn)`. |
 | `zone.Get(id).Pos(msg)` | `on.ClickAt(func(e on.Event) tea.Cmd)`, with `e.X` and `e.Y` relative to the node. |
 | Checking `InBounds` on motion events for hover | `HoverStyle(style)`, or `on.Hover(fn)`. |
-| `zone.NewPrefix()` | Usually nothing, since handlers need no IDs. Where you need IDs, a type per component, such as `type itemID int`, with values that differ between instances. |
+| `zone.NewPrefix()` | Usually nothing, since handlers need no IDs. Where you need IDs, one from `bloom.NewID` per component instance, and its parts with `id.Sub(i)`. |
 | `zone.AnyInBounds`, `MsgZoneInBounds` | Handlers on the nodes. A handler made with `on.Msg(msg)` sends `msg` to `Update`. |
 | `ZoneInfo.StartX`, `StartY`, `EndX`, `EndY` | `m.ui.Frame().Rect(id)`, an `image.Rectangle`. Its `Max` is exclusive, while `EndX` and `EndY` are the last cell. |
 | `zone.Clear(id)`, `zone.Close()` | Nothing. bloom builds the frame fresh on every `View`. |

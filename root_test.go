@@ -61,7 +61,7 @@ func TestSolveMatchesRoot(t *testing.T) {
 		r := New()
 		r.Render(size.X, size.Y, tree)
 		solved := Solve(size.X, size.Y, tree)
-		for _, id := range []any{"sidebar", "log", 4, "dialog"} {
+		for _, id := range []ID{"sidebar", "log", benchItemIDs[4], "dialog"} {
 			want, wantOK := r.Frame().Rect(id)
 			got, gotOK := solved.Rect(id)
 			if id == "dialog" {
@@ -94,7 +94,7 @@ func TestUnchangedFrame(t *testing.T) {
 func TestMouseMode(t *testing.T) {
 	t.Parallel()
 
-	var f Focus[string]
+	var f Focus
 	nothing := func() tea.Cmd { return nil }
 	tests := []struct {
 		name string

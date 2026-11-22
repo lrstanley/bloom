@@ -20,7 +20,7 @@ const selectWidth = 22
 // selectField is a field that opens a list of options to pick one from.
 type selectField struct {
 	st    styles
-	focus *bloom.Focus[control] // the model's, to show when the field has it
+	focus *bloom.Focus // the model's, to show when the field has it
 
 	// closeLists closes every select's list, and runs before this one's
 	// opens, so only one is open at a time. picked runs after an option is
@@ -28,7 +28,7 @@ type selectField struct {
 	closeLists func()
 	picked     func(s *selectField)
 
-	id      control
+	id      bloom.ID // made by newSelect, so no two selects share it
 	label   string
 	options []string
 	value   int

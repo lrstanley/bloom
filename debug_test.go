@@ -12,11 +12,6 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-type (
-	debugPane int
-	debugKey  string
-)
-
 func TestDebug(t *testing.T) {
 	t.Parallel()
 	panes := Column(
@@ -54,21 +49,21 @@ Column 0,0 15x5
 `},
 		{"overlay", Overlay(
 			Column(
-				Fixed(1, Scroll(Column(Text("a").ID(debugPane(1)), Text("b"), Text("c")), 1)),
+				Fixed(1, Scroll(Column(Text("a").ID("pane1"), Text("b"), Text("c")), 1)),
 				Marquee("scrolling", 0),
 				Text("in").ID("in").Focusable(),
 				Transition(0.5, Text("fading in over the frame beneath"), fx.Fade{}),
 			),
 			Layer(Text("drop")).AnchorTo("in", Bottom).Modal(),
 			Layer(Text("gone")).AnchorTo("missing", Top),
-			Layer(Text("toast")).ID(debugKey("a\nb")).Anchor(End, Start).Offset(-1, 0).Margin(1).Size(6, 1),
+			Layer(Text("toast")).ID("a\nb").Anchor(End, Start).Offset(-1, 0).Margin(1).Size(6, 1),
 		), 20, 5, `
 Overlay 0,0 20x5
 ├─ Column 0,0 20x5
 │  ├─ Fixed(1) 0,0 20x1
 │  │  └─ Scroll 0,0 20x1 offset=1
 │  │     └─ Column 0,-1 20x3 visible=0,0 20x1
-│  │        ├─ Text "a" id=bloom.debugPane(1) 0,-1 20x1 offscreen
+│  │        ├─ Text "a" id="pane1" 0,-1 20x1 offscreen
 │  │        ├─ Text "b" 0,0 20x1
 │  │        └─ Text "c" 0,1 20x1 offscreen
 │  ├─ bloom.MarqueeNode 0,1 20x1
@@ -80,20 +75,20 @@ Overlay 0,0 20x5
 │  └─ Text "drop" 0,3 4x1
 ├─ Layer hidden anchorTo="missing"/top
 │  └─ Text "gone" hidden
-└─ Layer id=bloom.debugKey(a b) 12,1 6x1 anchor=end,start offset=-1,0 margin=1 size=6x1
+└─ Layer id="a\nb" 12,1 6x1 anchor=end,start offset=-1,0 margin=1 size=6x1
    └─ Text "toast" 12,1 6x1
 `},
 		{"duplicate", Row(
 			Fill(Text("a")).ID("pane"),
 			Fill(Text("b")).ID("pane"),
-			Fill(Text("c")).ID(debugKey("pane")),
+			Fill(Text("c")).ID("other"),
 		), 9, 1, `
 Row 0,0 9x1
 ├─ Fill id="pane" 0,0 3x1
 │  └─ Text "a" 0,0 3x1
 ├─ Fill id="pane" duplicate 3,0 3x1
 │  └─ Text "b" 3,0 3x1
-└─ Fill id=bloom.debugKey(pane) 6,0 3x1
+└─ Fill id="other" 6,0 3x1
    └─ Text "c" 6,0 3x1
 `},
 		{"nil", nil, 10, 1, "\n"},
@@ -108,10 +103,9 @@ Row 0,0 9x1
 }
 
 // TestDuplicateIDsPanicInTests draws two nodes with the same ID, which
-// panics in a test binary, and two that differ only in type, which does not.
+// panics in a test binary.
 func TestDuplicateIDsPanicInTests(t *testing.T) {
 	t.Parallel()
-	New().Render(10, 1, Row(Text("a").ID("x"), Text("b").ID(debugKey("x"))))
 	defer func() {
 		if recover() == nil {
 			t.Fatal("two nodes with the same ID did not panic")

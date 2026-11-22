@@ -121,29 +121,53 @@ in the whole tree when there's none. An ID on a window's layer is enough for eve
 as the window is brought to the front, which a click on a window behind the others needs: the press is on one frame,
 and the release on the next.
 
-`ID` takes any comparable value. A type of your own, with a constant for each node, keeps IDs from colliding and
-lets [`Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) move between only the nodes of that type:
+An ID is a [`bloom.ID`](https://pkg.go.dev/bloomfx.dev/bloom#ID), which is a string. A constant for each node keeps
+them in one place, and a string literal works too:
 
 ```go
-type control int
-
 const (
-	fieldName control = iota
-	fieldEmail
-	buttonSave
+	fieldName  bloom.ID = "name"
+	buttonSave bloom.ID = "save"
 )
 
 bloom.Text(m.name).ID(fieldName).Focusable()
+bloom.Fixed(24, m.sidebar).ID("sidebar")
 ```
 
-IDs are compared as Go values, type included, so `control(0)` and `0` are different IDs, and so are a `string`
-`"save"` and a `control` `"save"`. Look a node up with the same type you gave it.
+The empty ID is no ID.
+
+### Keep IDs apart
 
 An ID should be unique in the frame. If two nodes share one, lookups such as `Frame.Rect` find the first laid out,
 focus and layout animation can't tell them apart, and neither can the mouse tell apart the nodes in them that have no
-ID. [`bloom.Debug`](/resources/troubleshooting) marks a node with the ID of one before it as `duplicate`.
-A component that can appear more than once needs a different ID for each instance, such as a struct with the
-instance's own key in it; see [Writing components](/bubble-tea/writing-components#give-each-instance-its-own-ids).
+ID. [`bloom.Debug`](/resources/troubleshooting) marks a node with the ID of one before it as `duplicate`, and in a
+test, drawing such a frame with a root panics.
+
+Names picked by hand can clash, such as a dialog and its button both called `"confirm"`. Two helpers make IDs easier
+to keep apart:
+
+- [`bloom.NewID(name)`](https://pkg.go.dev/bloomfx.dev/bloom#NewID) returns an ID that no other call returns,
+  whatever its name, such as `"confirm#3"`. Make it once and keep it: in a package variable, or in a component when
+  it's made.
+- [`id.Sub(part)`](https://pkg.go.dev/bloomfx.dev/bloom#ID.Sub) returns the ID of a part of the node with ID `id`: a
+  named part, such as `id.Sub("title")`, or one of many, such as `id.Sub(i)`. It's `id`, a `/`, and the part, so
+  two IDs from `NewID` whose names have no `/` never share a part. Keeping the parts of one ID apart is up to you:
+  `id.Sub(1)` and `id.Sub("1")` are the same ID.
+
+```go
+var (
+	dialogConfirm = bloom.NewID("confirm")
+	rowIDs        = bloom.NewID("row")
+)
+
+bloom.Layer(dialog).ID(dialogConfirm).Modal()
+bloom.Auto(m.rows[i]).ID(rowIDs.Sub(m.rows[i].key)).Focusable()
+```
+
+Use `NewID` for IDs that are never shown, such as focus scopes, and a constant for one you show or type, such as a
+button whose ID is in a status line or a test. A component that can appear more than once makes its ID with `NewID`
+when it's made, so each instance has its own; see
+[Writing components](/bubble-tea/writing-components#give-each-instance-its-own-ids).
 
 ## Related
 

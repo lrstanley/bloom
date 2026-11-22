@@ -31,23 +31,17 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// control is the ID of a node that can take focus: a select, or a button,
-// which shows its ID as its label.
-type control string
-
+// The IDs of the buttons, which show their IDs as their labels. Each select
+// makes its own ID.
 const (
-	selectTheme    control = "theme"
-	selectFont     control = "font"
-	selectLanguage control = "language"
-	selectProfile  control = "profile"
-
-	buttonSettings control = "settings"
-	buttonCancel   control = "cancel"
-	buttonSave     control = "save"
+	buttonSettings bloom.ID = "settings"
+	buttonCancel   bloom.ID = "cancel"
+	buttonSave     bloom.ID = "save"
 )
 
-// scopeSettings is the ID of the settings dialog, a focus scope.
-const scopeSettings = "settings"
+// scopeSettings is the ID of the settings dialog, a focus scope. NewID keeps
+// it apart from the settings button's, although they share a name.
+var scopeSettings = bloom.NewID("settings")
 
 type model struct {
 	ui   *bloom.Root
@@ -59,7 +53,7 @@ type model struct {
 	language *selectField
 	profile  *selectField
 
-	focus  bloom.Focus[control]
+	focus  bloom.Focus
 	status string
 
 	settings anim.Presence
@@ -74,25 +68,25 @@ func newModel() *model {
 	}
 	// Clicks move the focus, before the handler of what was clicked runs.
 	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
-	m.theme = m.newSelect(selectTheme, "Theme", 0, []string{
+	m.theme = m.newSelect("Theme", 0, []string{
 		"Macchiato", "Mocha", "Frappé", "Latte",
 	})
-	m.font = m.newSelect(selectFont, "Font size", 2, []string{
+	m.font = m.newSelect("Font size", 2, []string{
 		"12", "13", "14", "16", "18",
 	})
-	m.language = m.newSelect(selectLanguage, "Language", 0, []string{
+	m.language = m.newSelect("Language", 0, []string{
 		"English", "Deutsch", "Español", "Français", "Italiano", "日本語", "Português", "Svenska",
 	})
-	m.profile = m.newSelect(selectProfile, "Profile", 0, []string{
+	m.profile = m.newSelect("Profile", 0, []string{
 		"default", "work", "presentation", "focus",
 	})
 	m.focus.Set(buttonSettings)
 	return m
 }
 
-// newSelect makes a select with ID id, showing options[value]. Opening its
-// list closes the others, and picking an option says so in the status line.
-func (m *model) newSelect(id control, label string, value int, options []string) *selectField {
+// newSelect makes a select showing options[value]. Opening its list closes
+// the others, and picking an option says so in the status line.
+func (m *model) newSelect(label string, value int, options []string) *selectField {
 	return &selectField{
 		st:         m.st,
 		focus:      &m.focus,
@@ -100,7 +94,7 @@ func (m *model) newSelect(id control, label string, value int, options []string)
 		picked: func(s *selectField) {
 			m.status = fmt.Sprintf("%s: %s", s.label, s.options[s.value])
 		},
-		id:      id,
+		id:      bloom.NewID("select"),
 		label:   label,
 		options: options,
 		value:   value,
@@ -150,7 +144,7 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case "q", "ctrl+c":
 		return tea.Quit
 	case "s":
-		if m.focus.Scope() == nil {
+		if m.focus.Scope() == "" {
 			return m.openSettings()
 		}
 	case "esc":
@@ -184,7 +178,7 @@ func (m *model) openSettings() tea.Cmd {
 	m.closeLists()
 	m.saved = [3]int{m.theme.value, m.font.value, m.language.value}
 	m.focus.Push(scopeSettings)
-	m.focus.Set(selectTheme)
+	m.focus.Set(m.theme.id)
 	return m.settings.Show()
 }
 
@@ -261,7 +255,7 @@ func (m *model) row(s *selectField) bloom.Child {
 }
 
 // button is a button labeled with its ID, which runs press when pressed.
-func (m *model) button(id control, press func() tea.Cmd) bloom.Child {
+func (m *model) button(id bloom.ID, press func() tea.Cmd) bloom.Child {
 	st := m.st.button
 	if m.focus.Is(id) {
 		st = m.st.buttonOn

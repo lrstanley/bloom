@@ -15,7 +15,7 @@ import (
 // entry is a node of a frame that input refers to: one with an ID, mouse
 // handlers, a hover style, or a tooltip, or a modal layer.
 type entry struct {
-	id                      any
+	id                      ID
 	key                     nodeKey
 	rect                    image.Rectangle // where the node was laid out
 	vis                     image.Rectangle // the part of rect on screen
@@ -36,12 +36,12 @@ type entry struct {
 // without one, where it is in the nearest node with an ID that it is in, or
 // in the tree.
 type nodeKey struct {
-	id   any
+	id   ID
 	path uint64
 }
 
 func (b *box) key() nodeKey {
-	if b.meta.id != nil {
+	if b.meta.id != "" {
 		return nodeKey{id: b.meta.id}
 	}
 	return nodeKey{path: b.path}
@@ -83,7 +83,7 @@ func (r *renderer) addEntry(i int, vis, clip image.Rectangle, parent int) int {
 // text is its tooltip, is given one as it is painted, once it is known to
 // be cut; see [renderer.noteCut].
 func (r *renderer) hasEntry(b *box) bool {
-	return b.meta.id != nil || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable ||
+	return b.meta.id != "" || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable ||
 		(r.tipsOn && b.meta.tip != nil)
 }
 
@@ -155,7 +155,7 @@ func (f *Frame) mouseMode(clickFocus bool) tea.MouseMode {
 // report the visual rectangle drawn this frame, except for a node moving
 // with effects, such as with [SlotNode.MoveWith], which is laid out where it
 // goes from the start.
-func (f *Frame) Rect[K comparable](id K) (image.Rectangle, bool) {
+func (f *Frame) Rect(id ID) (image.Rectangle, bool) {
 	if i := f.index(id); i >= 0 {
 		return f.entries[i].rect, true
 	}
@@ -166,7 +166,7 @@ func (f *Frame) Rect[K comparable](id K) (image.Rectangle, bool) {
 // to fit in the frame, so it shows "…" in place of the rest of its text. It
 // is false for a node that fits, that is not in the frame, or that is not
 // truncated. A frame from [Solve] reports it too, as the node would be drawn.
-func (f *Frame) Truncated[K comparable](id K) bool {
+func (f *Frame) Truncated(id ID) bool {
 	i := f.index(id)
 	return i >= 0 && f.entries[i].cut
 }
@@ -174,7 +174,7 @@ func (f *Frame) Truncated[K comparable](id K) bool {
 // List returns which items the [List] with ID id showed, and whether it is
 // in the frame. Use it in Update to page by [ListView.Visible] items, and to
 // scroll from [ListView.First], where the list actually was.
-func (f *Frame) List[K comparable](id K) (ListView, bool) {
+func (f *Frame) List(id ID) (ListView, bool) {
 	if i := f.index(id); i >= 0 && f.entries[i].isList {
 		return f.entries[i].list, true
 	}
@@ -184,7 +184,7 @@ func (f *Frame) List[K comparable](id K) (ListView, bool) {
 // Viewport returns where the [Viewport] with ID id was scrolled to, and
 // whether it is in the frame. Use it in Update to scroll from where it
 // actually was, with the methods of [ViewportView].
-func (f *Frame) Viewport[K comparable](id K) (ViewportView, bool) {
+func (f *Frame) Viewport(id ID) (ViewportView, bool) {
 	if i := f.index(id); i >= 0 && f.entries[i].isVP {
 		return f.entries[i].vp, true
 	}
@@ -196,14 +196,14 @@ func (f *Frame) Viewport[K comparable](id K) (ViewportView, bool) {
 // nil when nothing with an ID is there, or when a modal layer takes the
 // point although it is outside the layer. It is for handling a
 // [tea.MouseMsg] in Update rather than with handlers.
-func (f *Frame) Hit(x, y int) []any {
+func (f *Frame) Hit(x, y int) []ID {
 	if f == nil {
 		return nil
 	}
 	chain, _ := f.under(image.Pt(x, y), nil)
-	var path []any
+	var path []ID
 	for _, i := range slices.Backward(chain) {
-		if id := f.entries[i].id; id != nil {
+		if id := f.entries[i].id; id != "" {
 			path = append(path, id)
 		}
 	}
@@ -277,17 +277,17 @@ func (f *Frame) under(p image.Point, chain []int) (_ []int, floor int) {
 // fails the test that drew the frame: IDs should be unique in a frame, and
 // two nodes with the same one are not told apart, nor are the nodes in them.
 func checkIDs(entries []entry) {
-	var seen map[any]bool
+	var seen map[ID]bool
 	for i := range entries {
 		e := &entries[i]
-		if e.id == nil || e.leaving {
+		if e.id == "" || e.leaving {
 			continue
 		}
 		if seen == nil {
-			seen = make(map[any]bool)
+			seen = make(map[ID]bool)
 		}
 		if seen[e.id] {
-			panic("bloom: two nodes in the frame have the ID " + debugID(e.id) + "; IDs must be unique in a frame")
+			panic("bloom: two nodes in the frame have the ID " + debugID(e.id) + "; IDs must be unique in a frame: make them with NewID, and the IDs of their parts with ID.Sub")
 		}
 		seen[e.id] = true
 	}
@@ -306,8 +306,12 @@ func findKey(entries []entry, k nodeKey) int {
 	return -1
 }
 
-// inScope reports whether entry i is inside the scope with ID scope.
-func (f *Frame) inScope(i int, scope any) bool {
+// inScope reports whether entry i is inside the scope with ID scope. No
+// entry is inside the empty ID, which a modal layer without an ID has.
+func (f *Frame) inScope(i int, scope ID) bool {
+	if scope == "" {
+		return false
+	}
 	for ; i >= 0; i = f.entries[i].parent {
 		if e := &f.entries[i]; e.scope && e.id == scope {
 			return true
@@ -317,18 +321,18 @@ func (f *Frame) inScope(i int, scope any) bool {
 }
 
 // nearestID returns the ID of entry i, or of its nearest ancestor with one.
-func (f *Frame) nearestID(i int) any {
+func (f *Frame) nearestID(i int) ID {
 	for ; i >= 0; i = f.entries[i].parent {
-		if id := f.entries[i].id; id != nil {
+		if id := f.entries[i].id; id != "" {
 			return id
 		}
 	}
-	return nil
+	return ""
 }
 
 // index returns the entry with ID id, or -1.
-func (f *Frame) index(id any) int {
-	if f != nil && id != nil {
+func (f *Frame) index(id ID) int {
+	if f != nil && id != "" {
 		for i := range f.entries {
 			if f.entries[i].id == id {
 				return i

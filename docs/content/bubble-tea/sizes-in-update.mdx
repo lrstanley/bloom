@@ -37,11 +37,9 @@ Give the nodes you need IDs. Here, the box gives the size of one page, and the t
 full height of the article:
 
 ```go
-type pane string
-
 const (
-	paneReader  pane = "reader"
-	paneArticle pane = "article"
+	paneReader  bloom.ID = "reader"
+	paneArticle bloom.ID = "article"
 )
 
 func (m *model) layout() bloom.Child {

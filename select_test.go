@@ -805,7 +805,7 @@ func TestCopySelectionMotionOff(t *testing.T) {
 
 // wantCopy fails t unless cmd, from CopySelection, sends exactly one
 // CopyMsg, of text from the node with ID id, without an error.
-func wantCopy(t *testing.T, cmd tea.Cmd, id any, text string) {
+func wantCopy(t *testing.T, cmd tea.Cmd, id ID, text string) {
 	t.Helper()
 	var msgs []CopyMsg
 	for _, m := range drainSequences(cmd) {
@@ -985,7 +985,7 @@ func TestSelectAll(t *testing.T) {
 	wantSelection(t, r2, "")
 
 	// Nothing selectable, or nothing at all, selects nothing.
-	for _, id := range []string{"other", "missing"} {
+	for _, id := range []ID{"other", "missing"} {
 		r.ClearSelection()
 		if r.SelectAll(id) {
 			t.Fatalf("SelectAll(%q) selected something", id)

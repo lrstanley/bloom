@@ -10,7 +10,7 @@ import (
 )
 
 // panelID names the panel, which the spotlight backdrop lights.
-type panelID struct{}
+const panelID bloom.ID = "panel"
 
 // panel is the card in the middle of the screen, with a row of tabs for the
 // screen's backdrops and one for the dialog's, and what the screen's
@@ -34,5 +34,5 @@ func (p panel) Layout(bloom.Context) bloom.Child {
 		bloom.Text(screens[p.screen].about).Style(p.st.text),
 		bloom.Text(" ").Style(p.st.text),
 		bloom.Text("click anywhere to drop a ripple, or a dialog backdrop to open it").Style(p.st.dim),
-	)).ID(panelID{})
+	)).ID(panelID)
 }

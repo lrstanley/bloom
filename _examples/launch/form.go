@@ -21,7 +21,7 @@ const service = "payments"
 // and what deploying sets off: the confetti, and the LIVE badge.
 type form struct {
 	st    styles
-	focus *bloom.Focus[formID] // the model's, which moves between the input and the button
+	focus *bloom.Focus // the model's, which moves between the input and the button
 
 	text  string // what was typed into the input.
 	err   string

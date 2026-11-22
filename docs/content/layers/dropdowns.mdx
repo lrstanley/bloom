@@ -17,9 +17,7 @@ where you right click instead, with [`on.RightClickAt`](https://pkg.go.dev/bloom
 Give the input an ID, then anchor a layer to its bottom edge:
 
 ```go
-type fieldID string
-
-const fieldLanguage fieldID = "language"
+const fieldLanguage bloom.ID = "language"
 
 func (m *model) View() tea.View {
 	form := bloom.Column(

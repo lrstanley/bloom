@@ -41,6 +41,15 @@ var (
 	benchSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#005f87")).Bold(true)
 	benchHeader   = lipgloss.NewStyle().Foreground(lipgloss.Color("#000000")).Background(lipgloss.Color("#87afd7")).Bold(true)
 	benchList     = benchListView()
+	// benchItemIDs are the sidebar items' IDs, made once, as an
+	// application's constants would be.
+	benchItemIDs = func() []ID {
+		ids := make([]ID, 30)
+		for i := range ids {
+			ids[i] = ID("item").Sub(i)
+		}
+		return ids
+	}()
 )
 
 func benchListView() benchView {
@@ -69,7 +78,7 @@ func benchTree(selected, frame int, dialog float64) Child {
 		if i == selected {
 			st = benchSelected
 		}
-		items = append(items, Text(fmt.Sprintf(" • item %02d", i)).Style(st).ID(i))
+		items = append(items, Text(fmt.Sprintf(" • item %02d", i)).Style(st).ID(benchItemIDs[i]))
 	}
 	items = append(items, Space())
 

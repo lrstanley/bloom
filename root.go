@@ -63,7 +63,7 @@ type config struct {
 	fps          int
 	unfocusedFPS int
 	now          func() time.Time
-	focus        focusTarget
+	focus        *Focus
 	selStyle     lipgloss.Style
 	selStyled    bool
 	wordChars    *string
@@ -110,7 +110,7 @@ func WithClock(now func() time.Time) Option { return func(c *config) { c.now = n
 // the terminal cursor: one given inside a focusable node f moves to is shown
 // only while that node is focused (see [TextNode.Cursor]). f must stay where
 // it is, as a field of a model used by pointer does.
-func WithFocus[K comparable](f *Focus[K]) Option { return func(c *config) { c.focus = f } }
+func WithFocus(f *Focus) Option { return func(c *config) { c.focus = f } }
 
 // New returns a Root.
 func New(opts ...Option) *Root {

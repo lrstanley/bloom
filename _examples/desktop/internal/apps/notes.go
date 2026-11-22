@@ -15,13 +15,14 @@ import (
 // Notepad is the notes app: the text of a file, which the wheel scrolls.
 type Notepad struct {
 	st   theme.Styles
+	id   bloom.ID // the viewport's, made for each window's notes
 	text *bloom.Buffer
 	at   bloom.ViewportPos // where it is scrolled to
 }
 
 // NewNotepad returns the notes app, showing file.
 func NewNotepad(file string) *Notepad {
-	return &Notepad{text: bloom.NewBuffer(strings.Join(files[file], "\n"))}
+	return &Notepad{id: bloom.NewID("notes"), text: bloom.NewBuffer(strings.Join(files[file], "\n"))}
 }
 
 // SetStyles sets the styles the notes app is drawn with. It keeps a copy of
@@ -40,12 +41,11 @@ func (n *Notepad) Update(msg tea.Msg) tea.Cmd {
 }
 
 // ScrollID returns the ID of the notes' viewport, for the scrollbar on the
-// edge of their window. The notes are their own ID: a pointer is unique to
-// each window's notes, and comparable.
-func (n *Notepad) ScrollID() any { return n }
+// edge of their window.
+func (n *Notepad) ScrollID() bloom.ID { return n.id }
 
 func (n *Notepad) Layout(bloom.Context) bloom.Child {
-	return bloom.Viewport(n.text).ID(n).At(n.at).
+	return bloom.Viewport(n.text).ID(n.id).At(n.at).
 		Wrap(bloom.WrapWords).Style(n.st.Body).
 		OnScroll(func(p bloom.ViewportPos) tea.Cmd { n.at = p; return nil })
 }

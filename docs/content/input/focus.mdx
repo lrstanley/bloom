@@ -9,28 +9,25 @@ layout is the tab order.
 
 ## Make nodes focusable
 
-Focus refers to nodes by [ID](/concepts/how-a-program-runs#ids), so give everything that can take focus an ID of
-the same type. A type of your own, with a constant for each node, keeps them apart from other IDs:
+Focus refers to nodes by [ID](/concepts/how-a-program-runs#ids), so give everything that can take focus an ID. A
+constant for each node keeps them in one place:
 
 ```go
-// control is the ID of a node that can take focus.
-type control string
-
 const (
-	fieldName    control = "name"
-	fieldEmail   control = "email"
-	buttonSave   control = "save"
-	buttonCancel control = "cancel"
+	fieldName    bloom.ID = "name"
+	fieldEmail   bloom.ID = "email"
+	buttonSave   bloom.ID = "save"
+	buttonCancel bloom.ID = "cancel"
 )
 ```
 
-Add a `bloom.Focus` of that type to your model. Its zero value has nothing focused:
+Add a `bloom.Focus` to your model. Its zero value has nothing focused:
 
 ```go
 type model struct {
 	ui     *bloom.Root
-	focus  bloom.Focus[control]
-	values map[control]string
+	focus  bloom.Focus
+	values map[bloom.ID]string
 	// ...
 }
 ```
@@ -42,7 +39,7 @@ bloom.Text(m.values[fieldName]).Style(input).ID(fieldName).Focusable()
 bloom.Text(m.values[fieldEmail]).Style(input).ID(fieldEmail).Focusable()
 ```
 
-Focus moves between focusable nodes with IDs of its type, and passes over the rest. Any node can be focusable,
+Focus moves between focusable nodes with IDs, and passes over those without one. Any node can be focusable,
 such as a slot: `bloom.Fill(m.editor).ID(paneEditor).Focusable()` makes a whole pane a stop in the tab
 order. A component that places children it was given can make them focusable the same way; see
 [Place components you're given](/bubble-tea/writing-components#place-components-youre-given).
@@ -78,9 +75,8 @@ A click then focuses the innermost focusable node under the pointer, then runs [
 a handler can move focus again, as a "next" button would. The root keeps a pointer to your `Focus`, so keep the
 model behind a pointer too.
 
-You can also move focus yourself: `Set(id)`, `Next(frame)`, `Prev(frame)`, and `Clear()`. `Set` takes an ID of the
-focus's type, so `m.focus.Set("cancel")` sets the `control` `"cancel"`. `Set` doesn't check the node: it can be
-one that isn't focusable, or is outside the current scope, and `Is` reports it focused anyway. `Next` and `Prev`
+You can also move focus yourself: `Set(id)`, `Next(frame)`, `Prev(frame)`, and `Clear()`. `Set` doesn't check the
+node: it can be one that isn't focusable, or is outside the current scope, and `Is` reports it focused anyway. `Next` and `Prev`
 report whether they found a node to move to.
 
 ## Press buttons with the keyboard
@@ -101,7 +97,7 @@ such as to type a space into an input.
 `m.focus.Is(id)` reports whether a node has focus, so `View` can style it:
 
 ```go
-func (m *model) field(id control) bloom.Child {
+func (m *model) field(id bloom.ID) bloom.Child {
 	style := input
 	if m.focus.Is(id) {
 		style = inputFocused
@@ -112,41 +108,37 @@ func (m *model) field(id control) bloom.Child {
 
 ## Route keys to the focused node
 
-`m.focus.Current()` returns the focused node's ID, and whether anything is focused. While nothing is, the ID is
-the type's zero value, which matches none of your constants:
+`m.focus.Current()` returns the focused node's ID, or `""` while nothing is focused, which matches none of your
+constants:
 
 ```go
-		id, _ := m.focus.Current()
-		switch id {
+		switch id := m.focus.Current(); id {
 		case fieldName, fieldEmail:
 			m.values[id] += msg.Text
 		}
 ```
 
-### Nodes of different kinds
+### Many nodes of one kind
 
-When the IDs of what takes focus are already different types, such as an `int` for each row of a table and a
-`string` for each button, make `K` an interface they all implement. A type switch then tells them apart:
+When there are many of a kind, such as the rows of a table, give each an ID made with
+[`Sub`](/concepts/how-a-program-runs#keep-ids-apart) from one ID of their own. To know which row is focused, keep
+each row's ID with it, and look for the focused one:
 
 ```go
-// control is implemented by the ID types of everything that takes focus.
-type control interface{ control() }
+var rowIDs = bloom.NewID("row")
 
-func (rowID) control()    {}
-func (buttonID) control() {}
+type row struct {
+	id   bloom.ID // rowIDs.Sub(key), made with the row
+	name string
+}
 ```
 
 ```go
-		id, _ := m.focus.Current() // a bloom.Focus[control]
-		switch id := id.(type) {
-		case rowID:
-			m.open(id)
-		case buttonID:
-			return m, m.press(id)
+		id := m.focus.Current()
+		if i := slices.IndexFunc(m.rows, func(r row) bool { return r.id == id }); i >= 0 {
+			return m, m.open(i)
 		}
 ```
-
-A `bloom.Focus[any]` moves between every focusable node, whatever its ID.
 
 ## Show the cursor in an input
 
@@ -166,8 +158,8 @@ the terminal does.
 The terminal has only one cursor, so bloom shows one. With [`WithFocus`](#move-focus-with-tab-and-clicks), it
 shows a cursor inside a focusable node only while that node is focused, so every input can give its cursor, and the
 cursor follows the focus. The cursor can be on the focusable node itself or anywhere inside it, such as on the text
-in a focusable box. The node that decides is the nearest focusable one with an ID of the focus's type: a node
-`Focus` passes over doesn't hide the cursor. A cursor in no such node is shown too, unless the focused node's
+in a focusable box. The node that decides is the nearest focusable one with an ID: a focusable node without one,
+which `Focus` passes over, doesn't hide the cursor. A cursor in no such node is shown too, unless the focused node's
 cursor is in sight; of those, the one drawn last is shown. Without `WithFocus`, bloom shows the cursor drawn last, so give it only to the focused input:
 
 ```go
@@ -186,6 +178,10 @@ While a dialog is open, <kbd>tab</kbd> should only move between its buttons. A *
 focusable nodes inside it. Modal layers with an ID are scopes:
 
 ```go
+// confirmDialog is never shown, so NewID keeps it apart from any button,
+// even one called "confirm".
+var confirmDialog = bloom.NewID("confirm")
+
 bloom.Layer(dialog).ID(confirmDialog).Modal()
 ```
 
@@ -225,7 +221,9 @@ if m.focus.Within(m.ui.Frame(), scopeForm) {
 
 ## Related
 
-- [`Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus) and [`WithFocus`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus) API reference
+- [`Focus`](https://pkg.go.dev/bloomfx.dev/bloom#Focus), [`WithFocus`](https://pkg.go.dev/bloomfx.dev/bloom#WithFocus), and
+  [`ID`](https://pkg.go.dev/bloomfx.dev/bloom#ID) API reference
+- [IDs](/concepts/how-a-program-runs#ids), and how to keep them apart
 - [Dialogs and modals](/layers/dialogs)
 - The [`forms` example](https://github.com/lrstanley/bloom/tree/master/_examples/forms), with focusable inputs,
   buttons, and stacked dialog scopes

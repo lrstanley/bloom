@@ -77,16 +77,14 @@ the list scrolls.
 
 ## Focus items
 
-An ID of your `Focus`'s type and `Focusable()` on the list make the whole list one stop in the
-[tab order](/input/focus). To make items focusable instead, give each its own ID, such as from its index, and mark it
-`Focusable`. Wrap an item in `bloom.Auto` to add these to a component that isn't a node; see
-[Place components you're given](/bubble-tea/writing-components#place-components-youre-given):
+An ID and `Focusable()` on the list make the whole list one stop in the [tab order](/input/focus). To make items
+focusable instead, give each its own ID, made from the list's with
+[`Sub`](/concepts/how-a-program-runs#keep-ids-apart), such as from its index, and mark it `Focusable`. Wrap an item
+in `bloom.Auto` to add these to a component that isn't a node; see [Place components you're given](/bubble-tea/writing-components#place-components-youre-given):
 
 ```go
-type rowID int // the ID of item i, for a Focus[rowID]
-
 bloom.List(len(m.items), func(i int) bloom.Child {
-	return bloom.Auto(m.items[i]).ID(rowID(i)).Focusable()
+	return bloom.Auto(m.items[i]).ID(paneItems.Sub(i)).Focusable()
 })
 ```
 

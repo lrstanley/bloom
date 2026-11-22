@@ -7,8 +7,10 @@ package fig
 import (
 	_ "embed"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
@@ -43,7 +45,7 @@ type TextNode struct {
 	paint    Paint
 	fallback bloom.Child
 	wrap     bool
-	id       any
+	id       bloom.ID
 	handlers []on.Handler
 
 	each    bool
@@ -89,8 +91,11 @@ func (n TextNode) Wrap() TextNode { n.wrap = true; return n }
 
 // ID sets the ID that [bloom.Frame.Rect] refers to the node by. It is also
 // what the IDs of its glyphs' layers are made from, which
-// [TextNode.Animate] needs.
-func (n TextNode) ID[K comparable](id K) TextNode { n.id = id; return n }
+// [TextNode.Animate] needs: they are parts of id, as [bloom.ID.Sub] makes,
+// named by the glyph's character and its index from [TextNode.Key], such as
+// id.Sub("A0") for the first A by [ByOccurrence], so give no other node a
+// part of id.
+func (n TextNode) ID(id bloom.ID) TextNode { n.id = id; return n }
 
 // On adds mouse handlers to the node, made by package on.
 func (n TextNode) On(handlers ...on.Handler) TextNode {
@@ -187,7 +192,7 @@ func (n TextNode) glyphwise() bool {
 
 // wrapped gives a tree of layers the node's ID and handlers.
 func (n TextNode) wrapped(c bloom.Child) bloom.Child {
-	if n.id == nil && len(n.handlers) == 0 {
+	if n.id == "" && len(n.handlers) == 0 {
 		return c
 	}
 	return bloom.Auto(c).ID(n.id).On(n.handlers...)
@@ -223,10 +228,12 @@ func (n TextNode) fallbackChild() bloom.Child {
 	return bloom.Text(n.text).Truncate()
 }
 
-// glyphID is the ID of a glyph's layer: the node's ID and the glyph's key.
-type glyphID struct {
-	node any
-	key  glyphKey
+// glyphID returns the ID of a glyph's layer: the node's ID and the glyph's
+// key, its character and which of that character it is.
+func glyphID(node bloom.ID, key glyphKey) bloom.ID {
+	var b [utf8.UTFMax + 20]byte
+	part := strconv.AppendInt(utf8.AppendRune(b[:0], key.r), int64(key.n), 10)
+	return node + "/" + bloom.ID(part)
 }
 
 // glyphs returns f drawn a layer per glyph, each glyph's effects applied for
@@ -258,8 +265,8 @@ func (n TextNode) layer(f *Figure, i int, rest bool, key glyphKey, t float64, ef
 	if len(effects) > 0 {
 		l = l.Transition(t, effects...)
 	}
-	if n.id != nil {
-		l = l.ID(glyphID{node: n.id, key: key})
+	if n.id != "" {
+		l = l.ID(glyphID(n.id, key))
 	}
 	if n.animate {
 		l = l.Animate(n.anim...)

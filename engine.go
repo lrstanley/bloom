@@ -7,7 +7,6 @@ package bloom
 import (
 	"hash/maphash"
 	"image"
-	"reflect"
 	"slices"
 
 	"bloomfx.dev/bloom/canvas"
@@ -113,7 +112,7 @@ type engine struct {
 	// next layout drops it, as a frame many boxes start animating in at once
 	// is rare.
 	seeds  int
-	seedAt map[any]image.Rectangle
+	seedAt map[ID]image.Rectangle
 	// moved is where the nearest animated box being arranged is on screen,
 	// which the boxes in it animate relative to, so they move with it.
 	moved image.Point
@@ -204,7 +203,7 @@ func (e *engine) build(c Child, parent, slot int) int {
 	default:
 		b.laid = own || !builtin
 	}
-	if b.meta.id != nil {
+	if b.meta.id != "" {
 		// The nodes in one with an ID are known by where they are in it,
 		// rather than in the whole tree, so that they stay the same nodes as
 		// it moves, such as a layer brought to the front: a click on one goes
@@ -308,10 +307,9 @@ func childPath(parent uint64, slot int) uint64 {
 var idSeed = maphash.MakeSeed()
 
 // idPath returns the path that the nodes in one with ID id are known by
-// from. IDs of different types are different IDs, which hashing an
-// interface by its value alone would not tell apart.
-func idPath(id any) uint64 {
-	return childPath(maphash.Comparable(idSeed, id), 0) ^ maphash.Comparable(idSeed, reflect.TypeOf(id))
+// from.
+func idPath(id ID) uint64 {
+	return childPath(maphash.String(idSeed, string(id)), 0)
 }
 
 func (e *engine) kidsOf(i int) []int {
@@ -721,7 +719,7 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 	if i < 0 {
 		return
 	}
-	if n, ok := e.boxes[i].child.(SlotNode); ok && e.motion != nil && n.id != nil && n.animation != nil {
+	if n, ok := e.boxes[i].child.(SlotNode); ok && e.motion != nil && n.id != "" && n.animation != nil {
 		r = e.animate(i, n.id, n.animation, n.moves, r)
 		defer func(at image.Point) { e.moved = at }(e.moved)
 		e.moved = r.Min
@@ -809,18 +807,18 @@ func (e *engine) arrangeFlex(i int, n FlexNode, r image.Rectangle) {
 // the box for painting. A box still gliding finishes its glide first. One
 // that was laid out last frame without an animation, such as a window that
 // followed the pointer while it was dragged, starts from where it was then.
-func (e *engine) animate(i int, id any, cfg *layoutAnimation, moves []fx.Effect, target image.Rectangle) image.Rectangle {
-	if !e.motion.Has(id) {
+func (e *engine) animate(i int, id ID, cfg *layoutAnimation, moves []fx.Effect, target image.Rectangle) image.Rectangle {
+	if !e.motion.Has(string(id)) {
 		if at, ok := e.lastRect(id); ok {
-			e.motion.Start(id, cfg.opts, at, e.moved)
+			e.motion.Start(string(id), cfg.opts, at, e.moved)
 		}
 	}
-	if len(moves) > 0 && !e.motion.Gliding(id) {
+	if len(moves) > 0 && !e.motion.Gliding(string(id)) {
 		b := &e.boxes[i]
-		b.from, b.moveT, b.moving = e.motion.Move(id, cfg.opts, target, e.moved)
+		b.from, b.moveT, b.moving = e.motion.Move(string(id), cfg.opts, target, e.moved)
 		return target
 	}
-	return e.motion.Rect(id, cfg.opts, target, e.moved)
+	return e.motion.Rect(string(id), cfg.opts, target, e.moved)
 }
 
 // scanSeeds is how many boxes a layout looks up in the last frame by
@@ -831,7 +829,7 @@ const scanSeeds = 8
 // few boxes a layout looks up scan the frame, and the rest share an index of
 // it, so that many boxes starting to animate at once, such as a long list
 // turning Animate on, each take a lookup rather than a scan.
-func (e *engine) lastRect(id any) (image.Rectangle, bool) {
+func (e *engine) lastRect(id ID) (image.Rectangle, bool) {
 	var f *Frame
 	if e.lastFrame != nil {
 		f = e.lastFrame()
@@ -844,11 +842,11 @@ func (e *engine) lastRect(id any) (image.Rectangle, bool) {
 		return f.Rect(id)
 	}
 	if e.seedAt == nil {
-		e.seedAt = make(map[any]image.Rectangle)
+		e.seedAt = make(map[ID]image.Rectangle)
 		// Backward, so that the first of a duplicated ID is the one, as for
 		// Frame.Rect.
 		for i := len(f.entries) - 1; i >= 0; i-- {
-			if en := &f.entries[i]; en.id != nil {
+			if en := &f.entries[i]; en.id != "" {
 				e.seedAt[en.id] = en.rect
 			}
 		}

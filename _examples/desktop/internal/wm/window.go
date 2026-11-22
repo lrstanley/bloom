@@ -32,10 +32,11 @@ type Window struct {
 	// window opened.
 	Cascade bool
 	// Scroll is the ID of a viewport in Content, for a scrollbar on the
-	// window's right edge, or nil for none.
-	Scroll any
+	// window's right edge, or "" for none.
+	Scroll bloom.ID
 
-	id    WindowID
+	id    bloom.ID
+	seq   int // the order it opened in, from 0
 	snap  snap
 	shut  bool          // closing, and removed once it has faded out
 	slide bool          // it minimizes and comes back by sliding to and from the taskbar
@@ -49,14 +50,15 @@ type Content interface {
 	Update(msg tea.Msg) tea.Cmd
 }
 
-// WindowID is the ID of a window's layer, which it keeps as it moves up and
+// ID returns the ID of the window's layer, which it keeps as it moves up and
 // down the stack, for Animate to follow it. The nodes in the window are
 // known by where they are in it, so a press on a button of a window behind
 // the others, which brings the window to the front, still clicks it.
-type WindowID int
+func (w *Window) ID() bloom.ID { return w.id }
 
-// ID returns the ID of the window's layer.
-func (w *Window) ID() WindowID { return w.id }
+// Seq returns the order the window opened in: a window opened later has a
+// greater one.
+func (w *Window) Seq() int { return w.seq }
 
 // Shown reports whether the window is open, rather than minimized or
 // closing.

@@ -129,7 +129,7 @@ func (n ScrollbarNode) Layout(Context) Child { return n }
 func (n TooltipSinkNode) Layout(Context) Child { return n }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the node by.
-func (n TextNode) ID[K comparable](id K) TextNode {
+func (n TextNode) ID(id ID) TextNode {
 	n.id = id
 	return n
 }
@@ -205,9 +205,9 @@ func (n TextNode) HoverStyle(style lipgloss.Style) TextNode {
 // Cursor shows the terminal cursor at c, relative to the node's top-left
 // cell, while that cell is on screen and not covered by a later layer. A
 // terminal has one cursor: with [WithFocus], a cursor inside a focusable node
-// whose ID is of the focus's type is shown only while the nearest such node,
-// which may be the node itself, is focused, and is shown over one in no such
-// node. Otherwise the cursor drawn last is shown.
+// with an ID is shown only while the nearest such node, which may be the node
+// itself, is focused, and is shown over one in no such node. Otherwise the
+// cursor drawn last is shown.
 func (n TextNode) Cursor(c *tea.Cursor) TextNode {
 	n.cursor = c
 	return n
@@ -215,7 +215,7 @@ func (n TextNode) Cursor(c *tea.Cursor) TextNode {
 
 // ID sets the ID that focus, layout animation, and [Frame.Rect] refer to the
 // slot by.
-func (n SlotNode) ID[K comparable](id K) SlotNode {
+func (n SlotNode) ID(id ID) SlotNode {
 	n.id = id
 	return n
 }
@@ -288,7 +288,7 @@ func (n SlotNode) Scope() SlotNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the row or column by.
-func (n FlexNode) ID[K comparable](id K) FlexNode {
+func (n FlexNode) ID(id ID) FlexNode {
 	n.id = id
 	return n
 }
@@ -356,7 +356,7 @@ func (n FlexNode) TooltipOpen(open bool) FlexNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the grid by.
-func (n GridNode) ID[K comparable](id K) GridNode {
+func (n GridNode) ID(id ID) GridNode {
 	n.id = id
 	return n
 }
@@ -421,7 +421,7 @@ func (n GridNode) TooltipOpen(open bool) GridNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the flow by.
-func (n WrapNode) ID[K comparable](id K) WrapNode {
+func (n WrapNode) ID(id ID) WrapNode {
 	n.id = id
 	return n
 }
@@ -486,7 +486,7 @@ func (n WrapNode) TooltipOpen(open bool) WrapNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the box by.
-func (n BoxNode) ID[K comparable](id K) BoxNode {
+func (n BoxNode) ID(id ID) BoxNode {
 	n.id = id
 	return n
 }
@@ -563,7 +563,7 @@ func (n BoxNode) HoverStyle(style lipgloss.Style) BoxNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the node by.
-func (n CenterNode) ID[K comparable](id K) CenterNode {
+func (n CenterNode) ID(id ID) CenterNode {
 	n.id = id
 	return n
 }
@@ -628,7 +628,7 @@ func (n CenterNode) TooltipOpen(open bool) CenterNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the scroll by.
-func (n ScrollNode) ID[K comparable](id K) ScrollNode {
+func (n ScrollNode) ID(id ID) ScrollNode {
 	n.id = id
 	return n
 }
@@ -694,7 +694,7 @@ func (n ScrollNode) TooltipOpen(open bool) ScrollNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the transition by.
-func (n TransitionNode) ID[K comparable](id K) TransitionNode {
+func (n TransitionNode) ID(id ID) TransitionNode {
 	n.id = id
 	return n
 }
@@ -761,7 +761,7 @@ func (n TransitionNode) TooltipOpen(open bool) TransitionNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the node by.
-func (n DrawableNode) ID[K comparable](id K) DrawableNode {
+func (n DrawableNode) ID(id ID) DrawableNode {
 	n.id = id
 	return n
 }
@@ -816,7 +816,7 @@ func (n DrawableNode) TooltipOpen(open bool) DrawableNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the overlay by.
-func (n OverlayNode) ID[K comparable](id K) OverlayNode {
+func (n OverlayNode) ID(id ID) OverlayNode {
 	n.id = id
 	return n
 }
@@ -883,7 +883,7 @@ func (n OverlayNode) TooltipOpen(open bool) OverlayNode {
 
 // ID sets the ID that focus, layout animation, anchoring, and [Frame.Rect]
 // refer to the layer by.
-func (n LayerNode) ID[K comparable](id K) LayerNode {
+func (n LayerNode) ID(id ID) LayerNode {
 	n.id = id
 	return n
 }
@@ -949,7 +949,7 @@ func (n LayerNode) TooltipOpen(open bool) LayerNode {
 
 // ID sets the ID that focus, [Frame.Rect], [Frame.List], and [ScrollbarOf]
 // refer to the list by.
-func (n ListNode) ID[K comparable](id K) ListNode {
+func (n ListNode) ID(id ID) ListNode {
 	n.id = id
 	return n
 }
@@ -1026,7 +1026,7 @@ func (n ListNode) TooltipOpen(open bool) ListNode {
 
 // ID sets the ID that focus, [Frame.Rect], [Frame.Viewport], and
 // [ScrollbarOf] refer to the viewport by.
-func (n ViewportNode) ID[K comparable](id K) ViewportNode {
+func (n ViewportNode) ID(id ID) ViewportNode {
 	n.id = id
 	return n
 }
@@ -1100,7 +1100,7 @@ func (n ViewportNode) TooltipOpen(open bool) ViewportNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the marquee by.
-func (n MarqueeNode) ID[K comparable](id K) MarqueeNode {
+func (n MarqueeNode) ID(id ID) MarqueeNode {
 	n.id = id
 	return n
 }
@@ -1166,7 +1166,7 @@ func (n MarqueeNode) TooltipOpen(open bool) MarqueeNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the skeleton by.
-func (n SkeletonNode) ID[K comparable](id K) SkeletonNode {
+func (n SkeletonNode) ID(id ID) SkeletonNode {
 	n.id = id
 	return n
 }
@@ -1232,7 +1232,7 @@ func (n SkeletonNode) TooltipOpen(open bool) SkeletonNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the node by.
-func (n MinSizeNode) ID[K comparable](id K) MinSizeNode {
+func (n MinSizeNode) ID(id ID) MinSizeNode {
 	n.id = id
 	return n
 }
@@ -1298,7 +1298,7 @@ func (n MinSizeNode) TooltipOpen(open bool) MinSizeNode {
 
 // ID sets the ID that focus and [Frame.Rect] refer to the scrollbar by. It is
 // in the frame only while it is drawn.
-func (n ScrollbarNode) ID[K comparable](id K) ScrollbarNode {
+func (n ScrollbarNode) ID(id ID) ScrollbarNode {
 	n.id = id
 	return n
 }
@@ -1356,7 +1356,7 @@ func (n ScrollbarNode) TooltipOpen(open bool) ScrollbarNode {
 }
 
 // ID sets the ID that focus and [Frame.Rect] refer to the sink by.
-func (n TooltipSinkNode) ID[K comparable](id K) TooltipSinkNode {
+func (n TooltipSinkNode) ID(id ID) TooltipSinkNode {
 	n.id = id
 	return n
 }

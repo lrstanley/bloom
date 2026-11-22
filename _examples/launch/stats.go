@@ -112,7 +112,7 @@ func (s *stats) pause() tea.Cmd {
 func (s *stats) Layout(bloom.Context) bloom.Child {
 	slots := make([]bloom.Child, len(cards))
 	for i := range cards {
-		slots[i] = bloom.Fill(s.card(i)).ID(cardID(i))
+		slots[i] = bloom.Fill(s.card(i)).ID(cardID.Sub(i))
 	}
 	return bloom.Row(slots...).Gap(2)
 }

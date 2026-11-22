@@ -67,8 +67,8 @@ func (t *Taskbar) Layout(bloom.Context) bloom.Child {
 	top := t.wm.Top()
 	// The buttons stay in the order the windows opened in, rather than the
 	// order they stack in, so that they don't move under the pointer.
-	byID := slices.SortedFunc(slices.Values(t.wm.Windows()), func(a, b *wm.Window) int { return int(a.ID() - b.ID()) })
-	for _, w := range byID {
+	bySeq := slices.SortedFunc(slices.Values(t.wm.Windows()), func(a, b *wm.Window) int { return a.Seq() - b.Seq() })
+	for _, w := range bySeq {
 		if w.Closing() {
 			continue
 		}

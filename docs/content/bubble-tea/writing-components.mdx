@@ -159,46 +159,39 @@ field.
 ## Give each instance its own IDs
 
 [IDs](/concepts/how-a-program-runs#ids) must be unique in a frame, and two instances of `Tabs` on one screen would
-otherwise give their nodes the same ones. Have the parent give each instance an ID, and build the IDs of its parts
-from it:
+otherwise give their nodes the same ones. Have each instance make an ID of its own with
+[`bloom.NewID`](https://pkg.go.dev/bloomfx.dev/bloom#NewID) when it's made, and build the IDs of its parts from it
+with [`Sub`](https://pkg.go.dev/bloomfx.dev/bloom#ID.Sub):
 
 ```go
 type Tabs struct {
-	ID     any // set by the parent, unique to this instance
+	ID     bloom.ID // unique to this instance
 	Labels []string
 	Active int
 }
 
-// tabID is the ID of one tab of a Tabs.
-type tabID struct {
-	tabs any
-	i    int
+// NewTabs returns tabs with the labels, and an ID of their own.
+func NewTabs(labels ...string) Tabs {
+	return Tabs{ID: bloom.NewID("tabs"), Labels: labels}
 }
 
 // in Layout
-tabs[i] = bloom.Text(label).Style(style).ID(tabID{t.ID, i})
+tabs[i] = bloom.Text(label).Style(style).ID(t.ID.Sub(i))
 // ...
 return bloom.Row(tabs...).ID(t.ID).Focusable()
 ```
 
-Taking the ID as `any` lets the parent use its own ID type, so the component's root node joins the parent's
-[focus](/input/focus) order. A `Focus` moves between nodes whose IDs have its type, whatever the field's type:
+`NewID` never returns the same ID twice, whatever the name, so two `Tabs` never clash, and neither do their tabs. The
+ID is a plain field, so a copy of the component keeps it, as Bubble Tea's copies of the model do. The parent makes
+each instance once, such as when it makes the model:
 
 ```go
-type control int
-
-const (
-	tabsMain control = iota
-	tabsSide
-)
-
-m.main = Tabs{ID: tabsMain, Labels: []string{"inbox", "sent", "drafts"}}
-m.side = Tabs{ID: tabsSide, Labels: []string{"people", "labels"}}
+m.main = NewTabs("inbox", "sent", "drafts")
+m.side = NewTabs("people", "labels")
 ```
 
-The ID must be comparable, like any ID. The unexported `tabID` type keeps the parts' IDs apart from everything
-else's, and the parent can still find one, such as with `m.ui.Frame().Rect(...)`, if the component exports a way
-to make it.
+The component's root node joins the parent's [focus](/input/focus) order, and the parent can find a tab by its ID,
+such as with `m.ui.Frame().Rect(m.main.ID.Sub(1))`.
 
 ## Place components you're given
 
@@ -211,7 +204,7 @@ whether they take focus by implementing an interface of the container's:
 // Focuser is a child of a Stack that takes focus, by the ID it returns.
 type Focuser interface {
 	bloom.Child
-	FocusID() any
+	FocusID() bloom.ID
 }
 
 // focusable makes c a stop in the tab order if it's a Focuser.
@@ -268,10 +261,10 @@ func (t *Tabs) Update(msg tea.Msg) tea.Cmd {
 	case tea.KeyPressMsg:
 		cmd, ok := m.focus.Update(msg, m.ui.Frame())
 		if !ok {
-			switch id, _ := m.focus.Current(); id {
-			case tabsMain:
+			switch m.focus.Current() {
+			case m.main.ID:
 				cmd = m.main.Update(msg)
-			case tabsSide:
+			case m.side.ID:
 				cmd = m.side.Update(msg)
 			}
 		}
@@ -300,21 +293,20 @@ var (
 
 // Tabs is a row of tabs, one of which is active.
 type Tabs struct {
-	ID     any // set by the parent, unique to this instance
+	ID     bloom.ID // unique to this instance
 	Labels []string
 	Active int
 }
 
-// TabMsg is sent when the user picks a tab.
-type TabMsg struct {
-	ID     any
-	Active int
+// NewTabs returns tabs with the labels, and an ID of their own.
+func NewTabs(labels ...string) Tabs {
+	return Tabs{ID: bloom.NewID("tabs"), Labels: labels}
 }
 
-// tabID is the ID of one tab of a Tabs.
-type tabID struct {
-	tabs any
-	i    int
+// TabMsg is sent when the user picks a tab.
+type TabMsg struct {
+	ID     bloom.ID
+	Active int
 }
 
 // Layout shows each label in full when there's room, and only its first
@@ -331,7 +323,7 @@ func (t *Tabs) Layout(ctx bloom.Context) bloom.Child {
 		if i == t.Active {
 			style = activeStyle
 		}
-		tabs[i] = bloom.Text(label).Style(style).ID(tabID{t.ID, i}).
+		tabs[i] = bloom.Text(label).Style(style).ID(t.ID.Sub(i)).
 			On(on.Click(func() tea.Cmd { return t.pick(i) }))
 	}
 	return bloom.Row(tabs...).ID(t.ID).Focusable()
@@ -371,7 +363,7 @@ A test can click a tab by its ID, with [`m.ui.Click`](/bubble-tea/testing):
 
 ```go
 m.View()
-if _, ok := m.ui.Click(tabID{tabsMain, 1}); !ok || m.main.Active != 1 {
+if _, ok := m.ui.Click(m.main.ID.Sub(1)); !ok || m.main.Active != 1 {
 	t.Fatal("the sent tab was not picked")
 }
 ```

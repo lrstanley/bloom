@@ -30,10 +30,12 @@ const (
 // colX is where column k of the tree starts.
 func colX(k int) int { return graphPad + k*(itemW+wireW) }
 
-// The IDs of nodes, for layout animation and for finding them on screen.
-type (
-	itemID string // a function in the tree, by where it is
-	wireID string // the wire to a function in the tree, from the one above it
+// The IDs of nodes, for layout animation and for finding them on screen,
+// by the key of a function in the tree, where it is: itemIDs.Sub(key) is the
+// function, and wireIDs.Sub(key) the wire to it, from the one above it.
+var (
+	itemIDs = bloom.NewID("item")
+	wireIDs = bloom.NewID("wire")
 )
 
 const (
@@ -246,11 +248,11 @@ func (m *model) place(layers *[]bloom.LayerNode, k int, key string, y int) int {
 	top, prev := y, y
 	for i, f := range fs {
 		id := key + "." + strconv.Itoa(i)
-		add(bloom.Layer(m.item(k, i, f)).ID(itemID(id)).Offset(colX(k), y).Size(itemW, 1))
+		add(bloom.Layer(m.item(k, i, f)).ID(itemIDs.Sub(id)).Offset(colX(k), y).Size(itemW, 1))
 		if k > 0 {
 			// The wire to this function, from the one above it.
 			from := min(prev+1, y)
-			add(bloom.Layer(m.wire(i, len(fs), sel)).ID(wireID(id)).Offset(colX(k)-wireW, from).Size(wireW, y-from+1))
+			add(bloom.Layer(m.wire(i, len(fs), sel)).ID(wireIDs.Sub(id)).Offset(colX(k)-wireW, from).Size(wireW, y-from+1))
 		}
 		prev = y
 		if m.expanded(k, i) {
@@ -354,7 +356,7 @@ func (m *model) item(k, i int, f *fn) bloom.Child {
 // selectedAt is the middle of the selected function in the tree, in the
 // last frame, for the code view to open from.
 func (m *model) selectedAt() image.Point {
-	r, ok := m.ui.Frame().Rect(itemID(m.treeKey(m.depth())))
+	r, ok := m.ui.Frame().Rect(itemIDs.Sub(m.treeKey(m.depth())))
 	if !ok {
 		return image.Point{}
 	}

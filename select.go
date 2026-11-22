@@ -29,7 +29,7 @@ import (
 type SelectionMsg struct {
 	// ID is the ID of the node the text was selected in, or of its nearest
 	// ancestor with one, such as the slot a component is placed in.
-	ID any
+	ID ID
 	// Text is the text selected.
 	Text string
 }
@@ -38,7 +38,7 @@ type SelectionMsg struct {
 type CopyMsg struct {
 	// ID is the ID of the node the text was selected in, as in
 	// [SelectionMsg].
-	ID any
+	ID ID
 	// Text is the text copied.
 	Text string
 	// Err is what the function given with [WithClipboard] returned, such as
@@ -288,7 +288,7 @@ type selPos struct {
 type selection struct {
 	ok      bool
 	key     nodeKey
-	id      any
+	id      ID
 	seq     int         // counts selections, for the ticks of one to know it
 	press   image.Point // where the drag started, until anchor is found there
 	pointer image.Point // where the pointer is while dragging, which head follows
@@ -425,7 +425,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 		// A leaf is known by where it is in the selected node, rather than
 		// in the tree, so that the selection stays on it as the node moves.
 		key := nodeKey{path: path}
-		if b.meta.id != nil {
+		if b.meta.id != "" {
 			key = nodeKey{id: b.meta.id}
 		}
 		l := selLeaf{key: key, box: i, rect: b.rect, clip: vis, inner: inner}
@@ -465,7 +465,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 	case ViewportNode:
 		if l := r.viewportOf(i); l != nil && !inner {
 			key := nodeKey{path: path}
-			if b.meta.id != nil {
+			if b.meta.id != "" {
 				key = nodeKey{id: b.meta.id}
 			}
 			rect, shown := viewportLeaf(l, vis)
@@ -1741,7 +1741,7 @@ func (r *Root) ClearSelection() {
 // The ID of an [Editable]'s node, or of a node it is in that is not made
 // selectable itself, selects all of the Editable's text, as its range, and
 // so does that of a viewport given [ViewportNode.Caret], of its buffer.
-func (r *Root) SelectAll[K comparable](id K) bool {
+func (r *Root) SelectAll(id ID) bool {
 	f := r.r.frame
 	i := f.index(id)
 	if i >= 0 {

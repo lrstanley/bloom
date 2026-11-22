@@ -28,16 +28,11 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// The IDs nodes are given.
-type (
-	cardID int
-	// formID identifies the input and the button of the form.
-	formID string
-)
-
+// The IDs nodes are given: cardID.Sub(i) is the card for statistic i.
 const (
-	inputConfirm formID = "confirm"
-	buttonDeploy formID = "deploy"
+	cardID       bloom.ID = "card"
+	inputConfirm bloom.ID = "confirm"
+	buttonDeploy bloom.ID = "deploy"
 )
 
 type model struct {
@@ -49,7 +44,7 @@ type model struct {
 	form  form
 	tour  tour
 
-	focus bloom.Focus[formID]
+	focus bloom.Focus
 }
 
 func newModel() *model {

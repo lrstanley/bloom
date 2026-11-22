@@ -24,27 +24,25 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// pane is the ID of a box that takes focus.
-type pane string
-
+// The IDs of the boxes that take focus.
 const (
-	paneLeft  pane = "left"
-	paneRight pane = "right"
+	paneLeft  bloom.ID = "left"
+	paneRight bloom.ID = "right"
 )
 
-var panes = []pane{paneLeft, paneRight}
+var panes = []bloom.ID{paneLeft, paneRight}
 
 type model struct {
 	ui   *bloom.Root
 	st   styles
 	w, h int
 
-	focus  bloom.Focus[pane]
-	inputs map[pane]*textinput.Model
+	focus  bloom.Focus
+	inputs map[bloom.ID]*textinput.Model
 }
 
 // newInput returns the input in the box with ID id.
-func newInput(id pane) *textinput.Model {
+func newInput(id bloom.ID) *textinput.Model {
 	in := textinput.New()
 	in.Prompt = string(id) + "> "
 	in.Placeholder = "type here"
@@ -60,7 +58,7 @@ func newModel() *model {
 	m := &model{st: newStyles(tint.TintEverforestDarkMed)}
 	// Clicks move the focus.
 	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
-	m.inputs = map[pane]*textinput.Model{
+	m.inputs = map[bloom.ID]*textinput.Model{
 		paneLeft:  newInput(paneLeft),
 		paneRight: newInput(paneRight),
 	}
@@ -90,8 +88,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Everything else goes to the input in the focused box only.
 	var cmd tea.Cmd
-	if id, ok := m.focus.Current(); ok {
-		*m.inputs[id], cmd = m.inputs[id].Update(msg)
+	if in, ok := m.inputs[m.focus.Current()]; ok {
+		*in, cmd = in.Update(msg)
 	}
 	return m, tea.Batch(cmd, m.ui.Update(msg))
 }
@@ -119,10 +117,9 @@ func (m *model) layout() bloom.Child {
 		field := bloom.Text(in.View()).Cursor(in.Cursor())
 		boxes = append(boxes, bloom.Fill(bloom.Box(st, field)).ID(id).Focusable())
 	}
-	cur, _ := m.focus.Current()
 	return bloom.Column(
 		bloom.Auto(bloom.Row(boxes...)),
-		bloom.Auto(bloom.Text(fmt.Sprintf("focus: %s · tab or click to move it · esc quits", cur)).Style(m.st.hint)),
+		bloom.Auto(bloom.Text(fmt.Sprintf("focus: %s · tab or click to move it · esc quits", m.focus.Current())).Style(m.st.hint)),
 	)
 }
 

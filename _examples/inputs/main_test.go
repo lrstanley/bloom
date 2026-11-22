@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"bloomfx.dev/bloom"
 	"getsteep.dev/steep"
 )
 
@@ -18,7 +19,7 @@ func TestInputs(t *testing.T) {
 
 	const w = 60
 	h := steep.NewHarness(t, newModel(), steep.WithWindowSize(w, 6), steep.WithTimeout(5*time.Second))
-	cursorIn := func(want pane) {
+	cursorIn := func(want bloom.ID) {
 		t.Helper()
 		c := h.CursorPosition()
 		if !h.CursorVisible() || c.Y != 1 || (c.X < w/2) != (want == paneLeft) {

@@ -19,7 +19,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-type item int
+// itemID is the ID of the sidebar's items: itemID.Sub(i) is item i.
+const itemID bloom.ID = "item"
 
 // app is a small program using every part of the package together: a
 // collapsible sidebar of clickable, focusable items, and a modal help dialog
@@ -28,7 +29,7 @@ type app struct {
 	ui       *bloom.Root
 	w, h     int
 	selected int
-	focus    bloom.Focus[item]
+	focus    bloom.Focus
 	help     anim.Presence
 }
 
@@ -69,20 +70,17 @@ func (m *app) toggleHelp() tea.Cmd {
 
 func (m *app) View() tea.View {
 	items := make([]bloom.Child, 0, 5)
+	focus := "none"
 	for i := range 4 {
 		label := fmt.Sprintf(" item %02d", i)
-		if m.focus.Is(item(i)) {
+		if m.focus.Is(itemID.Sub(i)) {
 			label = ">" + label[1:]
+			focus = fmt.Sprint(i)
 		}
-		items = append(items, bloom.Text(label).ID(item(i)).Focusable().
+		items = append(items, bloom.Text(label).ID(itemID.Sub(i)).Focusable().
 			On(on.Click(func() tea.Cmd { m.selected = i; return nil })))
 	}
 	items = append(items, bloom.Space())
-
-	focus := "none"
-	if it, ok := m.focus.Current(); ok {
-		focus = fmt.Sprint(int(it))
-	}
 
 	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 	base := bloom.Column(

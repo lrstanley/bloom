@@ -311,24 +311,21 @@ type tipState struct {
 
 	// The tooltip waiting to show, from src: for the pointer, that of the
 	// node with key; for the focus, that of the node the focus goes to, once
-	// keyOK, which was not focused when the key was pressed: prev, if
-	// prevOK.
-	armed  bool
-	src    tipSource
-	key    nodeKey
-	keyOK  bool
-	prev   any
-	prevOK bool
+	// keyOK, which was not focused when the key was pressed: prev.
+	armed bool
+	src   tipSource
+	key   nodeKey
+	keyOK bool
+	prev  ID
 
 	// The tooltip showing, of the node with shownKey, from shownSrc, which
 	// was on screen at vis, and is shown while it stays there, or for the
-	// focus, while the node with ID shownID is focused. For the pointer, it
+	// focus, while the node with ID shownKey.id is focused. For the pointer, it
 	// is placed beside the cells of the node on row, where the pointer was.
 	// It was drawn last at chip, unfolded over its node if unfolded.
 	shown    bool
 	shownSrc tipSource
 	shownKey nodeKey
-	shownID  any
 	vis      image.Rectangle
 	row      int
 	chip     image.Rectangle
@@ -360,8 +357,7 @@ type tipState struct {
 	warmUntil time.Time
 
 	// The focus in the frame drawn last, before a key press moves it.
-	lastFocus   any
-	lastFocusOK bool
+	lastFocus ID
 
 	memo tipChips
 }
@@ -597,7 +593,7 @@ func (r *Root) armFocus() tea.Cmd {
 	s := &r.tip
 	s.seq++
 	s.armed, s.src, s.keyOK = true, tipFocus, false
-	s.prev, s.prevOK = s.lastFocus, s.lastFocusOK
+	s.prev = s.lastFocus
 	return r.tipTick(0)
 }
 
@@ -641,7 +637,7 @@ func (r *Root) fireTip() tea.Cmd {
 	}
 	// The focus stayed where it was, such as while typing in a field,
 	// which does not bring its tooltip back.
-	if id := f.entries[i].id; s.prevOK && id == s.prev {
+	if id := f.entries[i].id; id == s.prev {
 		s.disarm()
 		return nil
 	}
@@ -657,8 +653,8 @@ func (r *Root) fireTip() tea.Cmd {
 // focusedTip returns the entry of f of the focused node, if it has a
 // tooltip and is on screen, or -1.
 func (r *Root) focusedTip(f *Frame) int {
-	id, ok := r.r.focus.focusedID()
-	if !ok {
+	id := r.r.focus.Current()
+	if id == "" {
 		return -1
 	}
 	if i := f.index(id); i >= 0 && !f.entries[i].vis.Empty() {
@@ -675,7 +671,7 @@ func (r *Root) showTip(f *Frame, i int, src tipSource) {
 	s := &r.tip
 	e := &f.entries[i]
 	s.disarm()
-	s.shown, s.shownSrc, s.shownKey, s.shownID, s.vis = true, src, e.key, e.id, e.vis
+	s.shown, s.shownSrc, s.shownKey, s.vis = true, src, e.key, e.vis
 	s.row, s.chip, s.unfolded, s.place = r.mouse.at.Y, image.Rectangle{}, false, placement{}
 }
 
@@ -699,7 +695,7 @@ func (r *Root) dismissTip(f *Frame, chain []int) {
 // tell whether it moved the focus.
 func (r *Root) noteFocus() {
 	if r.tip.on && r.r.focus != nil {
-		r.tip.lastFocus, r.tip.lastFocusOK = r.r.focus.focusedID()
+		r.tip.lastFocus = r.r.focus.Current()
 	}
 }
 
@@ -744,7 +740,7 @@ func (r *Root) activeTip() (int, *tipAt) {
 	}
 	i := findKey(rr.entries, s.shownKey)
 	t := tipIn(rr.tips, i)
-	if t == nil || t.pinOnly || covered(rr.entries, i, true) || (s.shownSrc == tipFocus && !r.focusIs(s.shownID)) {
+	if t == nil || t.pinOnly || covered(rr.entries, i, true) || (s.shownSrc == tipFocus && !rr.focus.Is(s.shownKey.id)) {
 		return -1, nil
 	}
 	return i, t
@@ -772,12 +768,6 @@ func (r *Root) paintActive(t *tipAt, screen image.Rectangle, sinkOn bool) {
 	}
 	s.chip = rect.Intersect(screen)
 	rr.topOps = append(rr.topOps, op{kind: opBlit, src: src, rect: rect, clip: screen})
-}
-
-// focusIs reports whether the node with ID id is focused.
-func (r *Root) focusIs(id any) bool {
-	_, focused := r.r.focus.focuses(id)
-	return focused
 }
 
 // unfold returns the full text of cut text t drawn as a chip over it, in

@@ -28,7 +28,7 @@ type ScrollbarNode struct {
 	meta
 
 	total, visible, offset int
-	of                     any
+	of                     ID
 	horizontal             bool
 	onScroll               func(offset int) tea.Cmd
 
@@ -64,7 +64,7 @@ func Scrollbar(total, visible, offset int) ScrollbarNode {
 // is in, or for the [List] with ID id, in items, which follows it from its
 // layout, with no state of its own. It is not drawn while there is no such
 // node on screen.
-func ScrollbarOf[K comparable](id K) ScrollbarNode {
+func ScrollbarOf(id ID) ScrollbarNode {
 	return ScrollbarNode{of: id}
 }
 
@@ -234,7 +234,7 @@ func viewportScrollbar(n ScrollbarNode, vp ViewportNode, v ViewportView) Scrollb
 // paintScrollbar adds the ops for scrollbar n, box b at index i, clipped to
 // clip, and the entry its mouse handler needs, under entry parent.
 func (r *renderer) paintScrollbar(i int, b *box, n ScrollbarNode, clip image.Rectangle, parent int) {
-	if n.of != nil {
+	if n.of != "" {
 		var ok bool
 		if n, ok = r.scrollbarOf(n); !ok {
 			return

@@ -48,7 +48,7 @@ func Debug(w, h int, c Child) string {
 		return ""
 	}
 	var sb strings.Builder
-	r.debugTree(&sb, root, r.area, "", "", false, make(map[any]bool))
+	r.debugTree(&sb, root, r.area, "", "", false, make(map[ID]bool))
 	return sb.String()
 }
 
@@ -56,11 +56,11 @@ func Debug(w, h int, c Child) string {
 // before the box, and indent before the boxes in it. hidden is set inside a
 // hidden box, as boxes in one are not laid out. ids are the IDs written so
 // far.
-func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lead, indent string, hidden bool, ids map[any]bool) {
+func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lead, indent string, hidden bool, ids map[ID]bool) {
 	b := &e.boxes[i]
 	kind, attrs := debugNode(b.child)
 	sb.WriteString(lead + kind)
-	if id := b.meta.id; id != nil {
+	if id := b.meta.id; id != "" {
 		sb.WriteString(" id=" + debugID(id))
 		if ids[id] {
 			sb.WriteString(" duplicate")
@@ -244,7 +244,7 @@ func debugSlot(n SlotNode) (kind string, attrs []string) {
 
 func debugLayer(n LayerNode) (attrs []string) {
 	switch {
-	case n.anchor != nil:
+	case n.side != 0:
 		attrs = append(attrs, "anchorTo="+debugID(n.anchor)+"/"+debugName(directionNames, n.side))
 	case n.x != Center || n.y != Center:
 		attrs = append(attrs, "anchor="+debugName(alignNames, n.x)+","+debugName(alignNames, n.y))
@@ -310,14 +310,8 @@ func debugRect(r image.Rectangle) string {
 	return fmt.Sprintf("%d,%d %dx%d", r.Min.X, r.Min.Y, r.Dx(), r.Dy())
 }
 
-// debugID returns id quoted if it is a string, or with its type otherwise,
-// since IDs of different types are different IDs, kept to one line.
-func debugID(id any) string {
-	if s, ok := id.(string); ok {
-		return strconv.Quote(s)
-	}
-	return lineBreaks.Replace(fmt.Sprintf("%T(%v)", id, id))
-}
+// debugID returns id quoted, kept to one line.
+func debugID(id ID) string { return strconv.Quote(string(id)) }
 
 // debugText returns the start of s as one quoted line, without its styles.
 func debugText(s string) string {

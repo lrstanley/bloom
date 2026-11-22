@@ -143,7 +143,7 @@ func (m *model) layout() bloom.Child {
 	// The marker follows the selected item wherever it moves.
 	marker := bloom.Layer(bloom.Text("< selected").Style(m.st.marker)).
 		Size(10, 1).
-		AnchorTo(names[m.selected], bloom.Right).
+		AnchorTo(bloom.ID(names[m.selected]), bloom.Right).
 		ID("selection").
 		Animate(anim.Spring(20, 1))
 
@@ -165,7 +165,7 @@ func (m *model) list() bloom.Child {
 			style = m.st.selected
 		}
 		item := bloom.Text(names[i]).Style(style)
-		items = append(items, bloom.Fixed(2, item).ID(names[i]).Animate())
+		items = append(items, bloom.Fixed(2, item).ID(bloom.ID(names[i])).Animate())
 	}
 	items = append(items, bloom.Space())
 	return bloom.Column(items...)

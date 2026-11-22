@@ -111,7 +111,7 @@ type renderer struct {
 	cursor   *tea.Cursor    // the cursor shown, picked from placed
 	placed   []placedCursor // the cursors painted this frame that may be shown
 	prev     []placedCursor // and those of the last frame
-	focus    focusTarget    // the Root's focus, given by WithFocus
+	focus    *Focus         // the Root's focus, given by WithFocus
 	out      string
 	drawn    image.Point // size of the last composited frame
 	drawnEnv canvas.Env
@@ -897,8 +897,8 @@ func (r *renderer) rankCursor(i, parent int) cursorRank {
 		if !e.focusable {
 			continue
 		}
-		if moves, focused := r.focus.focuses(e.id); moves {
-			if focused {
+		if e.id != "" {
+			if r.focus.Is(e.id) {
 				return cursorFocused
 			}
 			return cursorUnfocused

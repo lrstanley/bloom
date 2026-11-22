@@ -139,18 +139,6 @@ type press struct {
 	hold          bool // the click is held back, as it may become a double click
 }
 
-// focusTarget is a [Focus] of any type that clicks can move, and that
-// tooltips read, for [WithFocus].
-type focusTarget interface {
-	click(f *Frame, chain []int)
-	// focusedID returns the ID of the focused node, and whether a node is
-	// focused.
-	focusedID() (any, bool)
-	// focuses reports whether the focus moves to a focusable node with ID
-	// id, and whether that node is the one focused.
-	focuses(id any) (moves, focused bool)
-}
-
 // mouseEvent is the OnMouse handler of the view [Root.View] made for frame
 // f, which is on screen when Bubble Tea calls it. Bubble Tea runs it on the
 // event loop, so handlers run where Update does, but the command it returns
@@ -598,7 +586,7 @@ func (r *Root) ClickAt(x, y int) tea.Cmd {
 // Click runs the handlers for a click of the left button in the middle of
 // the part of the node with ID id that is on screen, as [Root.ClickAt]
 // does, and reports whether the node is on screen.
-func (r *Root) Click[K comparable](id K) (tea.Cmd, bool) {
+func (r *Root) Click(id ID) (tea.Cmd, bool) {
 	f := r.r.frame
 	i := f.index(id)
 	if i < 0 || f.entries[i].vis.Empty() {

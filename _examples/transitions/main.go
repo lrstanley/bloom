@@ -26,12 +26,10 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// buttonID identifies the buttons that open dialogs.
-type buttonID int
-
+// The IDs of the buttons that open dialogs.
 const (
-	buttonIris buttonID = iota
-	buttonUnfold
+	buttonIris   bloom.ID = "iris"
+	buttonUnfold bloom.ID = "unfold"
 )
 
 type model struct {
@@ -160,7 +158,7 @@ func (m *model) dialog(title, text string) bloom.LayerNode {
 
 // center returns the middle of the node with the given id in frame, or the
 // zero point, which an iris takes to mean the middle of what it reveals.
-func center(f *bloom.Frame, id buttonID) image.Point {
+func center(f *bloom.Frame, id bloom.ID) image.Point {
 	r, ok := f.Rect(id)
 	if !ok {
 		return image.Point{}

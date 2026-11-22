@@ -16,7 +16,7 @@ import (
 )
 
 // previewID is the ID of the outline showing where a window would snap.
-type previewID struct{}
+var previewID = bloom.NewID("snap-preview")
 
 // Layers returns the windows as layers of the desktop's overlay, in the
 // order they stack in, with the window in front last.
@@ -28,7 +28,7 @@ func (m *Manager) Layers() []bloom.LayerNode {
 			// The outline of where a window would snap goes beneath the window
 			// in front, which is the one being dragged.
 			layers = append(layers, bloom.Layer(bloom.Box(m.st.Outline, bloom.Space())).
-				ID(previewID{}).Transparent().Place(m.target).
+				ID(previewID).Transparent().Place(m.target).
 				Presence(m.preview, fx.Fade{}))
 		}
 		layers = append(layers, m.window(w, w == top))
@@ -61,7 +61,7 @@ func (m *Manager) window(w *Window, focused bool) bloom.LayerNode {
 		Edge(bloom.Top, bloom.End, m.button("−", m.st.CtlOver, func() tea.Cmd { return m.Minimize(w) })).
 		Edge(bloom.Top, bloom.Stretch, bar).
 		EdgeAt(bloom.Bottom, -1, bloom.Text("◢").Style(gr).HoverStyle(m.st.Corner).On(m.resizer(w)))
-	if w.Scroll != nil {
+	if w.Scroll != "" {
 		box = box.Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(w.Scroll).
 			Style(bloom.ScrollbarStyle{ThumbStyle: gr, TrackStyle: gr}))
 	}

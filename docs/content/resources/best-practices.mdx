@@ -77,8 +77,8 @@ them is a working reference.
   later update, and Bubble Tea runs commands at the same time, so two messages from one gesture can arrive in either
   order. When the model must act within the same update, such as a select that closes the others before the next
   key arrives, give the component a function from the model to call instead.
-- **Give each instance its own IDs.** Have the parent give a component an ID, and build the IDs of its parts from
-  it, so two instances on one screen don't clash. See
+- **Give each instance its own IDs.** Have a component make its ID with `bloom.NewID` when it's made, and build the
+  IDs of its parts from it with `Sub`, so two instances on one screen don't clash. See
   [Give each instance its own IDs](/bubble-tea/writing-components#give-each-instance-its-own-ids).
 - **Route keys to components yourself.** bloom routes the mouse to nodes, but keys only reach the model's `Update`.
   Give a component an `Update` of its own, and call it while the component has the focus. See
@@ -176,11 +176,13 @@ them is a working reference.
 
 ## Use IDs where something needs to find a node
 
-- **Use a type of your own for IDs.** IDs compare by type and value, so `"save"` and `control("save")` are
-  different IDs, and a `Focus` moves only between nodes whose IDs have its type. Give each node a constant. See
-  [IDs](/concepts/how-a-program-runs#ids).
+- **Keep IDs from clashing.** Two names picked by hand can be the same, such as a dialog and its button both
+  called `"confirm"`. Make IDs that are never shown, such as focus scopes, with `bloom.NewID`, and the IDs of their
+  parts with `id.Sub(part)`. Keep constants for IDs you show or type in tests. See
+  [Keep IDs apart](/concepts/how-a-program-runs#keep-ids-apart).
 - **Keep IDs unique within a frame.** Lookups find the first match, and focus, layout animation, and the mouse
-  can't tell two nodes with one ID apart. `bloom.Debug` marks a repeated ID as `duplicate`.
+  can't tell two nodes with one ID apart. `bloom.Debug` marks a repeated ID as `duplicate`, and a test that draws
+  one panics.
 - **Give an ID only where it's needed.** A node needs one to take focus, to be found with `Rect`, to animate, to be
   anchored to, or to have a scrollbar follow it. Handlers don't need one. Tie the ID to the item, not to its
   position, so it follows the item when the list is sorted.

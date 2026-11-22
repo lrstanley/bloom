@@ -77,7 +77,7 @@ func TestReaderMinimum(t *testing.T) {
 
 [`bloom.Debug`](https://pkg.go.dev/bloomfx.dev/bloom#Debug) lays out a tree as `Solve` does and returns it as text,
 a node to a line, with each node's ID, where it went, and whether it was collapsed or cut off. Log it when a test
-fails. IDs show as their type and value, so this layout's `pane` is a string type:
+fails:
 
 ```go
 if r.Dx() < 40 {
@@ -89,11 +89,11 @@ if r.Dx() < 40 {
 Column 0,0 60x20
 ├─ Fill 0,0 60x19
 │  └─ Row 0,0 60x19
-│     ├─ Fixed(24) id=main.pane(sidebar) hidden collapsible=1
+│     ├─ Fixed(24) id="sidebar" hidden collapsible=1
 │     │  └─ Text "Groceries" hidden
-│     └─ Fill id=main.pane(reader) 0,0 60x19 min=40
+│     └─ Fill id="reader" 0,0 60x19 min=40
 │        └─ Text "reader" 0,0 60x19
-└─ Text "save" id=main.pane(save) 0,19 60x1
+└─ Text "save" id="save" 0,19 60x1
 ```
 
 Its format may change between versions, so read it rather than asserting on it. Use `Solve` for anything a test

@@ -10,20 +10,18 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// action is the ID of a toolbar button, which focus moves between.
-type action string
-
+// The IDs of the toolbar buttons, which focus moves between.
 const (
-	actionRefresh  action = "refresh"
-	actionDeploy   action = "deploy"
-	actionRollback action = "rollback"
-	actionStop     action = "stop"
-	actionSettings action = "settings"
+	actionRefresh  bloom.ID = "refresh"
+	actionDeploy   bloom.ID = "deploy"
+	actionRollback bloom.ID = "rollback"
+	actionStop     bloom.ID = "stop"
+	actionSettings bloom.ID = "settings"
 )
 
 // toolButton is a button of the toolbar: its icon, and its tooltip.
 type toolButton struct {
-	id   action
+	id   bloom.ID
 	icon string
 	tip  string
 	opts []bloom.TipOption
@@ -41,9 +39,9 @@ var tools = []toolButton{
 // was done last. The model builds it each frame.
 type toolbar struct {
 	st    *styles
-	focus *bloom.Focus[action] // the model's, which moves along the buttons
+	focus *bloom.Focus // the model's, which moves along the buttons
 	note  string
-	press func(id action) tea.Cmd // runs the button with ID id
+	press func(id bloom.ID) tea.Cmd // runs the button with ID id
 }
 
 func (b toolbar) Layout(bloom.Context) bloom.Child {

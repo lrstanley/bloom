@@ -18,7 +18,7 @@ import (
 // paneSizes are how wide the panes are: fixed, or sharing the width by
 // weight down to a minimum. Those with a priority collapse as the terminal
 // narrows, the lowest first.
-var paneSizes = map[paneID]struct {
+var paneSizes = map[bloom.ID]struct {
 	fixed    int
 	grow     int
 	min      int
@@ -39,10 +39,6 @@ var glide = anim.Spring(14, 0.85)
 // take off from where they were and land where they go, over this long.
 var flight = []anim.Option{anim.Duration(800 * time.Millisecond), anim.Ease(anim.Linear)}
 
-// titleID is the ID of a pane's title, by which bloom follows the drag of
-// it as the pane moves from the row to its own layer.
-type titleID paneID
-
 // dragLayer floats the dragged pane under the pointer, held where it was
 // grabbed, over a shadow. It has the pane's ID, so it carries on from where
 // the pane was, and the pane carries on from it when dropped.
@@ -60,7 +56,7 @@ func (m *model) dragLayer() bloom.LayerNode {
 // slot is pane id's place in the row: sharing the width, all of it while
 // zoomed, or none while another pane is. While the pane is dragged, its
 // place is left empty, for the other panes to fly into as they move.
-func (m *model) slot(id paneID) bloom.SlotNode {
+func (m *model) slot(id bloom.ID) bloom.SlotNode {
 	if id == m.dragging {
 		size := paneSizes[id]
 		return bloom.Grow(size.grow, nil).Min(size.min)
@@ -87,7 +83,7 @@ func (m *model) slot(id paneID) bloom.SlotNode {
 
 // pane boxes the pane's content under its title, which, except for the
 // sidebar's, can be dragged to move the pane, and double clicked to zoom.
-func (m *model) pane(id paneID) bloom.Child {
+func (m *model) pane(id bloom.ID) bloom.Child {
 	var body bloom.Child
 	switch id {
 	case paneTints:
@@ -108,7 +104,9 @@ func (m *model) pane(id paneID) bloom.Child {
 
 	head := bloom.Text(string(id)).Style(title)
 	if id != paneTints {
-		head = bloom.Text("⠿ "+string(id)).Style(title).HoverStyle(m.st.grabbed).ID(titleID(id)).On(
+		// The title has an ID of its own, by which bloom follows the drag of
+		// it as the pane moves from the row to its own layer.
+		head = bloom.Text("⠿ "+string(id)).Style(title).HoverStyle(m.st.grabbed).ID(id.Sub("title")).On(
 			on.Drag(func(e on.Event) tea.Cmd { return m.drag(id, e) }),
 			on.DoubleClick(func() tea.Cmd { return m.zoom(id) }),
 		)
@@ -120,7 +118,7 @@ func (m *model) pane(id paneID) bloom.Child {
 // under the pointer, and moves its place in the row to wherever the pointer
 // is. The other panes glide out of the way, and when it is dropped, it
 // glides into its place.
-func (m *model) drag(id paneID, e on.Event) tea.Cmd {
+func (m *model) drag(id bloom.ID, e on.Event) tea.Cmd {
 	if e.Done {
 		m.dragging = ""
 		return nil
@@ -138,7 +136,7 @@ func (m *model) drag(id paneID, e on.Event) tea.Cmd {
 	// The pane goes after the last of the others on screen whose middle the
 	// pointer is past, or before the first on screen if it is past none, so
 	// panes collapsed out of sight keep their places around it.
-	others := slices.DeleteFunc(slices.Clone(m.order), func(p paneID) bool { return p == id })
+	others := slices.DeleteFunc(slices.Clone(m.order), func(p bloom.ID) bool { return p == id })
 	i, placed := slices.Index(m.order, id), false
 	for j, p := range others {
 		r, ok := m.ui.Frame().Rect(p)
@@ -155,7 +153,7 @@ func (m *model) drag(id paneID, e on.Event) tea.Cmd {
 }
 
 // zoom gives pane id the full width, or gives the others theirs back.
-func (m *model) zoom(id paneID) tea.Cmd {
+func (m *model) zoom(id bloom.ID) tea.Cmd {
 	m.zooming = true
 	if m.zoomed == id {
 		m.zoomed = ""

@@ -82,7 +82,7 @@ var dialogs = []backdrop{
 		name:  "Spotlight",
 		about: "fx.Spotlight dims everything but the panel, with a\nsoft edge.",
 		effects: func(m *model) []fx.Effect {
-			r, ok := m.ui.Frame().Rect(panelID{})
+			r, ok := m.ui.Frame().Rect(panelID)
 			if !ok {
 				return nil
 			}
