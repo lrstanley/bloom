@@ -16,7 +16,8 @@ import (
 func TestFonts(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("fig-fonts", 110, 30)...)
+	m := newModel()
+	h := steep.NewHarness(t, m, demo.Options("fig-fonts", 110, 30)...)
 	h.Wait("› standard").Wait("column paint").Sleep(demo.Hold(900 * time.Millisecond))
 
 	// The paints, on the standard font.
@@ -44,7 +45,7 @@ func TestFonts(t *testing.T) {
 	h.Key("up").Wait("› smslant").Sleep(demo.Hold(600 * time.Millisecond))
 	h.Key("q")
 	h.WaitFinished()
-	if m := h.FinalModelAs[*model](); m.font != standard-1 || m.paint != len(paints)-1 {
+	if m.font != standard-1 || m.paint != len(paints)-1 {
 		t.Fatalf("font %d, paint %d, want %d and %d", m.font, m.paint, standard-1, len(paints)-1)
 	}
 }

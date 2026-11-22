@@ -15,7 +15,8 @@ import (
 func TestMission(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("fig-mission", 100, 24)...)
+	m := newModel()
+	h := steep.NewHarness(t, m, demo.Options("fig-mission", 100, 24)...)
 	demo.ResizeInBand(t, h)
 	h.Wait("header: ansi-compact").Sleep(demo.Hold(1500 * time.Millisecond))
 
@@ -38,7 +39,7 @@ func TestMission(t *testing.T) {
 
 	h.Key("q")
 	h.WaitFinished()
-	if m := h.FinalModelAs[*model](); m.version != 43 || m.opaque {
+	if m.version != 43 || m.opaque {
 		t.Fatalf("version %d, opaque %v, want 43 and transparent", m.version, m.opaque)
 	}
 }

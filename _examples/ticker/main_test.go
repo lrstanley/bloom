@@ -15,7 +15,8 @@ import (
 func TestTicker(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("ticker", 56, 14)...)
+	m := newModel()
+	h := steep.NewHarness(t, m, demo.Options("ticker", 56, 14)...)
 
 	// Long names are cut off. The selected one waits a moment, then scrolls.
 	h.Wait("markets").Wait("Globex International Holdings G…").Wait("Stark Industries Advanced Resea…")
@@ -41,7 +42,7 @@ func TestTicker(t *testing.T) {
 
 	h.Key("q")
 	h.WaitFinished()
-	if got := h.FinalModelAs[*model]().selected; got != 2 {
+	if got := m.selected; got != 2 {
 		t.Fatalf("selected = %d after clicking the third row, want 2", got)
 	}
 }

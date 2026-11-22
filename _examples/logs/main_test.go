@@ -22,7 +22,8 @@ func init() { clip.Native = false }
 func TestLogs(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("logs", 110, 24, effects.Mouse())...)
+	m := newModel()
+	h := steep.NewHarness(t, m, demo.Options("logs", 110, 24, effects.Mouse())...)
 
 	// It starts at the end, following the lines as they are added.
 	h.Wait("server.log").Wait("· following").Wait("250001 lines").Wait("250003 lines").Sleep(demo.Hold(600 * time.Millisecond))
@@ -72,7 +73,7 @@ func TestLogs(t *testing.T) {
 	h.Key("q")
 	h.WaitFinished()
 
-	if m := h.FinalModelAs[*model](); !m.pos.AtEnd() || m.log.Len() <= preloaded {
+	if !m.pos.AtEnd() || m.log.Len() <= preloaded {
 		t.Fatalf("finished at %+v with %d lines", m.pos, m.log.Len())
 	}
 }

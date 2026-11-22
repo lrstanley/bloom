@@ -17,7 +17,8 @@ import (
 func TestLetters(t *testing.T) {
 	t.Parallel()
 
-	h := steep.NewHarness(t, newModel(), demo.Options("fig-letters", 112, 20, effects.Mouse())...)
+	m := newModel()
+	h := steep.NewHarness(t, m, demo.Options("fig-letters", 112, 20, effects.Mouse())...)
 
 	// The title is revealed from the middle out, as the clock ticks.
 	h.Wait(" 1/5 ").Sleep(2500 * time.Millisecond)
@@ -43,7 +44,6 @@ func TestLetters(t *testing.T) {
 
 	h.Key("q")
 	h.WaitFinished()
-	m := h.FinalModelAs[*model]()
 	if m.word != 3 || m.clicks != 1 || !m.paused {
 		t.Fatalf("word %d, clicks %d, paused %v, want 3, 1, and paused", m.word, m.clicks, m.paused)
 	}
