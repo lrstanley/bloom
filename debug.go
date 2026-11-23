@@ -60,7 +60,7 @@ func (e *engine) debugTree(sb *strings.Builder, i int, clip image.Rectangle, lea
 	b := &e.boxes[i]
 	kind, attrs := debugNode(b.child)
 	sb.WriteString(lead + kind)
-	if id := b.meta.id; id != "" {
+	if id := b.meta.id; !id.IsZero() {
 		sb.WriteString(" id=" + debugID(id))
 		if ids[id] {
 			sb.WriteString(" duplicate")

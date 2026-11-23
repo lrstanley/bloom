@@ -203,7 +203,7 @@ func (e *engine) build(c Child, parent, slot int) int {
 	default:
 		b.laid = own || !builtin
 	}
-	if b.meta.id != "" {
+	if !b.meta.id.IsZero() {
 		// The nodes in one with an ID are known by where they are in it,
 		// rather than in the whole tree, so that they stay the same nodes as
 		// it moves, such as a layer brought to the front: a click on one goes
@@ -719,7 +719,7 @@ func (e *engine) arrange(i int, r image.Rectangle) {
 	if i < 0 {
 		return
 	}
-	if n, ok := e.boxes[i].child.(SlotNode); ok && e.motion != nil && n.id != "" && n.animation != nil {
+	if n, ok := e.boxes[i].child.(SlotNode); ok && e.motion != nil && !n.id.IsZero() && n.animation != nil {
 		r = e.animate(i, n.id, n.animation, n.moves, r)
 		defer func(at image.Point) { e.moved = at }(e.moved)
 		e.moved = r.Min
@@ -846,7 +846,7 @@ func (e *engine) lastRect(id ID) (image.Rectangle, bool) {
 		// Backward, so that the first of a duplicated ID is the one, as for
 		// Frame.Rect.
 		for i := len(f.entries) - 1; i >= 0; i-- {
-			if en := &f.entries[i]; en.id != "" {
+			if en := &f.entries[i]; !en.id.IsZero() {
 				e.seedAt[en.id] = en.rect
 			}
 		}

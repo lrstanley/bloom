@@ -201,7 +201,7 @@ func (m *model) layout() bloom.Child {
 		bloom.Text(hints).Style(m.st.muted).Truncate(),
 	))
 	layers := []bloom.LayerNode{m.toast.Layer(), m.tour.Layer(m.ui.Frame())}
-	if m.dragging != "" {
+	if !m.dragging.IsZero() {
 		layers = append([]bloom.LayerNode{m.dragLayer()}, layers...)
 	}
 	return bloom.Overlay(screen, layers...)

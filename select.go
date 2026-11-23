@@ -425,7 +425,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 		// A leaf is known by where it is in the selected node, rather than
 		// in the tree, so that the selection stays on it as the node moves.
 		key := nodeKey{path: path}
-		if b.meta.id != "" {
+		if !b.meta.id.IsZero() {
 			key = nodeKey{id: b.meta.id}
 		}
 		l := selLeaf{key: key, box: i, rect: b.rect, clip: vis, inner: inner}
@@ -465,7 +465,7 @@ func (r *renderer) collectLeaves(i int, clip image.Rectangle, path uint64, inner
 	case ViewportNode:
 		if l := r.viewportOf(i); l != nil && !inner {
 			key := nodeKey{path: path}
-			if b.meta.id != "" {
+			if !b.meta.id.IsZero() {
 				key = nodeKey{id: b.meta.id}
 			}
 			rect, shown := viewportLeaf(l, vis)

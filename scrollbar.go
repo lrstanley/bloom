@@ -234,7 +234,7 @@ func viewportScrollbar(n ScrollbarNode, vp ViewportNode, v ViewportView) Scrollb
 // paintScrollbar adds the ops for scrollbar n, box b at index i, clipped to
 // clip, and the entry its mouse handler needs, under entry parent.
 func (r *renderer) paintScrollbar(i int, b *box, n ScrollbarNode, clip image.Rectangle, parent int) {
-	if n.of != "" {
+	if !n.of.IsZero() {
 		var ok bool
 		if n, ok = r.scrollbarOf(n); !ok {
 			return

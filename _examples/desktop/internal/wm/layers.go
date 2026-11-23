@@ -61,7 +61,7 @@ func (m *Manager) window(w *Window, focused bool) bloom.LayerNode {
 		Edge(bloom.Top, bloom.End, m.button("−", m.st.CtlOver, func() tea.Cmd { return m.Minimize(w) })).
 		Edge(bloom.Top, bloom.Stretch, bar).
 		EdgeAt(bloom.Bottom, -1, bloom.Text("◢").Style(gr).HoverStyle(m.st.Corner).On(m.resizer(w)))
-	if w.Scroll != "" {
+	if !w.Scroll.IsZero() {
 		box = box.Edge(bloom.Right, bloom.Stretch, bloom.ScrollbarOf(w.Scroll).
 			Style(bloom.ScrollbarStyle{ThumbStyle: gr, TrackStyle: gr}))
 	}

@@ -45,7 +45,7 @@ func TestFocus(t *testing.T) {
 
 	r.Render(20, 5, focusTree(true))
 	f.Push("dialog")
-	if f.Current() != "" || f.Scope() != "dialog" {
+	if !f.Current().IsZero() || f.Scope() != "dialog" {
 		t.Fatal("Push did not clear the focus")
 	}
 	for _, want := range []ID{"ok", "cancel", "ok"} {
@@ -91,7 +91,7 @@ func TestFocusAll(t *testing.T) {
 	r.Render(30, 1, tree)
 
 	var f Focus
-	if id := f.Current(); id != "" || f.Is("") {
+	if id := f.Current(); !id.IsZero() || f.Is("") {
 		t.Fatalf("a zero Focus has %q focused", id)
 	}
 	for _, want := range []ID{"name", "ok", "email", "name"} {
@@ -101,7 +101,7 @@ func TestFocusAll(t *testing.T) {
 		}
 	}
 	f.Set("")
-	if f.Current() != "" {
+	if !f.Current().IsZero() {
 		t.Fatalf("Set(\"\") left %q focused", f.Current())
 	}
 }
@@ -117,6 +117,21 @@ func TestNewID(t *testing.T) {
 	}
 	if got := ID("tabs").Sub(2); got != "tabs/2" {
 		t.Fatalf("Sub(2) = %q", got)
+	}
+}
+
+// TestIDIsZero checks that only the empty ID is zero.
+func TestIDIsZero(t *testing.T) {
+	t.Parallel()
+
+	var zero ID
+	if !zero.IsZero() || !ID("").IsZero() {
+		t.Fatal("the empty ID is not zero")
+	}
+	for _, id := range []ID{"a", NewID("a"), zero.Sub(0), ID(" ")} {
+		if id.IsZero() {
+			t.Fatalf("%q is zero", id)
+		}
 	}
 }
 
@@ -278,7 +293,7 @@ func TestFocusPicksCursor(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var f Focus
-			if tt.focus != "" {
+			if !tt.focus.IsZero() {
 				f.Set(tt.focus)
 			}
 			got := New(WithFocus(&f)).View(10, 2, tt.tree).Cursor

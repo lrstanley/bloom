@@ -654,7 +654,7 @@ func (r *Root) fireTip() tea.Cmd {
 // tooltip and is on screen, or -1.
 func (r *Root) focusedTip(f *Frame) int {
 	id := r.r.focus.Current()
-	if id == "" {
+	if id.IsZero() {
 		return -1
 	}
 	if i := f.index(id); i >= 0 && !f.entries[i].vis.Empty() {

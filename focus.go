@@ -50,7 +50,7 @@ type focusScope struct {
 func (f *Focus) Current() ID { return f.current }
 
 // Is reports whether the node with ID id is focused.
-func (f *Focus) Is(id ID) bool { return id != "" && f.current == id }
+func (f *Focus) Is(id ID) bool { return !id.IsZero() && f.current == id }
 
 // Set focuses the node with ID id. Setting "" clears the focus.
 func (f *Focus) Set(id ID) { f.current = id }
@@ -87,7 +87,7 @@ func (f *Focus) Scope() ID {
 // Within reports whether the focused node is inside the scope with ID scope
 // in frame.
 func (f *Focus) Within(frame *Frame, scope ID) bool {
-	if f.current == "" {
+	if f.current.IsZero() {
 		return false
 	}
 	i := frame.index(f.current)
@@ -147,11 +147,11 @@ func (f *Focus) click(frame *Frame, chain []int) {
 // focused, has an ID, is on screen, and is inside the innermost scope pushed.
 func (f *Focus) focusable(frame *Frame, i int) bool {
 	e := &frame.entries[i]
-	if e.id == "" || !e.focusable || e.vis.Empty() {
+	if e.id.IsZero() || !e.focusable || e.vis.Empty() {
 		return false
 	}
 	scope := f.Scope()
-	return scope == "" || frame.inScope(i, scope)
+	return scope.IsZero() || frame.inScope(i, scope)
 }
 
 // Update handles tab and shift+tab, which move the focus, and enter and

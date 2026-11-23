@@ -41,7 +41,7 @@ type nodeKey struct {
 }
 
 func (b *box) key() nodeKey {
-	if b.meta.id != "" {
+	if !b.meta.id.IsZero() {
 		return nodeKey{id: b.meta.id}
 	}
 	return nodeKey{path: b.path}
@@ -83,7 +83,7 @@ func (r *renderer) addEntry(i int, vis, clip image.Rectangle, parent int) int {
 // text is its tooltip, is given one as it is painted, once it is known to
 // be cut; see [renderer.noteCut].
 func (r *renderer) hasEntry(b *box) bool {
-	return b.meta.id != "" || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable ||
+	return !b.meta.id.IsZero() || b.modal || len(b.meta.handlers) > 0 || b.meta.hover != nil || b.meta.selectable ||
 		(r.tipsOn && b.meta.tip != nil)
 }
 
@@ -203,7 +203,7 @@ func (f *Frame) Hit(x, y int) []ID {
 	chain, _ := f.under(image.Pt(x, y), nil)
 	var path []ID
 	for _, i := range slices.Backward(chain) {
-		if id := f.entries[i].id; id != "" {
+		if id := f.entries[i].id; !id.IsZero() {
 			path = append(path, id)
 		}
 	}
@@ -280,7 +280,7 @@ func checkIDs(entries []entry) {
 	var seen map[ID]bool
 	for i := range entries {
 		e := &entries[i]
-		if e.id == "" || e.leaving {
+		if e.id.IsZero() || e.leaving {
 			continue
 		}
 		if seen == nil {
@@ -309,7 +309,7 @@ func findKey(entries []entry, k nodeKey) int {
 // inScope reports whether entry i is inside the scope with ID scope. No
 // entry is inside the empty ID, which a modal layer without an ID has.
 func (f *Frame) inScope(i int, scope ID) bool {
-	if scope == "" {
+	if scope.IsZero() {
 		return false
 	}
 	for ; i >= 0; i = f.entries[i].parent {
@@ -323,7 +323,7 @@ func (f *Frame) inScope(i int, scope ID) bool {
 // nearestID returns the ID of entry i, or of its nearest ancestor with one.
 func (f *Frame) nearestID(i int) ID {
 	for ; i >= 0; i = f.entries[i].parent {
-		if id := f.entries[i].id; id != "" {
+		if id := f.entries[i].id; !id.IsZero() {
 			return id
 		}
 	}
@@ -332,7 +332,7 @@ func (f *Frame) nearestID(i int) ID {
 
 // index returns the entry with ID id, or -1.
 func (f *Frame) index(id ID) int {
-	if f != nil && id != "" {
+	if f != nil && !id.IsZero() {
 		for i := range f.entries {
 			if f.entries[i].id == id {
 				return i

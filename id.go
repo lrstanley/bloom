@@ -35,8 +35,12 @@ import (
 //	bloom.Fixed(24, m.sidebar).ID("sidebar")
 //	m.ui.Click("sidebar")
 //
-// The empty ID is no ID.
+// The empty ID is no ID; [ID.IsZero] reports it.
 type ID string
+
+// IsZero reports whether id is the empty ID, the zero value of ID, which
+// names no node.
+func (id ID) IsZero() bool { return id == "" }
 
 // ids counts the IDs made by NewID.
 var ids atomic.Uint64

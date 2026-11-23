@@ -65,14 +65,14 @@ func (m *model) slot(id bloom.ID) bloom.SlotNode {
 	pane, size := m.pane(id), paneSizes[id]
 	s := bloom.Fill(pane)
 	switch {
-	case m.zoomed == "" && size.fixed > 0:
+	case m.zoomed.IsZero() && size.fixed > 0:
 		s = bloom.Fixed(size.fixed, pane)
-	case m.zoomed == "":
+	case m.zoomed.IsZero():
 		s = bloom.Grow(size.grow, pane).Min(size.min)
 	case m.zoomed != id:
 		s = bloom.Fixed(0, pane)
 	}
-	if m.zoomed == "" && size.collapse > 0 {
+	if m.zoomed.IsZero() && size.collapse > 0 {
 		s = s.Collapsible(size.collapse)
 	}
 	if id == paneTints || m.zooming {
@@ -123,10 +123,10 @@ func (m *model) drag(id bloom.ID, e on.Event) tea.Cmd {
 		m.dragging = ""
 		return nil
 	}
-	if m.dragging == "" {
+	if m.dragging.IsZero() {
 		// A press is not a drag until the pointer moves.
 		r, ok := m.ui.Frame().Rect(id)
-		if !ok || m.zoomed != "" || e.Screen == e.Start {
+		if !ok || !m.zoomed.IsZero() || e.Screen == e.Start {
 			return nil
 		}
 		m.dragging, m.grab, m.size, m.zooming = id, e.Start.Sub(r.Min), r.Size(), false

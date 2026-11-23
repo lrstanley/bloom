@@ -897,7 +897,7 @@ func (r *renderer) rankCursor(i, parent int) cursorRank {
 		if !e.focusable {
 			continue
 		}
-		if e.id != "" {
+		if !e.id.IsZero() {
 			if r.focus.Is(e.id) {
 				return cursorFocused
 			}

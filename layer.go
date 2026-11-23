@@ -62,7 +62,7 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 	}
 
 	lr := image.Rectangle{Min: at, Max: at.Add(image.Pt(w, h))}
-	if e.motion != nil && n.id != "" && n.animation != nil {
+	if e.motion != nil && !n.id.IsZero() && n.animation != nil {
 		lr = e.animate(i, n.id, n.animation, n.moves, lr)
 		defer func(at image.Point) { e.moved = at }(e.moved)
 		e.moved = lr.Min
@@ -96,7 +96,7 @@ func (e *engine) rectOf(id ID) (image.Rectangle, bool) {
 // shown returns the index of the box with ID id, if some of it is on screen,
 // or -1, as for the empty ID, which is no box's.
 func (e *engine) shown(id ID) int {
-	if id == "" {
+	if id.IsZero() {
 		return -1
 	}
 	for i := range e.boxes {

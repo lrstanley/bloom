@@ -192,7 +192,7 @@ func (n TextNode) glyphwise() bool {
 
 // wrapped gives a tree of layers the node's ID and handlers.
 func (n TextNode) wrapped(c bloom.Child) bloom.Child {
-	if n.id == "" && len(n.handlers) == 0 {
+	if n.id.IsZero() && len(n.handlers) == 0 {
 		return c
 	}
 	return bloom.Auto(c).ID(n.id).On(n.handlers...)
@@ -265,7 +265,7 @@ func (n TextNode) layer(f *Figure, i int, rest bool, key glyphKey, t float64, ef
 	if len(effects) > 0 {
 		l = l.Transition(t, effects...)
 	}
-	if n.id != "" {
+	if !n.id.IsZero() {
 		l = l.ID(glyphID(n.id, key))
 	}
 	if n.animate {

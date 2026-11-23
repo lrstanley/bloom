@@ -144,7 +144,7 @@ func (m *model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case "q", "ctrl+c":
 		return tea.Quit
 	case "s":
-		if m.focus.Scope() == "" {
+		if m.focus.Scope().IsZero() {
 			return m.openSettings()
 		}
 	case "esc":
