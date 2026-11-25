@@ -76,11 +76,11 @@ const gallery: Example[] = [
         body: "Focusable inputs with an autocomplete dropdown, then stacked modal dialogs over a recolored backdrop.",
     },
     {
-        name: "dashboard",
+        name: "sandbox",
         width: 1420,
-        height: 887,
-        alt: "The dashboard example: selecting services, a restart dialog over a dimmed backdrop, toasts, the sidebar springing shut and open, and panels collapsing as the terminal narrows",
-        body: "Services, a restart dialog, toasts, and a sidebar that springs shut, drawn at 120 frames a second.",
+        height: 987,
+        alt: "The sandbox example: rainbow sand poured over stone ledges, a stone dam with water behind it, lava hardening to stone where it meets the water, a hole erased in the dam that the water floods out of, then a rain of everything, with meters and a frame time graph beside it",
+        body: "A falling-sand toy painted cell by cell with a Drawable, with gravity, drawn at 120 frames a second.",
     },
     {
         name: "logs",
