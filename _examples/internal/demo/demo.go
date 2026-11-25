@@ -30,7 +30,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// look is the margin a tour's window is framed on: a linear gradient, angle
+// look is the backdrop a tour's window is framed on: a linear gradient, angle
 // degrees clockwise from up, with a drop shadow under the window.
 type look struct {
 	angle  float64
@@ -91,7 +91,8 @@ func Options(name string, w, h int, extra ...reel.Effect) []steep.Option {
 				render.WithPadding(10),
 				// The margin is as wide as the shadow's offset and blur together, so
 				// the image's edge doesn't cut the shadow off.
-				render.WithMarginGradient(40, frame.angle, frame.colors...),
+				render.WithMargin(40),
+				render.WithBackdrop(render.LinearGradient(frame.angle, frame.colors...)),
 				render.WithShadow(0, 12, 28, frame.shadow),
 				render.WithBorderRadius(10),
 			},
