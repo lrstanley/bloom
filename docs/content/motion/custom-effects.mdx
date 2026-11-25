@@ -1,6 +1,6 @@
 ---
 title: Custom effects
-description: Write your own cell effects with the fx.Effect interface and canvas.Surface, and draw directly onto cells with Drawable.
+description: Write your own cell effects with the fx.Effect interface and canvas.Surface.
 ---
 
 An effect is anything with an `Apply` method:
@@ -149,51 +149,9 @@ To move a whole node in a straight line, set `Offset` instead, as `fx.Slide` doe
 
 ## Draw directly with Drawable
 
-An effect transforms cells that something else drew. To paint cells yourself, such as a chart, a meter, or a
-game board, implement [Ultraviolet](https://github.com/charmbracelet/ultraviolet)'s `Drawable` interface and place it
-with [`bloom.Drawable`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable):
-
-```go
-import (
-	"image/color"
-
-	uv "github.com/charmbracelet/ultraviolet"
-)
-
-// meter fills a fraction of its area, from the left.
-type meter struct {
-	value float64 // from 0 to 1
-	color color.Color
-}
-
-func (m meter) Draw(scr uv.Screen, area uv.Rectangle) {
-	filled := area.Min.X + int(m.value*float64(area.Dx()))
-	for y := area.Min.Y; y < area.Max.Y; y++ {
-		for x := area.Min.X; x < area.Max.X; x++ {
-			glyph := "░"
-			if x < filled {
-				glyph = "█"
-			}
-			scr.SetCell(x, y, &uv.Cell{Content: glyph, Width: 1, Style: uv.Style{Fg: m.color}})
-		}
-	}
-}
-```
-
-```go
-bloom.Row(
-	bloom.Text("cpu "),
-	bloom.Fill(bloom.Drawable(meter{value: m.cpu, color: lipgloss.Color("#eb6f92")})),
-)
-```
-
-```
-cpu ████████░░░░░░░░░░░░
-```
-
-The drawable is clipped to the area it's given. Its natural size is zero unless it also implements
-[`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer), so give it a sized slot such as `Fill` or
-`Fixed`.
+An effect changes cells that something else drew. To paint cells yourself, such as a chart, a meter, or a game
+board, implement Ultraviolet's `Drawable` interface and place it with
+[`bloom.Drawable`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable). See [Drawing cells](/content/drawables).
 
 ## Related
 

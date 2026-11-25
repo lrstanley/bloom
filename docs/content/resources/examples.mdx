@@ -193,8 +193,20 @@ See also: [Boxes and borders](/content/borders#put-titles-and-more-on-a-border),
 
 Effects as looping transitions, two custom effects, and a `Drawable`.
 
-See also: [Effects reference](/reference/effects), [Custom effects](/motion/custom-effects).
+See also: [Effects reference](/reference/effects), [Custom effects](/motion/custom-effects),
+[Drawing cells](/content/drawables).
 [Source](https://github.com/lrstanley/bloom/tree/master/_examples/effects), or `go run ./effects`.
+
+## sandbox
+
+![The sandbox example: rainbow sand poured over stone ledges, a stone wall with water behind it, lava hardening to stone where it meets the water, then a rain of everything, with meters and a frame time graph beside it](/demos/sandbox.webp)
+
+A falling-sand toy: a `Drawable` paints a grid of pixels with half blocks, every cell, every frame. Pour rainbow
+sand, water, stone, and lava with the mouse, through handlers on the drawable. The world takes its size from the
+frame, a sidebar meters what a frame costs, and a second `Drawable` graphs the frame times.
+
+See also: [Drawing cells](/content/drawables).
+[Source](https://github.com/lrstanley/bloom/tree/master/_examples/sandbox), or `go run ./sandbox`.
 
 ## backdrops
 

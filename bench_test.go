@@ -654,3 +654,65 @@ func BenchmarkRenderTruncated(b *testing.B) {
 		})
 	}
 }
+
+// The Drawable benchmarks paint a whole 200×60 terminal from cells kept
+// outside the tree, as a terminal emulator embedded in an application would:
+// a uv.Buffer of half blocks in true color, every cell its own colors.
+
+// benchCellBuffer returns a w×h buffer of half blocks, colored by a
+// gradient shifted by frame.
+func benchCellBuffer(w, h, frame int) *uv.Buffer {
+	buf := uv.NewBuffer(w, h)
+	for y := range h {
+		for x := range w {
+			buf.SetCell(x, y, &uv.Cell{Content: "▀", Width: 1, Style: uv.Style{
+				Fg: color.RGBA{R: uint8(x + frame), G: uint8(2 * y), B: uint8(x * y), A: 0xff},
+				Bg: color.RGBA{R: uint8(x), G: uint8(2*y + 1 + frame), B: uint8(x + y), A: 0xff},
+			}})
+		}
+	}
+	return buf
+}
+
+// BenchmarkRenderDrawable draws a full screen buffer as a Drawable, the same
+// one every frame and a different one every frame, and for comparison, the
+// same cells as a View's string, which bloom parses, and keeps parsed while
+// it is asked for. A changing string is one of more strings than bloom keeps
+// parsed, so each frame parses one.
+func BenchmarkRenderDrawable(b *testing.B) {
+	bufs := [2]*uv.Buffer{benchCellBuffer(benchW, benchH, 0), benchCellBuffer(benchW, benchH, 1)}
+	strs := make([]benchView, 32)
+	for i := range strs {
+		strs[i] = benchView{s: benchCellBuffer(benchW, benchH, i).Render()}
+	}
+	for _, tt := range []struct {
+		name string
+		tree func(i int) Child
+	}{
+		{"drawable unchanged", func(int) Child { return Drawable(bufs[0]) }},
+		{"drawable changed", func(i int) Child { return Drawable(bufs[i%2]) }},
+		{"view unchanged", func(int) Child { return View(strs[0]) }},
+		{"view changed", func(i int) Child { return View(strs[i%len(strs)]) }},
+	} {
+		b.Run(tt.name, func(b *testing.B) {
+			r := New(WithColors(color.White, color.Black))
+			b.ReportAllocs()
+			for i := 0; b.Loop(); i++ {
+				r.View(benchW, benchH, tt.tree(i))
+			}
+		})
+	}
+}
+
+// BenchmarkRenderUnchangedDrawable is BenchmarkRenderUnchanged with a row
+// beneath it holding a small Drawable that doesn't change either. bloom
+// can't tell whether a Drawable would draw the same cells, so the frame is
+// composited again.
+func BenchmarkRenderUnchangedDrawable(b *testing.B) {
+	r := New(WithColors(color.White, color.Black))
+	tree := Column(Fill(benchTree(3, 0, -1)), Fixed(1, Row(Text("load "), Fixed(20, Drawable(benchCellBuffer(20, 1, 0))))))
+	b.ReportAllocs()
+	for b.Loop() {
+		r.View(benchW, benchH, tree)
+	}
+}

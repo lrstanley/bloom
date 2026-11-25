@@ -1,0 +1,245 @@
+---
+title: Drawing cells
+description: Paint cells yourself with Drawable, for charts, meters, game boards, pixel art, and embedded screens, with sizing, mouse input, and what it costs.
+---
+
+Most nodes draw text. When what you show isn't text, such as a chart, a meter, a game board, pixel art, or the
+screen of a program you embed, paint the cells yourself: implement
+[Ultraviolet](https://github.com/charmbracelet/ultraviolet)'s `Drawable` interface, and place it with
+[`bloom.Drawable`](https://pkg.go.dev/bloomfx.dev/bloom#Drawable).
+
+The [sandbox example](https://github.com/lrstanley/bloom/tree/master/_examples/sandbox) is a falling-sand toy drawn
+this way, every cell, every frame, with a second drawable graphing how long its frames take:
+
+![The sandbox example: rainbow sand poured over stone ledges, a stone wall with water behind it, lava hardening to stone where it meets the water, then a rain of everything, with meters and a frame time graph beside it](/demos/sandbox.webp)
+
+## Write a drawable
+
+A drawable is anything with a `Draw` method:
+
+```go
+type Drawable interface {
+	Draw(scr uv.Screen, area uv.Rectangle)
+}
+```
+
+`scr` is the node's own cells, and `area` is all of them. Set cells with `scr.SetCell`. Here, a meter fills a
+fraction of its area from the left:
+
+```go
+import (
+	"image/color"
+
+	uv "github.com/charmbracelet/ultraviolet"
+)
+
+// meter fills a fraction of its area, from the left.
+type meter struct {
+	value float64 // from 0 to 1
+	color color.Color
+}
+
+func (m meter) Draw(scr uv.Screen, area uv.Rectangle) {
+	filled := area.Min.X + int(m.value*float64(area.Dx()))
+	cell := uv.Cell{Width: 1, Style: uv.Style{Fg: m.color}}
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			cell.Content = "░"
+			if x < filled {
+				cell.Content = "█"
+			}
+			scr.SetCell(x, y, &cell)
+		}
+	}
+}
+```
+
+```go
+bloom.Row(
+	bloom.Text("cpu "),
+	bloom.Fill(bloom.Drawable(meter{value: m.cpu, color: lipgloss.Color("#eb6f92")})),
+)
+```
+
+```
+cpu ████████░░░░░░░░░░░░
+```
+
+The drawable can't draw outside its node: cells set outside it are dropped, and a wide glyph that would cross its
+edge is drawn as blanks. A cell it sets replaces what's beneath it, background and all, and cells it doesn't set keep
+what's beneath them, such as the background of the box it's in, so an empty pixel of a game board can leave its
+cell alone for the box to show through.
+
+A [`uv.Buffer`](https://pkg.go.dev/github.com/charmbracelet/ultraviolet#Buffer) is a drawable already, so cells kept in
+one, such as the screen of an embedded terminal emulator, are placed with `bloom.Drawable(buf)`.
+
+## Size it
+
+A drawable has no natural size, so it gets nothing in a row or column unless a slot sizes it, such as `Fill`,
+`Fixed`, or `Percent`. To give it one, also implement
+[`bloom.Measurer`](https://pkg.go.dev/bloomfx.dev/bloom#Measurer). `Measure` gets the space there is, and returns
+what the drawable needs, which bloom clamps to that space. Return what it needs rather than `avail` itself, since a
+layout drawn at its natural size has unbounded space:
+
+```go
+// graph draws the last samples as bars, one column each.
+type graph struct{ samples []time.Duration }
+
+// Measure asks for a column for each sample, four rows tall.
+func (g graph) Measure(avail bloom.Size) bloom.Size {
+	return bloom.Size{W: len(g.samples), H: 4}
+}
+```
+
+Inside a slot, the slot's size wins, so `bloom.Fill(bloom.Drawable(graph{...}))` draws the graph as tall as the space
+left.
+
+## Keep its state in the model
+
+Build the drawable in your layout each frame, from the model, like any other node. A small value, such as the meter,
+can be the drawable itself. For a large one, such as a game board, give the drawable a pointer to the state, and
+change the state in `Update`. `Draw` runs while `View` draws the frame, so it should only read:
+
+```go
+type model struct {
+	ui    *bloom.Root
+	board *board // the cells of the game, which Update changes
+}
+
+func (m *model) layout() bloom.Child {
+	return bloom.Fill(bloom.Drawable(boardView{b: m.board}))
+}
+```
+
+`Draw` runs for every frame the drawable is in, so keep it from allocating. Reuse one `uv.Cell` for the cells you
+set, as the meter does, rather than taking the address of a new one for each. A color such as `color.RGBA{...}`
+allocates each time it's put in a `color.Color`, which `uv.Style` holds. Make the colors you draw
+with once, as `color.Color` values, and reuse them:
+
+```go
+// palette is made once, so drawing a frame doesn't allocate a color for each cell.
+var palette = []color.Color{
+	color.RGBA{R: 0xe0, G: 0xb0, B: 0x60, A: 0xff},
+	color.RGBA{R: 0x30, G: 0x70, B: 0xd0, A: 0xff},
+}
+```
+
+## Draw two pixels to a cell
+
+A terminal cell is about twice as tall as it is wide. The upper half block, `▀`, splits a cell into two square
+pixels: the top one in the cell's foreground, and the bottom one in its background. A grid of pixels drawn this way
+is twice as tall as the cells it fills:
+
+```go
+func (v boardView) Draw(scr uv.Screen, area uv.Rectangle) {
+	cell := uv.Cell{Width: 1}
+	for row := range area.Dy() {
+		for col := range area.Dx() {
+			x, y := area.Min.X+col, area.Min.Y+row
+			top, bottom := v.b.color(col, 2*row), v.b.color(col, 2*row+1) // nil for an empty pixel
+			if top == nil && bottom == nil {
+				continue // leave the cell as it is
+			}
+			if top == nil {
+				cell.Content, cell.Style = "▄", uv.Style{Fg: bottom, Bg: beneath(scr, x, y)}
+			} else {
+				if bottom == nil {
+					bottom = beneath(scr, x, y)
+				}
+				cell.Content, cell.Style = "▀", uv.Style{Fg: top, Bg: bottom}
+			}
+			scr.SetCell(x, y, &cell)
+		}
+	}
+}
+
+// beneath returns the background of the cell at x, y before it is set, such
+// as a box's, for an empty pixel to show.
+func beneath(scr uv.Screen, x, y int) color.Color {
+	if c := scr.CellAt(x, y); c != nil {
+		return c.Style.Bg
+	}
+	return nil
+}
+```
+
+A cell you set replaces the one beneath it, background and all, so a cell with one empty pixel takes the
+background beneath it from `scr.CellAt`, and paints it on the empty half. A pixel that's empty on top uses the lower
+half block, `▄`, with that background behind it.
+
+## Take the mouse
+
+A drawable takes an `ID`, mouse handlers with `On`, `Focusable`, and a `Tooltip`, like other nodes. A handler's
+event gives the pointer relative to the drawable's top-left cell, in `e.X` and `e.Y`, so it maps straight onto the
+drawable's own cells. Here, dragging over a board paints it, with two pixels to a cell:
+
+```go
+bloom.Drawable(boardView{b: m.board}).ID("board").On(
+	on.Drag(func(e on.Event) tea.Cmd {
+		m.board.paint(e.X, 2*e.Y)
+		return nil
+	}),
+)
+```
+
+For the pointer as it moves without a button down, add an [`on.Hover`](/input/mouse) handler, which turns on motion
+events, and read them with `on.Mouse`.
+
+## Read its size in Update
+
+State sized to the drawable, such as a board with a pixel for each half cell, needs the drawable's size in
+`Update`. Give it an ID, and read where it went from the last frame with
+[`m.ui.Frame().Rect`](/bubble-tea/sizes-in-update):
+
+```go
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmd := m.ui.Update(msg)
+	// ...
+	if r, ok := m.ui.Frame().Rect("board"); ok {
+		m.board.resize(r.Dx(), 2*r.Dy())
+	}
+	return m, cmd
+}
+```
+
+The first frame draws the board before it has a size, and the next message sizes it. To have the size before the
+first frame, solve the layout with [`bloom.Solve`](/bubble-tea/sizes-in-update#find-a-nodes-size-in-update)
+instead.
+
+## Animate it
+
+For a drawable that moves on its own, such as a simulation, step its state on an
+[`anim.Ticker`](https://pkg.go.dev/bloomfx.dev/bloom/anim#Ticker) in `Update`, and the next frame draws it. Transitions and effects run
+on a drawable's cells as they do on any node's, so `bloom.Transition(t, bloom.Drawable(d), fx.Fade{})` fades one in.
+
+## What it costs
+
+bloom keeps a frame that would be the same as the last one, rather than drawing it again. It can't tell whether a
+drawable would draw the same cells, so a frame with a drawable in it is always drawn again. On a recent desktop CPU,
+with the 200×60 dashboard of the repository's benchmarks:
+
+| Frame | Time |
+| --- | --- |
+| the dashboard, unchanged | about 0.02ms |
+| the dashboard, unchanged, with a row beneath it holding a small drawable that doesn't change | about 0.2ms |
+| every cell of the screen from a drawable, each in colors of its own | about 0.75ms |
+| the same cells as a string placed with `View`, a new string every frame | about 3.3ms |
+
+Most of the cost of a full screen from a drawable is encoding it for the terminal, not drawing it: in a CPU profile
+of the 0.75ms, `Draw` takes under a tenth. A string has to be parsed first, which costs more than the rest of the
+frame together, so cells that change every frame are cheaper drawn than rendered to a string. These times are
+bloom's share of a frame, which at 120 frames a second has 8.3ms: Bubble Tea then writes what changed to the
+terminal, which costs more the more cells change.
+
+To keep still frames cheap, leave a drawable out of the tree while it has nothing to show. For something that
+rarely changes, render it to a string, and place it with [`View`](https://pkg.go.dev/bloomfx.dev/bloom#View), which is parsed
+once and kept while the string is the same. Run the benchmarks yourself with
+`go test -bench 'Drawable' .` in the repository.
+
+## Related
+
+- [Custom effects](/motion/custom-effects), to change cells that something else drew
+- [Rendering and performance](/concepts/rendering), for what bloom keeps from frame to frame
+- The [`sandbox` example](https://github.com/lrstanley/bloom/tree/master/_examples/sandbox), a falling-sand toy with
+  two drawables, and the [`effects` example](https://github.com/lrstanley/bloom/tree/master/_examples/effects), with
+  a drawable in a transition

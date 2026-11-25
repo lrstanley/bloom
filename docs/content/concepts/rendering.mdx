@@ -45,6 +45,8 @@ value. A few things can't be compared, so bloom assumes they change every frame:
 
 - Effects that are functions, such as [`fx.Func`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Func) or [`fx.Ease`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Ease) (which holds an easing function).
 - Effects behind pointers, which could be changed in place.
+- [Drawables](/content/drawables), which could draw different cells from the same value. A frame with one in it is
+  drawn again, which on the dashboard above takes about 0.2ms rather than 0.02ms.
 
 That only costs anything while they're on screen. Wrapping a node in a transition only while it animates, as in
 `if m.shake.Animating() { ... }`, keeps still frames free.
