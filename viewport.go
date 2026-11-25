@@ -96,7 +96,7 @@ const (
 	// and scrolled sideways with [ViewportPos.X]. It is the default.
 	WrapNone = WrapMode(linebuf.None)
 	// WrapWords wraps lines at the spaces between words, and after
-	// hyphens, as Lip Gloss wraps a [Text], breaking a word only when it is
+	// hyphens, as a [Text] wraps, breaking a word only when it is
 	// wider than the viewport.
 	WrapWords = WrapMode(linebuf.Words)
 	// WrapChars wraps lines at the viewport's width, wherever it falls.

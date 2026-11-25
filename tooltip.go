@@ -1078,7 +1078,7 @@ func (r *Root) chip(m *chipMemo, t *tipAt, limit int) *canvas.Canvas {
 	if tw, _ := canvas.Measure(text, r.r.method); limit > 0 && out.GetWidth() == 0 && tw+out.GetHorizontalFrameSize() > limit {
 		out = out.Width(max(limit-out.GetHorizontalMargins(), 0))
 	}
-	parsed := r.r.cache.Sanitized(out.Render(text))
+	parsed := r.r.cache.Sanitized(render(out, text))
 	src := fillChip(parsed, st, r.r.method)
 	if src == parsed {
 		// Kept past the frames the cache keeps it for, which then parses

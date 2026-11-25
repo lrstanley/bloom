@@ -4,7 +4,13 @@
 
 package linebuf
 
-import "github.com/charmbracelet/x/ansi"
+import (
+	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/charmbracelet/x/ansi"
+)
 
 // Mode is how lines wider than a viewport are fitted to it.
 type Mode uint8
@@ -38,11 +44,26 @@ func wrapLine(s string, method ansi.Method, w int, mode Mode, starts []int) (row
 	return len(starts), starts
 }
 
+// breakable reports whether glyph g is a space a row wrapped at words may
+// start after, which hangs off the row before it: a space, or another
+// Unicode space but those meant not to break a line, as x/ansi wraps text.
+func breakable(g string) bool {
+	if g == " " {
+		return true
+	}
+	if g == "" || g[0] < utf8.RuneSelf {
+		return false
+	}
+	// A space with a mark on it is a glyph to keep.
+	r, n := utf8.DecodeRuneInString(g)
+	return n == len(g) && unicode.IsSpace(r) && r != '\u00a0' && r != '\u2007' && r != '\u202f'
+}
+
 // scanWrap is [wrapLine] for any line, a glyph at a time.
 func scanWrap(s string, method ansi.Method, w int, mode Mode, starts []int) []int {
 	words := mode == Words
-	// open is set where a row may start at the next glyph: after spaces, or
-	// a hyphen.
+	// open is set where a row may start at the next glyph: after spaces
+	// (see [breakable]), or a hyphen.
 	start, brk, open := 0, -1, false
 	sc := newScanner(s, method)
 	for sc.next() != glyphEnd {
@@ -51,7 +72,7 @@ func scanWrap(s string, method ansi.Method, w int, mode Mode, starts []int) []in
 			continue
 		}
 		if words {
-			if sc.g == " " {
+			if breakable(sc.g) {
 				open = true
 				continue
 			}
@@ -156,4 +177,98 @@ func asciiWrap(s string, w int, mode Mode, starts []int) ([]int, bool) {
 		fit(ws, x, spaced)
 	}
 	return starts, true
+}
+
+// Wrap returns text s with its lines wrapped at words to w cells, measured
+// with method, into the rows a viewport wrapping with [Words] shows them
+// in: a newline starts each row past a line's first, in place of the spaces
+// that would hang off the row before it, and the spaces that end a line
+// past w are dropped. A tab counts as a space a cell wide rather than up to
+// the next stop, as the canvas draws none for it in a text, where a viewport
+// draws spaces. A w of zero or less leaves s as it is, as does a text with
+// no line longer than w in bytes, which is returned without a copy.
+func Wrap(s string, method ansi.Method, w int) string {
+	if w <= 0 || len(s) <= w {
+		return s // a cell takes at least a byte, so every line fits
+	}
+	var (
+		b       strings.Builder
+		starts  []int
+		blank   [][2]int // scratch for breakLine
+		done    int      // the bytes of s written to b
+		wrapped bool
+	)
+	for at := 0; at <= len(s); {
+		end := strings.IndexByte(s[at:], '\n')
+		if end < 0 {
+			end = len(s)
+		} else {
+			end += at
+		}
+		if line := s[at:end]; len(line) > w {
+			if !wrapped {
+				b.Grow(len(s) + len(s)/16)
+				wrapped = true
+			}
+			b.WriteString(s[done:at])
+			// Measured with its tabs as spaces, which are a byte each too.
+			probe := line
+			if strings.IndexByte(line, '\t') >= 0 {
+				probe = strings.ReplaceAll(line, "\t", " ")
+			}
+			_, starts = wrapLine(probe, method, w, Words, starts[:0])
+			blank = breakLine(&b, line, probe, method, w, starts, blank[:0])
+			done = end
+		}
+		at = end + 1
+	}
+	if !wrapped {
+		return s
+	}
+	b.WriteString(s[done:])
+	return b.String()
+}
+
+// breakLine writes line to b as [Wrap] wraps it, its rows starting at the
+// cells starts gives, the first at 0, measured from probe, which is line
+// with its tabs as spaces. It returns blank, the scratch it was given.
+func breakLine(b *strings.Builder, line, probe string, method ansi.Method, w int, starts []int, blank [][2]int) [][2]int {
+	// blank holds the bytes of the spaces since the last glyph that is not
+	// one, which are dropped before a row that starts past them, or at the
+	// end of a line too wide for them. A row starts past the last of them,
+	// or the last glyph, so sequences after them start it as well.
+	from, k, after := 0, 1, 0 // the bytes of line written, the next row, and where it may start
+	cut := func(to int) {
+		for _, sp := range blank {
+			b.WriteString(line[from:sp[0]])
+			from = sp[1]
+		}
+		b.WriteString(line[from:to])
+		from, blank = to, blank[:0]
+	}
+	sc := newScanner(probe, method)
+	for kind := sc.next(); kind != glyphEnd; kind = sc.next() {
+		switch {
+		case kind != glyphText || sc.w == 0:
+			continue
+		case breakable(sc.g):
+			blank = append(blank, [2]int{sc.at, sc.at + len(sc.g)})
+			after = sc.at + len(sc.g)
+			continue
+		}
+		// Rows start at glyphs that are not spaces, each at its own.
+		if k < len(starts) && sc.x == starts[k] {
+			cut(after)
+			b.WriteByte('\n')
+			k++
+		}
+		blank, after = blank[:0], sc.i
+	}
+	// Past the last glyph, the scanner is at the end of the line.
+	if len(blank) > 0 && sc.x-starts[len(starts)-1] > w {
+		cut(len(line))
+		return blank
+	}
+	b.WriteString(line[from:])
+	return blank
 }

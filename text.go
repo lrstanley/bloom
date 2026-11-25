@@ -10,6 +10,7 @@ import (
 
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
+	"bloomfx.dev/bloom/internal/linebuf"
 	"bloomfx.dev/bloom/internal/same"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -317,7 +318,7 @@ func (e *engine) wraps(i int, n TextNode, w int) bool {
 // Gloss measures them, whatever the renderer measures with, as it wraps any
 // line it finds wider. An inline style does not wrap, so is not cut.
 func clipLines(n TextNode, w int) TextNode {
-	n = styleText(n)
+	n.s, n.style = styleText(n.s, n.style)
 	if w <= 0 {
 		w = unbounded
 	}
@@ -336,22 +337,40 @@ func clipLines(n TextNode, w int) TextNode {
 	return n
 }
 
-// styleText returns styled node n with its text as Lip Gloss renders it
-// before wrapping it, the steps taken off its style: after the string the
-// style holds, transformed, and with tabs as spaces.
-func styleText(n TextNode) TextNode {
-	if v := n.style.Value(); v != "" {
-		n.s, n.style = v+" "+n.s, n.style.SetString()
+// render renders s with style st, as [lipgloss.Style.Render] does, with
+// the lines wrapped first, by [linebuf.Wrap] to the width the style wraps
+// them to, so that Lip Gloss has none to wrap: its wrapping leaves a row
+// wider than that when a run of hyphens comes at the end of it, which a box
+// as wide as the style then cuts. Lines are measured as Lip Gloss measures
+// them, whatever the renderer measures with.
+func render(st lipgloss.Style, s string) string {
+	w := st.GetWidth() - st.GetHorizontalBorderSize() - st.GetHorizontalPadding()
+	if w <= 0 || st.GetInline() {
+		return st.Render(s)
 	}
-	if tf := n.style.GetTransform(); tf != nil {
-		n.s, n.style = tf(n.s), n.style.UnsetTransform()
+	s, st = styleText(s, st)
+	if strings.Contains(s, "\r\n") {
+		s = strings.ReplaceAll(s, "\r\n", "\n") // as Lip Gloss does before wrapping
 	}
-	if strings.Contains(n.s, "\t") {
-		if tw := tabWidth(n.style); tw >= 0 {
-			n.s = strings.ReplaceAll(n.s, "\t", strings.Repeat(" ", tw))
+	return st.Render(linebuf.Wrap(s, ansi.GraphemeWidth, w))
+}
+
+// styleText returns text s as Lip Gloss renders it with style before
+// wrapping it, and style with those steps taken off it: after the string
+// the style holds, transformed, and with tabs as spaces.
+func styleText(s string, style lipgloss.Style) (string, lipgloss.Style) {
+	if v := style.Value(); v != "" {
+		s, style = v+" "+s, style.SetString()
+	}
+	if tf := style.GetTransform(); tf != nil {
+		s, style = tf(s), style.UnsetTransform()
+	}
+	if strings.Contains(s, "\t") {
+		if tw := tabWidth(style); tw >= 0 {
+			s = strings.ReplaceAll(s, "\t", strings.Repeat(" ", tw))
 		}
 	}
-	return n
+	return s, style
 }
 
 // tabWidth returns how many spaces style draws a tab as, or -1 when it keeps

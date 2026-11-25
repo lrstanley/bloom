@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"bloomfx.dev/bloom/canvas"
 	uv "github.com/charmbracelet/ultraviolet"
@@ -77,12 +78,15 @@ func TestWrapLine(t *testing.T) {
 		{"日本語", 1, Chars, []int{0, 2, 4}},
 		{"a\tb", 3, Chars, []int{0, 3}},
 		{"\x1b[1mbold\x1b[m words", 5, Words, []int{0, 5}},
-		// After a hyphen, as Lip Gloss wraps text.
+		// After a hyphen, as a Text wraps.
 		{"hello-world", 8, Words, []int{0, 6}},
 		{"a-b-c-d-e-f", 4, Words, []int{0, 4, 8}},
 		{"self-contained text here", 10, Words, []int{0, 5, 15}},
 		{"--flag-name value", 6, Words, []int{0, 2, 7, 12}},
 		{"a-\x1b[1mbcdef", 4, Words, []int{0, 2, 6}},
+		// At other spaces too, but those meant not to break.
+		{"ab\u2003cde", 4, Words, []int{0, 3}},
+		{"ab\u00a0cde", 4, Words, []int{0, 4}},
 		{"hello-world", 8, Chars, []int{0, 8}},
 	} {
 		_, got := wrapLine(tc.s, ansi.GraphemeWidth, tc.w, tc.mode, nil)
@@ -448,4 +452,93 @@ func clampedCol(bounds []int, col int) int {
 		i--
 	}
 	return bounds[i]
+}
+
+func TestWrap(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		s    string
+		w    int
+		want string
+	}{
+		{"two is a longer line", 14, "two is a\nlonger line"},
+		{"abcdefghij", 4, "abcd\nefgh\nij"},
+		// The spaces a row breaks at are dropped.
+		{"abcd     efgh", 4, "abcd\nefgh"},
+		{"  indented words", 10, "  indented\nwords"},
+		{"first line\nsecond one", 6, "first\nline\nsecond\none"},
+		// And those past the width that end a line, while those that fit
+		// are kept.
+		{"abc      \nd", 4, "abc\nd"},
+		{"ab  \nd", 4, "ab  \nd"},
+		// A tab counts as a space, as the canvas draws none for it.
+		{"a\tbc de", 6, "a\tbc\nde"},
+		{"a\tbcde fg", 6, "a\tbcde\nfg"},
+		{"a\tb cc", 3, "a\tb\ncc"},
+		{"abc\tdef", 3, "abc\ndef"},
+		// Sequences stay where they were.
+		{"\x1b[1mbold\x1b[m words", 5, "\x1b[1mbold\x1b[m\nwords"},
+		{"bold \x1b[1mwords\x1b[m", 5, "bold\n\x1b[1mwords\x1b[m"},
+		{"日本語 日本", 5, "日本\n語\n日本"},
+		{"ab\u2003cde", 4, "ab\ncde"},
+		{"日本\u3000語", 5, "日本\n語"},
+		{"ab\u00a0cde", 4, "ab\u00a0c\nde"},
+		{"a\u2003\u0301b", 2, "a\u2003\u0301\nb"},
+		// A row breaks after a hyphen, a run of them as well, and never
+		// past the width.
+		{"hello-world", 8, "hello-\nworld"},
+		{"--flag-name value", 6, "--\nflag-\nname\nvalue"},
+		{"a line of --- between", 12, "a line of --\n- between"},
+		{"a line of --- between", 11, "a line of -\n-- between"},
+		{"a-\x1b[1mbcdef", 4, "a-\n\x1b[1mbcde\nf"},
+		{"a líne of --- between", 12, "a líne of --\n- between"},
+		{"x -- y", 3, "x -\n- y"},
+		{"x -- y", 0, "x -- y"},
+	} {
+		if got := Wrap(tc.s, ansi.GraphemeWidth, tc.w); got != tc.want {
+			t.Errorf("Wrap(%q, %d): got %q, want %q", tc.s, tc.w, got, tc.want)
+		}
+	}
+
+	// Text with no line longer than the width in bytes is not copied.
+	s := "short\nlines"
+	if got := Wrap(s, ansi.GraphemeWidth, 5); unsafe.StringData(got) != unsafe.StringData(s) {
+		t.Error("text that fits was copied")
+	}
+}
+
+// TestWrapKeepsGlyphs checks that wrapping text, plain or not, drops none of
+// its glyphs, only spaces, and leaves no row wider than it wraps to, with
+// runs of hyphens of every length.
+func TestWrapKeepsGlyphs(t *testing.T) {
+	t.Parallel()
+
+	var texts []string
+	for _, dashes := range []string{"-", "--", "---"} {
+		for _, s := range []string{
+			"a line of %s between",
+			"edit them in one editor, with a line of %s between each, since a line can't tell them apart",
+			"x %s y",
+			"%s",
+			"well%sknown and %sflag-name",
+		} {
+			s = strings.ReplaceAll(s, "%s", dashes)
+			texts = append(texts, s, strings.Replace(s, "i", "í", 1), "\x1b[1m"+strings.ReplaceAll(s, " ", " \x1b[m")+"\x1b[m")
+		}
+	}
+	for _, s := range texts {
+		want := strings.Join(strings.Fields(ansi.Strip(s)), "")
+		for w := 1; w <= len(s); w++ {
+			got := Wrap(s, ansi.GraphemeWidth, w)
+			if kept := strings.Join(strings.Fields(ansi.Strip(got)), ""); kept != want {
+				t.Fatalf("Wrap(%q, %d) = %q: kept %q, want %q", s, w, got, kept, want)
+			}
+			for row := range strings.SplitSeq(got, "\n") {
+				if ansi.StringWidth(row) > w {
+					t.Fatalf("Wrap(%q, %d) = %q: row %q wider than %d", s, w, got, row, w)
+				}
+			}
+		}
+	}
 }

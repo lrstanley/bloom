@@ -382,7 +382,7 @@ func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 		if w > 0 && !n.truncate && !n.nowrap {
 			// Unstyled text is drawn as it is, with no style to fill its
 			// box, so it is only wrapped, not padded to w×h.
-			return method.Wrap(n.s, w, ""), full
+			return linebuf.Wrap(n.s, method, w), full
 		}
 		return n.s, full // cut off at the edge of its box if too wide
 	}
@@ -396,7 +396,7 @@ func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 	if h > 0 && st.GetHeight() == 0 {
 		st = st.Height(max(h-st.GetVerticalMargins(), 0))
 	}
-	return st.Render(n.s), full
+	return render(st, n.s), full
 }
 
 // truncLine returns truncated node n as its line is cut, w cells wide or at
@@ -405,11 +405,11 @@ func textOf(n TextNode, w, h int, method ansi.Method) (out, full string) {
 // to one line, and the room the line has.
 func truncLine(n TextNode, w int) (_ TextNode, room int) {
 	if n.styled {
-		t := styleText(n)
-		if t.s != n.s {
-			t.s = lineBreaks.Replace(t.s) // what the style added
+		s, style := styleText(n.s, n.style)
+		if s != n.s {
+			s = lineBreaks.Replace(s) // what the style added
 		}
-		n = t
+		n.s, n.style = s, style
 	}
 	if w <= 0 {
 		w = unbounded

@@ -384,6 +384,47 @@ func TestTextSizeKept(t *testing.T) {
 	}
 }
 
+// TestTextWrapsHyphenRuns checks that text wrapped where a run of hyphens
+// meets the end of a row drops none of them, styled or not, plain or not:
+// the run stays whole, or breaks after one of its hyphens.
+func TestTextWrapsHyphenRuns(t *testing.T) {
+	t.Parallel()
+
+	got := strings.Split(ansi.Strip(Render(12, 0, Text("a line of --- between"))), "\n")
+	for i := range got {
+		got[i] = strings.TrimRight(got[i], " ")
+	}
+	if want := []string{"a line of --", "- between"}; !slices.Equal(got, want) {
+		t.Fatalf("drawn %q, want %q", got, want)
+	}
+	padded := lipgloss.NewStyle().Padding(0, 1)
+	for _, dashes := range []string{"-", "--", "---"} {
+		for _, s := range []string{
+			"a line of %s between",
+			"edit them in one editor, with a line of %s between each, since a line can't tell them apart",
+			"x %s y",
+		} {
+			s = strings.ReplaceAll(s, "%s", dashes)
+			for _, s := range []string{s, strings.Replace(s, "i", "í", 1)} {
+				want := strings.Join(strings.Fields(s), "")
+				for w := 3; w <= len(s); w++ {
+					for name, n := range map[string]TextNode{
+						"unstyled": Text(s),
+						"styled":   Text(s).Style(lipgloss.NewStyle().Bold(true)),
+						"padded":   Text(s).Style(padded),
+						"sized":    Text(s).Style(lipgloss.NewStyle().Width(w)),
+					} {
+						got := ansi.Strip(Render(w, 0, n))
+						if kept := strings.Join(strings.Fields(got), ""); kept != want {
+							t.Fatalf("%s %q at %d: drew\n%s\nkeeping %q", name, s, w, got, kept)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 // TestTextWraps checks that text too wide for the space it is given wraps
 // to it and is measured that many lines tall, styled or not, and that
 // truncated text is cut to one line instead.
