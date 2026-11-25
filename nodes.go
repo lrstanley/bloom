@@ -71,13 +71,17 @@ func Grow(weight int, child Child) SlotNode {
 }
 
 // Percent places child at p percent of its container's main axis. It can
-// shrink when space runs short.
+// shrink when space runs short, as an [Auto] slot does.
 func Percent(p int, child Child) SlotNode {
 	return SlotNode{child: child, sizing: sizePercent, n: p}
 }
 
 // Auto places child at its natural size. It can shrink when space runs
-// short, down to its Min, which is zero unless set.
+// short, down to its Min, which is zero unless set: in a row, with the
+// others, in proportion to their sizes, each keeping a cell while they all
+// can, and in a column, the last first, so that a column too short for its
+// children cuts off the last of them rather than any from the middle. When
+// a row's children cannot each keep a cell, the last are cut off too.
 func Auto(child Child) SlotNode { return SlotNode{child: child} }
 
 // Space is an empty slot that fills the space left by its siblings.
@@ -90,8 +94,9 @@ func (n SlotNode) Min(cells int) SlotNode { n.min = cells; return n }
 func (n SlotNode) Max(cells int) SlotNode { n.max = cells; return n }
 
 // Collapsible lets the slot be dropped, with the gap beside it, when its
-// container cannot fit the minimum sizes of all its children. Slots with
-// the lowest priority are dropped first.
+// container cannot fit the minimum sizes of all its children, or for a
+// column, the natural sizes of those it would cut off. Slots with the lowest
+// priority are dropped first.
 func (n SlotNode) Collapsible(priority int) SlotNode { n.collapse = max(priority, 1); return n }
 
 // Align overrides the container's cross-axis alignment for this slot.

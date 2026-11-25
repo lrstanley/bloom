@@ -708,7 +708,16 @@ func (e *engine) planFlex(i int, n FlexNode, mainAvail, crossAvail int) (sizes, 
 
 	mark = len(e.ints)
 	e.ints = slices.Grow(e.ints, 2*len(kids))[:mark+2*len(kids)]
-	sizes = flex.Split(e.ints[mark:mark], mainAvail, n.gap, e.tracks[tracksAt:])
+	// A column too short for its children keeps the first at their size
+	// and cuts off the last, rather than losing rows from all over it, as
+	// shrinking each in proportion would round a row of one line to none. A
+	// row shrinks each in proportion, so that text cut short to fit keeps
+	// some of every piece, down to a cell each while it can.
+	shrink := flex.ShrinkByBasis
+	if n.vertical {
+		shrink = flex.ShrinkFromEnd
+	}
+	sizes = flex.Split(e.ints[mark:mark], mainAvail, n.gap, e.tracks[tracksAt:], shrink)
 	offsets = flex.Place(e.ints[mark+len(kids):mark+len(kids)], sizes, mainAvail, n.gap, n.justify)
 	e.tracks = e.tracks[:tracksAt]
 	return sizes, offsets, mark

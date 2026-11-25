@@ -27,8 +27,8 @@ bloom.Grid(3, cards...).Gap(1, 0)
 - A short last row keeps the same column widths, so cards line up. When the width doesn't divide evenly, the first
   columns get the extra cells.
 - Every column has the same width. For columns of different widths, use a `Row` of [slots](/layout/slots).
-- Each row is as tall as its tallest cell. Rows share any extra height equally, and give up height in proportion
-  to their own size when there isn't enough.
+- Each row is as tall as its tallest cell. Rows share any extra height equally. When there isn't enough, the first
+  rows keep their height and the last are cut off, as in a [column](/layout/slots).
 - A `cols` below one means a single column.
 
 ### Change the column count with the width

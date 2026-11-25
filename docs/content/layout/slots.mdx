@@ -28,13 +28,18 @@ bloom.Row(
 | Slot | Size | Grows | Shrinks when space is short |
 | --- | --- | --- | --- |
 | [`Fixed(n, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fixed) | exactly `n` cells | no | no |
-| [`Auto(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Auto), or `c` with no slot | the child's natural size | no | yes, down to its `Min` |
+| [`Auto(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Auto), or `c` with no slot | the child's natural size | no | yes, down to its `Min`: in a row in proportion to its size, keeping a cell while it can; in a column from the last back |
 | [`Fill(c)`](https://pkg.go.dev/bloomfx.dev/bloom#Fill) | an equal share of the space left over | yes | gets only what's left, down to its `Min` |
 | [`Grow(w, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Grow) | `w` shares of the space left over | yes, by weight | gets only what's left, down to its `Min` |
-| [`Percent(p, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Percent) | `p`% of the row or column | no | yes, down to its `Min` |
+| [`Percent(p, c)`](https://pkg.go.dev/bloomfx.dev/bloom#Percent) | `p`% of the row or column | no | yes, down to its `Min`, as `Auto` does |
 
 "Space left over" is what remains after the `Fixed`, `Auto`, and `Percent` slots, and the gaps, are placed. `Fill`
 is the same as `Grow(1, c)`.
+
+When a column is too short for its children, the first keep their natural size and the last are cut off, so 20
+lines of text in a column 6 lines tall show the first 6. A `Fill` gives up its space before anything is cut, so a
+footer after it keeps its line. To show that rows were cut, or to reach them, put them in a
+[`Scroll`](/content/scrolling) instead.
 
 A child's natural size is the space its content needs: the width of its longest line and its number of lines for
 text, plus the border and padding for a box. See [How layout works](/concepts/how-layout-works) for how bloom

@@ -255,6 +255,141 @@ func TestEmptySlotTakesNoGap(t *testing.T) {
 	}
 }
 
+// TestColumnCutsOffTheEnd checks that a column too short for its children
+// keeps the first at their natural size and cuts off the last, rather than
+// shrinking each and losing rows from the middle, while fixed and growing
+// children keep their sizes and collapsible ones are dropped first.
+func TestColumnCutsOffTheEnd(t *testing.T) {
+	t.Parallel()
+
+	texts := func(format string, n int) []Child {
+		var kids []Child
+		for i := 1; i <= n; i++ {
+			kids = append(kids, Text(fmt.Sprintf(format, i)))
+		}
+		return kids
+	}
+	fields := []string{
+		"Type", "Latest version", "Min encryption", "Min decryption", "Min available",
+		"Auto-rotate", "Exportable", "Derived", "Deletion allowed",
+	}
+	var fieldRows []Child
+	for _, f := range fields {
+		fieldRows = append(fieldRows, Text(fmt.Sprintf("%-18s value", f)))
+	}
+	for _, tt := range []struct {
+		name string
+		w, h int
+		tree Child
+		want []string
+	}{
+		{"rows", 20, 6, Column(texts("row %d", 20)...), []string{"row 1", "row 2", "row 3", "row 4", "row 5", "row 6"}},
+		// A row cut off takes no gap, which the rows before it keep.
+		{"rows with gaps", 20, 6, Column(texts("row %d", 20)...).Gap(1), []string{"row 1", "", "row 2", "", "row 3", ""}},
+		{
+			"a details panel", 34, 8,
+			Column(Text("key orders"), Fixed(1, nil), Fill(Column(fieldRows...)), Text("o rotate  T trim  D delete")),
+			[]string{
+				"key orders", "",
+				"Type               value", "Latest version     value", "Min encryption     value",
+				"Min decryption     value", "Min available      value",
+				"o rotate  T trim  D delete",
+			},
+		},
+		{
+			"fixed and growing children kept", 10, 6,
+			Column(append(append([]Child{Fixed(1, Text("header"))}, texts("row %d", 10)...), Space(), Fixed(1, Text("footer")))...),
+			[]string{"header", "row 1", "row 2", "row 3", "row 4", "footer"},
+		},
+		{"down to a minimum", 10, 4, Column(Text("a"), Text("b"), Auto(Column(texts("c%d", 3)...)).Min(2)), []string{"a", "b", "c1", "c2"}},
+		{
+			"nested", 10, 6,
+			Column(Column(texts("a%d", 4)...), Column(texts("b%d", 4)...)),
+			[]string{"a1", "a2", "a3", "a4", "b1", "b2"},
+		},
+		{
+			"collapsible dropped first", 10, 6,
+			Column(append(append([]Child{Fixed(2, Text("banner")).Collapsible(1)}, texts("row %d", 10)...), Fixed(1, Text("footer")))...),
+			[]string{"row 1", "row 2", "row 3", "row 4", "row 5", "footer"},
+		},
+		{
+			"a form, then hints", 20, 4,
+			Column(Fill(Column(texts("field %d", 5)...)), Text("tab next  esc quit")),
+			[]string{"field 1", "field 2", "field 3", "tab next  esc quit"},
+		},
+		{
+			"a grid's rows", 20, 4, Grid(2, texts("cell %d", 20)...),
+			[]string{"cell 1    cell 2", "cell 3    cell 4", "cell 5    cell 6", "cell 7    cell 8"},
+		},
+		{
+			"wrapped text cut short", 10, 3,
+			Column(Text("one two three four"), Text("last")),
+			[]string{"one two", "three four", "last"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got, want := trimLines(Render(tt.w, tt.h, tt.tree)), strings.Join(tt.want, "\n"); got != want {
+				t.Fatalf("drawn:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+
+	// Laying out the same tree at the same size gives the same rectangles.
+	tree := func() Child {
+		kids := texts("row %d", 20)
+		for i, k := range kids {
+			kids[i] = Auto(k).ID(ID(fmt.Sprintf("r%d", i+1)))
+		}
+		return Column(kids...)
+	}
+	a, b := Solve(20, 6, tree()), Solve(20, 6, tree())
+	for i := 1; i <= 20; i++ {
+		id := ID(fmt.Sprintf("r%d", i))
+		ra, oka := a.Rect(id)
+		rb, okb := b.Rect(id)
+		if ra != rb || oka != okb {
+			t.Fatalf("%s: %v, %v then %v, %v", id, ra, oka, rb, okb)
+		}
+		if want := (i <= 6); oka && !ra.Empty() != want {
+			t.Fatalf("%s at %v, shown %v, want %v", id, ra, !ra.Empty(), want)
+		}
+	}
+}
+
+// TestRowKeepsACellEach checks that a row too narrow for its children
+// shrinks each in proportion, keeping a cell of each while they all fit
+// one, and when they do not, cuts off the last rather than any from the
+// middle.
+func TestRowKeepsACellEach(t *testing.T) {
+	t.Parallel()
+
+	var cells []Child
+	for c := 'a'; c <= 't'; c++ {
+		cells = append(cells, Text(string(c)))
+	}
+	long := func(c string) TextNode { return Text(strings.Repeat(c, 40)).Truncate() }
+	for _, tt := range []struct {
+		name string
+		w    int
+		tree Child
+		want string
+	}{
+		{"one cell each, too many", 6, Row(cells...), "abcdef"},
+		{"too many, with gaps", 11, Row(cells...).Gap(1), "a b c d e f"},
+		{"pieces cut short", 20, Row(long("x"), Text(" | "), long("y")), "xxxxxxxxx… yyyyyyyy…"},
+		{"a cell each", 12, Row(Text("name").Truncate(), Text(" · "), Text("status").Truncate(), Text(" · "), Text("a long description").Truncate()), "n… st… a lo…"},
+		{"a one cell separator", 21, Row(long("x"), Text("|"), long("y")), "xxxxxxxxx…|yyyyyyyyy…"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ansi.Strip(Render(tt.w, 1, tt.tree)); got != tt.want {
+				t.Fatalf("drawn %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestFillNaturalSize checks that growing children, which share space by
 // weight rather than by size, each get at least their natural size when
 // their row is at its natural size.

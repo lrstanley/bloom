@@ -60,9 +60,14 @@ For a row (and, turned on its side, a column), bloom works out sizes in this ord
 2. `Auto` slots (and children with no slot) get their natural size, and `Percent` slots their percentage.
 3. The gaps between children are subtracted.
 4. What's left is shared between `Fill` and `Grow` slots by weight, within each slot's `Min` and `Max`.
-5. If there wasn't enough, slots that can shrink give up space in proportion to their size, down to their `Min`.
+5. If there wasn't enough, slots that can shrink give up space, down to their `Min`. In a row, each gives up space in
+   proportion to its size, so text cut short to fit keeps some of every piece, and each keeps at least one cell while
+   they all can; when they can't, the last ones give up theirs first. In a column, the last ones always give up
+   theirs first: the rows at the top keep their natural size, and the rows that don't fit are cut off at the bottom,
+   never skipped from the middle, the way CSS clips flex items that don't shrink below their content.
 6. If the minimums still don't fit, `Collapsible` slots are dropped, lowest priority first (the last one, on a
-   tie), and the rest is worked out again.
+   tie), and the rest is worked out again. In a column, they're dropped as soon as the slots at their natural size
+   don't fit, before any row is cut off.
 
 On the other axis, children stretch to the row's height unless an `Align` says otherwise.
 

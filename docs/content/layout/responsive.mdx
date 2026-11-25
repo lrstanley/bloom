@@ -16,7 +16,8 @@ The [responsive example](https://github.com/lrstanley/bloom/tree/master/_example
 Mark slots [`Collapsible(priority)`](https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.Collapsible) and set the `Min` of the slots that must stay
 usable. When the minimum sizes don't all fit, bloom drops collapsible slots, lowest priority first, along with the
 gap beside each. Slots with the same priority are dropped from the end first. A `Fixed` slot counts at its full
-size, and a `Fill` or `Auto` slot at its `Min`.
+size, and a `Fill` or `Auto` slot at its `Min`. In a column, an `Auto` slot counts at its natural size, so collapsible
+slots are dropped before any row is cut off.
 
 ```go
 bloom.Row(

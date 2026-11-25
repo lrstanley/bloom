@@ -88,8 +88,9 @@ func gridSpan(total, count, gap, index int) (offset, length int) {
 }
 
 // gridRows appends a track to e.tracks for each row of grid i when it is
-// width wide: its tallest cell, growing by an equal share of extra height
-// and shrinking in proportion to its height.
+// width wide: its tallest cell, growing by an equal share of extra height.
+// A grid too short for its rows keeps the first at their height and cuts
+// off the last, as a column does.
 func (e *engine) gridRows(i int, n GridNode, width int) {
 	kids := e.kidsOf(i)
 	for row := 0; row*n.cols < len(kids); row++ {
@@ -133,7 +134,7 @@ func (e *engine) arrangeGrid(i int, n GridNode, r image.Rectangle) {
 	rows := e.tracks[at:]
 	mark := len(e.ints)
 	e.ints = slices.Grow(e.ints, 2*len(rows))[:mark+2*len(rows)]
-	heights := flex.Split(e.ints[mark:mark], r.Dy(), n.gapY, rows)
+	heights := flex.Split(e.ints[mark:mark], r.Dy(), n.gapY, rows, flex.ShrinkFromEnd)
 	tops := flex.Place(e.ints[mark+len(rows):mark+len(rows)], heights, r.Dy(), n.gapY, flex.Start)
 	e.tracks = e.tracks[:at]
 	for j, k := range e.kidsOf(i) {
