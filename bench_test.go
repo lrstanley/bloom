@@ -227,12 +227,17 @@ func BenchmarkRenderWrappedText(b *testing.B) {
 		lines[i] = benchLogLine(i)
 	}
 	plain := Text(strings.Join(lines, "\n"))
-	for name, text := range map[string]TextNode{"styled": plain.Style(benchItem), "unstyled": plain} {
+	texts := []struct {
+		name string
+		text TextNode
+	}{{"styled", plain.Style(benchItem)}, {"unstyled", plain}}
+	for k := range texts {
+		name, text := texts[k].name, &texts[k].text
 		b.Run(name, func(b *testing.B) {
 			r := New(WithColors(color.White, color.Black))
 			b.ReportAllocs()
 			for i := 0; b.Loop(); i++ {
-				r.View(benchW, benchH, Box(benchBorder, Scroll(text, i*3%10_000)))
+				r.View(benchW, benchH, Box(benchBorder, Scroll(*text, i*3%10_000)))
 			}
 		})
 	}

@@ -6,6 +6,8 @@
 // frame to the next, for boxes that tend to stay the same.
 package memo
 
+import "maps"
+
 // Table keeps a value for each index. Values a frame did not use are
 // dropped once it is done, as they would keep what they refer to alive.
 type Table[T any] struct {
@@ -75,9 +77,7 @@ func (m *Map[K, T]) Retire() {
 	m.gen++
 	if n := len(m.slots); n < m.peak/4 {
 		slots := make(map[K]*Slot[T], n)
-		for k, s := range m.slots {
-			slots[k] = s
-		}
+		maps.Copy(slots, m.slots)
 		m.slots, m.peak = slots, n
 	} else {
 		m.peak = max(m.peak, n)

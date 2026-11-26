@@ -193,8 +193,12 @@ func TestBackdrops(t *testing.T) {
 		t.Parallel()
 		// At t=0 each leaves every cell of a fresh region as it was.
 		for _, e := range []Effect{
-			Dim{Amount: 1}, Desaturate{Amount: 1}, Recolor{Fg: white, Bg: white, Amount: 1}, Recolor{Fg: white},
-			Braille{}, Spotlight{Rect: image.Rect(1, 0, 2, 1)},
+			Dim{Amount: 1},
+			Desaturate{Amount: 1},
+			Recolor{Fg: white, Bg: white, Amount: 1},
+			Recolor{Fg: white},
+			Braille{},
+			Spotlight{Rect: image.Rect(1, 0, 2, 1)},
 		} {
 			s, fresh := region(), region()
 			e.Apply(s, 0)

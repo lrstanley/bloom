@@ -481,7 +481,7 @@ func TestTextWraps(t *testing.T) {
 			for i := range got {
 				got[i] = strings.TrimRight(got[i], " ")
 			}
-			if want := append(tt.want, "end"); !slices.Equal(got, want) {
+			if want := slices.Concat(tt.want, []string{"end"}); !slices.Equal(got, want) {
 				t.Fatalf("drawn:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 			}
 		})

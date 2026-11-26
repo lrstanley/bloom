@@ -68,6 +68,7 @@ func (id ID) Sub[P string | int](part P) ID {
 	if p, ok := any(part).(string); ok {
 		return id + "/" + ID(p)
 	}
+	i, _ := any(part).(int) // P is string or int
 	var n [20]byte
-	return id + "/" + ID(strconv.AppendInt(n[:0], int64(any(part).(int)), 10))
+	return id + "/" + ID(strconv.AppendInt(n[:0], int64(i), 10))
 }

@@ -83,7 +83,8 @@ func TestValueIgnoresOtherFrames(t *testing.T) {
 	if a.Update(stale) != nil || a.Float() != 5 {
 		t.Fatal("a frame from before Set moved the value")
 	}
-	if a.Update(a.frameMsg()); a.Float() <= 5 {
+	a.Update(a.frameMsg())
+	if a.Float() <= 5 {
 		t.Fatal("the current frame did not move the value")
 	}
 	if b.Update(stale) != nil || b.Float() != 0 {
@@ -198,10 +199,12 @@ func TestPresenceShowFor(t *testing.T) {
 	first := hideMsg{id: p.v.id, gen: p.hide}
 	p.ShowFor(time.Second)
 	second := hideMsg{id: p.v.id, gen: p.hide}
-	if p.Update(first); !p.Shown() {
+	p.Update(first)
+	if !p.Shown() {
 		t.Fatal("the timer of the ShowFor before hid it")
 	}
-	if p.Update(second); p.Shown() {
+	p.Update(second)
+	if p.Shown() {
 		t.Fatal("not hidden once the last ShowFor's time was up")
 	}
 }
