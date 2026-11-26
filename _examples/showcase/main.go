@@ -181,8 +181,7 @@ func (m *model) layout() bloom.Child {
 		row = append(row, m.slot(id))
 	}
 
-	// Each tint's colors wave in. A transition's cells replace what is
-	// beneath them, background and all, so the body brings its own.
+	// Each tint's colors wave in, over the tint's own background.
 	body := bloom.Child(bloom.Box(m.st.base, bloom.Row(row...).Gap(1)))
 	if m.wave.Animating() {
 		body = bloom.Transition(m.wave.Float(), body, fx.Wave{From: fx.Left})

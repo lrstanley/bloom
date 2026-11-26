@@ -297,8 +297,9 @@ func TestShade(t *testing.T) {
 			}
 			if strings.ContainsAny(c.Content, "░▒▓") {
 				seen[c.Content]++
-				if rgba(c.Style.Bg) != red || rgba(c.Style.Fg) != rgba(blue) {
-					t.Fatalf("shade at %d,%d is %v on %v, want the node's blue over the frame's red", x, y, c.Style.Fg, c.Style.Bg)
+				// No background of its own: it sits on the frame's red.
+				if c.Style.Bg != nil || rgba(c.Style.Fg) != rgba(blue) {
+					t.Fatalf("shade at %d,%d is %v on %v, want the node's blue on the frame's background", x, y, c.Style.Fg, c.Style.Bg)
 				}
 			}
 		}

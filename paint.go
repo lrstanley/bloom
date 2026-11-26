@@ -27,7 +27,7 @@ type opKind uint8
 const (
 	opBlit    opKind = iota // copy src into rect, blanking the rest of it
 	opStretch               // copy src into rect, stretched to fill it at mid
-	opClear                 // blank rect, background and all
+	opClear                 // blank rect's glyphs, keeping backgrounds
 	opDraw                  // draw a uv.Drawable into rect
 	opEffects               // apply effects to rect of the frame
 	opPush                  // draw what follows into its own cells, for effects
@@ -701,7 +701,9 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 
 	// A layer is opaque: whatever its child does not draw, such as a Space,
 	// is blank rather than showing the base through. Cells drawn for effects
-	// start out blank; otherwise the layer's rect is blanked first.
+	// start out blank; otherwise the layer's rect is blanked first. Either
+	// way, cells without a background of their own keep the one beneath,
+	// as everywhere else, so a layer looks the same moving and still.
 	// A layer moving with effects is drawn into cells of its own, among the
 	// layers, unlike a slot, which waits for the rest of its container.
 	// Its cells are drawn whole, as its effects draw it on its way from
@@ -938,7 +940,7 @@ func (r *renderer) execute(again bool) {
 		case opStretch:
 			t.c.BlitStretched(o.src, o.mid, o.rect.Sub(t.origin), o.clip.Sub(t.origin))
 		case opClear:
-			t.c.ClearArea(o.rect.Sub(t.origin))
+			t.c.Blank(o.rect.Sub(t.origin))
 		case opSelect:
 			r.executeSelect(o, t)
 		case opDraw:

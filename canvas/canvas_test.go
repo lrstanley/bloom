@@ -111,6 +111,63 @@ func TestComposite(t *testing.T) {
 	}
 }
 
+// Cells without a background drawn over colored wide glyphs, whether
+// blanked, blitted, composited, or set by a Drawable, keep the color of the
+// glyph they cover, tails included.
+func TestKeepsBackgroundOfWideGlyphs(t *testing.T) {
+	t.Parallel()
+
+	colored := func(t *testing.T, c *Canvas, name string) {
+		t.Helper()
+		for x := range 4 {
+			// A glyph's tail shows its lead's style, holding none itself.
+			if cell := c.CellAt(x, 0); cell.Width > 0 && cell.Style.Bg == nil {
+				t.Errorf("%s: cell %d %q lost its background: %q", name, x, cell.Content, c.String())
+			}
+		}
+	}
+	const wide = "\x1b[44m世界\x1b[m.."
+
+	blank := Parse(wide, method)
+	blank.Blank(image.Rect(1, 0, 3, 1))
+	colored(t, blank, "Blank")
+
+	blit := Parse(wide, method)
+	blit.Blit(Parse("xy", method), image.Rect(1, 0, 3, 1), blit.Bounds())
+	colored(t, blit, "Blit")
+
+	comp := Parse(wide, method)
+	s := Parse("xy", method).Layer(image.Rect(1, 0, 3, 1), comp.Bounds(), comp, DefaultEnv, &Mixer{})
+	comp.Composite(s, comp.Bounds())
+	colored(t, comp, "Composite")
+
+	drawn := Parse(wide, method)
+	scr := drawn.Screen(image.Pt(1, 0), image.Pt(2, 1), drawn.Bounds())
+	scr.SetCell(0, 0, uv.NewCell(method, "x"))
+	scr.SetCell(1, 0, uv.NewCell(method, "y"))
+	colored(t, drawn, "Screen")
+
+	cleared := Parse(wide, method)
+	cleared.Screen(image.Pt(1, 0), image.Pt(2, 1), cleared.Bounds()).SetCell(0, 0, nil)
+	colored(t, cleared, "Screen clearing")
+
+	// A source glyph cut by the clip's left edge leaves a blank on the color.
+	cut := Parse("\x1b[44m....\x1b[m", method)
+	cut.Blit(Parse("世x", method), image.Rect(0, 0, 3, 1), image.Rect(1, 0, 4, 1))
+	colored(t, cut, "Blit cut on the left")
+
+	// A stretched frame, here plain dots, drawn over colored wide glyphs.
+	stretched := Parse(wide, method)
+	stretched.BlitStretched(Parse("...", method), image.Pt(1, 0), image.Rect(0, 0, 4, 1), stretched.Bounds())
+	colored(t, stretched, "BlitStretched")
+
+	// A Screen kept after its canvas shrinks ignores what is set outside it.
+	kept := Parse(wide, method)
+	scr = kept.Screen(image.Pt(0, 0), image.Pt(6, 1), kept.Bounds())
+	kept.Resize(2, 1)
+	scr.SetCell(4, 0, uv.NewCell(method, "x"))
+}
+
 func TestScreenClips(t *testing.T) {
 	t.Parallel()
 

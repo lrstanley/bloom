@@ -126,7 +126,8 @@ func (e Shade) Apply(s *canvas.Surface, t float64) {
 		}
 		c.Content, c.Link = shades[step-1], uv.Link{}
 		c.Style.Attrs, c.Style.Underline = 0, 0
-		c.Style.Fg, c.Style.Bg = ink, s.Bg(s.Under(x, y))
+		// On the background beneath, which a cell without one keeps.
+		c.Style.Fg, c.Style.Bg = ink, nil
 	}
 }
 

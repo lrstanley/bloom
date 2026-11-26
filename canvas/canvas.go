@@ -16,6 +16,7 @@ package canvas
 
 import (
 	"image"
+	"image/color"
 	"strings"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -202,11 +203,7 @@ func (c *Canvas) Blit(src *Canvas, r, clip image.Rectangle) {
 		dst := c.lines[y]
 		x0, x1 := area.Min.X, area.Max.X
 
-		// A copy that starts on the tail of a wide glyph in c leaves its
-		// lead behind, which must not survive half covered.
-		if dst[x0].Width == 0 {
-			blankLead(dst, x0)
-		}
+		cutEdges(dst, x0, x1)
 		var row uv.Line
 		if y-at.Y < src.h {
 			row = src.lines[y-at.Y]
@@ -221,15 +218,20 @@ func (c *Canvas) Blit(src *Canvas, r, clip image.Rectangle) {
 				dst[x] = uv.EmptyCell
 			}
 		} else {
+			// A tail's background is its lead's, read before the lead is
+			// overwritten.
+			var under color.Color
 			for x := x0; x < x1; x++ {
-				bg := dst[x].Style.Bg
+				if dst[x].Width > 0 {
+					under = dst[x].Style.Bg
+				}
 				if x < copied {
 					dst[x] = row[x-at.X]
 				} else {
 					dst[x] = uv.EmptyCell
 				}
 				if dst[x].Style.Bg == nil {
-					dst[x].Style.Bg = bg
+					dst[x].Style.Bg = under
 				}
 			}
 		}
@@ -299,14 +301,15 @@ func (c *Canvas) BlitStretched(src *Canvas, mid image.Point, r, clip image.Recta
 		dst := c.lines[y]
 		row := src.lines[from(y-r.Min.Y, r.Dy(), mid.Y, bottom)]
 		x0, x1 := area.Min.X, area.Max.X
-		if dst[x0].Width == 0 {
-			blankLead(dst, x0)
-		}
+		cutEdges(dst, x0, x1)
+		var under color.Color // as in Blit
 		for x := x0; x < x1; x++ {
-			bg := dst[x].Style.Bg
+			if dst[x].Width > 0 {
+				under = dst[x].Style.Bg
+			}
 			dst[x] = row[from(x-r.Min.X, r.Dx(), mid.X, right)]
 			if dst[x].Style.Bg == nil {
-				dst[x].Style.Bg = bg
+				dst[x].Style.Bg = under
 			}
 		}
 		fixEdges(dst, nil, x0, x1, 0)
@@ -328,9 +331,7 @@ func (c *Canvas) ClearArea(r image.Rectangle) {
 	r = r.Intersect(c.Bounds())
 	for y := r.Min.Y; y < r.Max.Y; y++ {
 		dst := c.lines[y]
-		if dst[r.Min.X].Width == 0 {
-			blankLead(dst, r.Min.X)
-		}
+		cutEdges(dst, r.Min.X, r.Max.X)
 		for x := r.Min.X; x < r.Max.X; x++ {
 			dst[x] = uv.EmptyCell
 		}
@@ -338,12 +339,49 @@ func (c *Canvas) ClearArea(r image.Rectangle) {
 	}
 }
 
+// Blank blanks the glyphs in r, as [Canvas.ClearArea] does, but keeps
+// their backgrounds, so what is drawn over r without a background of its
+// own sits on the color beneath, as with [Canvas.Blit].
+func (c *Canvas) Blank(r image.Rectangle) { c.Blit(&nothing, r, r) }
+
+// nothing is a canvas with no cells, which blits as blanks.
+var nothing Canvas
+
+// bgAt returns the background shown at x in l, which for the tail of a wide
+// glyph is its lead's.
+func bgAt(l uv.Line, x int) color.Color {
+	if i := leadIndex(l, x); i >= 0 {
+		return l[i].Style.Bg
+	}
+	return nil
+}
+
+// setOver sets the cell at x, y to cell, which keeps the background already
+// there if it has none of its own, as [Canvas.Blit] does.
+func (c *Canvas) setOver(x, y int, cell *uv.Cell) {
+	if y < 0 || y >= c.h || x < 0 || x >= len(c.lines[y]) {
+		return // as Line.Set ignores it, such as from a Screen kept too long
+	}
+	line := c.lines[y]
+	if cell.Style.Bg != nil {
+		line.Set(x, cell)
+		return
+	}
+	bg := bgAt(line, x)
+	line.Set(x, cell)
+	line[x].Style.Bg = bg
+}
+
 // fixEdges repairs the glyphs a row copy into dst[x0:x1] cut at either end:
 // tails copied without their lead, a lead copied without its whole tail,
 // and tails left in dst after the span whose lead the copy overwrote.
 func fixEdges(dst, src uv.Line, x0, x1, offset int) {
 	for x := x0; x < x1 && dst[x].Width == 0; x++ {
+		bg := dst[x].Style.Bg
 		dst[x] = blankAt(src, leadIndex(src, x-offset))
+		if dst[x].Style.Bg == nil {
+			dst[x].Style.Bg = bg
+		}
 	}
 	for x := x1 - 1; x >= x0; x-- {
 		if w := dst[x].Width; w > 0 {
@@ -361,14 +399,25 @@ func fixEdges(dst, src uv.Line, x0, x1, offset int) {
 	}
 }
 
-// blankLead blanks the wide glyph whose tail is at x, from its lead up to x.
-func blankLead(l uv.Line, x int) {
+// cutEdges blanks the wide glyphs that a write to l[x0:x1] would leave half
+// covered, a tail at x0 or past x1-1, in their style, background and all.
+func cutEdges(l uv.Line, x0, x1 int) {
+	if l[x0].Width == 0 {
+		blankGlyph(l, x0)
+	}
+	if x1 < len(l) && l[x1].Width == 0 {
+		blankGlyph(l, x1)
+	}
+}
+
+// blankGlyph blanks the whole wide glyph whose tail is at x, in its style.
+func blankGlyph(l uv.Line, x int) {
 	lead := leadIndex(l, x)
 	if lead < 0 {
 		return
 	}
-	blank := blankAt(l, lead)
-	for i := lead; i < x; i++ {
+	blank, end := blankAt(l, lead), min(lead+l[lead].Width, len(l))
+	for i := lead; i < end; i++ {
 		l[i] = blank
 	}
 }
@@ -430,12 +479,16 @@ func (s *screen) SetCell(x, y int, cell *uv.Cell) {
 	if !p.In(s.clip) {
 		return
 	}
-	if cell != nil && p.X+cell.Width > s.clip.Max.X {
+	switch {
+	case cell == nil:
+		// A clear, as a StyledString does before drawing, keeps it too.
+		s.c.setOver(p.X, p.Y, &uv.EmptyCell)
+	case p.X+cell.Width > s.clip.Max.X:
 		blank := blankLike(cell)
 		for i := p.X; i < s.clip.Max.X; i++ {
-			s.c.SetCell(i, p.Y, &blank)
+			s.c.setOver(i, p.Y, &blank)
 		}
-		return
+	default:
+		s.c.setOver(p.X, p.Y, cell)
 	}
-	s.c.SetCell(p.X, p.Y, cell)
 }

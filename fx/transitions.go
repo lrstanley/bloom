@@ -15,7 +15,9 @@ import (
 // from the one beneath to the node's own; until t=0.5 each cell shows the
 // glyph beneath, fading into that background, and after it the node's own,
 // fading in. At t=0 the node looks exactly like what is beneath it. Cells
-// over or holding wide glyphs keep the node's glyph throughout.
+// over or holding wide glyphs keep the node's glyph throughout. A cell
+// without a background of its own is left without one, so it stays on the
+// background beneath, or the terminal's own, translucent or not.
 type Fade struct{}
 
 // Apply implements [Effect].
@@ -25,7 +27,11 @@ func (Fade) Apply(s *canvas.Surface, t float64) {
 	}
 	for at, c := range s.Cells() {
 		under := s.Under(at.X, at.Y)
-		bg := s.Mix(s.Bg(under), s.Bg(c), t)
+		bg := s.Bg(under)
+		if c.Style.Bg != nil {
+			bg = s.Mix(bg, c.Style.Bg, t)
+			c.Style.Bg = bg
+		}
 		if t < 0.5 && under != nil && under.Width == 1 && c.Width == 1 {
 			c.Content, c.Link = under.Content, under.Link
 			c.Style.Attrs, c.Style.Underline = under.Style.Attrs, under.Style.Underline
@@ -33,7 +39,6 @@ func (Fade) Apply(s *canvas.Surface, t float64) {
 		} else {
 			c.Style.Fg = s.Mix(bg, s.Fg(c), max(2*t-1, 0))
 		}
-		c.Style.Bg = bg
 	}
 }
 

@@ -366,7 +366,10 @@ func (s *Surface) Gray(c color.Color, t float64) color.Color { return s.mixer.Gr
 // Composite copies the shown cells of s, a surface from [Canvas.Layer] or
 // [Canvas.TravelLayer], onto c at its rect moved by its offset, with the rest
 // of its reach around it, writing only inside clip. Wide glyphs are copied
-// whole or not at all, by the visibility of their first cell.
+// whole or not at all, by the visibility of their first cell. Cells without
+// a background of their own keep the one already in c, as with
+// [Canvas.Blit], so a node drawn with effects inside a colored box sits on
+// the box's color, as it does without them.
 func (c *Canvas) Composite(s *Surface, clip image.Rectangle) {
 	at := s.rect.Min.Add(s.Offset).Add(s.reach.Min)
 	area := image.Rectangle{Min: at, Max: at.Add(s.reach.Size())}.Intersect(clip).Intersect(c.Bounds())
@@ -381,16 +384,16 @@ func (c *Canvas) Composite(s *Surface, clip image.Rectangle) {
 				// as a blank in its style, if its lead is shown.
 				if lead := leadIndex(row, sx); x == area.Min.X && lead >= 0 && mask[lead] {
 					blank := blankAt(row, lead)
-					c.lines[y].Set(x, &blank)
+					c.setOver(x, y, &blank)
 				}
 			case !mask[sx]:
 			case x+cell.Width > area.Max.X:
 				blank := blankLike(cell)
 				for i := x; i < area.Max.X; i++ {
-					c.lines[y].Set(i, &blank)
+					c.setOver(i, y, &blank)
 				}
 			default:
-				c.lines[y].Set(x, cell)
+				c.setOver(x, y, cell)
 			}
 		}
 	}

@@ -131,7 +131,8 @@ Terminal cells are about twice as tall as they are wide, so an offset of two col
 
 ## Show what's beneath a layer's blank cells
 
-A layer covers everything beneath it, blank cells too. `Transparent()` shows what's beneath its blank cells
+A layer covers everything beneath it, blank cells too, though a cell without a background of its own, blank or not,
+keeps the background beneath it, as text in a box does. `Transparent()` shows what's beneath its blank cells
 instead: those with no background color, underline, or reversed colors. Use it for text drawn over the screen
 without a box around it, such as [FIGlet text](/content/figlet-text#draw-it-over-other-things):
 

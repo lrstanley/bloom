@@ -212,3 +212,34 @@ func BenchmarkBorderFrame(b *testing.B) {
 		r.Render(benchW, benchH, tree(float64(i%100)/100))
 	}
 }
+
+// A node drawn with effects sits on the background of the box it is in, as
+// it does without them, and where nothing has a background, fading never
+// gives it one: a translucent terminal background stays translucent.
+func TestTransitionKeepsBackground(t *testing.T) {
+	bg := color.RGBA{0x20, 0x20, 0x30, 0xff}
+	painted := lipgloss.NewStyle().Background(bg)
+	effects := map[string][]fx.Effect{
+		"fade":    {fx.Fade{}},
+		"stagger": {fx.Stagger{Effect: fx.Fade{}, From: fx.Top}},
+		"shade":   {fx.Shade{}},
+		"none":    nil,
+	}
+	for name, eff := range effects {
+		for _, p := range []float64{0, 0.3, 0.7, 1} {
+			for _, paint := range []bool{true, false} {
+				style, want := lipgloss.NewStyle(), 0
+				if paint {
+					style, want = painted, 3
+				}
+				out := Render(6, 3, Box(style, Column(Text("top"), Transition(p, Column(Text("ab"), Text("cd")), eff...))))
+				if got := strings.Count(out, "48;2;32;32;48"); got != want {
+					t.Errorf("%s at %v, painted %v: %d rows on the box's background, want %d:\n%q", name, p, paint, got, want, out)
+				}
+				if !paint && strings.Contains(out, "48;") {
+					t.Errorf("%s at %v: a background where none was:\n%q", name, p, out)
+				}
+			}
+		}
+	}
+}

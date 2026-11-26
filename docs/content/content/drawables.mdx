@@ -66,9 +66,9 @@ cpu ████████░░░░░░░░░░░░
 ```
 
 The drawable can't draw outside its node: cells set outside it are dropped, and a wide glyph that would cross its
-edge is drawn as blanks. A cell it sets replaces what's beneath it, background and all, and cells it doesn't set keep
-what's beneath them, such as the background of the box it's in, so an empty pixel of a game board can leave its
-cell alone for the box to show through.
+edge is drawn as blanks. A cell it sets replaces what's beneath it, keeping the background beneath, such as the box
+it's in, unless it has a background of its own, as text does. Cells it doesn't set keep what's beneath them, so an
+empty pixel of a game board can leave its cell alone for the box to show through.
 
 A [`uv.Buffer`](https://pkg.go.dev/github.com/charmbracelet/ultraviolet#Buffer) is a drawable already, so cells kept in
 one, such as the screen of an embedded terminal emulator, are placed with `bloom.Drawable(buf)`.
@@ -163,8 +163,9 @@ func beneath(scr uv.Screen, x, y int) color.Color {
 }
 ```
 
-A cell you set replaces the one beneath it, background and all, so a cell with one empty pixel takes the
-background beneath it from `scr.CellAt`, and paints it on the empty half. A pixel that's empty on top uses the lower
+A cell you set keeps the background beneath only where it has none of its own, and a half block with an empty half
+needs one for that half, so a cell with one empty pixel takes the background beneath it from `scr.CellAt`, and paints
+it on the empty half. A pixel that's empty on top uses the lower
 half block, `▄`, with that background behind it.
 
 ## Take the mouse
