@@ -667,6 +667,21 @@ func (r *renderer) paintFloats(mark int) {
 	r.floats = r.floats[:mark]
 }
 
+// outside returns the parts of s outside r: above, below, left of, and right
+// of it, some of them empty.
+func outside(s, r image.Rectangle) [4]image.Rectangle {
+	in := s.Intersect(r)
+	if in.Empty() {
+		return [4]image.Rectangle{s}
+	}
+	return [4]image.Rectangle{
+		{Min: s.Min, Max: image.Pt(s.Max.X, in.Min.Y)},
+		{Min: image.Pt(s.Min.X, in.Max.Y), Max: s.Max},
+		{Min: image.Pt(s.Min.X, in.Min.Y), Max: image.Pt(in.Min.X, in.Max.Y)},
+		{Min: image.Pt(in.Max.X, in.Min.Y), Max: image.Pt(s.Max.X, in.Max.Y)},
+	}
+}
+
 // snapshot copies effects into storage the renderer owns, so that the
 // previous frame's ops do not change when a caller reuses a slice of them.
 func (r *renderer) snapshot(effects []fx.Effect) []fx.Effect {
@@ -686,8 +701,18 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 		r.ops = append(r.ops, op{kind: opEffects, rect: clip, viewport: clip, t: n.t, effects: r.snapshot(n.backdrop)})
 	}
 	if len(n.shadow) > 0 {
-		shadow := b.rect.Add(image.Pt(n.shadowX, n.shadowY)).Intersect(clip)
-		r.ops = append(r.ops, op{kind: opEffects, rect: shadow, viewport: clip, t: n.t, effects: r.snapshot(n.shadow)})
+		// An opaque layer hides its own shadow: drawn under it, the shadow
+		// would show through its cells without a background of their own.
+		shadow, effects := b.rect.Add(image.Pt(n.shadowX, n.shadowY)).Intersect(clip), r.snapshot(n.shadow)
+		parts := [4]image.Rectangle{shadow}
+		if !n.clear {
+			parts = outside(shadow, b.rect)
+		}
+		for _, part := range parts {
+			if !part.Empty() {
+				r.ops = append(r.ops, op{kind: opEffects, rect: part, viewport: clip, t: n.t, effects: effects})
+			}
+		}
 	}
 	from := len(r.entries)
 	if r.hasEntry(b) {

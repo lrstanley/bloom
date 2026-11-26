@@ -562,7 +562,9 @@ func (n LayerNode) Transparent() LayerNode { n.clear = true; return n }
 func (n LayerNode) Backdrop(effects ...fx.Effect) LayerNode { n.backdrop = effects; return n }
 
 // Shadow applies effects to the frame beneath the layer, offset by x, y, the
-// way a drop shadow darkens what is under it.
+// way a drop shadow darkens what is under it. Unless the layer is
+// [LayerNode.Transparent], the shadow is only where the layer doesn't cover
+// it, as cells of the layer without a background keep the one beneath.
 func (n LayerNode) Shadow(x, y int, effects ...fx.Effect) LayerNode {
 	n.shadowX, n.shadowY, n.shadow = x, y, effects
 	return n

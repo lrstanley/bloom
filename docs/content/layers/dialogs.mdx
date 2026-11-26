@@ -121,7 +121,7 @@ Several effects can be combined: `Backdrop(fx.Desaturate{Amount: 1}, fx.Dim{Amou
 ## Add a shadow
 
 `Shadow(x, y, effects...)` applies effects to the area beneath the layer, offset by `x` columns and `y` rows,
-like a drop shadow:
+like a drop shadow. The layer hides the part of its shadow it covers, unless it's transparent:
 
 ```go
 bloom.Layer(dialog).Shadow(2, 1, fx.Dim{Amount: 0.7})
