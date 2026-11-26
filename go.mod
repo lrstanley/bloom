@@ -3,10 +3,10 @@ module bloomfx.dev/bloom
 go 1.27.3
 
 require (
-	charm.land/bubbletea/v2 v2.1.2
+	charm.land/bubbletea/v2 v2.2.0
 	charm.land/lipgloss/v2 v2.1.1
-	github.com/charmbracelet/ultraviolet v0.0.0-20261119151026-8ecbcf0e188c
-	github.com/charmbracelet/x/ansi v0.11.10
+	github.com/charmbracelet/ultraviolet v0.0.0-20261125122737-8ed499892fb4
+	github.com/charmbracelet/x/ansi v0.12.0
 	github.com/clipperhouse/uax29/v2 v2.7.0
 )
 

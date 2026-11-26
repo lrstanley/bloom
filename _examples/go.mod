@@ -5,18 +5,18 @@ go 1.27.3
 replace bloomfx.dev/bloom => ../
 
 require (
-	bloomfx.dev/bloom v0.0.0-alpha.10
+	bloomfx.dev/bloom v0.0.0-alpha.15
 	charm.land/bubbles/v2 v2.2.2
-	charm.land/bubbletea/v2 v2.1.2
+	charm.land/bubbletea/v2 v2.2.0
 	charm.land/lipgloss/v2 v2.1.1
 	getsteep.dev/steep v0.0.0-alpha.18
 	getsteep.dev/steep/reel v0.0.0-alpha.18
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/atotto/clipboard v0.1.4
-	github.com/charmbracelet/ultraviolet v0.0.0-20261119151026-8ecbcf0e188c
-	github.com/charmbracelet/x/ansi v0.11.10
-	github.com/lrstanley/bubbletint/chromatint/v2 v2.0.4
-	github.com/lrstanley/bubbletint/v2 v2.0.4
+	github.com/charmbracelet/ultraviolet v0.0.0-20261125122737-8ed499892fb4
+	github.com/charmbracelet/x/ansi v0.12.0
+	github.com/lrstanley/bubbletint/chromatint/v2 v2.1.0
+	github.com/lrstanley/bubbletint/v2 v2.1.0
 	golang.org/x/tools v0.53.0
 )
 
