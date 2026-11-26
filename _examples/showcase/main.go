@@ -156,13 +156,12 @@ func (m *model) switchTint(i int) tea.Cmd {
 	// ones from a themeMsg.
 	themed := m.updateComponents(themeMsg{st: &m.st})
 
-	// The view gives the terminal the tint's colors. The root is told, as
-	// the terminal would tell it, for effects such as the tour's spotlight
-	// that blend toward them.
+	// The view paints the screen with the tint's background, and the root is
+	// told the tint's colors, for effects such as the tour's spotlight that
+	// blend toward them.
+	m.ui.SetColors(t.Fg, t.Bg)
 	return tea.Batch(
 		themed,
-		m.ui.Update(tea.ForegroundColorMsg{Color: t.Fg}),
-		m.ui.Update(tea.BackgroundColorMsg{Color: t.Bg}),
 		m.wave.Play(0, 1),
 		m.toast.notify("✦ "+t.DisplayName),
 	)

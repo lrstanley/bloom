@@ -7,6 +7,7 @@ package bloom
 import (
 	"bytes"
 	"image"
+	"image/color"
 	"io"
 	"runtime"
 	"slices"
@@ -15,6 +16,8 @@ import (
 	"time"
 	"unsafe"
 
+	"bloomfx.dev/bloom/canvas"
+	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -140,6 +143,64 @@ func TestCursor(t *testing.T) {
 	covered := Overlay(tree, Layer(Text("dialog over the input")).Anchor(End, Start))
 	if cur := New().View(30, 3, covered).Cursor; cur != nil {
 		t.Fatalf("cursor under a layer is shown at %+v", cur)
+	}
+}
+
+func TestSetColors(t *testing.T) {
+	t.Parallel()
+
+	var (
+		paper  = color.RGBA{R: 0xf3, G: 0xed, B: 0xe2, A: 0xff}
+		ink    = color.RGBA{R: 0x2d, G: 0x2a, B: 0x26, A: 0xff}
+		termBg = color.RGBA{R: 0x10, G: 0x10, B: 0x20, A: 0xff}
+		termFg = color.RGBA{R: 0xc0, G: 0xc0, B: 0xd0, A: 0xff}
+		echoBg = color.RGBA{R: 0x20, G: 0x20, B: 0x30, A: 0xff}
+	)
+	want := func(r *Root, fg, bg color.Color) {
+		t.Helper()
+		r.Render(1, 1, Text("a"))
+		if got := r.r.env; !got.Equal(canvas.Env{Fg: fg, Bg: bg}) {
+			t.Fatalf("colors are %v on %v, want %v on %v", got.Fg, got.Bg, fg, bg)
+		}
+	}
+
+	r := New()
+	want(r, canvas.DefaultEnv.Fg, canvas.DefaultEnv.Bg)
+	// The terminal's reports fill in what the model did not set.
+	r.Update(tea.BackgroundColorMsg{Color: termBg})
+	want(r, canvas.DefaultEnv.Fg, termBg)
+	r.SetColors(nil, paper)
+	want(r, canvas.DefaultEnv.Fg, paper)
+	// A report never replaces a color the model set, but is kept for when
+	// the model sets it back to nil.
+	r.Update(tea.BackgroundColorMsg{Color: echoBg})
+	r.Update(tea.ForegroundColorMsg{Color: termFg})
+	want(r, termFg, paper)
+	r.SetColors(ink, paper)
+	want(r, ink, paper)
+	r.SetColors(nil, nil)
+	want(r, termFg, echoBg)
+
+	r = New(WithColors(ink, paper))
+	want(r, ink, paper)
+	r.Update(tea.BackgroundColorMsg{Color: termBg})
+	r.Update(tea.ForegroundColorMsg{Color: termFg})
+	want(r, ink, paper)
+}
+
+func TestSetColorsRedraws(t *testing.T) {
+	t.Parallel()
+
+	tree := Overlay(Text("behind the dialog"), Layer(Text("dialog")).Anchor(End, Start).Modal().Backdrop(fx.Dim{Amount: 0.5}))
+	r := New(WithColors(color.White, color.Black))
+	dark := r.Render(20, 1, tree)
+	r.SetColors(color.RGBA{R: 0x2d, G: 0x2a, B: 0x26, A: 0xff}, color.RGBA{R: 0xf3, G: 0xed, B: 0xe2, A: 0xff})
+	if light := r.Render(20, 1, tree); light == dark {
+		t.Fatalf("the backdrop is drawn the same after the colors changed: %q", light)
+	}
+	r.SetColors(color.White, color.Black)
+	if again := r.Render(20, 1, tree); again != dark {
+		t.Fatalf("the backdrop is drawn as %q after the colors changed back, want %q", again, dark)
 	}
 }
 

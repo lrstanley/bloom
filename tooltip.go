@@ -1137,7 +1137,7 @@ func fillChip(src *canvas.Canvas, st lipgloss.Style, method ansi.Method) *canvas
 }
 
 // tipStyle returns the style tooltip t is drawn with: its own, the root's,
-// or the default, which is worked out from the terminal's colors. A nil t is
+// or the default, which is worked out from the screen's colors. A nil t is
 // the full text of cut text, which has no style of its own.
 func (r *Root) tipStyle(t *tooltip) lipgloss.Style {
 	switch {

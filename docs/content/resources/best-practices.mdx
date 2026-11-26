@@ -154,10 +154,8 @@ them is a working reference.
 
   A component the model keeps but stops passing messages to, such as one whose window was closed, misses the change,
   so set its styles again when it's put back. Give the root the theme's colors with `bloom.WithColors(t.Fg, t.Bg)`,
-  and when the theme changes, tell it the new ones with `m.ui.Update(tea.ForegroundColorMsg{Color: t.Fg})` and
-  `m.ui.Update(tea.BackgroundColorMsg{Color: t.Bg})`, for the effects that blend toward them. Return both commands,
-  such as in a `tea.Batch`, as you would any of the root's. See
-  [Colors and the terminal](/concepts/rendering#colors-and-the-terminal).
+  and when the theme changes, the new ones with `m.ui.SetColors(t.Fg, t.Bg)`, for the effects that blend toward
+  them. See [Colors and the terminal](/concepts/rendering#colors-and-the-terminal).
 - **Let a component made each frame borrow the styles.** A small component built in `View` from the model's state,
   such as a status bar, lives for one frame, so it can hold a pointer to the model's styles rather than a copy. A
   styles struct with dozens of styles is many kilobytes, and copying it into each frame's tree would allocate it

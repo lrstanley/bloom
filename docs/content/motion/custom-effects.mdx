@@ -90,7 +90,7 @@ changes. Coordinates are relative to its top-left cell.
 | `Offset` | moves the whole surface when it's drawn, as `fx.Slide` does |
 | `From`, `Reach()` | where a node moving with `MoveWith` was, and the cells around it that it passes over |
 | `Viewport` | the area the node is placed in, such as the screen for a dialog, which tells you how far it can move out of sight |
-| `Env` | the terminal's default colors and color profile |
+| `Env` | the colors a cell with none of its own shows: the screen's background and foreground |
 
 Cells are [Ultraviolet](https://github.com/charmbracelet/ultraviolet) cells: `c.Content` is the glyph, `c.Width`
 its width in columns, and `c.Style` its colors and attributes.

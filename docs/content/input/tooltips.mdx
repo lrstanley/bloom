@@ -209,8 +209,8 @@ m.ui = bloom.New(bloom.WithTooltips(bloom.Tooltips{
 | `MaxWidth` | 60 | the widest a bubble gets, padding and border included, before its text wraps; never wider than the screen |
 | `Truncated`, `Explicit` | `TipDefault`: `TipUnfold`, `TipBubble` | [where each kind is drawn](#choose-where-tooltips-are-drawn) |
 
-The default background is worked out from the terminal's colors, which it reports when you return `m.ui.Init()`
-from `Init`, or from those given with `WithColors`, so it suits dark and light terminals alike.
+The default background is worked out from the screen's colors, those given with `WithColors` or `SetColors`, or
+the terminal's, which it reports when you return `m.ui.Init()` from `Init`, so it suits dark and light screens alike.
 
 One tooltip can have a style and a delay of its own, for a warning that should stand out, or a control whose
 tooltip should show at once:

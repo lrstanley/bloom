@@ -133,9 +133,10 @@ I/O in the handler itself. Return a command for that work instead, which runs in
 
 ## Effects look wrong on a light terminal
 
-`Dim` fades toward the terminal's background, and some effects use its foreground. Until the terminal reports its
-colors, bloom assumes white on black. Return `m.ui.Init()` from your model's `Init` and pass every message to
-`m.ui.Update` so the root hears the reply. For terminals that never answer, set defaults with `bloom.WithColors`.
+`Dim` fades toward the screen's background, and some effects use its foreground. Unless it's told them, bloom
+assumes light gray on black. If your program paints the screen, such as with the view's `BackgroundColor`, give the
+root the same colors with `bloom.WithColors`, and with `m.ui.SetColors` when they change. Otherwise, return
+`m.ui.Init()` from your model's `Init` and pass every message to `m.ui.Update` so the root hears the terminal's.
 
 ## Text doesn't wrap, or wraps when it shouldn't
 

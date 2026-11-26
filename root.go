@@ -46,6 +46,11 @@ type Root struct {
 	copyFlash  bool
 	clickDelay bool
 	clipboard  func(text string) error
+
+	// The colors of a cell without its own: those the model set with
+	// SetColors, and those the terminal reported, for those it did not.
+	fg, bg         color.Color
+	termFg, termBg color.Color
 	// after returns a command sending what fn returns after d, as tea.Tick
 	// does; tests have it send at once.
 	after func(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd
@@ -82,8 +87,8 @@ func WithWidthMethod(method ansi.Method) Option {
 	return func(c *config) { c.method = method }
 }
 
-// WithColors sets the terminal's default colors, for effects that blend
-// colors, until the terminal reports its own (see [Root.Init]).
+// WithColors sets the colors a cell without its own shows from the start, as
+// [Root.SetColors] does.
 func WithColors(fg, bg color.Color) Option {
 	return func(c *config) { c.fg, c.bg = fg, bg }
 }
@@ -139,8 +144,7 @@ func New(opts ...Option) *Root {
 	if c.wordChars != nil {
 		r.r.words.Chars = *c.wordChars
 	}
-	r.r.env.Fg = cmp.Or(c.fg, r.r.env.Fg)
-	r.r.env.Bg = cmp.Or(c.bg, r.r.env.Bg)
+	r.SetColors(c.fg, c.bg)
 	r.tip.configure(c.tips)
 	if c.tipsOn {
 		r.EnableTooltips(true)
@@ -149,14 +153,31 @@ func New(opts ...Option) *Root {
 }
 
 // Init asks the terminal for its default colors, which effects that blend
-// colors use. Return it from the model's Init. Pass every message to
-// [Root.Update] and return its command from the model's Update.
+// colors use where [Root.SetColors] set none. Return it from the model's
+// Init. Pass every message to [Root.Update] and return its command from the
+// model's Update.
 func (r *Root) Init() tea.Cmd {
 	return tea.Batch(tea.RequestBackgroundColor, tea.RequestForegroundColor)
 }
 
-// Update notes what the terminal reports about itself: its default colors,
-// color profile, and focus. Pass every message to Update and return its
+// SetColors sets the colors a cell without its own shows, which effects that
+// blend colors need for it: a dimmed backdrop, a fade, the mouse selection,
+// and a tooltip's background. A model that paints the screen, such as with
+// the BackgroundColor and ForegroundColor of its [tea.View], sets them to
+// the colors it paints, and again when they change.
+//
+// A nil color is the terminal's own, as it reports it to [Root.Update]; until
+// it does, or if it never does, light gray on black is used. A report never
+// replaces a color set here, but it is kept, for when the color is set back
+// to nil. While the screen is painted, the terminal reports the colors it is
+// painted with, so a model that stops painting can ask it again, with
+// [tea.RequestBackgroundColor] and [tea.RequestForegroundColor].
+func (r *Root) SetColors(fg, bg color.Color) {
+	r.fg, r.bg = fg, bg
+}
+
+// Update notes what the terminal reports about itself: its default colors
+// (see [Root.SetColors]) and focus. Pass every message to Update and return its
 // command: it schedules frames while layout animations run, fewer while the
 // terminal is not focused (see [WithUnfocusedFPS]), and returns the commands
 // of mouse handlers it runs. It runs them for mouse events that the OnMouse
@@ -166,11 +187,9 @@ func (r *Root) Init() tea.Cmd {
 func (r *Root) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.BackgroundColorMsg:
-		r.r.env.Bg = msg.Color
+		r.termBg = msg.Color
 	case tea.ForegroundColorMsg:
-		r.r.env.Fg = msg.Color
-	case tea.ColorProfileMsg:
-		r.r.env.Profile = msg.Profile
+		r.termFg = msg.Color
 	case tea.FocusMsg:
 		r.blurred = false
 	case tea.BlurMsg:
@@ -240,6 +259,8 @@ func (r *Root) Render(w, h int, c Child) string {
 		}
 	}
 	r.r.sel, r.r.dragged, r.r.selLost = *shown, r.mouse.drag, false
+	r.r.env.Fg = cmp.Or(r.fg, r.termFg, canvas.DefaultEnv.Fg)
+	r.r.env.Bg = cmp.Or(r.bg, r.termBg, canvas.DefaultEnv.Bg)
 	r.noteFocus()
 	out := r.r.render(w, h, c)
 	// Where the selection starts and ends is found in the frame, and

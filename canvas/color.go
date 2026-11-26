@@ -6,26 +6,21 @@ package canvas
 
 import (
 	"image/color"
-
-	"github.com/charmbracelet/colorprofile"
 )
 
-// Env describes the terminal a frame is drawn for.
+// Env describes the screen a frame is drawn on.
 type Env struct {
-	// Fg and Bg are the terminal's default colors, which a cell without a
-	// color shows. Effects that blend colors need them; a frame drawn before
-	// the terminal reported them uses white on black.
+	// Fg and Bg are the colors a cell without a color of its own shows:
+	// those the program paints the screen with, or the terminal's own.
+	// Effects that blend colors need them for such cells; a frame drawn
+	// without them uses [DefaultEnv]'s.
 	Fg, Bg color.Color
-	// Profile is the terminal's color profile. Colors are blended in true
-	// color either way, and Bubble Tea converts them down, but an effect may
-	// want plainer colors on a terminal with few.
-	Profile colorprofile.Profile
 }
 
-// Equal reports whether e and o describe the same terminal. Colors are
+// Equal reports whether e and o describe the same screen. Colors are
 // compared by value, so any [color.Color] can be compared.
 func (e Env) Equal(o Env) bool {
-	return e.Profile == o.Profile && sameColor(e.Fg, o.Fg) && sameColor(e.Bg, o.Bg)
+	return sameColor(e.Fg, o.Fg) && sameColor(e.Bg, o.Bg)
 }
 
 func sameColor(a, b color.Color) bool {
@@ -47,11 +42,11 @@ func (e Env) withDefaults() Env {
 	return e
 }
 
-// DefaultEnv is the [Env] used until the terminal reports its colors.
+// DefaultEnv is the [Env] used for colors that neither the program nor the
+// terminal gave: light gray on black.
 var DefaultEnv = Env{
-	Fg:      color.RGBA{R: 0xdd, G: 0xdd, B: 0xdd, A: 0xff},
-	Bg:      color.RGBA{A: 0xff},
-	Profile: colorprofile.TrueColor,
+	Fg: color.RGBA{R: 0xdd, G: 0xdd, B: 0xdd, A: 0xff},
+	Bg: color.RGBA{A: 0xff},
 }
 
 // mixOp is the kind of color math a [Mixer] result was computed with.

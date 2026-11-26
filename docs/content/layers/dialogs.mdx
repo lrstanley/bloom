@@ -110,11 +110,12 @@ Effects that suit backdrops:
 
 Several effects can be combined: `Backdrop(fx.Desaturate{Amount: 1}, fx.Dim{Amount: 0.4})`.
 
-<Callout title="Dim needs the terminal's colors">
-  `Dim` moves colors toward the terminal's background color, and `Shimmer` and `Wave` use its foreground. The root
-  asks the terminal for both. Return `m.ui.Init()` from your model's `Init` and pass every message to
-  `m.ui.Update` so it hears the answer, or set defaults with
-  [`bloom.WithColors`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors).
+<Callout title="Dim needs the screen's colors">
+  `Dim` moves colors toward the screen's background color, and `Shimmer` and `Wave` use its foreground. If your
+  program paints the screen, give the root those colors with
+  [`bloom.WithColors`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) and `m.ui.SetColors`. Otherwise return
+  `m.ui.Init()` from your model's `Init` and pass every message to `m.ui.Update`, so it hears the terminal's. See
+  [Colors and the terminal](/concepts/rendering#colors-and-the-terminal).
 </Callout>
 
 ## Add a shadow

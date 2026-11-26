@@ -182,6 +182,7 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 | --- | --- |
 | `bloom.New(opts...)` | make a root; keep it in your model by pointer |
 | `ui.Init()` | ask the terminal for its colors; return from `Init` |
+| `ui.SetColors(fg, bg)` | the colors effects blend with where a cell has none: those your program paints the screen with; `nil` for the terminal's own |
 | `ui.Update(msg)` | hear the terminal, run layout animation, and keep hover up to date; pass every message, return the command |
 | `ui.View(w, h, tree)` | lay out, draw, and return a `tea.View` that runs mouse handlers |
 | `ui.Render(w, h, tree)` | lay out and draw to a string; a width or height of zero or less uses the natural size on that axis |
@@ -196,7 +197,7 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 
 | Option | Default | Sets |
 | --- | --- | --- |
-| [`WithColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) | light gray (`#dddddd`) on black | the terminal colors effects blend with, until the terminal reports its own |
+| [`WithColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) | light gray (`#dddddd`) on black | the colors effects blend with where a cell has none, from the start, as `ui.SetColors` sets them |
 | [`WithFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithFPS) | 60 | the frame rate of layout animation |
 | [`WithUnfocusedFPS(n)`](https://pkg.go.dev/bloomfx.dev/bloom#WithUnfocusedFPS) | 20 | the frame rate of layout animation while the terminal isn't focused; never above `WithFPS` |
 | [`WithWidthMethod(m)`](https://pkg.go.dev/bloomfx.dev/bloom#WithWidthMethod) | `ansi.GraphemeWidth` | how character widths are measured; must match the terminal |

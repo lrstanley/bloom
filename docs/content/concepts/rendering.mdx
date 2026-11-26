@@ -53,10 +53,18 @@ That only costs anything while they're on screen. Wrapping a node in a transitio
 
 ## Colors and the terminal
 
-Some effects blend toward the terminal's own colors: `Dim` toward its background, and `Wave`, and `Shimmer` by
-default, toward its foreground. `m.ui.Init()` asks the terminal for those colors, and `m.ui.Update` hears the reply, along with the
-terminal's color profile. Until the reply arrives, or if the terminal never answers, bloom uses defaults that you can
-set with [`bloom.WithColors`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors).
+Effects blend colors, and a cell with no color of its own shows the screen's: `Dim` fades toward the screen's
+background, a fade blends cells with none from it, and `Wave`, and `Shimmer` by default, blend toward its foreground.
+The root needs to know those colors.
+
+- **If your program paints the screen**, as with the `BackgroundColor` and `ForegroundColor` of its `tea.View`, give
+  the root the same colors: [`bloom.WithColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#WithColors) when you
+  make it, and [`m.ui.SetColors(fg, bg)`](https://pkg.go.dev/bloomfx.dev/bloom#Root.SetColors) when they change,
+  such as with the theme. Either can be `nil`, for the terminal's own.
+- **For any color left to the terminal**, return `m.ui.Init()` from `Init`, which asks the terminal for its colors,
+  and pass every message to `m.ui.Update`, which hears the reply.
+
+Colors you set win over the terminal's reply. Colors that neither you nor the terminal gave are light gray on black.
 
 Text widths are measured with grapheme clustering by default, as Lip Gloss and modern terminals do. If your
 program targets terminals that measure differently, set the method with

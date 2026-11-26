@@ -110,7 +110,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case apps.OpenMsg:
 		cmds = append(cmds, m.open(apps.Notes, msg.File))
 	case theme.ChangeMsg:
-		cmds = append(cmds, m.setTheme(*msg.Styles))
+		m.setTheme(*msg.Styles)
 	case startmenu.LogoutMsg:
 		cmds = append(cmds, m.logout())
 	}
@@ -202,11 +202,11 @@ func (m *model) open(a apps.App, f string) tea.Cmd {
 // setTheme takes the styles of a new theme, which Update then gives each
 // component too, and tells the root the theme's colors, for the effects that
 // blend them.
-func (m *model) setTheme(st theme.Styles) tea.Cmd {
+func (m *model) setTheme(st theme.Styles) {
 	m.st = st
 	t := st.Tint
 	m.say("changed the theme to " + t.DisplayName)
-	return tea.Batch(m.ui.Update(tea.BackgroundColorMsg{Color: t.Bg}), m.ui.Update(tea.ForegroundColorMsg{Color: t.Fg}))
+	m.ui.SetColors(t.Fg, t.Bg)
 }
 
 // logout shuts the desktop down: it shades out to the splash, which runs
