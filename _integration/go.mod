@@ -5,7 +5,7 @@ go 1.27.3
 replace bloomfx.dev/bloom => ../
 
 require (
-	bloomfx.dev/bloom v0.0.0-alpha.15
+	bloomfx.dev/bloom v0.0.0-alpha.17
 	charm.land/bubbletea/v2 v2.2.0
 	charm.land/lipgloss/v2 v2.1.1
 	getsteep.dev/steep v0.0.0-alpha.18
