@@ -14,6 +14,7 @@ import (
 	"bloomfx.dev/bloom/fig"
 	"bloomfx.dev/bloom/fig/fonts"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/lrstanley/bubbletint/roles/v2"
 )
 
 const heading = "Mission Control"
@@ -54,7 +55,8 @@ func (hd *header) Layout(bloom.Context) bloom.Child {
 }
 
 // shine returns the header's paint with a band of light t of the way across
-// it, diagonally, brightening the strokes it passes over.
+// it, diagonally, turning the strokes it passes over toward the body text's
+// color.
 func (hd *header) shine(t float64) fig.Paint {
 	if t <= 0 || t >= 1 {
 		return hd.st.headerPaint
@@ -65,7 +67,7 @@ func (hd *header) shine(t float64) fig.Paint {
 		const band = 6.0
 		at := -band + t*(float64(w+2*h)+2*band)
 		if d := math.Abs(float64(c.X+2*(h-1-c.Y)) - at); d < band && st.Fg != nil {
-			st.Fg = blend(st.Fg, hd.st.theme.BrightWhite, 0.85*(1-d/band))
+			st.Fg = blend(st.Fg, hd.st.fit.Color(roles.Fg), 0.85*(1-d/band))
 		}
 		return st
 	})

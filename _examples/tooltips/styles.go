@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -15,7 +17,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	page        lipgloss.Style
 	title       lipgloss.Style
@@ -40,37 +42,36 @@ type styles struct {
 	failedTip lipgloss.Style
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a failed deploy, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg := t.Fg
-	muted := t.BrightBlack
-	accent := t.Purple
-	dark := t.Bg
-	button := lipgloss.Lighten(t.Bg, 0.1)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	bar := f.On(roles.Surface) // the roles for drawing on the status line
 
-	tool := lipgloss.NewStyle().Foreground(fg).Background(button).Padding(0, 1)
-	statusBar := lipgloss.NewStyle().Foreground(fg).Background(lipgloss.Lighten(t.Bg, 0.05)).Padding(0, 1)
+	tool := f.Fill(roles.Surface).Padding(0, 1)
+	statusBar := bar.Fill(roles.Surface).Padding(0, 1)
 	return styles{
-		theme: t,
+		fit: f,
 
 		page:        lipgloss.NewStyle().Padding(1, 2, 0),
-		title:       lipgloss.NewStyle().Bold(true).Foreground(accent),
-		text:        lipgloss.NewStyle().Foreground(fg),
-		label:       lipgloss.NewStyle().Foreground(muted),
-		header:      lipgloss.NewStyle().Foreground(muted).Bold(true),
-		marker:      lipgloss.NewStyle().Foreground(accent).Bold(true),
+		title:       f.Text(roles.Accent).Bold(true),
+		text:        f.Text(roles.Fg),
+		label:       f.Text(roles.Muted),
+		header:      f.Text(roles.Muted).Bold(true),
+		marker:      f.Text(roles.Accent).Bold(true),
 		tool:        tool,
-		toolHover:   tool.Background(lipgloss.Lighten(t.Bg, 0.2)),
-		toolOn:      tool.Foreground(dark).Background(accent).Bold(true),
+		toolHover:   f.Fill(roles.Hover).Padding(0, 1),
+		toolOn:      f.Fill(roles.Accent).Bold(true).Padding(0, 1),
 		statusBar:   statusBar,
-		statusMuted: statusBar.Foreground(muted),
-		hint:        statusBar.Foreground(muted).Padding(0, 1, 0, 0),
+		statusMuted: statusBar.Foreground(bar.Color(roles.Muted)),
+		hint:        statusBar.Foreground(bar.Color(roles.Muted)).Padding(0, 1, 0, 0),
 
-		healthy:  lipgloss.NewStyle().Foreground(t.Green),
-		degraded: lipgloss.NewStyle().Foreground(t.Yellow),
-		failed:   lipgloss.NewStyle().Foreground(t.Red),
-		rolling:  lipgloss.NewStyle().Foreground(t.Blue),
+		healthy:  f.Text(roles.Success),
+		degraded: f.Text(roles.Warning),
+		failed:   f.Text(roles.Danger),
+		rolling:  f.Text(roles.Info),
 
-		failedTip: lipgloss.NewStyle().Foreground(dark).Background(t.Red).Padding(0, 1),
+		failedTip: f.Fill(roles.Danger).Padding(0, 1),
 	}
 }

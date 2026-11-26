@@ -9,9 +9,24 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/lrstanley/bubbletint/chromatint/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
+
+// trail is the path to the selected function in the tree, and the selected
+// row of a list without focus: a role the example adds to bubbletint's, a
+// step above the panel it sits on, and a step short of a row under the
+// pointer.
+var trail = roles.Define(roles.Spec{
+	Name: "trail",
+	Kind: roles.KindSurface,
+	Derive: func(p *roles.Palette) tint.Color {
+		return p.Color(roles.Surface).Mix(p.Color(roles.Hover), 0.6)
+	},
+	Distinct: []roles.Role{roles.Surface, roles.Hover},
+})
 
 // styles are the example's colors and styles, all made from one bubbletint
 // tint by newStyles, so that nothing is a package global. The model keeps
@@ -19,7 +34,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the bubbletint tint the colors come from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	text   lipgloss.Style
 	muted  lipgloss.Style
@@ -66,7 +81,7 @@ type styles struct {
 	resultHover     lipgloss.Style
 	resultSelHover  lipgloss.Style
 
-	// codeStyle is the chroma style made from the theme by chromatint,
+	// codeStyle is the chroma style made from the tint by chromatint,
 	// without backgrounds, so the code takes its pane's.
 	codeStyle *chroma.Style
 
@@ -83,90 +98,77 @@ type paintKey struct {
 	line   int
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or the selected row, from
+// the tint, so the example reads on any tint, dark or light. The code alone
+// is colored by the tint's own palette, through chromatint.
 func newStyles(t *tint.Tint) styles {
-	// The colors the styles are made from.
-	var (
-		fg       = t.Fg
-		bright   = lipgloss.Lighten(t.Fg, 0.25)
-		muted    = lipgloss.Darken(t.BrightBlack, 0.3)
-		faint    = lipgloss.Lighten(t.Bg, 0.22)
-		accent   = t.BrightRed
-		call     = t.BrightYellow
-		method   = t.BrightBlue
-		iface    = t.BrightCyan
-		external = lipgloss.Darken(t.BrightBlack, 0.2)
-	)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	raised := f.On(roles.Raised) // the roles for drawing on a dialog
+	c := f.Color
 
-	// The backgrounds, from the screen's up.
-	var (
-		bgPanel   = lipgloss.Lighten(t.Bg, 0.03)
-		bgItem    = lipgloss.Lighten(t.Bg, 0.05)
-		bgPath    = lipgloss.Lighten(t.Bg, 0.1)
-		bgHover   = lipgloss.Lighten(t.Bg, 0.13)
-		bgSel     = lipgloss.Lighten(t.Bg, 0.16)
-		bgMarked  = lipgloss.Darken(t.BrightRed, 0.55)
-		bgDialog  = lipgloss.Lighten(t.Bg, 0.06)
-		bgPreview = lipgloss.Lighten(t.Bg, 0.025)
-	)
+	// A function in the tree past the selected one is drawn on a fill half
+	// way from the screen's background to a panel's.
+	p := f.Palette()
+	preview := f.Fit(p.Color(roles.Bg).Mix(p.Color(roles.Surface), 0.5), roles.Surface)
 
 	codeStyle, err := chroma.NewStyle("golens", chromatint.StyleEntry(t, false))
 	if err != nil {
 		panic(err)
 	}
 
-	s := lipgloss.NewStyle()
-	item := s.Background(bgItem).PaddingRight(1)
-	panel := s.Background(bgPanel).Padding(0, 1)
-	row := s.Foreground(fg).Padding(0, 1)
-	rowSel := row.Background(bgSel).Foreground(bright)
-	rowSelBlur := row.Background(bgPath)
+	onSel := f.On(roles.Selection).Color(roles.Fg) // text on the selected row
+	item := f.Fill(roles.Surface).PaddingRight(1)
+	panel := f.Fill(roles.Surface).Padding(0, 1)
+	row := f.Text(roles.Fg).Padding(0, 1)
+	rowSel := f.Fill(roles.Selection).Padding(0, 1)
+	rowSelBlur := row.Background(c(trail))
 	return styles{
-		theme: t,
+		fit: f,
 
-		text:   s.Foreground(fg),
-		muted:  s.Foreground(muted),
-		faint:  s.Foreground(faint),
-		bright: s.Foreground(bright).Bold(true),
-		accent: s.Foreground(accent),
+		text:   f.Text(roles.Fg),
+		muted:  f.Text(roles.Muted),
+		faint:  f.Text(roles.Subtle),
+		bright: f.Text(roles.Fg).Bold(true),
+		accent: f.Text(roles.Accent),
 
 		item:         item,
-		itemPath:     item.Background(bgPath),
-		itemSel:      item.Background(bgSel),
-		itemPreview:  item.Background(bgPreview),
-		itemHover:    item.Background(bgHover),
-		bar:          s.Foreground(accent),
-		name:         s.Foreground(fg),
-		nameSel:      s.Foreground(bright).Bold(true),
-		nameExternal: s.Foreground(external).Italic(true),
-		meta:         s.Foreground(muted),
-		iconFunc:     s.Foreground(call),
-		iconMethod:   s.Foreground(method),
-		iconIface:    s.Foreground(iface),
-		iconExternal: s.Foreground(external),
-		wire:         s.Foreground(faint),
-		wireHot:      s.Foreground(accent),
+		itemPath:     item.Background(c(trail)),
+		itemSel:      item.Background(c(roles.Selection)),
+		itemPreview:  item.Background(preview),
+		itemHover:    item.Background(c(roles.Hover)),
+		bar:          f.Text(roles.Accent),
+		name:         f.Text(roles.Fg),
+		nameSel:      lipgloss.NewStyle().Foreground(onSel).Bold(true),
+		nameExternal: f.Text(roles.Muted).Italic(true),
+		meta:         f.Text(roles.Muted),
+		iconFunc:     f.Text(roles.Yellow),
+		iconMethod:   f.Text(roles.Blue),
+		iconIface:    f.Text(roles.Cyan),
+		iconExternal: f.Text(roles.Muted),
+		wire:         f.Text(roles.Border),
+		wireHot:      f.Text(roles.Accent),
 
-		screen:     s.Background(t.Bg),
+		screen:     f.Fill(roles.Bg),
 		panel:      panel,
-		dialog:     s.Background(bgDialog).Border(lipgloss.RoundedBorder()).BorderForeground(faint).BorderBackground(bgDialog).Padding(0, 1),
+		dialog:     raised.Fill(roles.Raised).Border(lipgloss.RoundedBorder()).BorderForeground(raised.Color(roles.Border)).BorderBackground(c(roles.Raised)).Padding(0, 1),
 		row:        row,
 		rowSel:     rowSel,
 		rowSelBlur: rowSelBlur,
 
 		code:         make(map[chroma.TokenType]lipgloss.Style),
-		mark:         s.Foreground(bright).Background(bgMarked).Bold(true),
-		lineNo:       s.Foreground(faint),
-		lineNoMarked: s.Foreground(accent),
+		mark:         f.Fill(roles.Accent.Soft()).Bold(true),
+		lineNo:       f.Text(roles.Subtle),
+		lineNoMarked: f.Text(roles.Accent),
 
 		callsPanel:      panel.Padding(0),
-		rowHover:        row.Background(bgHover),
-		rowSelHover:     rowSel.Background(bgHover),
-		rowSelBlurHover: rowSelBlur.Background(bgHover),
+		rowHover:        row.Background(c(roles.Hover)),
+		rowSelHover:     rowSel.Background(c(roles.Hover)),
+		rowSelBlurHover: rowSelBlur.Background(c(roles.Hover)),
 		result:          row.Padding(0),
 		resultSel:       rowSel.Padding(0),
-		resultHover:     row.Padding(0).Background(bgHover),
-		resultSelHover:  rowSel.Padding(0).Background(bgHover),
+		resultHover:     row.Padding(0).Background(c(roles.Hover)),
+		resultSelHover:  rowSel.Padding(0).Background(c(roles.Hover)),
 
 		codeStyle: codeStyle,
 		painted:   make(map[paintKey]string),

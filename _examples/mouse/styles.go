@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -15,7 +17,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel    lipgloss.Style // a rounded frame
 	item     lipgloss.Style // a file in the list
@@ -29,21 +31,24 @@ type styles struct {
 	status   lipgloss.Style // the status line
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as the selected file or the row under
+// the pointer, from the tint, so the example reads on any tint, dark or
+// light.
 func newStyles(t *tint.Tint) styles {
-	item := lipgloss.NewStyle().Foreground(t.Fg).Padding(0, 1)
-	divider := lipgloss.NewStyle().Foreground(t.BrightBlack)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	divider := f.Text(roles.Border)
 	return styles{
-		theme:    t,
-		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BrightBlack),
-		item:     item,
-		hovered:  item.Background(lipgloss.Lighten(t.Bg, 0.08)),
-		selected: item.Foreground(t.Bg).Background(t.Blue).Bold(true),
+		fit:      f,
+		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		item:     f.Text(roles.Fg).Padding(0, 1),
+		hovered:  f.Fill(roles.Hover).Padding(0, 1),
+		selected: f.Fill(roles.Selection).Bold(true).Padding(0, 1),
 		divider:  divider,
-		grabbed:  divider.Foreground(t.Blue),
-		heading:  lipgloss.NewStyle().Bold(true).Foreground(t.Blue).Padding(0, 1),
+		grabbed:  divider.Foreground(f.Color(roles.Accent)),
+		heading:  f.Text(roles.Accent).Bold(true).Padding(0, 1),
 		page:     lipgloss.NewStyle().Padding(0, 1),
-		code:     lipgloss.NewStyle().Foreground(t.Fg),
-		status:   lipgloss.NewStyle().Foreground(t.BrightBlack),
+		code:     f.Text(roles.Fg),
+		status:   f.Text(roles.Muted),
 	}
 }

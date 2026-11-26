@@ -50,10 +50,12 @@ github.com/google/jsonschema-go v0.4.3 h1:/DBOLZTfDow7pe2GmaJNhltueGTtDKICi8V8p+
 github.com/google/jsonschema-go v0.4.3/go.mod h1:r5quNTdLOYEz95Ru18zA0ydNbBuYoo9tgaYcxEYhJVE=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
-github.com/lrstanley/bubbletint/chromatint/v2 v2.1.0 h1:V89qKCZnnpEmF56ao4B4hCe0CWvo0mgHS0guhif62oM=
-github.com/lrstanley/bubbletint/chromatint/v2 v2.1.0/go.mod h1:9HUzbG/AENi2T+CGxY2FeU4rjzJiMoGdxSCwhEjANhU=
-github.com/lrstanley/bubbletint/v2 v2.1.0 h1:MDgDatluf78DM0Pdm4v0M+ygU9+sBe2TgCYAlDN7VLw=
-github.com/lrstanley/bubbletint/v2 v2.1.0/go.mod h1:HaBq3Yc6pcCrQDuW8huE+Bs1adVFUmg/O1B9Zu/kab4=
+github.com/lrstanley/bubbletint/chromatint/v2 v2.2.0-alpha.2 h1:n5SIu3gkHf1U2vOiIXrhW+Ci2T2O8HThFdl5ZtE8puQ=
+github.com/lrstanley/bubbletint/chromatint/v2 v2.2.0-alpha.2/go.mod h1:9F9rg4V09dp91rM/Yy+iWXLNegXGCp+2wBhxGswg4ZM=
+github.com/lrstanley/bubbletint/roles/v2 v2.2.0-alpha.2 h1:HZU1bHoNoih/z6FW1sejsFQURVxJ4kbj3qdsF+7G9f0=
+github.com/lrstanley/bubbletint/roles/v2 v2.2.0-alpha.2/go.mod h1:e36vwvXMwoQe+Smv5Lusc8KRqQeDUMLHtuh4QAMab84=
+github.com/lrstanley/bubbletint/v2 v2.2.0-alpha.2 h1:MvVm8idk530X0GIid7GpsM9dHiQWS4JtGjJqFKGGFTI=
+github.com/lrstanley/bubbletint/v2 v2.2.0-alpha.2/go.mod h1:HaBq3Yc6pcCrQDuW8huE+Bs1adVFUmg/O1B9Zu/kab4=
 github.com/lucasb-eyer/go-colorful v1.4.1 h1:1EO+WB73+EH8EVbzlrG3KLAfEypQWVHIBqlTf+2hNss=
 github.com/lucasb-eyer/go-colorful v1.4.1/go.mod h1:R4dSotOR9KMtayYi1e77YzuveK+i7ruzyGqttikkLy0=
 github.com/mattn/go-runewidth v0.0.31 h1:1oCV4ReTlosDBc6rYRw5cL8S/4y8iv5oRl4SJ5IBgwo=

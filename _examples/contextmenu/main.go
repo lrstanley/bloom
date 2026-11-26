@@ -24,6 +24,7 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -58,7 +59,7 @@ func newModel() *model {
 		},
 		status: "right click a file, or the empty space below the files",
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
 	m.menu = menu{st: m.st}
 	return m
 }
@@ -88,7 +89,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

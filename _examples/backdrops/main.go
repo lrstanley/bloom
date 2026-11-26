@@ -26,6 +26,7 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -49,7 +50,7 @@ func newModel() *model {
 		st:    newStyles(tint.TintTokyoNight),
 		clock: anim.NewTicker(),
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
 	m.dialog = dialog{st: m.st, presence: anim.NewPresence(anim.Duration(350 * time.Millisecond))}
 	return m
 }
@@ -84,7 +85,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) View() tea.View {
 	v := m.ui.View(m.w, m.h, m.layout())
 	v.AltScreen = true
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	// The clock slows while the terminal is not focused.
 	v.ReportFocus = true
 	// The pointer is followed everywhere, not just over hoverable nodes.

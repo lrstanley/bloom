@@ -19,6 +19,7 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -43,7 +44,7 @@ func newModel() *model {
 			"v1.4.39 rolled back", "v1.4.40 rolled out", "v1.4.41 rolled out",
 		},
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
 	m.header = newHeader()
 	m.header.setStyles(m.st)
 	m.toast = newToast()
@@ -81,7 +82,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

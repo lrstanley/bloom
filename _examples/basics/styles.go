@@ -7,6 +7,8 @@ package main
 import (
 	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -22,17 +24,21 @@ type styles struct {
 	prose     lipgloss.Style // the paragraph's text
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as an accent or body text, from the
+// tint, so the example reads on any tint, dark or light. The headings are the
+// tint's yellow, apart from the frames and chips they title.
 func newStyles(t *tint.Tint) styles {
-	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.Blue)
-	chip := lipgloss.NewStyle().Foreground(t.Bg).Background(t.Green).Padding(0, 1)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Accent))
+	chip := f.Fill(roles.Accent2).Padding(0, 1)
 	return styles{
 		border:    border,
 		padded:    border.Padding(1, 2),
 		chip:      chip,
 		stretched: chip.Align(lipgloss.Center, lipgloss.Center),
-		heading:   lipgloss.NewStyle().Bold(true).Foreground(t.Yellow),
-		prose:     lipgloss.NewStyle().Foreground(t.White),
+		heading:   f.Text(roles.Yellow).Bold(true),
+		prose:     f.Text(roles.Fg),
 	}
 }
 

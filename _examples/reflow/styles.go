@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -13,7 +15,7 @@ import (
 // tint by newStyles. The model keeps them, so that nothing is a package
 // global.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel    lipgloss.Style // a rounded frame
 	heading  lipgloss.Style // the title at the top
@@ -22,15 +24,17 @@ type styles struct {
 	marker   lipgloss.Style // the marker that follows the selected item
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as a border or the selected item, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	item := lipgloss.NewStyle().Padding(0, 1).Foreground(t.Fg)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 	return styles{
-		theme:    t,
-		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BrightBlack),
-		heading:  lipgloss.NewStyle().Bold(true).Foreground(t.Blue),
-		item:     item,
-		selected: item.Background(lipgloss.Lighten(t.Bg, 0.12)),
-		marker:   lipgloss.NewStyle().Foreground(t.Green).Bold(true),
+		fit:      f,
+		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		heading:  f.Text(roles.Accent).Bold(true),
+		item:     f.Text(roles.Fg).Padding(0, 1),
+		selected: f.Fill(roles.Selection).Padding(0, 1),
+		marker:   f.Text(roles.Accent2).Bold(true),
 	}
 }

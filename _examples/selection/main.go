@@ -52,6 +52,7 @@ import (
 	"bloomfx.dev/bloom/_examples/internal/clip"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -82,7 +83,7 @@ type model struct {
 func newModel() *model {
 	m := &model{st: newStyles(tint.TintTokyoNight), status: "drag over any text to select it"}
 	m.ui = bloom.New(
-		bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg),
+		bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)),
 		// A background alone keeps the colors of the log's levels. The
 		// dim timestamps, hard to read on it, take the theme's
 		// foreground instead.
@@ -180,7 +181,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

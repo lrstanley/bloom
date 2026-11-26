@@ -7,6 +7,8 @@ package main
 import (
 	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -16,7 +18,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel     lipgloss.Style // a pane's rounded frame, padded
 	title     lipgloss.Style // a pane's title, on its frame
@@ -29,36 +31,42 @@ type styles struct {
 
 	dialog      lipgloss.Style // the dialog's frame
 	dialogTitle lipgloss.Style // the dialog's title, inside it
+	dialogText  lipgloss.Style // the dialog's note, inside it
 	token       lipgloss.Style // the token in the dialog
 
 	levels map[string]lipgloss.Style // the levels of the log, by name
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a raised dialog, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent := t.Fg, t.BrightBlack, t.Blue
-	title := lipgloss.NewStyle().Foreground(accent).Bold(true).Padding(0, 1)
-	value := lipgloss.NewStyle().Foreground(fg)
-	status := lipgloss.NewStyle().Foreground(muted)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	raised := f.On(roles.Raised) // the roles for drawing on the dialog
+
+	title := f.Text(roles.Accent).Bold(true).Padding(0, 1)
+	value := f.Text(roles.Fg)
+	status := f.Text(roles.Muted)
 	return styles{
-		theme:     t,
-		panel:     lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(0, 1),
+		fit:       f,
+		panel:     lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)).Padding(0, 1),
 		title:     title,
-		label:     lipgloss.NewStyle().Foreground(muted),
+		label:     f.Text(roles.Muted),
 		value:     value,
 		caret:     value.Reverse(true),
 		status:    status,
-		message:   status.Foreground(fg),
-		selection: lipgloss.NewStyle().Background(t.SelectionBg),
-		dialog: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(accent).
-			Padding(1, 2).Background(lipgloss.Lighten(t.Bg, 0.06)),
-		dialogTitle: title.Padding(0),
-		token:       lipgloss.NewStyle().Foreground(t.Green).Bold(true),
+		message:   f.Text(roles.Fg),
+		selection: lipgloss.NewStyle().Background(f.Color(roles.Selection)),
+		dialog: raised.Fill(roles.Raised).Border(lipgloss.RoundedBorder()).
+			BorderForeground(raised.Color(roles.Accent)).Padding(1, 2),
+		dialogTitle: raised.Text(roles.Accent).Bold(true),
+		dialogText:  raised.Text(roles.Muted),
+		token:       raised.Text(roles.Success).Bold(true),
 		levels: map[string]lipgloss.Style{
-			info:  lipgloss.NewStyle().Foreground(t.Blue),
-			warn:  lipgloss.NewStyle().Foreground(t.Yellow),
-			fail:  lipgloss.NewStyle().Foreground(t.Red),
-			debug: lipgloss.NewStyle().Foreground(muted),
+			info:  f.Text(roles.Info),
+			warn:  f.Text(roles.Warning),
+			fail:  f.Text(roles.Danger),
+			debug: f.Text(roles.Muted),
 		},
 	}
 }

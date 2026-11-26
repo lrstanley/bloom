@@ -47,6 +47,7 @@ import (
 	"bloomfx.dev/bloom/_examples/desktop/internal/theme"
 	"bloomfx.dev/bloom/_examples/desktop/internal/wm"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 )
 
 type model struct {
@@ -76,7 +77,7 @@ type windowKey struct {
 
 func newModel() *model {
 	m := &model{st: theme.NewStyles(theme.Tints[0])}
-	m.ui = bloom.New(bloom.WithColors(m.st.Tint.Fg, m.st.Tint.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.Fit.Color(roles.Fg), m.st.Fit.Color(roles.Bg)))
 	m.splash = splash.New().SetStyles(m.st)
 	m.wm = wm.New(m.ui.Frame, m.say).SetStyles(m.st)
 	m.icons = apps.NewIcons().SetStyles(m.st)
@@ -145,7 +146,7 @@ func (m *model) View() tea.View {
 	v.WindowTitle = "desktop"
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.Tint.Bg
+	v.BackgroundColor = m.st.Fit.Color(roles.Bg)
 	return v
 }
 
@@ -204,9 +205,8 @@ func (m *model) open(a apps.App, f string) tea.Cmd {
 // blend them.
 func (m *model) setTheme(st theme.Styles) {
 	m.st = st
-	t := st.Tint
-	m.say("changed the theme to " + t.DisplayName)
-	m.ui.SetColors(t.Fg, t.Bg)
+	m.say("changed the theme to " + st.Tint.DisplayName)
+	m.ui.SetColors(st.Fit.Color(roles.Fg), st.Fit.Color(roles.Bg))
 }
 
 // logout shuts the desktop down: it shades out to the splash, which runs

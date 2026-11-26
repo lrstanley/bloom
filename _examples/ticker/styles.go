@@ -8,6 +8,8 @@ import (
 	"image/color"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -17,13 +19,16 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
-	// muted, good, and bad are the live indicator's colors, and a stock's
-	// change, up or down.
-	muted color.Color
-	good  color.Color
-	bad   color.Color
+	// good and bad are a stock's change, up or down, and goodOn and badOn
+	// the same on the title bar and the selected row, which share its fill.
+	// The live indicator pulses from dim to goodOn, on the title bar.
+	good   color.Color
+	bad    color.Color
+	goodOn color.Color
+	badOn  color.Color
+	dim    color.Color
 
 	onPanel lipgloss.Style // the background of the headline bar and the banner
 	header  lipgloss.Style // the title bar
@@ -44,36 +49,40 @@ type styles struct {
 	selectedRight lipgloss.Style
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a bar's panel, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent, warn, bg := t.Fg, t.BrightBlack, t.Blue, t.Yellow, t.Bg
-	panelBg := lipgloss.Lighten(t.Bg, 0.05)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	panel := f.On(roles.Surface) // the roles for drawing on the headline bar and the banner
+	title := f.On(roles.Accent)  // the roles for drawing on the title bar and the selected row
 
-	onBg := lipgloss.NewStyle().Background(bg)
-	onPanel := lipgloss.NewStyle().Background(panelBg)
-	header := onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1)
-	item := onBg.Foreground(fg).Padding(0, 1)
-	selected := item.Foreground(bg).Background(accent).Bold(true)
+	onBg := f.Fill(roles.Bg)
+	onPanel := panel.Fill(roles.Surface)
+	header := f.Fill(roles.Accent).Bold(true).Padding(0, 1)
+	item := onBg.Padding(0, 1)
 	return styles{
-		theme: t,
-		muted: muted,
-		good:  t.Green,
-		bad:   t.Red,
+		fit:    f,
+		good:   f.Color(roles.Success),
+		bad:    f.Color(roles.Danger),
+		goodOn: title.Color(roles.Success),
+		badOn:  title.Color(roles.Danger),
+		dim:    title.Color(roles.Muted),
 
 		onPanel: onPanel,
 		header:  header,
 		pulse:   header.Padding(0),
 		live:    header.PaddingLeft(0),
-		bar:     onPanel.Foreground(fg).Padding(0, 1),
-		badge:   onBg.Foreground(bg).Background(warn).Bold(true).Padding(0, 1),
-		panel:   onBg.Border(lipgloss.RoundedBorder()).BorderForeground(muted),
-		status:  onBg.Foreground(muted).Padding(0, 1),
-		banner:  onPanel.Border(lipgloss.RoundedBorder()).BorderForeground(warn).Padding(0, 1),
+		bar:     onPanel.Padding(0, 1),
+		badge:   f.Fill(roles.Warning).Bold(true).Padding(0, 1),
+		panel:   onBg.Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		status:  onBg.Foreground(f.Color(roles.Muted)).Padding(0, 1),
+		banner:  onPanel.Border(lipgloss.RoundedBorder()).BorderForeground(panel.Color(roles.Warning)).Padding(0, 1),
 
 		item:          item,
-		selected:      selected,
+		selected:      header,
 		itemRight:     item.Align(lipgloss.Right),
-		selectedRight: selected.Align(lipgloss.Right),
+		selectedRight: header.Align(lipgloss.Right),
 	}
 }
 

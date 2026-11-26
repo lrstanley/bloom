@@ -13,16 +13,17 @@ require (
 	getsteep.dev/steep/reel v0.0.0-alpha.18
 	github.com/alecthomas/chroma/v2 v2.27.0
 	github.com/atotto/clipboard v0.1.4
+	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/ultraviolet v0.0.0-20261125122737-8ed499892fb4
 	github.com/charmbracelet/x/ansi v0.12.0
-	github.com/lrstanley/bubbletint/chromatint/v2 v2.1.0
-	github.com/lrstanley/bubbletint/v2 v2.1.0
+	github.com/lrstanley/bubbletint/chromatint/v2 v2.2.0-alpha.2
+	github.com/lrstanley/bubbletint/roles/v2 v2.2.0-alpha.2
+	github.com/lrstanley/bubbletint/v2 v2.2.0-alpha.2
 	golang.org/x/tools v0.53.0
 )
 
 require (
 	github.com/aymanbagabas/go-udiff v0.4.2 // indirect
-	github.com/charmbracelet/colorprofile v0.4.3 // indirect
 	github.com/charmbracelet/x/conpty v0.2.0 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect

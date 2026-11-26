@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -15,7 +17,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	card    lipgloss.Style // the frame of a card
 	name    lipgloss.Style // a card's name, and a dialog's title
@@ -27,22 +29,22 @@ type styles struct {
 	dialog  lipgloss.Style // the frame of a dialog
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a raised panel, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	ink, muted, accent, dark := t.Fg, t.BrightBlack, t.Cyan, t.Bg
-	surface := lipgloss.Lighten(t.Bg, 0.1)
-	raised := lipgloss.Lighten(t.Bg, 0.15)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 
-	rowEven := lipgloss.NewStyle().Foreground(ink).Background(surface)
+	rowEven := f.Fill(roles.Surface)
 	return styles{
-		theme:   t,
-		card:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
-		name:    lipgloss.NewStyle().Bold(true).Foreground(accent),
+		fit:     f,
+		card:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		name:    f.Text(roles.Accent).Bold(true),
 		rowEven: rowEven,
-		rowOdd:  rowEven.Background(raised),
-		panel:   rowEven.Border(lipgloss.NormalBorder()).BorderForeground(t.Blue).Padding(0, 1),
-		status:  lipgloss.NewStyle().Foreground(muted),
-		button:  lipgloss.NewStyle().Foreground(dark).Background(accent).Padding(0, 1),
-		dialog:  lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(t.Yellow).Padding(1, 3),
+		rowOdd:  f.Fill(roles.Raised),
+		panel:   rowEven.Border(lipgloss.NormalBorder()).BorderForeground(f.On(roles.Surface).Color(roles.Accent2)).Padding(0, 1),
+		status:  f.Text(roles.Muted),
+		button:  f.Fill(roles.Accent).Padding(0, 1),
+		dialog:  lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(f.Color(roles.Accent)).Padding(1, 3),
 	}
 }

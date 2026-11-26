@@ -42,13 +42,13 @@ type watchlist struct {
 func (l watchlist) Layout(bloom.Context) bloom.Child {
 	rows := make([]bloom.Child, 0, len(stocks)+1)
 	for i, s := range stocks {
-		st, right, phase := l.st.item, l.st.itemRight, 0.0
+		st, right, phase, good, bad := l.st.item, l.st.itemRight, 0.0, l.st.good, l.st.bad
 		if i == l.selected {
-			st, right, phase = l.st.selected, l.st.selectedRight, l.phase
+			st, right, phase, good, bad = l.st.selected, l.st.selectedRight, l.phase, l.st.goodOn, l.st.badOn
 		}
-		trend := l.st.good
+		trend := good
 		if s.change < 0 {
-			trend = l.st.bad
+			trend = bad
 		}
 
 		price := bloom.Text(fmt.Sprintf("%.2f", s.price)).Style(right)

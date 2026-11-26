@@ -24,6 +24,7 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -64,7 +65,7 @@ func newModel() *model {
 		phase:  anim.NewLoop(4 * time.Second),
 		status: "drag a scrollbar, or click an icon on the list's left side",
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
 	m.list = secrets{st: m.st, phase: &m.phase, paths: paths, listed: &bloom.Buffer{}}
 	m.log = logBox{st: m.st, lines: bloom.NewBuffer(strings.Join(log, "\n"))}
 	m.list.setFilter(0)
@@ -106,7 +107,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	// The loop slows down while the terminal is not focused.
 	v.ReportFocus = true
 	return v

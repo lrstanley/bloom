@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -15,7 +17,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel    lipgloss.Style // a rounded frame
 	item     lipgloss.Style // a file
@@ -30,28 +32,29 @@ type styles struct {
 	menuRule        lipgloss.Style // a rule between items of a menu
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as a menu or the row under the
+// pointer, from the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent, danger, dark := t.Fg, t.BrightBlack, t.Blue, t.Red, t.Bg
-	raised := lipgloss.Lighten(t.Bg, 0.08)
-	// A menu has no border, so its background sets it apart from the list.
-	menuBg := lipgloss.Lighten(t.Bg, 0.14)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	// A menu has no border, so its overlay background sets it apart from
+	// the list.
+	menu := f.On(roles.Overlay) // the roles for drawing on a menu
 
-	item := lipgloss.NewStyle().Foreground(fg).Padding(0, 1)
-	menuItem := item.Background(menuBg).Width(menuWidth)
-	menuHover := menuItem.Foreground(dark).Background(accent)
+	menuItem := menu.Fill(roles.Overlay).Padding(0, 1).Width(menuWidth)
+	menuHover := menu.Fill(roles.Accent).Padding(0, 1).Width(menuWidth)
 	return styles{
-		theme:    t,
-		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
-		item:     item,
-		hovered:  item.Background(raised),
-		selected: item.Foreground(dark).Background(accent).Bold(true),
-		status:   lipgloss.NewStyle().Foreground(muted),
+		fit:      f,
+		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		item:     f.Text(roles.Fg).Padding(0, 1),
+		hovered:  f.Fill(roles.Hover).Padding(0, 1),
+		selected: f.Fill(roles.Selection).Bold(true).Padding(0, 1),
+		status:   f.Text(roles.Muted),
 
 		menuItem:        menuItem,
 		menuHover:       menuHover,
-		menuDanger:      menuItem.Foreground(danger),
-		menuDangerHover: menuHover.Background(danger),
-		menuRule:        menuItem.Foreground(muted),
+		menuDanger:      menuItem.Foreground(menu.Color(roles.Danger)),
+		menuDangerHover: menu.Fill(roles.Danger).Padding(0, 1).Width(menuWidth),
+		menuRule:        menuItem.Foreground(menu.Color(roles.Border)),
 	}
 }

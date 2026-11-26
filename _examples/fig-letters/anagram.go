@@ -16,6 +16,7 @@ import (
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/lrstanley/bubbletint/roles/v2"
 )
 
 // anagrams are the words shown, one after the other.
@@ -81,7 +82,7 @@ func (a *anagram) glyphHandlers(g fig.Glyph) []on.Handler {
 }
 
 // wordPaint colors each letter of the anagram, and the one under the
-// pointer bold and white.
+// pointer bold, in the body text's color.
 func (a *anagram) wordPaint() fig.Paint {
 	if a.hover < 0 {
 		return a.st.wordPaint
@@ -90,7 +91,7 @@ func (a *anagram) wordPaint() fig.Paint {
 	return fig.PaintFunc(func(f *fig.Figure, c fig.Cell) uv.Style {
 		st := a.st.wordPaint.Shade(f, c)
 		if c.Glyph == hover {
-			st.Fg = a.st.theme.BrightWhite
+			st.Fg = a.st.fit.Color(roles.Fg)
 			st.Attrs |= uv.AttrBold
 		}
 		return st

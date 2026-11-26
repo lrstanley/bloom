@@ -6,8 +6,24 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
+
+// control is the deploy button while it isn't focused: a role the example
+// adds to bubbletint's, well clear of the background it sits on, while its
+// text still reads.
+var control = roles.Define(roles.Spec{
+	Name: "control",
+	Kind: roles.KindSurface,
+	Derive: func(p *roles.Palette) tint.Color {
+		fg := p.Color(roles.Fg)
+		return p.Color(roles.Bg).MixReadable(fg, fg, p.ByDark(0.22, 0.17), 4.5)
+	},
+	Distinct: []roles.Role{roles.Bg},
+	Fallback: roles.Fallback{Slots: []tint.Slot{tint.SlotBrightBlack}},
+})
 
 // styles are the example's colors and styles, all made from one bubbletint
 // tint by newStyles, so that nothing is a package global. The model keeps
@@ -15,7 +31,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	card        lipgloss.Style
 	heading     lipgloss.Style
@@ -35,39 +51,35 @@ type styles struct {
 	status      lipgloss.Style
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or an input's well, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg := t.Fg
-	muted := t.BrightBlack
-	accent := t.Blue
-	good := t.Green
-	warn := t.Red
-	dark := t.Bg
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	// The focused input takes the selection's highlight, so that it stands
+	// out from the unfocused one, sunk into the background.
+	sunken, selection := f.On(roles.Sunken), f.On(roles.Selection)
 
-	field := lipgloss.Lighten(t.Bg, 0.05)
-	fieldOn := lipgloss.Lighten(t.Bg, 0.16)
-
-	input := lipgloss.NewStyle().Foreground(fg).Background(field).Padding(0, 1)
-	inputOn := input.Background(fieldOn)
-	button := lipgloss.NewStyle().Foreground(fg).Background(muted).Padding(0, 2)
+	input := sunken.Fill(roles.Sunken).Padding(0, 1)
+	inputOn := selection.Fill(roles.Selection).Padding(0, 1)
 	return styles{
-		theme: t,
+		fit: f,
 
-		card:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).Padding(0, 2),
-		heading:     lipgloss.NewStyle().Bold(true).Foreground(accent),
-		label:       lipgloss.NewStyle().Foreground(muted),
-		big:         lipgloss.NewStyle().Bold(true).Foreground(fg),
+		card:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)).Padding(0, 2),
+		heading:     f.Text(roles.Accent).Bold(true),
+		label:       f.Text(roles.Muted),
+		big:         f.Text(roles.Fg).Bold(true),
 		input:       input,
 		inputOn:     inputOn,
-		inputOnHint: inputOn.Foreground(muted),
-		hint:        input.Foreground(muted),
-		button:      button,
-		buttonOn:    button.Foreground(dark).Background(accent).Bold(true),
-		staged:      lipgloss.NewStyle().Foreground(muted).Padding(0, 1),
-		live:        lipgloss.NewStyle().Foreground(dark).Background(good).Bold(true).Padding(0, 1),
-		failure:     lipgloss.NewStyle().Foreground(warn),
-		success:     lipgloss.NewStyle().Foreground(good),
-		tour:        lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(accent).Padding(0, 2),
-		status:      lipgloss.NewStyle().Foreground(muted),
+		inputOnHint: selection.Text(roles.Subtle).Padding(0, 1),
+		hint:        sunken.Text(roles.Subtle).Padding(0, 1),
+		button:      f.Fill(control).Padding(0, 2),
+		buttonOn:    f.Fill(roles.Accent).Bold(true).Padding(0, 2),
+		staged:      f.Text(roles.Muted).Padding(0, 1),
+		live:        f.Fill(roles.Success).Bold(true).Padding(0, 1),
+		failure:     f.Text(roles.Danger),
+		success:     f.Text(roles.Success),
+		tour:        lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(f.Color(roles.Accent)).Padding(0, 2),
+		status:      f.Text(roles.Muted),
 	}
 }

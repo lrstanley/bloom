@@ -10,6 +10,8 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/fig"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -19,7 +21,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	onBg   lipgloss.Style // the background, and nothing else
 	panel  lipgloss.Style // the frame of a card
@@ -38,26 +40,30 @@ type styles struct {
 	toastPaint  fig.Paint
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a service that is
+// down, from the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent, bg := t.Fg, t.BrightBlack, t.Blue, t.Bg
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	hue := f.Color // the tint's hues, which the figures are painted in
 
-	onBg := lipgloss.NewStyle().Background(bg)
+	onBg := f.Fill(roles.Bg)
+	title := onBg.Foreground(f.Color(roles.Accent)).Bold(true)
 	return styles{
-		theme:  t,
+		fit:    f,
 		onBg:   onBg,
-		panel:  onBg.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Darken(accent, 0.45)).Padding(0, 1),
-		title:  onBg.Foreground(accent).Bold(true),
-		text:   onBg.Foreground(fg),
-		dim:    onBg.Foreground(muted),
-		keycap: onBg.Foreground(fg).Background(lipgloss.Lighten(bg, 0.12)).Padding(0, 1),
-		plain:  onBg.Foreground(accent).Bold(true).Padding(0, 1),
-		good:   onBg.Foreground(t.Green),
-		bad:    onBg.Foreground(t.Red),
-		warn:   onBg.Foreground(t.Yellow),
+		panel:  onBg.Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)).Padding(0, 1),
+		title:  title,
+		text:   onBg,
+		dim:    onBg.Foreground(f.Color(roles.Muted)),
+		keycap: f.Fill(roles.Raised).Padding(0, 1),
+		plain:  title.Padding(0, 1),
+		good:   onBg.Foreground(f.Color(roles.Success)),
+		bad:    onBg.Foreground(f.Color(roles.Danger)),
+		warn:   onBg.Foreground(f.Color(roles.Warning)),
 
-		headerPaint: fig.Gradient(t.Purple, t.Blue, t.Cyan).By(fig.ByDiagonal),
-		toastPaint:  fig.Gradient(t.Green, t.Yellow).By(fig.ByColumn),
+		headerPaint: fig.Gradient(hue(roles.Magenta), hue(roles.Blue), hue(roles.Cyan)).By(fig.ByDiagonal),
+		toastPaint:  fig.Gradient(hue(roles.Green), hue(roles.Yellow)).By(fig.ByColumn),
 	}
 }
 

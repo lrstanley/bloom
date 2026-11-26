@@ -9,6 +9,8 @@ import (
 
 	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -18,7 +20,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel   lipgloss.Style // the log's rounded frame
 	title   lipgloss.Style // the log's name, on the frame
@@ -42,29 +44,31 @@ type styles struct {
 	levels map[string]string
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or an error's level, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	muted, accent := t.BrightBlack, t.Blue
-	thumb := lipgloss.NewStyle().Foreground(accent)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	muted := f.Text(roles.Muted)
 	return styles{
-		theme:    t,
-		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
-		title:    lipgloss.NewStyle().Foreground(accent).Bold(true).Padding(0, 1),
-		counter:  lipgloss.NewStyle().Foreground(muted).Padding(0, 1),
-		status:   lipgloss.NewStyle().Foreground(t.Fg),
-		hint:     lipgloss.NewStyle().Foreground(muted),
-		numbers:  lipgloss.NewStyle().Foreground(muted),
-		bar:      bloom.ScrollbarStyle{ThumbStyle: thumb},
-		barHover: bloom.ScrollbarStyle{ThumbStyle: thumb.Foreground(t.Purple)},
-		match:    lipgloss.NewStyle().Background(t.Yellow).Foreground(t.Bg),
-		current:  lipgloss.NewStyle().Background(t.Purple).Foreground(t.Bg).Bold(true),
-		focused:  lipgloss.NewStyle().Background(lipgloss.Lighten(t.Bg, 0.06)),
-		stamp:    sgr(lipgloss.NewStyle().Foreground(muted)),
+		fit:      f,
+		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		title:    f.Text(roles.Accent).Bold(true).Padding(0, 1),
+		counter:  muted.Padding(0, 1),
+		status:   f.Text(roles.Fg),
+		hint:     muted,
+		numbers:  muted,
+		bar:      bloom.ScrollbarStyle{ThumbStyle: f.Text(roles.BorderStrong)},
+		barHover: bloom.ScrollbarStyle{ThumbStyle: f.Text(roles.Accent)},
+		match:    f.Fill(roles.Yellow),
+		current:  f.Fill(roles.Accent).Bold(true),
+		focused:  lipgloss.NewStyle().Background(f.Color(roles.Selection)),
+		stamp:    sgr(muted),
 		levels: map[string]string{
-			info:  sgr(lipgloss.NewStyle().Foreground(t.Blue)),
-			warn:  sgr(lipgloss.NewStyle().Foreground(t.Yellow)),
-			fail:  sgr(lipgloss.NewStyle().Foreground(t.Red).Bold(true)),
-			debug: sgr(lipgloss.NewStyle().Foreground(muted)),
+			info:  sgr(f.Text(roles.Info)),
+			warn:  sgr(f.Text(roles.Warning)),
+			fail:  sgr(f.Text(roles.Danger).Bold(true)),
+			debug: sgr(muted),
 		},
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/fig"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -17,7 +19,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	onBg    lipgloss.Style // the background, and nothing else
 	panel   lipgloss.Style // the frame of a card
@@ -34,26 +36,30 @@ type styles struct {
 	wordPaint  fig.Paint
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a running clock, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent, bg := t.Fg, t.BrightBlack, t.Purple, t.Bg
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	hue := f.Color // the tint's hues, which the figures are painted in
 
-	onBg := lipgloss.NewStyle().Background(bg)
+	onBg := f.Fill(roles.Bg)
+	muted := onBg.Foreground(f.Color(roles.Muted))
 	return styles{
-		theme:   t,
+		fit:     f,
 		onBg:    onBg,
-		panel:   onBg.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Darken(accent, 0.35)).Padding(0, 2),
-		label:   onBg.Foreground(accent).Bold(true),
-		dim:     onBg.Foreground(muted),
-		chip:    onBg.Foreground(muted).Padding(0, 1),
-		chipOn:  onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1),
-		keycap:  onBg.Foreground(fg).Background(lipgloss.Lighten(bg, 0.12)).Padding(0, 1),
-		running: onBg.Foreground(t.Green),
-		paused:  onBg.Foreground(t.Yellow),
+		panel:   onBg.Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)).Padding(0, 2),
+		label:   onBg.Foreground(f.Color(roles.Accent)).Bold(true),
+		dim:     muted,
+		chip:    muted.Padding(0, 1),
+		chipOn:  f.Fill(roles.Accent).Bold(true).Padding(0, 1),
+		keycap:  f.Fill(roles.Raised).Padding(0, 1),
+		running: onBg.Foreground(f.Color(roles.Success)),
+		paused:  onBg.Foreground(f.Color(roles.Warning)),
 
-		titlePaint: fig.Gradient(t.BrightPurple, t.Purple, t.Cyan).By(fig.ByDiagonal),
-		clockPaint: fig.Gradient(t.Cyan, t.Green).By(fig.ByRow),
-		wordPaint:  fig.Palette(t.BrightPurple, t.Red, t.Yellow, t.Green, t.Cyan, t.Purple),
+		titlePaint: fig.Gradient(hue(roles.Accent), hue(roles.Magenta), hue(roles.Cyan)).By(fig.ByDiagonal),
+		clockPaint: fig.Gradient(hue(roles.Cyan), hue(roles.Green)).By(fig.ByRow),
+		wordPaint:  fig.Palette(hue(roles.Magenta), hue(roles.Red), hue(roles.Yellow), hue(roles.Green), hue(roles.Cyan), hue(roles.Blue)),
 	}
 }
 

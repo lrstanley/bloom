@@ -24,6 +24,7 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -84,7 +85,7 @@ func newModel() *model {
 		order: []bloom.ID{paneActivity, panePalette, paneServices},
 		wave:  effect(500 * time.Millisecond),
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
 	m.activity = activity{st: m.st, bars: anim.NewLoop(6 * time.Second)}
 	m.services = serviceList{st: m.st}
 	m.toast = toast{st: m.st, shown: anim.NewPresence(anim.Spring(9, 0.6)), text: effect(700 * time.Millisecond)}
@@ -122,7 +123,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the tint's background too, around and beneath the
 	// layout, where terminals let programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	// The bars slow down while the terminal is not focused.
 	v.ReportFocus = true
 	return v
@@ -159,7 +160,7 @@ func (m *model) switchTint(i int) tea.Cmd {
 	// The view paints the screen with the tint's background, and the root is
 	// told the tint's colors, for effects such as the tour's spotlight that
 	// blend toward them.
-	m.ui.SetColors(t.Fg, t.Bg)
+	m.ui.SetColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg))
 	return tea.Batch(
 		themed,
 		m.wave.Play(0, 1),

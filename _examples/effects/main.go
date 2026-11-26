@@ -20,6 +20,7 @@ import (
 	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/fx"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -45,8 +46,8 @@ func newModel() *model {
 		).With(anim.Duration(1400*time.Millisecond), anim.Ease(anim.InOutCubic)),
 		phase: anim.NewLoop(26 * time.Second),
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
-	m.gallery = newGallery(m.st.accent)
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
+	m.gallery = newGallery(m.st.fit.Color(roles.Accent))
 	return m
 }
 
@@ -81,7 +82,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

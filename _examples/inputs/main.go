@@ -21,6 +21,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -57,7 +58,7 @@ func newInput(id bloom.ID) *textinput.Model {
 func newModel() *model {
 	m := &model{st: newStyles(tint.TintEverforestDarkMed)}
 	// Clicks move the focus.
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)), bloom.WithFocus(&m.focus))
 	m.inputs = map[bloom.ID]*textinput.Model{
 		paneLeft:  newInput(paneLeft),
 		paneRight: newInput(paneRight),
@@ -99,7 +100,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

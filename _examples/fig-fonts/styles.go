@@ -8,6 +8,8 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/fig"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -17,7 +19,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel      lipgloss.Style // the frame of the font list
 	stage      lipgloss.Style // the frame of the font shown
@@ -40,39 +42,41 @@ type paint struct {
 	paint fig.Paint
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or the focused frame,
+// from the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent, bg := t.Fg, t.BrightBlack, t.Blue, t.Bg
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 
-	onBg := lipgloss.NewStyle().Background(bg)
-	panel := onBg.Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Darken(accent, 0.45))
-	title := onBg.Foreground(accent).Bold(true)
-	text := onBg.Foreground(fg)
+	onBg := f.Fill(roles.Bg)
+	panel := onBg.Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border))
+	title := onBg.Foreground(f.Color(roles.Accent)).Bold(true)
+	muted := onBg.Foreground(f.Color(roles.Muted))
 
 	pink, peach := lipgloss.Color("#ff6f91"), lipgloss.Color("#ffc29b")
-	sky, violet := t.Cyan, t.Purple
+	sky, violet := f.Color(roles.Cyan), f.Color(roles.Magenta)
 
 	return styles{
-		theme:      t,
+		fit:        f,
 		panel:      panel,
-		stage:      panel.BorderForeground(accent).Padding(0, 2),
+		stage:      panel.BorderForeground(f.Color(roles.Accent)).Padding(0, 2),
 		title:      title,
-		dim:        onBg.Foreground(muted),
-		item:       text.Padding(0, 1),
-		selected:   onBg.Foreground(bg).Background(accent).Bold(true).Padding(0, 1),
+		dim:        muted,
+		item:       onBg.Padding(0, 1),
+		selected:   f.Fill(roles.Accent).Bold(true).Padding(0, 1),
 		paintLabel: title.PaddingRight(1),
-		chip:       onBg.Foreground(muted).Padding(0, 1),
-		chipOn:     onBg.Foreground(bg).Background(t.Purple).Bold(true).Padding(0, 1),
-		keycap:     onBg.Foreground(fg).Background(lipgloss.Lighten(bg, 0.12)).Padding(0, 1),
+		chip:       muted.Padding(0, 1),
+		chipOn:     f.Fill(roles.Accent2).Bold(true).Padding(0, 1),
+		keycap:     f.Fill(roles.Raised).Padding(0, 1),
 		paints: []paint{
 			{"column", fig.Gradient(pink, peach)},
 			{"diagonal", fig.Gradient(sky, violet, pink).By(fig.ByDiagonal)},
 			{"row", fig.Gradient(peach, pink, violet).By(fig.ByRow)},
 			{"glyph", fig.Gradient(sky, pink).By(fig.ByGlyph)},
-			{"palette", fig.Palette(t.Red, t.Yellow, t.Green, t.Cyan, t.Blue)},
+			{"palette", fig.Palette(f.Color(roles.Red), f.Color(roles.Yellow), f.Color(roles.Green), sky, f.Color(roles.Blue))},
 			{"rainbow", fig.Rainbow()},
 			{"metal", fig.Metal()},
-			{"filled", fig.Fill(lipgloss.Darken(violet, 0.55), fig.Solid(peach))},
+			{"filled", fig.Fill(f.Color(roles.Magenta.Soft()), fig.Solid(peach))},
 		},
 	}
 }

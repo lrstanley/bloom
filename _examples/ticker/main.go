@@ -22,6 +22,7 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/anim"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -63,7 +64,7 @@ func newModel() *model {
 			anim.To(0, anim.Duration(900*time.Millisecond)),
 		).With(anim.Ease(anim.InOutQuad), anim.FPS(30)),
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)))
 	m.banner = newBanner()
 	m.banner.setStyles(m.st)
 	return m
@@ -92,7 +93,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	// The loops slow down while the terminal is not focused.
 	v.ReportFocus = true
 	return v
@@ -147,7 +148,7 @@ func (m *model) phase(s *anim.Sequence) float64 {
 // layout places the title bar and the headlines over the watchlist, with
 // the keys at the bottom, and the banner over it all.
 func (m *model) layout() bloom.Child {
-	pulse := blend(m.st.muted, m.st.good, m.phase(&m.pulse))
+	pulse := blend(m.st.dim, m.st.goodOn, m.phase(&m.pulse))
 	title := bloom.Row(
 		bloom.Fill(bloom.Text("◆ markets").Style(m.st.header)),
 		bloom.Text("•").Style(m.st.pulse.Foreground(pulse)),

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"bloomfx.dev/bloom"
+	"github.com/lrstanley/bubbletint/roles/v2"
 )
 
 // load is requests per second over the last minutes, oldest first.
@@ -41,9 +42,10 @@ func (c chart) Layout(ctx bloom.Context) bloom.Child {
 			}
 			b.WriteRune(levels[min(max(fill, 0), 8)])
 		}
-		// Rows toward the top, reached only under heavy load, are warmer.
+		// Rows toward the top, reached only under heavy load, are closer
+		// to danger.
 		t := 1 - float64(y)/float64(max(ctx.Height()-1, 1))
-		rows[y] = c.st.onBg.Foreground(blend(c.st.theme.Green, c.st.theme.Red, t*t)).Render(b.String())
+		rows[y] = c.st.onBg.Foreground(blend(c.st.fit.Color(roles.Success), c.st.fit.Color(roles.Danger), t*t)).Render(b.String())
 	}
 	return bloom.Text(strings.Join(rows, "\n"))
 }

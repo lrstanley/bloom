@@ -24,11 +24,11 @@ type dialog struct {
 func (d *dialog) Layer(b backdrop, effects ...fx.Effect) bloom.LayerNode {
 	// The dialog sits below the panel, so its backdrop shows on the panel.
 	return bloom.Layer(bloom.Box(d.st.dialog, bloom.Column(
-		bloom.Text("Backdrop: "+b.name).Style(d.st.title),
-		bloom.Text(" ").Style(d.st.text),
-		bloom.Text(b.about).Style(d.st.text),
-		bloom.Text(" ").Style(d.st.text),
-		bloom.Text("b: next backdrop · esc or d closes it").Style(d.st.dim),
+		bloom.Text("Backdrop: "+b.name).Style(d.st.dialogTitle),
+		bloom.Text(" ").Style(d.st.dialogText),
+		bloom.Text(b.about).Style(d.st.dialogText),
+		bloom.Text(" ").Style(d.st.dialogText),
+		bloom.Text("b: next backdrop · esc or d closes it").Style(d.st.dialogDim),
 	))).Modal().
 		Anchor(bloom.Center, bloom.End).
 		Margin(2).

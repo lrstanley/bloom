@@ -25,6 +25,6 @@ func (d *dialog) Layer() bloom.LayerNode {
 		bloom.Fixed(1, nil),
 		secret{value: "blm_live_9Qk2Xv7rLp4TzW8nB3sHc6Yd", head: 9, tail: 4, style: d.st.token},
 		bloom.Fixed(1, nil),
-		bloom.Text("Drag over the token, then ctrl+c:\nthe whole token is copied. It is\nnot shown again.").Style(d.st.label),
+		bloom.Text("Drag over the token, then ctrl+c:\nthe whole token is copied. It is\nnot shown again.").Style(d.st.dialogText),
 	))).ID("dialog").Selectable().Modal().Backdrop(fx.Dim{Amount: 0.5})
 }

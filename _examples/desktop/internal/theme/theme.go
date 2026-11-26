@@ -11,6 +11,8 @@ package theme
 import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -24,7 +26,8 @@ var Tints = []*tint.Tint{
 
 // Styles are the desktop's colors and styles.
 type Styles struct {
-	Tint *tint.Tint // the tint the styles are made from
+	Tint *tint.Tint    // the tint the styles are made from, which the settings app names
+	Fit  *roles.Fitted // the tint's roles, which the desktop's colors come from
 
 	// The desktop: its wallpaper, and its icons.
 	Paper     lipgloss.Style
@@ -92,81 +95,85 @@ type Styles struct {
 	SplashWord lipgloss.Style
 }
 
-// NewStyles makes the desktop's styles from tint t.
+// NewStyles makes the desktop's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a window's surface,
+// from the tint, so the desktop reads on any tint, even one of a single hue.
 func NewStyles(t *tint.Tint) Styles {
-	fg, muted, accent, hot, dark := t.Fg, t.BrightBlack, t.Purple, t.Red, t.Bg
-	winBg, raised, barBg := lipgloss.Lighten(t.Bg, 0.06), lipgloss.Lighten(t.Bg, 0.12), lipgloss.Darken(t.Bg, 0.25)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	win := f.On(roles.Surface)  // the roles for drawing in a window, and on the taskbar
+	key := f.On(roles.Raised)   // the roles for drawing on a key or a taskbar button
+	menu := f.On(roles.Overlay) // the roles for drawing on the start menu
 
-	frame := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted).BorderBackground(winBg).Background(winBg).Padding(0, 1)
-	title := lipgloss.NewStyle().Foreground(muted).Background(winBg)
-	grip := lipgloss.NewStyle().Foreground(muted).Background(winBg)
-	control := lipgloss.NewStyle().Foreground(fg).Background(winBg)
-	body := lipgloss.NewStyle().Foreground(fg).Background(winBg)
-	key := lipgloss.NewStyle().Foreground(fg).Background(raised)
-	keyEq := key.Foreground(dark).Background(accent).Bold(true)
-	icon := lipgloss.NewStyle().Foreground(fg).Width(12).Align(lipgloss.Center).Padding(0, 1)
-	rowOn := body.Foreground(dark).Background(t.Blue).Bold(true)
-	menuItem := lipgloss.NewStyle().Foreground(fg).Background(raised)
-	banner := lipgloss.NewStyle().Foreground(dark).Background(accent).Bold(true)
-	start := lipgloss.NewStyle().Foreground(dark).Background(accent).Bold(true)
-	task := lipgloss.NewStyle().Foreground(fg).Background(raised)
+	frame := win.Fill(roles.Surface).Border(lipgloss.RoundedBorder()).
+		BorderForeground(win.Color(roles.Border)).BorderBackground(win.Color(roles.Surface)).Padding(0, 1)
+	title := win.Text(roles.Muted)
+	grip := win.Text(roles.BorderStrong)
+	control := win.Fill(roles.Surface)
+	body := win.Fill(roles.Surface)
+	keyEq := f.Fill(roles.Accent).Bold(true)
+	icon := func(s lipgloss.Style) lipgloss.Style { return s.Width(12).Align(lipgloss.Center).Padding(0, 1) }
+	rowOn := f.Fill(roles.Accent2).Bold(true)
+	menuItem := f.Fill(roles.Overlay)
+	banner := f.Fill(roles.Accent).Bold(true)
+	button := f.Fill(roles.Raised) // a key, a taskbar button, and the clock
 	line := lipgloss.NewStyle().Width(SplashWidth).Align(lipgloss.Center)
 
 	return Styles{
 		Tint: t,
+		Fit:  f,
 
-		Paper:     lipgloss.NewStyle().Foreground(lipgloss.Lighten(t.Bg, 0.14)),
-		Icon:      icon,
-		IconHover: icon.Background(raised),
-		IconOn:    icon.Foreground(dark).Background(accent),
+		Paper:     f.Text(roles.Border),
+		Icon:      icon(f.Text(roles.Fg)),
+		IconHover: icon(f.Fill(roles.Hover)),
+		IconOn:    icon(f.Fill(roles.Accent)),
 
 		Frame:   frame,
-		FrameOn: frame.BorderForeground(accent),
+		FrameOn: frame.BorderForeground(win.Color(roles.Accent)),
 		Title:   title,
-		TitleOn: title.Foreground(dark).Background(accent).Bold(true),
+		TitleOn: win.Fill(roles.Accent).Bold(true),
 		Grip:    grip,
-		GripOn:  grip.Foreground(accent),
+		GripOn:  win.Text(roles.Accent),
 		Control: control,
-		CtlOver: control.Foreground(dark).Background(accent),
-		CtlShut: control.Foreground(dark).Background(hot),
-		Corner:  grip.Foreground(accent),
+		CtlOver: win.Fill(roles.Accent),
+		CtlShut: win.Fill(roles.Danger),
+		Corner:  win.Text(roles.Accent),
 
-		Outline: lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(accent),
+		Outline: lipgloss.NewStyle().Border(lipgloss.DoubleBorder()).BorderForeground(f.Color(roles.Accent)),
 
 		Body:     body,
-		Faint:    body.Foreground(muted),
+		Faint:    win.Text(roles.Muted),
 		Row:      body,
-		RowHover: body.Background(raised),
+		RowHover: body.Background(win.Color(roles.Hover)),
 		RowOn:    rowOn,
 
-		Display:    lipgloss.NewStyle().Foreground(fg).Background(barBg).Bold(true).Padding(0, 1),
-		Key:        key,
-		KeyOp:      key.Foreground(t.Cyan),
-		KeyHover:   key.Foreground(dark).Background(t.Cyan),
+		Display:    f.Fill(roles.Sunken).Bold(true).Padding(0, 1),
+		Key:        button,
+		KeyOp:      key.Text(roles.Accent2),
+		KeyHover:   f.Fill(roles.Accent2),
 		KeyEq:      keyEq,
-		KeyEqHover: keyEq.Background(t.BrightPurple),
+		KeyEqHover: f.Fill(roles.Accent.Soft()).Bold(true),
 
 		MenuItem:   menuItem.Width(MenuWidth),
 		MenuHover:  rowOn.Width(MenuWidth),
-		MenuRule:   menuItem.Foreground(muted),
+		MenuRule:   menu.Text(roles.Border),
 		Banner:     banner,
 		BannerText: banner.Width(3).Align(lipgloss.Center),
 
-		Bar:      lipgloss.NewStyle().Background(barBg),
-		Start:    start,
-		StartOn:  start.Background(t.BrightPurple),
-		Task:     task,
-		TaskOn:   task.Foreground(dark).Background(t.Blue).Bold(true),
-		TaskMin:  task.Foreground(muted).Background(barBg),
-		TaskOver: task.Background(lipgloss.Lighten(t.Bg, 0.2)),
-		Status:   lipgloss.NewStyle().Foreground(muted).Background(barBg),
-		Clock:    lipgloss.NewStyle().Foreground(fg).Background(raised),
+		Bar:      f.Fill(roles.Surface),
+		Start:    banner,
+		StartOn:  f.Fill(roles.Accent.Soft()).Bold(true),
+		Task:     button,
+		TaskOn:   rowOn,
+		TaskMin:  win.Text(roles.Muted),
+		TaskOver: button.Background(f.Color(roles.Overlay)),
+		Status:   win.Text(roles.Muted),
+		Clock:    button,
 
-		SplashLogo: line.Foreground(accent).Bold(true),
+		SplashLogo: line.Foreground(f.Color(roles.Accent)).Bold(true),
 		SplashLine: line,
-		SplashDone: lipgloss.NewStyle().Foreground(accent),
-		SplashToDo: lipgloss.NewStyle().Foreground(muted),
-		SplashWord: line.Foreground(muted),
+		SplashDone: f.Text(roles.Accent),
+		SplashToDo: f.Text(roles.Subtle),
+		SplashWord: line.Foreground(f.Color(roles.Muted)),
 	}
 }
 

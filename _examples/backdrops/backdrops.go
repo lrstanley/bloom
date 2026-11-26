@@ -6,7 +6,7 @@ package main
 
 import (
 	"bloomfx.dev/bloom/fx"
-	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 )
 
 // backdrop is one of the backdrops the example switches between.
@@ -22,7 +22,7 @@ var screens = []backdrop{
 		name:  "Ripple",
 		about: "Rings of glyphs ripple out from each click, and from the\npointer as it moves. Drops of rain keep it moving.",
 		effects: func(m *model) []fx.Effect {
-			return []fx.Effect{fx.Ripple{Time: m.clock.Elapsed(), Drops: m.drops, Rain: 0.7, Color: m.st.theme.Cyan}}
+			return []fx.Effect{fx.Ripple{Time: m.clock.Elapsed(), Drops: m.drops, Rain: 0.7, Color: m.st.fit.Color(roles.Cyan)}}
 		},
 	},
 	{
@@ -30,8 +30,8 @@ var screens = []backdrop{
 		about: "Faint patches of glyphs drift and fade, gathering around\nthe pointer. Clicks still ripple through them.",
 		effects: func(m *model) []fx.Effect {
 			return []fx.Effect{
-				fx.Drift{Time: m.clock.Elapsed(), Focus: m.pointer, Radius: m.lens(), Color: m.st.theme.Fg},
-				fx.Ripple{Time: m.clock.Elapsed(), Drops: m.drops, Color: m.st.theme.Fg},
+				fx.Drift{Time: m.clock.Elapsed(), Focus: m.pointer, Radius: m.lens(), Color: m.st.fit.Color(roles.Fg)},
+				fx.Ripple{Time: m.clock.Elapsed(), Drops: m.drops, Color: m.st.fit.Color(roles.Fg)},
 			}
 		},
 	},
@@ -40,8 +40,8 @@ var screens = []backdrop{
 		about: "Streams of glyphs fall, each led by one that scrambles\nas it falls, and trailed by glyphs that settle.",
 		effects: func(m *model) []fx.Effect {
 			return []fx.Effect{
-				fx.Rain{Time: m.clock.Elapsed(), Color: m.st.theme.Green, Head: m.st.theme.Fg},
-				fx.Ripple{Time: m.clock.Elapsed(), Drops: m.drops, Color: m.st.theme.Green},
+				fx.Rain{Time: m.clock.Elapsed(), Color: m.st.fit.Color(roles.Green), Head: m.st.fit.Color(roles.Fg)},
+				fx.Ripple{Time: m.clock.Elapsed(), Drops: m.drops, Color: m.st.fit.Color(roles.Green)},
 			}
 		},
 	},
@@ -68,14 +68,14 @@ var dialogs = []backdrop{
 		name:  "Tint",
 		about: "fx.Recolor, with the same color for both, tints\neverything toward it.",
 		effects: func(m *model) []fx.Effect {
-			return []fx.Effect{fx.Recolor{Fg: m.st.theme.Purple, Bg: m.st.theme.Purple, Amount: 0.45}}
+			return []fx.Effect{fx.Recolor{Fg: m.st.fit.Color(roles.Accent), Bg: m.st.fit.Color(roles.Accent), Amount: 0.45}}
 		},
 	},
 	{
 		name:  "Two colors",
 		about: "fx.Recolor, all the way, draws every cell in two colors.",
 		effects: func(m *model) []fx.Effect {
-			return []fx.Effect{fx.Recolor{Fg: lipgloss.Lighten(m.st.theme.Bg, 0.17), Bg: lipgloss.Darken(m.st.theme.Bg, 0.3)}}
+			return []fx.Effect{fx.Recolor{Fg: m.st.fit.Color(roles.Border), Bg: m.st.fit.Color(roles.Sunken)}}
 		},
 	},
 	{
@@ -100,14 +100,14 @@ var dialogs = []backdrop{
 		name:  "Braille tint",
 		about: "fx.Braille draws in grays, and an fx.Recolor after it\ntints them.",
 		effects: func(m *model) []fx.Effect {
-			return []fx.Effect{fx.Braille{Amount: 0.5, Seed: 7}, fx.Recolor{Fg: m.st.theme.Purple, Amount: 0.3}}
+			return []fx.Effect{fx.Braille{Amount: 0.5, Seed: 7}, fx.Recolor{Fg: m.st.fit.Color(roles.Accent), Amount: 0.3}}
 		},
 	},
 	{
 		name:  "Dim + Drift",
 		about: "fx.Dim, with an ambient fx.Drift drawn over it, both\nfading in with the dialog.",
 		effects: func(m *model) []fx.Effect {
-			return []fx.Effect{fx.Dim{Amount: 0.6}, fx.Drift{Time: m.clock.Elapsed(), Color: m.st.theme.Purple}}
+			return []fx.Effect{fx.Dim{Amount: 0.6}, fx.Drift{Time: m.clock.Elapsed(), Color: m.st.fit.Color(roles.Accent)}}
 		},
 	},
 }

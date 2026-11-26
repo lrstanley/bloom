@@ -9,6 +9,8 @@ import (
 
 	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -18,7 +20,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	// The colors the border effects are drawn in.
 	accent color.Color
@@ -43,32 +45,36 @@ type styles struct {
 	onBar     bloom.ScrollbarStyle // a scrollbar's thumb under the pointer
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a border, from the
+// tint, so the example reads on any tint, dark or light. Pink is the tint's
+// magenta, which the example uses for its own sake.
 func newStyles(t *tint.Tint) styles {
-	fg, muted, accent, pink := t.Fg, t.BrightBlack, t.Blue, t.Purple
-	panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	tab := lipgloss.NewStyle().Foreground(muted)
-	thumb := lipgloss.NewStyle().Foreground(accent)
-	icon := lipgloss.NewStyle().Foreground(fg)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	accent, pink := f.Color(roles.Accent), f.Color(roles.Magenta)
+	panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border))
+	tab := f.Text(roles.Muted)
+	thumb := f.Text(roles.Accent)
+	icon := f.Text(roles.Fg)
 	return styles{
-		theme:  t,
+		fit:    f,
 		accent: accent,
 		pink:   pink,
-		warn:   t.Yellow,
-		good:   t.Green,
-		bad:    t.Red,
+		warn:   f.Color(roles.Warning),
+		good:   f.Color(roles.Success),
+		bad:    f.Color(roles.Danger),
 
 		panel: panel,
 		pane:  panel.Padding(0, 1),
-		item:  lipgloss.NewStyle().Foreground(fg).Padding(0, 1),
-		text:  lipgloss.NewStyle().Foreground(fg),
-		title: lipgloss.NewStyle().Foreground(fg).Bold(true).Padding(0, 1),
-		label: lipgloss.NewStyle().Foreground(muted).Padding(0, 1),
+		item:  f.Text(roles.Fg).Padding(0, 1),
+		text:  f.Text(roles.Fg),
+		title: f.Text(roles.Fg).Bold(true).Padding(0, 1),
+		label: f.Text(roles.Muted).Padding(0, 1),
 		tab:   tab,
 		onTab: tab.Foreground(accent).Bold(true),
 		icon:  icon,
-		onTip: icon.Foreground(t.Yellow).Bold(true),
-		side:  lipgloss.NewStyle().Foreground(pink).Bold(true),
+		onTip: icon.Foreground(accent).Bold(true),
+		side:  f.Text(roles.Magenta).Bold(true),
 
 		scrollbar: bloom.ScrollbarStyle{ThumbStyle: thumb},
 		onBar:     bloom.ScrollbarStyle{ThumbStyle: thumb.Foreground(pink)},

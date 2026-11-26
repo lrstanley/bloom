@@ -49,6 +49,7 @@ import (
 	"bloomfx.dev/bloom"
 	"bloomfx.dev/bloom/_examples/internal/clip"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -71,7 +72,7 @@ type model struct {
 // without one, followed by generated lines until there are lines of them.
 func newModel(path string, lines int) (*model, error) {
 	m := &model{st: newStyles(tint.TintTokyoNight), status: "type away; ctrl+q quits"}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithClipboard(clip.Write))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)), bloom.WithClipboard(clip.Write))
 	m.text = newTextarea()
 	m.text.setStyles(m.st)
 	if path != "" {
@@ -146,7 +147,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

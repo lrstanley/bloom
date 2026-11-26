@@ -27,6 +27,7 @@ import (
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -77,7 +78,7 @@ func newModel() *model {
 		drop:      anim.NewPresence(anim.Spring(9, 0.35)),
 	}
 	// Clicks move the focus, before the handler of what was clicked runs.
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithFocus(&m.focus))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)), bloom.WithFocus(&m.focus))
 	m.form = form{st: m.st, focus: &m.focus, values: make(map[bloom.ID]string), save: m.askToSave}
 	m.toast = toast{st: m.st, presence: anim.NewPresence(anim.Duration(600*time.Millisecond), anim.Ease(anim.Linear))}
 	m.focus.Set(fieldName)
@@ -110,7 +111,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

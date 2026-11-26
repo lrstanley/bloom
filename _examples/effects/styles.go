@@ -5,10 +5,10 @@
 package main
 
 import (
-	"image/color"
-
 	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -16,8 +16,7 @@ import (
 // tint by newStyles. The model keeps them, so that nothing is a package
 // global.
 type styles struct {
-	theme  *tint.Tint  // the tint the styles are made from
-	accent color.Color // the color of the sweep effect's band
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	frame  lipgloss.Style // the frame of a card
 	name   lipgloss.Style // the name of a card's effect
@@ -25,15 +24,17 @@ type styles struct {
 	status lipgloss.Style // the status line
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a raised panel, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 	return styles{
-		theme:  t,
-		accent: t.Purple,
-		frame:  lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BrightBlack),
-		name:   lipgloss.NewStyle().Bold(true).Foreground(t.Cyan),
-		sample: lipgloss.NewStyle().Foreground(t.Fg).Background(lipgloss.Lighten(t.Bg, 0.1)).Padding(0, 1),
-		status: lipgloss.NewStyle().Foreground(t.BrightBlack),
+		fit:    f,
+		frame:  lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		name:   f.Text(roles.Accent2).Bold(true),
+		sample: f.Fill(roles.Raised).Padding(0, 1),
+		status: f.Text(roles.Muted),
 	}
 }
 

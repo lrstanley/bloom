@@ -7,6 +7,8 @@ package main
 import (
 	"bloomfx.dev/bloom"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -16,7 +18,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel   lipgloss.Style // the text's rounded frame
 	title   lipgloss.Style // the text's name, on the frame
@@ -32,20 +34,23 @@ type styles struct {
 	barHover bloom.ScrollbarStyle
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a scrollbar's thumb,
+// from the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	muted, accent := t.BrightBlack, t.Blue
-	thumb := lipgloss.NewStyle().Foreground(accent)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	muted := f.Text(roles.Muted)
+	thumb := f.Text(roles.BorderStrong)
 	return styles{
-		theme:    t,
-		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted),
-		title:    lipgloss.NewStyle().Foreground(accent).Bold(true).Padding(0, 1),
-		counter:  lipgloss.NewStyle().Foreground(muted).Padding(0, 1),
-		status:   lipgloss.NewStyle().Foreground(t.Fg),
-		hint:     lipgloss.NewStyle().Foreground(muted),
-		numbers:  lipgloss.NewStyle().Foreground(muted),
-		current:  lipgloss.NewStyle().Background(lipgloss.Lighten(t.Bg, 0.05)),
+		fit:      f,
+		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+		title:    f.Text(roles.Accent).Bold(true).Padding(0, 1),
+		counter:  muted.Padding(0, 1),
+		status:   f.Text(roles.Fg),
+		hint:     muted,
+		numbers:  f.Text(roles.Subtle),
+		current:  lipgloss.NewStyle().Background(f.Color(roles.Surface)),
 		bar:      bloom.ScrollbarStyle{ThumbStyle: thumb},
-		barHover: bloom.ScrollbarStyle{ThumbStyle: thumb.Foreground(t.Purple)},
+		barHover: bloom.ScrollbarStyle{ThumbStyle: thumb.Foreground(f.Color(roles.Accent))},
 	}
 }

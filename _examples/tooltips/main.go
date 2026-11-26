@@ -31,6 +31,7 @@ import (
 
 	"bloomfx.dev/bloom"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -50,7 +51,7 @@ type model struct {
 func newModel() *model {
 	m := &model{st: newStyles(tint.TintCatppuccinMocha), note: "prod-eu-1 · 6 services"}
 	m.ui = bloom.New(
-		bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg),
+		bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)),
 		bloom.WithFocus(&m.focus),
 		bloom.WithTooltips(m.tips),
 	)
@@ -91,7 +92,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it, and reports focus, which tooltips close on losing.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	v.ReportFocus = true
 	return v
 }

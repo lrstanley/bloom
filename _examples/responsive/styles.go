@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -15,7 +17,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel    lipgloss.Style // a rounded frame
 	pane     lipgloss.Style // the frame of the reader and the details, padded
@@ -30,26 +32,28 @@ type styles struct {
 	note     lipgloss.Style // quieter text, in the details
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as muted text or a bar's panel, from
+// the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	fg, text, accent, muted, dark := t.Fg, t.White, t.Yellow, t.BrightBlack, t.Bg
-	barBg := lipgloss.Lighten(t.Bg, 0.05)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	onBar := f.On(roles.Surface) // the roles for drawing on the toolbar and the status bar
 
-	panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(muted)
-	bar := lipgloss.NewStyle().Foreground(fg).Background(barBg)
-	item := lipgloss.NewStyle().Foreground(text).Padding(0, 1)
+	panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border))
+	bar := onBar.Fill(roles.Surface)
+	item := f.Text(roles.Fg).Padding(0, 1)
 	return styles{
-		theme:    t,
+		fit:      f,
 		panel:    panel,
 		pane:     panel.Padding(0, 1),
 		bar:      bar,
-		title:    bar.Bold(true).Foreground(accent).Padding(0, 1),
-		action:   bar.Foreground(text).Padding(0, 1),
+		title:    onBar.Text(roles.Accent).Bold(true).Padding(0, 1),
+		action:   bar.Padding(0, 1),
 		item:     item,
-		selected: item.Foreground(dark).Background(accent).Bold(true),
-		prose:    lipgloss.NewStyle().Foreground(fg),
-		chip:     lipgloss.NewStyle().Foreground(dark).Background(t.Purple).Padding(0, 1),
+		selected: f.Fill(roles.Accent).Bold(true).Padding(0, 1),
+		prose:    f.Text(roles.Fg),
+		chip:     f.Fill(roles.Accent2).Padding(0, 1),
 		bold:     lipgloss.NewStyle().Bold(true),
-		note:     lipgloss.NewStyle().Foreground(muted),
+		note:     f.Text(roles.Muted),
 	}
 }

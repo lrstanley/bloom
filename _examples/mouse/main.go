@@ -26,6 +26,7 @@ import (
 	"bloomfx.dev/bloom/_examples/internal/clip"
 	"bloomfx.dev/bloom/on"
 	tea "charm.land/bubbletea/v2"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -48,7 +49,7 @@ func newModel() *model {
 		split:  22,
 		status: "hover, click, or double click a file; drag the divider or over the text",
 	}
-	m.ui = bloom.New(bloom.WithColors(m.st.theme.Fg, m.st.theme.Bg), bloom.WithClipboard(clip.Write))
+	m.ui = bloom.New(bloom.WithColors(m.st.fit.Color(roles.Fg), m.st.fit.Color(roles.Bg)), bloom.WithClipboard(clip.Write))
 	m.reader = reader{st: m.st, buf: bloom.NewBuffer("double click a file to open it")}
 	return m
 }
@@ -99,7 +100,7 @@ func (m *model) View() tea.View {
 	v.AltScreen = true
 	// The terminal takes the theme's background, where terminals let
 	// programs set it.
-	v.BackgroundColor = m.st.theme.Bg
+	v.BackgroundColor = m.st.fit.Color(roles.Bg)
 	return v
 }
 

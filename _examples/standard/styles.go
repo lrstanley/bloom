@@ -6,6 +6,8 @@ package main
 
 import (
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
@@ -15,7 +17,7 @@ import (
 // afresh each frame borrows the styles of whatever builds it, by pointer,
 // rather than copying them into every frame.
 type styles struct {
-	theme *tint.Tint // the tint the styles are made from
+	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
 	panel    lipgloss.Style // a rounded frame
 	page     lipgloss.Style // the frame of the reader, padded
@@ -23,15 +25,18 @@ type styles struct {
 	selected lipgloss.Style // the sidebar item of the page open
 }
 
-// newStyles makes the example's styles from tint t.
+// newStyles makes the example's styles from tint t. bubbletint's roles
+// derive what each color is for, such as a border or the open page's item,
+// from the tint, so the example reads on any tint, dark or light.
 func newStyles(t *tint.Tint) styles {
-	panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BrightBlack)
+	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
+	panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border))
 	item := lipgloss.NewStyle().Padding(0, 1)
 	return styles{
-		theme:    t,
+		fit:      f,
 		panel:    panel,
 		page:     panel.Padding(0, 1),
 		item:     item,
-		selected: item.Foreground(t.Bg).Background(t.Green),
+		selected: f.Fill(roles.Accent).Padding(0, 1),
 	}
 }
