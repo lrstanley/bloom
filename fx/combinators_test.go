@@ -275,7 +275,7 @@ func TestCombinatorsComparable(t *testing.T) {
 		Reverse{Effect: Dissolve{Seed: 1}},
 		Delay{Effect: Reverse{Effect: Stagger{Effect: Wipe{}}}},
 		Unfold{},
-		Iris{At: image.Pt(3, 4)},
+		Iris{From: At(image.Pt(3, 4))},
 		Shade{Seed: 2},
 		Blinds{From: Top, Size: 2},
 		Wave{From: Left},

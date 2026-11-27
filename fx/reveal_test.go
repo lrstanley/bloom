@@ -84,7 +84,7 @@ func snapshot(s *canvas.Surface) []string {
 var revealEffects = map[string]Effect{
 	"unfold":       Unfold{},
 	"iris":         Iris{},
-	"iris at":      Iris{At: image.Pt(7, 4)},
+	"iris at":      Iris{From: At(image.Pt(7, 4))},
 	"shade":        Shade{Seed: 3},
 	"blinds top":   Blinds{From: Top},
 	"blinds right": Blinds{From: Right, Size: 2},
@@ -262,12 +262,12 @@ func TestIris(t *testing.T) {
 		// right corner, which is at 4,2.
 		at := image.Pt(4+18, 2+1)
 		s := boxLayer(20, 9)
-		Iris{At: at}.Apply(s, 0.15)
+		Iris{From: At(at)}.Apply(s, 0.15)
 		if !s.Visible(18, 1) || s.Visible(0, 8) || s.Visible(0, 0) {
 			t.Fatalf("the circle is not at %v", at)
 		}
 		s = boxLayer(20, 9)
-		Iris{At: at}.Apply(s, 0.99)
+		Iris{From: At(at)}.Apply(s, 0.99)
 		if !s.Visible(0, 8) {
 			t.Fatal("the farthest corner is not shown by t=0.99")
 		}

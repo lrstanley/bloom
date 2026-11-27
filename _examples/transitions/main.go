@@ -138,7 +138,7 @@ func (m *model) layout() bloom.Child {
 	iris := m.dialog(
 		"Iris dialog",
 		"Opened by an iris that grows\nfrom the button that opened it.",
-	).Presence(m.iris, fx.Iris{At: m.irisAt})
+	).Presence(m.iris, fx.Iris{From: fx.At(m.irisAt)})
 	unfold := m.dialog(
 		"Unfold dialog",
 		"Opened by unfolding from\nits middle row outward.",

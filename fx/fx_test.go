@@ -106,6 +106,27 @@ func TestSlide(t *testing.T) {
 			t.Errorf("Slide from %d at t=1: offset %v", tt.from, s.Offset)
 		}
 	}
+
+	// A few cells away, it comes that far on each axis it moves along.
+	for _, tt := range []struct {
+		from Direction
+		want image.Point
+	}{
+		{Right, image.Pt(3, 0)},
+		{TopLeft, image.Pt(-3, -3)},
+		{0, image.Pt(0, 3)},
+	} {
+		s := layer()
+		Slide{From: tt.from, Cells: 3}.Apply(s, 0)
+		if s.Offset != tt.want {
+			t.Errorf("Slide 3 cells from %d at t=0: offset %v, want %v", tt.from, s.Offset, tt.want)
+		}
+		s = layer()
+		Slide{From: tt.from, Cells: 3}.Apply(s, 0.5)
+		if want := tt.want.Div(2); s.Offset != want && s.Offset != tt.want.Sub(want) {
+			t.Errorf("Slide 3 cells from %d at t=0.5: offset %v", tt.from, s.Offset)
+		}
+	}
 }
 
 func TestFade(t *testing.T) {

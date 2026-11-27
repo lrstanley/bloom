@@ -51,13 +51,12 @@ func (Unfold) Apply(s *canvas.Surface, t float64) {
 	}
 }
 
-// Iris reveals a node with a circle that grows from At until it covers the
-// node, such as a dialog opening from the button that was pressed.
+// Iris reveals a node with a circle that grows from From until it covers
+// the node, such as a dialog opening from the button that was pressed.
 type Iris struct {
-	// At is the circle's center, in frame coordinates, such as the rectangle
-	// of a button from the previous frame. The zero point means the center of
-	// the node.
-	At image.Point
+	// From is the circle's center, such as [At] the button pressed, which
+	// may be off the node. The zero value is the node's [Middle].
+	From Origin
 }
 
 // Apply implements [Effect].
@@ -66,11 +65,7 @@ func (e Iris) Apply(s *canvas.Surface, t float64) {
 		return
 	}
 	w, h := s.Width(), s.Height()
-	cx, cy := float64(w)/2, float64(h)/2
-	if e.At != (image.Point{}) {
-		at := e.At.Sub(s.Rect().Min)
-		cx, cy = float64(at.X)+0.5, float64(at.Y)+0.5
-	}
+	cx, cy := e.From.point(s.Rect())
 	// Cells are about twice as tall as they are wide, so rows count double
 	// for the circle to look round.
 	farX, farY := max(cx, float64(w)-cx), 2*max(cy, float64(h)-cy)

@@ -14,20 +14,32 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 )
 
-// Fly flies a moving node's cells over from where it was, [canvas.Surface.From],
-// to where it is, for a slot or layer that moves with effects, such as with
-// [bloom.SlotNode.MoveWith]. The node starts out whole where it was, squeezed
-// or stretched to the size it was there. Its columns, or its rows for a move mostly up or down, take off
-// one after another, from the edge facing where they go, each cell a little
-// apart from its neighbors, arc over, and land.
-// A glyph in flight shows a bright random glyph in its own color, and blank
-// cells wait where they were until they land, so the node is whole at both
-// ends. Flights are the same for the same Seed. On a node that is not
-// moving, it does nothing.
+// Fly flies a node's cells over to where they are: from where it was,
+// [canvas.Surface.From], for a slot or layer that moves with effects, such
+// as with [bloom.SlotNode.MoveWith], or out of a spot, From, such as a menu
+// flying out of where it was clicked, or a dialog out of the middle of the
+// screen. The node starts out whole where it was, squeezed or stretched to
+// the size it was there, or to a single cell at From. Its columns, or its
+// rows for a move mostly up or down, take off one after another, from the
+// edge facing where they go, each cell a little apart from its neighbors,
+// arc over, and land.
+//
+// A glyph in flight shows a bright random glyph in its own color, or itself
+// if Plain, and blank cells wait where they were until they land, so the
+// node is whole at both ends. Flights are the same for the same Seed. Run
+// backward, as when a layer's presence hides, the node flies back. Without
+// From, on a node that is not moving, it does nothing.
 //
 // [bloom.SlotNode.MoveWith]: https://pkg.go.dev/bloomfx.dev/bloom#SlotNode.MoveWith
 type Fly struct {
+	// From is where the node flies out of, its nearest cell for a spot off
+	// it, whether it moved or not. The zero value is where it was.
+	From Origin
 	Seed uint32
+	// Plain flies each glyph as itself, rather than as a bright random one
+	// deciphering in flight, such as for a quick flight, where the random
+	// glyphs would only flicker.
+	Plain bool
 }
 
 const (
@@ -58,6 +70,10 @@ var flyBufs = sync.Pool{New: func() any { return new(flyBuf) }}
 // Apply implements [Effect].
 func (e Fly) Apply(s *canvas.Surface, t float64) {
 	from, to := s.From, s.Rect()
+	if !e.From.IsZero() && !to.Empty() {
+		at := to.Min.Add(e.From.Cell(to))
+		from = image.Rectangle{Min: at, Max: at.Add(image.Pt(1, 1))}
+	}
 	if t >= 1 || from.Empty() || to.Empty() || from == to {
 		return
 	}
@@ -70,7 +86,7 @@ func (e Fly) Apply(s *canvas.Surface, t float64) {
 
 	shift := from.Min.Sub(to.Min) // from a node's cells to where it was
 	resized := from.Size() != to.Size()
-	waiting := e.lift(s, buf, t, resized)
+	waiting := e.lift(s, buf, from, t, resized)
 
 	// Cells waiting to leave are drawn where they were, and those in flight
 	// over them.
@@ -96,10 +112,12 @@ func (e Fly) Apply(s *canvas.Surface, t float64) {
 			start = start.Add(image.Pt(c.x*from.Dx()/s.Width()-c.x, c.y*from.Dy()/s.Height()-c.y))
 		}
 		k := smoothstep(c.p)
-		c.c.Content, c.c.Width = flicker(decodeGlyphs, c.x, c.y, e.Seed, step), 1
-		c.c.Style.Attrs |= uv.AttrBold
-		if c.c.Style.Fg == nil {
-			c.c.Style.Fg = s.Env.Fg
+		if !e.Plain {
+			c.c.Content, c.c.Width = flicker(decodeGlyphs, c.x, c.y, e.Seed, step), 1
+			c.c.Style.Attrs |= uv.AttrBold
+			if c.c.Style.Fg == nil {
+				c.c.Style.Fg = s.Env.Fg
+			}
 		}
 		// An arc up and over, a row or two high.
 		lift := int(math.Round(math.Sin(math.Pi*k) * (1 + hash(c.y, c.x, e.Seed))))
@@ -111,11 +129,11 @@ func (e Fly) Apply(s *canvas.Surface, t float64) {
 	}
 }
 
-// lift hides the cells of the node on s that have not landed at t, keeping
-// them in buf, with which of them each is if the node was resized, and
-// reports whether any are waiting to leave. Cells that have landed stay where
-// they are drawn.
-func (e Fly) lift(s *canvas.Surface, buf *flyBuf, t float64, resized bool) (waiting bool) {
+// lift hides the cells of the node on s, flying from from, that have not
+// landed at t, keeping them in buf, with which of them each is if the node
+// was resized, and reports whether any are waiting to leave. Cells that have
+// landed stay where they are drawn.
+func (e Fly) lift(s *canvas.Surface, buf *flyBuf, from image.Rectangle, t float64, resized bool) (waiting bool) {
 	w, h := s.Width(), s.Height()
 	if resized {
 		buf.at = slices.Grow(buf.at[:0], w*h)[:w*h]
@@ -124,7 +142,7 @@ func (e Fly) lift(s *canvas.Surface, buf *flyBuf, t float64, resized bool) (wait
 	// Parts leave in order from the edge facing where they go, by how the
 	// node's middle moves: columns for a move mostly across, rows for one
 	// mostly up or down.
-	from, to := s.From, s.Rect()
+	to := s.Rect()
 	d := from.Min.Add(from.Max).Sub(to.Min.Add(to.Max))
 	across := abs(d.X) >= abs(d.Y)
 	parts, toward := w, d.X

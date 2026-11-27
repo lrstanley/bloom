@@ -101,6 +101,12 @@ func TestFly(t *testing.T) {
 			t.Fatalf("t=0.44, column %d has landed:\n%s", x, got)
 		}
 	}
+	// Plain, what is in flight is the node's own glyphs.
+	s = flyLayer(text, node, from, 10)
+	Fly{Seed: 1, Plain: true}.Apply(s, 0.44)
+	if plain := reached(s); strings.Trim(strings.ReplaceAll(plain, "\n", ""), "~abcdefgh") != "" || plain == got {
+		t.Fatalf("t=0.44, plain, want only the node's glyphs in flight:\n%s", plain)
+	}
 	s = flyLayer(text, node, from, 10)
 	Fly{Seed: 1}.Apply(s, 0.56)
 	got = reached(s)
@@ -156,5 +162,72 @@ func BenchmarkFlyFullScreen(b *testing.B) {
 		s := cells.TravelLayer(node, node, frame.Bounds(), frame, env, &canvas.Mixer{})
 		s.From = from
 		Fly{Seed: 1}.Apply(s, float64(i%20)/20)
+	}
+}
+
+func TestFlyFrom(t *testing.T) {
+	t.Parallel()
+
+	node := image.Rect(2, 1, 6, 3)
+	const text = "abcd\nefgh"
+
+	tests := []struct {
+		name string
+		from Origin
+		at   image.Point // the cell it all starts out in
+	}{
+		{"middle", Middle, image.Pt(4, 2)},
+		{"top", Side(Top), image.Pt(4, 1)},
+		{"bottom right", Side(BottomRight), image.Pt(5, 2)},
+		{"a cell", At(image.Pt(3, 1)), image.Pt(3, 1)},
+		{"a cell off it", At(image.Pt(0, 9)), image.Pt(2, 2)},
+	}
+	for _, tt := range tests {
+		// It flies out of its spot whether it moved or not, starting out
+		// squeezed into the one cell.
+		for _, was := range []image.Rectangle{{}, image.Rect(6, 1, 10, 3)} {
+			s := flyLayer(text, node, was, 10)
+			Fly{From: tt.from, Seed: 1}.Apply(s, 0)
+			rows := strings.Split(reached(s), "\n")
+			for y, row := range rows {
+				for x, c := range row {
+					if at := image.Pt(x, y); (c != '~') != (at == tt.at) {
+						t.Fatalf("%s, was %v, t=0 shows %q at %v:\n%s", tt.name, was, c, at, reached(s))
+					}
+				}
+			}
+			s = flyLayer(text, node, was, 10)
+			Fly{From: tt.from, Seed: 1}.Apply(s, 1)
+			if got, want := reached(s), "~~~~~~~~~~\n~~abcd~~~~\n~~efgh~~~~"; got != want {
+				t.Fatalf("%s, was %v, t=1:\n%s\nwant:\n%s", tt.name, was, got, want)
+			}
+		}
+	}
+}
+
+func TestOriginCell(t *testing.T) {
+	t.Parallel()
+
+	r := image.Rect(10, 5, 20, 9) // 10×4
+	tests := []struct {
+		o    Origin
+		want image.Point
+	}{
+		{Origin{}, image.Pt(5, 2)},
+		{Middle, image.Pt(5, 2)},
+		{Side(Top), image.Pt(5, 0)},
+		{Side(Bottom), image.Pt(5, 3)},
+		{Side(Left), image.Pt(0, 2)},
+		{Side(TopRight), image.Pt(9, 0)},
+		{At(image.Pt(12, 6)), image.Pt(2, 1)},
+		{At(image.Pt(0, 100)), image.Pt(0, 3)},
+	}
+	for _, tt := range tests {
+		if got := tt.o.Cell(r); got != tt.want {
+			t.Errorf("%+v: cell %v, want %v", tt.o, got, tt.want)
+		}
+	}
+	if got := Middle.Cell(image.Rectangle{}); got != (image.Point{}) {
+		t.Errorf("an empty node: cell %v", got)
 	}
 }

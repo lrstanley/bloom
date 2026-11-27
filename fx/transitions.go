@@ -43,10 +43,14 @@ func (Fade) Apply(s *canvas.Surface, t float64) {
 }
 
 // Slide moves a node in from beyond a side or corner of its viewport, such
-// as a dialog rising from the bottom of the screen.
+// as a dialog rising from the bottom of the screen, or from a few cells
+// away, such as a toast nudged in from the edge it sits on.
 type Slide struct {
 	// From is where the node comes from. The zero value is Bottom.
 	From Direction
+	// Cells is how far the node comes from on each axis it moves along. Zero
+	// is from beyond the viewport.
+	Cells int
 }
 
 // Apply implements [Effect].
@@ -57,6 +61,11 @@ func (e Slide) Apply(s *canvas.Surface, t float64) {
 	r, vp := s.Rect(), s.Viewport
 	// The node moves against the way from its side or corner.
 	dx, dy := cmp.Or(e.From, Bottom).Vector()
+	if e.Cells > 0 {
+		k := lerpInt(e.Cells, 0, t)
+		s.Offset = s.Offset.Add(image.Pt(-dx*k, -dy*k))
+		return
+	}
 	var off image.Point
 	switch {
 	case dx > 0:

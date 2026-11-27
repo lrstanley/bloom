@@ -253,7 +253,7 @@ func (m *model) layout() bloom.Child {
 			ID(codeID).
 			Size(m.w, m.h).
 			Modal().
-			Presence(m.code, fx.Iris{At: m.selectedAt()}, fx.Fade{}),
+			Presence(m.code, fx.Iris{From: fx.At(m.selectedAt())}, fx.Fade{}),
 		bloom.Layer(search).
 			Size(min(72, m.w-4), 0).
 			Anchor(bloom.Center, bloom.Start).
