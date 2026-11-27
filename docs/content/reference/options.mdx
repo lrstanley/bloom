@@ -170,8 +170,10 @@ A scrollbar has a `HoverStyle` of its own, which takes a `ScrollbarStyle`.
 | `Backdrop(effects...)` | apply effects to everything beneath |
 | `Shadow(x, y, effects...)` | apply effects beneath, offset like a drop shadow |
 | `Presence(p, effects...)` | show while a presence is visible, with effects |
+| `Enter(opts, effects...)` | play effects as it appears; needs an ID and a `Root`; see [Let Root play a layer's entrance and exit](/motion/transitions#let-root-play-a-layers-entrance-and-exit) |
+| `Exit(opts, effects...)` | keep drawing it with effects, running back to 0, once it's gone; needs an ID and a `Root` |
 | `Transition(t, effects...)` | draw with effects at progress `t` |
-| `ID(id)` | the ID for focus, anchoring, layout animation, and `Frame.Rect` |
+| `ID(id)` | the ID for focus, anchoring, layout animation, entering and exiting, and `Frame.Rect` |
 | `On(handlers...)` | mouse handlers; `on.ClickOutside` runs for a modal layer's backdrop |
 | `Animate(opts...)` | glide to new positions and sizes; needs an ID and a `Root` |
 | `MoveWith(effects...)` | draw the move to a new place with effects, such as `fx.Fly`, timed by `Animate`; see [Move with effects](/motion/layout-animation#move-with-effects) |

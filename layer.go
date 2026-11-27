@@ -68,6 +68,9 @@ func (e *engine) arrangeLayer(i int, r image.Rectangle) {
 		e.moved = lr.Min
 	}
 	e.boxes[i].rect = lr
+	if e.presence != nil && n.exit != nil {
+		e.presence.placed(n.id, lr.Sub(r.Min))
+	}
 	e.arrange(kid, lr)
 }
 

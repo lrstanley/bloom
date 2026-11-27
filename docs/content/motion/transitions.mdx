@@ -17,6 +17,7 @@ their buttons:
 | Where | Use |
 | --- | --- |
 | A layer that comes and goes | `bloom.Layer(c).Presence(p, effects...)` |
+| A layer that comes and goes, played by `Root` | `bloom.Layer(c).ID(id).Enter(opts, effects...).Exit(opts, effects...)` |
 | A node in a layout that comes and goes | `bloom.Present(p, c, effects...)` |
 | Any node, with any progress | `bloom.Transition(t, c, effects...)` or `bloom.Layer(c).Transition(t, effects...)` |
 
@@ -75,10 +76,47 @@ if !m.dialog.Shown() { // animating out
 bloom.Layer(dialog).Presence(m.dialog, effects...)
 ```
 
+## Let Root play a layer's entrance and exit
+
+A presence is state your model keeps and updates. For a layer that's simply drawn while it's open, such as a
+dialog or a menu, `Enter` and `Exit` let [`Root`](/bubble-tea/root) play its transitions instead: it notices by
+the layer's ID when the layer appears and when it's gone, so nothing in your model, or in the components the layer
+is made of, has to know it animates.
+
+```go
+timing := []anim.Option{anim.Duration(300 * time.Millisecond), anim.Ease(anim.Linear)}
+fly := fx.Fly{From: fx.Middle, Plain: true}
+
+var layers []bloom.LayerNode
+if m.confirming {
+	layers = append(layers, bloom.Layer(confirm).ID(confirmID).Enter(timing, fly).Exit(timing, fly))
+}
+bloom.Overlay(page, layers...)
+```
+
+When `m.confirming` turns true, the dialog flies out of the middle of the screen. When it turns false, `Root` keeps
+showing what the dialog last showed, flying back in, then drops it. Nothing in the dialog is drawn again, so its
+components can go away with it. While it exits it takes no input: what's beneath it gets clicks at once. It stays
+where it was among the overlay's layers, so a toast declared after it still covers it. Drawing a layer with the
+same ID again while it exits brings it back from where it got to.
+
+The options configure the progress, as for [`anim.NewValue`](https://pkg.go.dev/bloomfx.dev/bloom/anim#NewValue),
+and the enter and exit can differ, such as a quicker exit. The layer's backdrop and shadow follow the progress, so
+a dimmed backdrop fades in and out with it.
+
+`Root` has to be able to follow the frame a layer appears on with another, so a layer is shown at once, rather than
+entering, on the first frame, on a frame of a new size, and when its overlay wasn't on screen the frame before.
+Keep the `Overlay` in the tree with no layers, rather than leaving it out, for a layer to enter the first time it's
+drawn. A layer exits only while its overlay stays on screen, where it was in the tree, or with the same ID.
+
 ## Combine effects
 
 Effects given together are applied in order, all with the same progress. `fx.Fade{}, fx.Slide{From: bloom.Bottom}`
 fades in while sliding up. `fx.Scramble{}, fx.Fade{}` settles random glyphs into the text while it fades in.
+
+Put `Fade` after effects that change glyphs or move cells, such as `Scramble`, `Decode`, and `Fly`. For the first
+half of its progress, `Fade` shows the glyphs beneath the node in its cells, so an effect after it changes those
+instead: `fx.Fade{}, fx.Scramble{}` scrambles what's beneath the dialog, not the dialog.
 
 The [`fx`](https://pkg.go.dev/bloomfx.dev/bloom/fx) package has four combinators for finer control:
 
@@ -130,8 +168,9 @@ sits still.
 
 ## Open a dialog from its button
 
-`fx.Iris` reveals a node through a growing circle. Center the circle on the button that was pressed and the
-dialog appears to open out of it. Find the button in the last frame when it's pressed:
+`fx.Iris` reveals a node through a growing circle, and `fx.Fly` flies its cells out of one spot. Start either on
+the button that was pressed and the dialog appears to open out of it. Find the button in the last frame when it's
+pressed:
 
 ```go
 bloom.Text("share").ID(buttonShare).On(on.Press(m.openShare))
@@ -147,10 +186,16 @@ func (m *model) openShare() tea.Cmd {
 ```
 
 ```go
-bloom.Layer(shareDialog).Presence(m.share, fx.Iris{At: m.shareFrom})
+bloom.Layer(shareDialog).Presence(m.share, fx.Iris{From: fx.At(m.shareFrom)})
 ```
 
-`At` is in screen coordinates. The zero point means the center of the node.
+Both take an [`fx.Origin`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Origin) as `From`: `fx.At(p)` for a cell in
+screen coordinates, such as the button's middle or where a click was, `fx.Side(d)` for a side or corner of the node,
+or `fx.Middle`. `Iris` starts in the middle without one. A menu opened with a right click can fly out of the click:
+
+```go
+bloom.Layer(menu).ID(menuID).Enter(timing, fx.Fly{From: fx.At(m.clickedAt), Plain: true})
+```
 
 ## Random effects stay steady
 

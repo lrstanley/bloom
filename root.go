@@ -135,6 +135,7 @@ func New(opts ...Option) *Root {
 		after:      tea.Tick,
 	}
 	r.r.motion = motion.New(c.now)
+	r.r.presence = newLayerPresences(c.now, c.method)
 	r.r.screen = r.handlerFrame
 	r.r.lastFrame = r.Frame
 	r.r.focus = c.focus
@@ -212,12 +213,14 @@ func (r *Root) tick(msg tea.Msg) tea.Cmd {
 			return nil
 		}
 		r.pending = false
-		if !r.r.motion.Running() {
+		if !r.r.motion.Running() && !r.r.presence.running {
 			return nil
 		}
 	}
-	// With motion off, boxes reach their targets as they are laid out.
-	if r.pending || r.r.motion.Len() == 0 || !anim.Animates() {
+	// With motion off, boxes reach their targets as they are laid out. A
+	// frame follows any other message while a box could animate, or a layer
+	// enter or exit, as the frame drawn for it may start one.
+	if r.pending || (r.r.motion.Len() == 0 && !r.r.presence.armed()) || !anim.Animates() {
 		return nil
 	}
 	r.pending = true
@@ -262,6 +265,8 @@ func (r *Root) Render(w, h int, c Child) string {
 	r.r.env.Fg = cmp.Or(r.fg, r.termFg, canvas.DefaultEnv.Fg)
 	r.r.env.Bg = cmp.Or(r.bg, r.termBg, canvas.DefaultEnv.Bg)
 	r.noteFocus()
+	// A layer can start entering or exiting only on a frame another follows.
+	r.r.presence.follow = r.pending
 	out := r.r.render(w, h, c)
 	// Where the selection starts and ends is found in the frame, and
 	// followed from frame to frame by the text it is in, unless the text it

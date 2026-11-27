@@ -467,6 +467,15 @@ type LayerNode struct {
 	effects   []fx.Effect
 	animation *layoutAnimation
 	moves     []fx.Effect
+	enter     *layerMotion
+	exit      *layerMotion
+}
+
+// layerMotion is how a layer enters or exits: the options of its progress,
+// and the effects drawn with it.
+type layerMotion struct {
+	opts    []anim.Option
+	effects []fx.Effect
 }
 
 // Layer returns a layer showing child at its natural size, in the middle of
@@ -598,6 +607,42 @@ func (n LayerNode) Presence(p anim.Presence, effects ...fx.Effect) LayerNode {
 // hidden anchor or removed layer disappears immediately.
 func (n LayerNode) Animate(opts ...anim.Option) LayerNode {
 	n.animation = &layoutAnimation{opts: opts}
+	return n
+}
+
+// Enter draws the layer with effects as it appears, with its transition
+// running from 0 to 1, such as a dialog flying out of the middle of the
+// screen with [fx.Fly] and [fx.Middle]. opts configure that progress, which
+// defaults to [anim.NewValue]'s. The layer takes input as it enters.
+//
+// [Root] plays it, noticing by the layer's ID that it was not drawn on the
+// last frame, so the layer needs an ID, and does nothing outside a Root.
+// While it enters, the layer's own [LayerNode.Transition] is set aside. A
+// layer that appears on a frame Root cannot follow with another, as when
+// its overlay was not on screen the frame before, or on the first frame or
+// one of a new size, is shown at once. Turning motion off with
+// [anim.SetMotion] shows it at once too.
+func (n LayerNode) Enter(opts []anim.Option, effects ...fx.Effect) LayerNode {
+	n.enter = &layerMotion{opts: opts, effects: effects}
+	return n
+}
+
+// Exit keeps the layer on screen once it is no longer drawn, showing what
+// it last showed, where it was, with its transition running back from 1 to 0
+// with effects, such as a dialog flying back into where it came from,
+// playing [LayerNode.Enter]'s effects backward. opts configure that
+// progress, as for Enter. Its child is not drawn again, so a component in
+// it may go away with it. Its backdrop and shadow follow the progress. It
+// stays where it was among its overlay's layers, and takes no input: it is
+// not in the [Frame], and what is beneath it gets mouse events at once.
+//
+// Like Enter, it needs an ID and a [Root], which notices that the layer is
+// gone. The layer exits only while its overlay is still on screen, where it
+// was in the tree or with the same ID. Drawing a layer with the same ID
+// again has it enter from where its exit had got to. A layer gone while
+// its [LayerNode.Presence] was hiding does not exit again.
+func (n LayerNode) Exit(opts []anim.Option, effects ...fx.Effect) LayerNode {
+	n.exit = &layerMotion{opts: opts, effects: effects}
 	return n
 }
 

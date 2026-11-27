@@ -104,6 +104,7 @@ type engine struct {
 	vps        []vpLayout        // the viewports laid out this frame
 	vpRows     []linebuf.RowSpan // the rows they show, in spans
 	motion     *motion.Tracker   // nil for pooled renderers, which keep no state between frames
+	presence   *layerPresences   // the layers entering and exiting; nil as motion is
 	screen     func() *Frame     // the Root's frame on screen, for Context.Frame; nil outside a Root
 	lastFrame  func() *Frame     // the Root's frame drawn last, which the screen can be behind; nil outside a Root
 	// seeds counts the boxes this layout looked up in the last frame, to
@@ -135,6 +136,10 @@ func (e *engine) layout(w, h int, c Child) int {
 	e.seeds, e.seedAt = 0, nil
 	defer e.frameMemos.Retire()
 	defer e.textMemos.Retire()
+	if e.presence != nil {
+		e.presence.begin(w, h)
+		defer e.presence.end()
+	}
 	root := e.tree(c)
 	if root < 0 {
 		if e.motion != nil {
@@ -228,13 +233,17 @@ func (e *engine) build(c Child, parent, slot int) int {
 	case ScrollNode:
 		kids = []Child{n.child}
 	case OverlayNode:
-		kids = make([]Child, 0, 1+len(n.layers))
+		layers := n.layers
+		if e.presence != nil && !e.apart {
+			layers = e.presence.present(b.path, layers)
+		}
+		kids = make([]Child, 0, 1+len(layers))
 		base := n.base
 		if absent(base) {
 			base = Text("")
 		}
 		kids = append(kids, base)
-		for _, l := range n.layers {
+		for _, l := range layers {
 			kids = append(kids, l)
 		}
 	case LayerNode:
