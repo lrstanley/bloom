@@ -24,15 +24,15 @@ var linear = []anim.Option{anim.Duration(time.Second), anim.Ease(anim.Linear)}
 
 // setMotion sets the motion until the test ends. Motion is global, so tests
 // using this do not call t.Parallel, and run while the ones that do wait.
-func setMotion(t *testing.T, on bool) {
+func setMotion(t *testing.T, l anim.MotionLevel) {
 	t.Helper()
 	prev := anim.Motion()
-	anim.SetMotion(on)
+	anim.SetMotion(l)
 	t.Cleanup(func() { anim.SetMotion(prev) })
 }
 
 func TestLayoutAnimationMotionOff(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, anim.Off)
 
 	now := time.Unix(1, 0)
 	r := New(WithClock(func() time.Time { return now }))

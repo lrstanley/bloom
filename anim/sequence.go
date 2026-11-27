@@ -192,7 +192,7 @@ func (s *Sequence) enter() {
 		// A step changes how the value moves, but not how often it asks for
 		// frames, or its clock.
 		s.v.curve = s.base.with(st.opts).curve
-		if !Motion() {
+		if !Animates() {
 			s.v.duration, s.v.spring = 0, false
 		}
 		s.v.from, s.v.target, s.v.start, s.v.last = s.v.current, st.target, s.at, s.at
@@ -205,7 +205,7 @@ func (s *Sequence) enter() {
 func (s *Sequence) done(now time.Time) (end time.Time, done bool) {
 	switch st := s.steps[s.step]; st.kind {
 	case stepHold:
-		if s.loop && !Motion() {
+		if s.loop && !Animates() {
 			// Steps that take no time end the loop, rather than blinking forever.
 			return s.at, true
 		}

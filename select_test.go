@@ -752,7 +752,7 @@ func TestCopySelection(t *testing.T) {
 }
 
 func TestCopySelectionMotionOff(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, anim.Off)
 
 	now := time.Unix(1, 0)
 	tree := func() Child { return Text("alpha beta").ID("text").Selectable() }
@@ -779,14 +779,14 @@ func TestCopySelectionMotionOff(t *testing.T) {
 	}
 
 	// Back on, it sweeps again.
-	anim.SetMotion(true)
+	anim.SetMotion(anim.Full)
 	if out := copyHalfWay(); !strings.Contains(out, selected) || ticks != 1 {
 		t.Fatalf("no band with motion back on, %d ticks: %q", ticks, out)
 	}
 
 	// Turned off part way, its next tick stops it, and asks for no other,
 	// and the band is gone from the next render.
-	anim.SetMotion(false)
+	anim.SetMotion(anim.Off)
 	r.Update(flashMsg{root: r})
 	if ticks != 1 {
 		t.Fatal("the flash kept ticking with motion off")
@@ -795,9 +795,9 @@ func TestCopySelectionMotionOff(t *testing.T) {
 		t.Fatalf("band still drawn after motion was turned off: %q", out)
 	}
 	// Nor is it drawn when motion goes off before the tick.
-	anim.SetMotion(true)
+	anim.SetMotion(anim.Full)
 	copyHalfWay()
-	anim.SetMotion(false)
+	anim.SetMotion(anim.Off)
 	if out := r.Render(10, 1, tree()); strings.Contains(out, selected) {
 		t.Fatalf("band drawn after motion was turned off, before its tick: %q", out)
 	}

@@ -50,7 +50,7 @@ func (k *Ticker) Animating() bool { return k.running }
 // Start runs the ticker from where it stopped, returning the command for its
 // first frame, or nil when it is already running or motion is off.
 func (k *Ticker) Start() tea.Cmd {
-	if k.now == nil || k.running || !Motion() {
+	if k.now == nil || k.running || !Animates() {
 		return nil
 	}
 	k.running, k.last = true, k.now()
@@ -87,7 +87,7 @@ func (k *Ticker) Update(msg tea.Msg) tea.Cmd {
 	if !k.own(msg) || !k.running {
 		return nil
 	}
-	if !Motion() {
+	if !Animates() {
 		k.Stop()
 		return nil
 	}

@@ -217,7 +217,7 @@ func (r *Root) tick(msg tea.Msg) tea.Cmd {
 		}
 	}
 	// With motion off, boxes reach their targets as they are laid out.
-	if r.pending || r.r.motion.Len() == 0 || !anim.Motion() {
+	if r.pending || r.r.motion.Len() == 0 || !anim.Animates() {
 		return nil
 	}
 	r.pending = true
@@ -246,7 +246,7 @@ func (r *Root) Render(w, h int, c Child) string {
 	if r.flash.ok {
 		t := float64(r.now().Sub(r.flashAt)) / float64(flashFor)
 		switch {
-		case t >= 1 || !anim.Motion():
+		case t >= 1 || !anim.Animates():
 			r.flash = selection{}
 		case r.flash.held:
 			if h := r.heldAt(r.flash.key); h != nil && h.get() == r.flashRange {

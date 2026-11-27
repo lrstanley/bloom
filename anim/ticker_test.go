@@ -113,7 +113,7 @@ func TestTickerUnfocused(t *testing.T) {
 }
 
 func TestTickerMotionOff(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, Off)
 
 	k := NewTicker()
 	if k.Start() != nil || k.Animating() {

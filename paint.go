@@ -8,6 +8,7 @@ import (
 	"image"
 	"slices"
 
+	"bloomfx.dev/bloom/anim"
 	"bloomfx.dev/bloom/canvas"
 	"bloomfx.dev/bloom/fx"
 	"bloomfx.dev/bloom/internal/linebuf"
@@ -764,6 +765,25 @@ func (r *renderer) paintLayer(i int, clip image.Rectangle, parent int) {
 	}
 }
 
+// applyEffects applies effects to s for t. Under reduced motion, those that
+// move cells are left out, and a node, when fade is set, fades instead,
+// after the rest, unless it fades already.
+func applyEffects(s *canvas.Surface, effects []fx.Effect, t float64, fade bool) {
+	reduced, faded, moved := anim.Motion() == anim.Reduced, false, false
+	for _, e := range effects {
+		if reduced && fx.Moves(e) {
+			moved = true
+			continue
+		}
+		_, isFade := e.(fx.Fade)
+		faded = faded || isFade
+		e.Apply(s, t)
+	}
+	if fade && moved && !faded {
+		fx.Fade{}.Apply(s, t)
+	}
+}
+
 // cutout hides the blank cells of a transparent layer, before and after its
 // own effects, so that what is beneath shows through them.
 type cutout struct{}
@@ -974,9 +994,7 @@ func (r *renderer) execute(again bool) {
 		case opEffects:
 			s := t.c.Region(o.rect.Sub(t.origin), r.env, &r.mixer)
 			s.Viewport = o.viewport.Sub(t.origin)
-			for _, e := range o.effects {
-				e.Apply(s, o.t)
-			}
+			applyEffects(s, o.effects, o.t, false)
 		case opPush:
 			depth := len(r.targets) - 1
 			if depth >= len(r.scratch) {
@@ -999,9 +1017,7 @@ func (r *renderer) execute(again bool) {
 			if !o.sub.Empty() {
 				applied = s.Sub(o.sub.Sub(o.rect.Min))
 			}
-			for _, e := range o.effects {
-				e.Apply(applied, o.t)
-			}
+			applyEffects(applied, o.effects, o.t, true)
 			parent.c.Composite(s, o.clip.Sub(parent.origin))
 			o.offset = s.Offset
 			if !again {

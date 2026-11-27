@@ -38,6 +38,53 @@ type Effect interface {
 	Apply(s *canvas.Surface, t float64)
 }
 
+// Mover is an effect that moves cells, such as [Fly] and [Slide], rather
+// than changing them where they are, as [Fade] does. Under reduced motion,
+// set with anim.SetMotion, bloom fades a node in place of the effects that
+// move it.
+type Mover interface {
+	Effect
+	// Moves reports whether the effect moves cells.
+	Moves() bool
+}
+
+// Moves reports whether e moves cells: whether it is a [Mover] whose Moves
+// reports true.
+func Moves(e Effect) bool {
+	m, ok := e.(Mover)
+	return ok && m.Moves()
+}
+
+// Moves implements [Mover].
+func (Fly) Moves() bool { return true }
+
+// Moves implements [Mover].
+func (Slide) Moves() bool { return true }
+
+// Moves implements [Mover].
+func (Shake) Moves() bool { return true }
+
+// Moves implements [Mover]: its rows jitter sideways.
+func (Glitch) Moves() bool { return true }
+
+// Moves implements [Mover]: its rows move apart.
+func (Unfold) Moves() bool { return true }
+
+// Moves implements [Mover]: its particles fly.
+func (Burst) Moves() bool { return true }
+
+// Moves implements [Mover], for its effect.
+func (e Stagger) Moves() bool { return e.Effect != nil && Moves(e.Effect) }
+
+// Moves implements [Mover], for its effect.
+func (e Delay) Moves() bool { return e.Effect != nil && Moves(e.Effect) }
+
+// Moves implements [Mover], for its effect.
+func (e Reverse) Moves() bool { return e.Effect != nil && Moves(e.Effect) }
+
+// Moves implements [Mover], for its effect.
+func (e Ease) Moves() bool { return e.Effect != nil && Moves(e.Effect) }
+
 // Func adapts a function to an [Effect].
 type Func func(s *canvas.Surface, t float64)
 

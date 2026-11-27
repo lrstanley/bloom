@@ -69,6 +69,18 @@ But Go can't compare functions, so bloom assumes a function effect changes every
 on screen. Effects behind pointers are treated the same way, since they can change in place. Prefer a struct for
 effects you keep.
 
+## Say whether it moves cells
+
+Under [reduced motion](/motion/animating-values#turn-motion-off), bloom fades a node in place of the effects that
+move its cells. An effect that moves them, by setting the surface's `Offset` or drawing cells somewhere else, says
+so with a `Moves` method, which makes it an [`fx.Mover`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Mover):
+
+```go
+func (Bounce) Moves() bool { return true }
+```
+
+A combinator that wraps another effect reports what that effect does, with `fx.Moves(e.Effect)`.
+
 ## What a surface offers
 
 [`canvas.Surface`](https://pkg.go.dev/bloomfx.dev/bloom/canvas#Surface) is the grid of cells an effect

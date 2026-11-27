@@ -20,6 +20,14 @@ From a corner, effects that sweep across a node (`Wipe`, `Decode`, `Blinds`, `Wa
 bottom side. The zero value is the effect's default: `Bottom`, unless the table says otherwise. `Seed` fields pick a
 random pattern that stays the same for the same seed.
 
+`Origin` fields take a spot to start from: `fx.At(p)`, a cell in frame coordinates, such as where a click was;
+`fx.Side(d)`, a side or corner of the node; or `fx.Middle`. The zero value is the effect's default, which the table
+gives.
+
+Effects that move cells (`Fly`, `Slide`, `Shake`, `Glitch`, `Unfold`, `Burst`, and the combinators wrapping them)
+report it with a `Moves` method. Under `anim.SetMotion(anim.Reduced)`, a node fades instead of running them; see
+[turning motion off](/motion/animating-values#turn-motion-off).
+
 The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/effects) loops every effect as a transition:
 
 ![The effects example: a gallery of effects entering and leaving on a loop](/demos/effects.webp)
@@ -29,14 +37,14 @@ The [effects example](https://github.com/lrstanley/bloom/tree/master/_examples/e
 | Effect | Fields | Brings a node in by |
 | --- | --- | --- |
 | [`Fade`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Fade) | | crossfading from what's beneath it |
-| [`Slide`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Slide) | `From Direction` | moving in from beyond a side or corner of its viewport |
+| [`Slide`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Slide) | `From Direction`, `Cells` | moving in from beyond a side or corner of its viewport, or from `Cells` away |
 | [`Wipe`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Wipe) | `From Direction` | revealing it from one side or corner to the opposite one |
 | [`Dissolve`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Dissolve) | `Seed` | revealing its cells in a random order |
 | [`Typewriter`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Typewriter) | | revealing its cells in reading order |
 | [`Scramble`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Scramble) | `Seed` | random glyphs settling into its own |
 | [`Decode`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Decode) | `From Direction` (default `Top`), `Seed` | columns falling into place like digital rain, or rows or diagonals from another side or corner |
 | [`Unfold`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Unfold) | | opening from its middle row outward, like a CRT turning on |
-| [`Iris`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Iris) | `At image.Point` | a circle growing from `At` (frame coordinates; zero is the node's center) |
+| [`Iris`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Iris) | `From Origin` | a circle growing from `From`, which may be off the node (zero is the node's middle) |
 | [`Shade`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Shade) | `Seed` | each cell stepping through ░ ▒ ▓ to its glyph |
 | [`Blinds`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Blinds) | `From Direction`, `Size int` (default 3) | opening slats, like window blinds; diagonal from a corner |
 | [`Wave`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Wave) | `From Direction` | a wobbling front sweeping across, with a bright crest |
@@ -94,7 +102,7 @@ These draw a slot or layer on its way to a new place, given to
 
 | Effect | Fields | Does |
 | --- | --- | --- |
-| [`Fly`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Fly) | `Seed` | flies the node's cells over from where it was, a column at a time, as bright glyphs arcing to where they land |
+| [`Fly`](https://pkg.go.dev/bloomfx.dev/bloom/fx#Fly) | `From Origin`, `Seed`, `Plain` | flies the node's cells over from where it was, or out of `From`, a column at a time, as bright glyphs arcing to where they land, or as themselves with `Plain` |
 
 ## Borders
 

@@ -1793,7 +1793,7 @@ func (r *Root) CopySelection() tea.Cmd {
 		return nil
 	}
 	var flash tea.Cmd
-	if r.copyFlash && anim.Motion() {
+	if r.copyFlash && anim.Animates() {
 		r.flash, r.flashAt = r.sel, r.now()
 		r.flash.dragging = false
 		if r.sel.held {
@@ -1826,7 +1826,7 @@ func (r *Root) flashFrame(msg tea.Msg) tea.Cmd {
 	if f, ok := msg.(flashMsg); !ok || f.root != r || !r.flash.ok {
 		return nil
 	}
-	if r.now().Sub(r.flashAt) >= flashFor || !anim.Motion() {
+	if r.now().Sub(r.flashAt) >= flashFor || !anim.Animates() {
 		r.flash = selection{}
 		return nil
 	}

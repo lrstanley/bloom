@@ -52,7 +52,8 @@ func New(now func() time.Time) *Tracker {
 }
 
 // Begin starts a w×h frame. When the size differs from the last frame's,
-// boxes snap to where they go rather than animating there.
+// boxes snap to where they go rather than animating there, as they glide
+// nowhere under reduced motion.
 func (m *Tracker) Begin(w, h int) {
 	size := image.Pt(w, h)
 	m.snap, m.size, m.running = size != m.size, size, false
@@ -131,7 +132,7 @@ func (m *Tracker) Rect(id string, opts []anim.Option, target image.Rectangle, or
 	s.at = image.Rectangle{Min: rel, Max: rel.Add(target.Size())}
 	for i, c := range coords {
 		v := &s.values[i]
-		if m.snap {
+		if m.snap || anim.Motion() == anim.Reduced {
 			v.Set(float64(c))
 		} else {
 			// Moving parents can change a child's target every frame. Sample its

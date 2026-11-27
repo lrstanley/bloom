@@ -194,7 +194,7 @@ func (v *Value) To(target float64) tea.Cmd {
 	if v.now == nil || target == v.target {
 		return nil
 	}
-	if !Motion() {
+	if !Animates() {
 		v.Set(target)
 		return nil
 	}
@@ -288,7 +288,7 @@ func (f *frames) frame() tea.Cmd {
 // advance moves the value to where it is at now, reporting whether it is
 // done. Callers put a value that is done on its target.
 func (v *Value) advance(now time.Time) bool {
-	if !Motion() {
+	if !Animates() {
 		return true
 	}
 	if !v.spring {

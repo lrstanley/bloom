@@ -11,15 +11,15 @@ import (
 
 // setMotion sets the motion until the test ends. Motion is global, so tests
 // using this do not call t.Parallel, and run while the ones that do wait.
-func setMotion(t *testing.T, on bool) {
+func setMotion(t *testing.T, l MotionLevel) {
 	t.Helper()
 	prev := Motion()
-	SetMotion(on)
+	SetMotion(l)
 	t.Cleanup(func() { SetMotion(prev) })
 }
 
 func TestMotionOffValue(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, Off)
 
 	for name, opt := range map[string]Option{"ease": Duration(time.Hour), "spring": Spring(9, 0.3)} {
 		v := NewValue(0, opt)
@@ -41,7 +41,7 @@ func TestMotionOffValue(t *testing.T) {
 }
 
 func TestMotionOffPresence(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, Off)
 
 	p := NewPresence(Spring(9, 0.3))
 	if cmd := p.Show(); cmd != nil || !p.Shown() || p.Progress() != 1 {
@@ -53,12 +53,12 @@ func TestMotionOffPresence(t *testing.T) {
 }
 
 func TestMotionOffFinishesRunning(t *testing.T) {
-	setMotion(t, true)
+	setMotion(t, Full)
 
 	c := &clock{now: time.Unix(0, 0)}
 	v := NewValue(0, Duration(time.Hour), Clock(c.Now))
 	v.To(10)
-	SetMotion(false)
+	SetMotion(Off)
 	if cmd := v.Update(v.frameMsg()); cmd != nil {
 		t.Fatal("asked for a frame after motion was turned off")
 	}
@@ -68,7 +68,7 @@ func TestMotionOffFinishesRunning(t *testing.T) {
 }
 
 func TestMotionOffSequence(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, Off)
 
 	c := &clock{now: time.Unix(0, 0)}
 
@@ -103,7 +103,7 @@ func TestMotionOffSequence(t *testing.T) {
 }
 
 func TestMotionOffSequenceDoesNotDrift(t *testing.T) {
-	setMotion(t, false)
+	setMotion(t, Off)
 
 	c := &clock{now: time.Unix(0, 0)}
 	s := NewSequence(0, To(1), Hold(time.Second), To(2), Hold(time.Second), To(3)).With(Clock(c.Now))
@@ -117,14 +117,14 @@ func TestMotionOffSequenceDoesNotDrift(t *testing.T) {
 }
 
 func TestMotionOffKeepsHoldAfterInterruptedStep(t *testing.T) {
-	setMotion(t, true)
+	setMotion(t, Full)
 
 	c := &clock{now: time.Unix(0, 0)}
 	s := NewSequence(0, To(1, Duration(10*time.Second)), Hold(time.Second), To(0)).With(Clock(c.Now))
 	s.Play()
 	c.advance(2 * time.Second)
 
-	SetMotion(false)
+	SetMotion(Off)
 	if cmd := s.Update(s.frameMsg()); cmd == nil || s.Step() != 1 || s.Float() != 1 {
 		t.Fatalf("step %d at %v, command %v", s.Step(), s.Float(), cmd != nil)
 	}
@@ -135,7 +135,7 @@ func TestMotionOffKeepsHoldAfterInterruptedStep(t *testing.T) {
 }
 
 func TestMotionOffEndsRunningLoop(t *testing.T) {
-	setMotion(t, true)
+	setMotion(t, Full)
 
 	c := &clock{now: time.Unix(0, 0)}
 	s := NewSequence(0, To(1, Duration(time.Second), Ease(Linear)), Hold(time.Second), To(0, Duration(time.Second), Ease(Linear))).With(Clock(c.Now))
@@ -144,13 +144,13 @@ func TestMotionOffEndsRunningLoop(t *testing.T) {
 	}
 	tick(c, &s, 500*time.Millisecond)
 
-	SetMotion(false)
+	SetMotion(Off)
 	if cmd := s.Update(s.frameMsg()); cmd != nil || s.Animating() || s.Float() != 0 {
 		t.Fatalf("at %v, animating %v, command %v", s.Float(), s.Animating(), cmd != nil)
 	}
 
 	// Once motion is back, the program can start it again.
-	SetMotion(true)
+	SetMotion(Full)
 	if s.Loop() == nil || !s.Animating() {
 		t.Fatal("loop did not restart")
 	}
