@@ -234,7 +234,7 @@ const (
 	// the pointer is held past its edge.
 	scrollEvery = 50 * time.Millisecond
 	// flashFor is how long the band [Root.CopySelection] sweeps takes.
-	flashFor = 450 * time.Millisecond
+	flashFor = 300 * time.Millisecond
 )
 
 // The ticks a Root sends itself while selecting.
