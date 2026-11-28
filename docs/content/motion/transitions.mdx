@@ -79,9 +79,9 @@ bloom.Layer(dialog).Presence(m.dialog, effects...)
 ## Let Root play a layer's entrance and exit
 
 A presence is state your model keeps and updates. For a layer that's simply drawn while it's open, such as a
-dialog or a menu, `Enter` and `Exit` let [`Root`](/bubble-tea/root) play its transitions instead: it notices by
-the layer's ID when the layer appears and when it's gone, so nothing in your model, or in the components the layer
-is made of, has to know it animates.
+dialog or a menu, `Enter` and `Exit` let [`Root`](https://pkg.go.dev/bloomfx.dev/bloom#Root) play its transitions
+instead: it notices by the layer's ID when the layer appears and when it's gone, so nothing in your model, or in the
+components the layer is made of, has to know it animates.
 
 ```go
 timing := []anim.Option{anim.Duration(300 * time.Millisecond), anim.Ease(anim.Linear)}
