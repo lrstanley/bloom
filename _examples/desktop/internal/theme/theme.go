@@ -124,7 +124,7 @@ func NewStyles(t *tint.Tint) Styles {
 
 		Paper:     f.Text(roles.Border),
 		Icon:      icon(f.Text(roles.Fg)),
-		IconHover: icon(f.Fill(roles.Hover)),
+		IconHover: icon(f.Fill(roles.Bg.Hover())),
 		IconOn:    icon(f.Fill(roles.Accent)),
 
 		Frame:   frame,
@@ -143,7 +143,7 @@ func NewStyles(t *tint.Tint) Styles {
 		Body:     body,
 		Faint:    win.Text(roles.Muted),
 		Row:      body,
-		RowHover: body.Background(win.Color(roles.Hover)),
+		RowHover: win.Fill(roles.Surface.Hover()),
 		RowOn:    rowOn,
 
 		Display:    f.Fill(roles.Sunken).Bold(true).Padding(0, 1),
@@ -151,7 +151,7 @@ func NewStyles(t *tint.Tint) Styles {
 		KeyOp:      key.Text(roles.Accent2),
 		KeyHover:   f.Fill(roles.Accent2),
 		KeyEq:      keyEq,
-		KeyEqHover: f.Fill(roles.Accent.Soft()).Bold(true),
+		KeyEqHover: f.Fill(roles.Accent.Hover()).Bold(true),
 
 		MenuItem:   menuItem.Width(MenuWidth),
 		MenuHover:  rowOn.Width(MenuWidth),
@@ -165,7 +165,7 @@ func NewStyles(t *tint.Tint) Styles {
 		Task:     button,
 		TaskOn:   rowOn,
 		TaskMin:  win.Text(roles.Muted),
-		TaskOver: button.Background(f.Color(roles.Overlay)),
+		TaskOver: f.Fill(roles.Raised.Hover()),
 		Status:   win.Text(roles.Muted),
 		Clock:    button,
 

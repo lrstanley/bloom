@@ -244,11 +244,11 @@ func (m *model) layers() []bloom.LayerNode {
 // button is a button labeled with its ID, which runs press when pressed. It
 // is highlighted while it has focus.
 func button(st *styles, focus *bloom.Focus, id bloom.ID, press func() tea.Cmd) bloom.Child {
-	s := st.button
+	s, hover := st.button, st.buttonHover
 	if focus.Is(id) {
-		s = st.buttonOn
+		s, hover = st.buttonOn, st.buttonOnHover
 	}
-	return bloom.Text(string(id)).Style(s).ID(id).Focusable().On(on.Press(press))
+	return bloom.Text(string(id)).Style(s).HoverStyle(hover).ID(id).Focusable().On(on.Press(press))
 }
 
 func main() {

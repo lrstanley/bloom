@@ -71,7 +71,7 @@ func newStyles(t *tint.Tint) styles {
 		heading:  f.Text(roles.Accent2).Bold(true).MarginTop(1),
 		item:     item,
 		picked:   f.Fill(roles.Accent).Bold(true).Padding(0, 1),
-		hovered:  f.Fill(roles.Hover).Padding(0, 1),
+		hovered:  f.Fill(roles.Bg.Hover()).Padding(0, 1),
 		label:    f.Text(roles.Muted),
 		value:    f.Text(roles.Fg),
 		muted:    f.Text(roles.Muted).Italic(true),

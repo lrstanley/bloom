@@ -55,11 +55,11 @@ func (b toolbar) Layout(bloom.Context) bloom.Child {
 
 // button is a button of the toolbar, an icon with a tooltip.
 func (b toolbar) button(t toolButton) bloom.Child {
-	st := b.st.tool
+	st, hover := b.st.tool, b.st.toolHover
 	if b.focus.Is(t.id) {
-		st = b.st.toolOn
+		st, hover = b.st.toolOn, b.st.toolOnHover
 	}
-	return bloom.Text(t.icon).Style(st).HoverStyle(b.st.toolHover).
+	return bloom.Text(t.icon).Style(st).HoverStyle(hover).
 		ID(t.id).Focusable().
 		On(on.Press(func() tea.Cmd { return b.press(t.id) })).
 		Tooltip(t.tip, t.opts...)

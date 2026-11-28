@@ -28,8 +28,8 @@ func (p panel) Layout(bloom.Context) bloom.Child {
 	return bloom.Box(p.st.card, bloom.Column(
 		bloom.Text("bloom · backdrops").Style(p.st.title),
 		bloom.Text(" ").Style(p.st.text),
-		p.st.tabs("Screen", screens, p.screen, p.st.selected, p.pickScreen),
-		p.st.tabs("Dialog", dialogs, p.backed, p.st.picked, p.pickDialog),
+		p.st.tabs("Screen", screens, p.screen, p.st.selected, p.st.selHover, p.pickScreen),
+		p.st.tabs("Dialog", dialogs, p.backed, p.st.picked, p.st.pickHov, p.pickDialog),
 		bloom.Text(" ").Style(p.st.text),
 		bloom.Text(screens[p.screen].about).Style(p.st.text),
 		bloom.Text(" ").Style(p.st.text),

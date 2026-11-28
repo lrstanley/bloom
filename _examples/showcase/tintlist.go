@@ -24,7 +24,7 @@ func (l tintList) Layout(bloom.Context) bloom.Child {
 	for i, t := range tints {
 		st, hover, name, mark := l.st.item, l.st.hovered, l.st.text, "  "
 		if i == l.current {
-			st, hover, name, mark = l.st.selected, l.st.selected, l.st.highlight, "▸ "
+			st, hover, name, mark = l.st.selected, l.st.selHover, l.st.current, "▸ "
 		}
 		row := []bloom.Child{bloom.Text(mark + t.DisplayName).Style(name), bloom.Space()}
 		for j := range l.st.dots[i] {

@@ -49,7 +49,9 @@ type styles struct {
 	item      lipgloss.Style
 	hovered   lipgloss.Style
 	selected  lipgloss.Style
+	selHover  lipgloss.Style // the selected row, under the pointer
 	highlight lipgloss.Style
+	current   lipgloss.Style // the current tint's name, on its selected row
 	toast     lipgloss.Style
 	tour      lipgloss.Style
 	status    [3]lipgloss.Style // by a service's status.
@@ -66,6 +68,9 @@ type styles struct {
 func newStyles(t *tint.Tint) styles {
 	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 	raised := f.On(roles.Raised) // the roles for drawing on the toast and the tour's note
+	// The roles for drawing on a selected row under the pointer, the fill
+	// text reads least on, so it reads on the row at rest too.
+	selected := f.On(roles.Bg.Selected().Hover())
 
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
 	bg := func(cs ...color.Color) []lipgloss.Style {
@@ -100,9 +105,11 @@ func newStyles(t *tint.Tint) styles {
 		title:     title,
 		grabbed:   f.Fill(roles.Accent).Bold(true).Padding(0, 1),
 		item:      item,
-		hovered:   item.Background(f.Color(roles.Hover)),
-		selected:  item.Background(f.Color(roles.Selection)),
+		hovered:   item.Background(f.Color(roles.Bg.Hover())),
+		selected:  item.Background(f.Color(roles.Bg.Selected())),
+		selHover:  item.Background(f.Color(roles.Bg.Selected().Hover())),
 		highlight: f.Text(roles.Accent).Bold(true),
+		current:   selected.Text(roles.Accent).Bold(true),
 		toast:     floating.Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Accent)),
 		tour:      floating.Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Info)),
 		status:    [3]lipgloss.Style{f.Text(roles.Success), f.Text(roles.Warning), f.Text(roles.Danger)},

@@ -257,11 +257,11 @@ func (m *model) row(s *selectField) bloom.Child {
 
 // button is a button labeled with its ID, which runs press when pressed.
 func (m *model) button(id bloom.ID, press func() tea.Cmd) bloom.Child {
-	st := m.st.button
+	st, hover := m.st.button, m.st.buttonHover
 	if m.focus.Is(id) {
-		st = m.st.buttonOn
+		st, hover = m.st.buttonOn, m.st.buttonOnHover
 	}
-	return bloom.Text(string(id)).Style(st).ID(id).Focusable().On(on.Press(press))
+	return bloom.Text(string(id)).Style(st).HoverStyle(hover).ID(id).Focusable().On(on.Press(press))
 }
 
 func main() {

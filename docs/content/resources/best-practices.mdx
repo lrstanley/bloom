@@ -104,23 +104,32 @@ them is a working reference.
 
   // Styles are the program's styles.
   type Styles struct {
-  	Tint     *tint.Tint // the tint the styles are made from
+  	Tint     *tint.Tint    // the tint the styles are made from
+  	Fit      *roles.Fitted // the tint's roles, which every color comes from
   	Panel    lipgloss.Style
   	Item     lipgloss.Style
+  	Hovered  lipgloss.Style
   	Selected lipgloss.Style
   }
 
   // NewStyles makes the program's styles from tint t.
   func NewStyles(t *tint.Tint) Styles {
-  	item := lipgloss.NewStyle().Padding(0, 1)
+  	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
   	return Styles{
   		Tint:     t,
-  		Panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.BrightBlack),
-  		Item:     item,
-  		Selected: item.Foreground(t.Bg).Background(t.Green),
+  		Fit:      f,
+  		Panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
+  		Item:     f.Text(roles.Fg).Padding(0, 1),
+  		Hovered:  f.Fill(roles.Bg.Hover()).Padding(0, 1),
+  		Selected: f.Fill(roles.Bg.Selected()).Padding(0, 1),
   	}
   }
   ```
+
+  bubbletint's [roles](https://pkg.go.dev/github.com/lrstanley/bubbletint/roles/v2) package works out what each
+  color is for, such as a border, a row under the pointer, or the selected row, from the tint, so the same styles
+  read on a dark tint, a light one, or one of a single hue. Text drawn on something other than the background, such
+  as a dialog, takes its colors from `f.On(roles.Raised)`, so it stays readable there.
 
   A small program with all of its components in `main` can keep the same thing unexported, as `styles` and
   `newStyles`, in a `styles.go` beside them.
@@ -153,9 +162,9 @@ them is a working reference.
   ```
 
   A component the model keeps but stops passing messages to, such as one whose window was closed, misses the change,
-  so set its styles again when it's put back. Give the root the theme's colors with `bloom.WithColors(t.Fg, t.Bg)`,
-  and when the theme changes, the new ones with `m.ui.SetColors(t.Fg, t.Bg)`, for the effects that blend toward
-  them. See [Colors and the terminal](/concepts/rendering#colors-and-the-terminal).
+  so set its styles again when it's put back. Give the root the theme's colors with
+  `bloom.WithColors(st.Fit.Color(roles.Fg), st.Fit.Color(roles.Bg))`, and when the theme changes, the new ones with
+  `m.ui.SetColors`, for the effects that blend toward them. See [Colors and the terminal](/concepts/rendering#colors-and-the-terminal).
 - **Let a component made each frame borrow the styles.** A small component built in `View` from the model's state,
   such as a status bar, lives for one frame, so it can hold a pointer to the model's styles rather than a copy. A
   styles struct with dozens of styles is many kilobytes, and copying it into each frame's tree would allocate it

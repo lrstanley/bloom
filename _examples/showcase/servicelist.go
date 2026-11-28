@@ -50,7 +50,7 @@ func (l *serviceList) Layout(bloom.Context) bloom.Child {
 	for i, s := range services {
 		st, hover := l.st.item, l.st.hovered
 		if i == l.selected {
-			st, hover = l.st.selected, l.st.selected
+			st, hover = l.st.selected, l.st.selHover
 		}
 		latency := fmt.Sprintf("%dms", s.ms)
 		if s.status == 2 {

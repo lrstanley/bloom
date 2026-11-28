@@ -28,6 +28,7 @@ type styles struct {
 	tool        lipgloss.Style
 	toolHover   lipgloss.Style
 	toolOn      lipgloss.Style
+	toolOnHover lipgloss.Style // the focused tool, under the pointer
 	statusBar   lipgloss.Style
 	statusMuted lipgloss.Style // the status line's hint, while tooltips float
 	hint        lipgloss.Style
@@ -61,8 +62,9 @@ func newStyles(t *tint.Tint) styles {
 		header:      f.Text(roles.Muted).Bold(true),
 		marker:      f.Text(roles.Accent).Bold(true),
 		tool:        tool,
-		toolHover:   f.Fill(roles.Hover).Padding(0, 1),
+		toolHover:   f.Fill(roles.Surface.Hover()).Padding(0, 1),
 		toolOn:      f.Fill(roles.Accent).Bold(true).Padding(0, 1),
+		toolOnHover: f.Fill(roles.Accent.Hover()).Bold(true).Padding(0, 1),
 		statusBar:   statusBar,
 		statusMuted: statusBar.Foreground(bar.Color(roles.Muted)),
 		hint:        statusBar.Foreground(bar.Color(roles.Muted)).Padding(0, 1, 0, 0),

@@ -45,9 +45,10 @@ func (c *confirm) key(k string) tea.Cmd {
 
 // Layer is the dialog, asking whether to restart service.
 func (c *confirm) Layer(service string) bloom.LayerNode {
-	restart, cancel := c.st.button, c.st.active
+	restart, restartHover := c.st.button, c.st.buttonHover
+	cancel, cancelHover := c.st.active, c.st.activeHover
 	if c.restart {
-		restart, cancel = c.st.active, c.st.button
+		restart, restartHover, cancel, cancelHover = cancel, cancelHover, restart, restartHover
 	}
 
 	body := bloom.Column(
@@ -55,8 +56,8 @@ func (c *confirm) Layer(service string) bloom.LayerNode {
 		bloom.Text("In-flight requests will be drained first.").Style(c.st.dialogText),
 		bloom.Fixed(1, nil),
 		bloom.Row(
-			bloom.Text("restart").Style(restart).On(on.Click(func() tea.Cmd { return c.close(true) })),
-			bloom.Text("cancel").Style(cancel).On(on.Click(func() tea.Cmd { return c.close(false) })),
+			bloom.Text("restart").Style(restart).HoverStyle(restartHover).On(on.Click(func() tea.Cmd { return c.close(true) })),
+			bloom.Text("cancel").Style(cancel).HoverStyle(cancelHover).On(on.Click(func() tea.Cmd { return c.close(false) })),
 		).Gap(2).Justify(flex.End),
 	)
 

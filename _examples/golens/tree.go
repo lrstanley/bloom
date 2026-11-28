@@ -312,11 +312,11 @@ func (w wireRun) Layout(ctx bloom.Context) bloom.Child {
 func (m *model) item(k, i int, f *fn) bloom.Child {
 	d := m.depth()
 	selected := k == d && i == m.path[d]
-	box, name := m.st.item, m.st.name
+	box, hover, name := m.st.item, m.st.itemHover, m.st.name
 	bar := " "
 	switch {
 	case selected:
-		box, name, bar = m.st.itemSel, m.st.nameSel, "▌"
+		box, hover, name, bar = m.st.itemSel, m.st.itemSelHover, m.st.nameSel, "▌"
 	case k < d && i == m.path[k]:
 		box, bar = m.st.itemPath, "▏"
 	case k > d:
@@ -347,7 +347,7 @@ func (m *model) item(k, i int, f *fn) bloom.Child {
 		bloom.Text(icon+" ").Style(iconSt),
 		bloom.Fill(bloom.Text(f.name).Style(name).Truncate()),
 		bloom.Text(" "+strings.Join(meta, " ")).Style(m.st.meta),
-	)).HoverStyle(m.st.itemHover).On(
+	)).HoverStyle(hover).On(
 		on.Click(func() tea.Cmd { return m.selectPath(path) }),
 		on.DoubleClick(m.openCode),
 	)

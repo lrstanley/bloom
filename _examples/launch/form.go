@@ -91,9 +91,9 @@ func (f *form) Layout(bloom.Context) bloom.Child {
 		field = bloom.Transition(f.shake.Float(), field, fx.Shake{Amount: 3, Times: 3})
 	}
 
-	btn := f.st.button
+	btn, hover := f.st.button, f.st.buttonHover
 	if f.focus.Is(buttonDeploy) {
-		btn = f.st.buttonOn
+		btn, hover = f.st.buttonOn, f.st.buttonOnHover
 	}
 	msg := bloom.Text(" ")
 	switch {
@@ -102,7 +102,7 @@ func (f *form) Layout(bloom.Context) bloom.Child {
 	case f.err != "":
 		msg = bloom.Text(f.err).Style(f.st.failure)
 	}
-	deploy := bloom.Text("deploy").Style(btn).ID(buttonDeploy).Focusable().On(on.Press(f.deploy))
+	deploy := bloom.Text("deploy").Style(btn).HoverStyle(hover).ID(buttonDeploy).Focusable().On(on.Press(f.deploy))
 
 	return bloom.Column(
 		bloom.Text("Deploy "+service+" to production").Style(f.st.heading),

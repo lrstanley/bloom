@@ -12,33 +12,18 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// Roles the example adds to bubbletint's: the focused field, and a neutral
-// button.
-var (
-	// fieldOn is the focused field: lifted from the other fields toward the
-	// text, so the one in use stands out.
-	fieldOn = roles.Define(roles.Spec{
-		Name: "field-on",
-		Kind: roles.KindSurface,
-		Derive: func(p *roles.Palette) tint.Color {
-			return p.Color(roles.Sunken).Mix(p.Color(roles.Fg), p.ByDark(0.16, 0.12))
-		},
-		Distinct: []roles.Role{roles.Sunken},
-		Fallback: roles.Fallback{Slots: []tint.Slot{tint.SlotBrightBlack}},
-	})
-	// control is a neutral button: well clear of the background it sits on,
-	// while its text still reads.
-	control = roles.Define(roles.Spec{
-		Name: "control",
-		Kind: roles.KindSurface,
-		Derive: func(p *roles.Palette) tint.Color {
-			fg := p.Color(roles.Fg)
-			return p.Color(roles.Bg).MixReadable(fg, fg, p.ByDark(0.3, 0.2), 4.5)
-		},
-		Distinct: []roles.Role{roles.Bg},
-		Fallback: roles.Fallback{Slots: []tint.Slot{tint.SlotBrightBlack}},
-	})
-)
+// fieldOn is the focused field, a role the example adds to bubbletint's:
+// lifted from the other fields toward the text, so the one in use stands
+// out.
+var fieldOn = roles.Define(roles.Spec{
+	Name: "field-on",
+	Kind: roles.KindSurface,
+	Derive: func(p *roles.Palette) tint.Color {
+		return p.Color(roles.Sunken).Mix(p.Color(roles.Fg), p.ByDark(0.16, 0.12))
+	},
+	Distinct: []roles.Role{roles.Sunken},
+	Fallback: roles.Fallback{Slots: []tint.Slot{tint.SlotBrightBlack}},
+})
 
 // styles are the example's colors and styles, all made from one bubbletint
 // tint by newStyles, so that nothing is a package global. The model keeps
@@ -48,17 +33,19 @@ var (
 type styles struct {
 	fit *roles.Fitted // the tint's roles, which the example's colors come from
 
-	heading  lipgloss.Style
-	text     lipgloss.Style
-	label    lipgloss.Style
-	panel    lipgloss.Style
-	dialog   lipgloss.Style
-	input    lipgloss.Style
-	inputOn  lipgloss.Style
-	button   lipgloss.Style
-	buttonOn lipgloss.Style
-	status   lipgloss.Style
-	backdrop fx.Dim
+	heading       lipgloss.Style
+	text          lipgloss.Style
+	label         lipgloss.Style
+	panel         lipgloss.Style
+	dialog        lipgloss.Style
+	input         lipgloss.Style
+	inputOn       lipgloss.Style
+	button        lipgloss.Style
+	buttonHover   lipgloss.Style
+	buttonOn      lipgloss.Style
+	buttonOnHover lipgloss.Style // the focused button, under the pointer
+	status        lipgloss.Style
+	backdrop      fx.Dim
 
 	// A list's border joins its field's sides, and the edge facing the
 	// field is left open: listBelow is a list that opens below its field,
@@ -77,24 +64,26 @@ func newStyles(t *tint.Tint) styles {
 	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 	overlay := f.On(roles.Overlay) // the roles for drawing on a list
 
-	button := f.Fill(control).Padding(0, 2)
+	button := f.Fill(roles.Control).Padding(0, 2)
 	list := overlay.Fill(roles.Overlay).Border(lipgloss.NormalBorder()).
 		BorderForeground(overlay.Color(roles.Accent)).BorderBackground(overlay.Color(roles.Overlay))
 	option := overlay.Fill(roles.Overlay).Padding(0, 1)
 	return styles{
 		fit: f,
 
-		heading:  f.Text(roles.Accent).Bold(true),
-		text:     f.Text(roles.Fg),
-		label:    f.Text(roles.Muted),
-		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)).Padding(1, 2),
-		dialog:   lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Accent)).Padding(1, 2),
-		input:    f.Fill(roles.Sunken).Padding(0, 1),
-		inputOn:  f.Fill(fieldOn).Padding(0, 1),
-		button:   button,
-		buttonOn: f.Fill(roles.Accent).Bold(true).Padding(0, 2),
-		status:   f.Text(roles.Muted),
-		backdrop: fx.Dim{Amount: 0.5},
+		heading:       f.Text(roles.Accent).Bold(true),
+		text:          f.Text(roles.Fg),
+		label:         f.Text(roles.Muted),
+		panel:         lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)).Padding(1, 2),
+		dialog:        lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Accent)).Padding(1, 2),
+		input:         f.Fill(roles.Sunken).Padding(0, 1),
+		inputOn:       f.Fill(fieldOn).Padding(0, 1),
+		button:        button,
+		buttonHover:   f.Fill(roles.Control.Hover()).Padding(0, 2),
+		buttonOn:      f.Fill(roles.Accent).Bold(true).Padding(0, 2),
+		buttonOnHover: f.Fill(roles.Accent.Hover()).Bold(true).Padding(0, 2),
+		status:        f.Text(roles.Muted),
+		backdrop:      fx.Dim{Amount: 0.5},
 
 		listBelow:    list.BorderTop(false),
 		listAbove:    list.BorderBottom(false),

@@ -29,7 +29,9 @@ type styles struct {
 	label    lipgloss.Style // the name before a row of tabs
 	item     lipgloss.Style // a tab
 	selected lipgloss.Style // the screen's backdrop, in its tabs
+	selHover lipgloss.Style // the screen's backdrop, under the pointer
 	picked   lipgloss.Style // the dialog's backdrop, in its tabs
+	pickHov  lipgloss.Style // the dialog's backdrop, under the pointer
 	hover    lipgloss.Style // a tab under the pointer
 	status   lipgloss.Style // the line of keys at the bottom
 
@@ -60,8 +62,10 @@ func newStyles(t *tint.Tint) styles {
 		label:    dim.Width(8),
 		item:     item,
 		selected: panel.Fill(roles.Accent2).Bold(true).Padding(0, 1),
+		selHover: panel.Fill(roles.Accent2.Hover()).Bold(true).Padding(0, 1),
 		picked:   panel.Fill(roles.Accent).Bold(true).Padding(0, 1),
-		hover:    item.Background(panel.Color(roles.Hover)),
+		pickHov:  panel.Fill(roles.Accent.Hover()).Bold(true).Padding(0, 1),
+		hover:    item.Background(panel.Color(roles.Surface.Hover())),
 		status:   f.Text(roles.Muted),
 
 		dialog:      onDialog.Border(lipgloss.RoundedBorder()).BorderForeground(raised.Color(roles.Accent)).BorderBackground(raised.Color(roles.Raised)).Padding(1, 4),
@@ -72,16 +76,16 @@ func newStyles(t *tint.Tint) styles {
 }
 
 // tabs is a row of clickable backdrop names after name, with current drawn
-// in style.
-func (st *styles) tabs(name string, list []backdrop, current int, style lipgloss.Style, pick func(i int) tea.Cmd) bloom.Child {
+// in style, and in hover under the pointer.
+func (st *styles) tabs(name string, list []backdrop, current int, style, hover lipgloss.Style, pick func(i int) tea.Cmd) bloom.Child {
 	items := make([]bloom.Child, 0, len(list)+1)
 	items = append(items, bloom.Text(name).Style(st.label))
 	for i, d := range list {
-		s := st.item
+		s, h := st.item, st.hover
 		if i == current {
-			s = style
+			s, h = style, hover
 		}
-		items = append(items, bloom.Text(d.name).Style(s).HoverStyle(st.hover).On(on.Click(func() tea.Cmd { return pick(i) })))
+		items = append(items, bloom.Text(d.name).Style(s).HoverStyle(h).On(on.Click(func() tea.Cmd { return pick(i) })))
 	}
 	return bloom.Row(items...).Gap(1)
 }

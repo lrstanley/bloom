@@ -56,7 +56,7 @@ func newStyles(t *tint.Tint) styles {
 		caret:     value.Reverse(true),
 		status:    status,
 		message:   f.Text(roles.Fg),
-		selection: lipgloss.NewStyle().Background(f.Color(roles.Selection)),
+		selection: lipgloss.NewStyle().Background(f.Color(roles.Bg.Selected())),
 		dialog: raised.Fill(roles.Raised).Border(lipgloss.RoundedBorder()).
 			BorderForeground(raised.Color(roles.Accent)).Padding(1, 2),
 		dialogTitle: raised.Text(roles.Accent).Bold(true),

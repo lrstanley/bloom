@@ -34,7 +34,7 @@ func newStyles(t *tint.Tint) styles {
 		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
 		heading:  f.Text(roles.Accent).Bold(true),
 		item:     f.Text(roles.Fg).Padding(0, 1),
-		selected: f.Fill(roles.Selection).Padding(0, 1),
+		selected: f.Fill(roles.Bg.Selected()).Padding(0, 1),
 		marker:   f.Text(roles.Accent2).Bold(true),
 	}
 }

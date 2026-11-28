@@ -23,9 +23,9 @@ var trail = roles.Define(roles.Spec{
 	Name: "trail",
 	Kind: roles.KindSurface,
 	Derive: func(p *roles.Palette) tint.Color {
-		return p.Color(roles.Surface).Mix(p.Color(roles.Hover), 0.6)
+		return p.Color(roles.Surface).Mix(p.Color(roles.Surface.Hover()), 0.6)
 	},
-	Distinct: []roles.Role{roles.Surface, roles.Hover},
+	Distinct: []roles.Role{roles.Surface},
 })
 
 // styles are the example's colors and styles, all made from one bubbletint
@@ -45,6 +45,7 @@ type styles struct {
 	item         lipgloss.Style
 	itemPath     lipgloss.Style
 	itemSel      lipgloss.Style
+	itemSelHover lipgloss.Style
 	itemPreview  lipgloss.Style
 	itemHover    lipgloss.Style
 	bar          lipgloss.Style
@@ -105,6 +106,10 @@ type paintKey struct {
 func newStyles(t *tint.Tint) styles {
 	f := roles.Derive(t).Fit(roles.Target{Profile: colorprofile.TrueColor})
 	raised := f.On(roles.Raised) // the roles for drawing on a dialog
+	// The tree and the code view's lists sit on panels, and search's results
+	// on its dialog, so each row's highlight steps off the surface it's on.
+	panelSel, panelHover := roles.Surface.Selected(), roles.Surface.Hover()
+	dialogSel, dialogHover := roles.Raised.Selected(), roles.Raised.Hover()
 	c := f.Color
 
 	// A function in the tree past the selected one is drawn on a fill half
@@ -117,11 +122,11 @@ func newStyles(t *tint.Tint) styles {
 		panic(err)
 	}
 
-	onSel := f.On(roles.Selection).Color(roles.Fg) // text on the selected row
+	onSel := f.On(panelSel).Color(roles.Fg) // text on the selected row
 	item := f.Fill(roles.Surface).PaddingRight(1)
 	panel := f.Fill(roles.Surface).Padding(0, 1)
-	row := f.Text(roles.Fg).Padding(0, 1)
-	rowSel := f.Fill(roles.Selection).Padding(0, 1)
+	row := f.On(roles.Surface).Text(roles.Fg).Padding(0, 1)
+	rowSel := f.Fill(panelSel).Padding(0, 1)
 	rowSelBlur := row.Background(c(trail))
 	return styles{
 		fit: f,
@@ -134,9 +139,10 @@ func newStyles(t *tint.Tint) styles {
 
 		item:         item,
 		itemPath:     item.Background(c(trail)),
-		itemSel:      item.Background(c(roles.Selection)),
+		itemSel:      item.Background(c(panelSel)),
+		itemSelHover: item.Background(c(panelSel.Hover())),
 		itemPreview:  item.Background(preview),
-		itemHover:    item.Background(c(roles.Hover)),
+		itemHover:    item.Background(c(panelHover)),
 		bar:          f.Text(roles.Accent),
 		name:         f.Text(roles.Fg),
 		nameSel:      lipgloss.NewStyle().Foreground(onSel).Bold(true),
@@ -162,13 +168,13 @@ func newStyles(t *tint.Tint) styles {
 		lineNoMarked: f.Text(roles.Accent),
 
 		callsPanel:      panel.Padding(0),
-		rowHover:        row.Background(c(roles.Hover)),
-		rowSelHover:     rowSel.Background(c(roles.Hover)),
-		rowSelBlurHover: rowSelBlur.Background(c(roles.Hover)),
-		result:          row.Padding(0),
-		resultSel:       rowSel.Padding(0),
-		resultHover:     row.Padding(0).Background(c(roles.Hover)),
-		resultSelHover:  rowSel.Padding(0).Background(c(roles.Hover)),
+		rowHover:        f.Fill(panelHover).Padding(0, 1),
+		rowSelHover:     f.Fill(panelSel.Hover()).Padding(0, 1),
+		rowSelBlurHover: f.Fill(trail.Hover()).Padding(0, 1),
+		result:          raised.Text(roles.Fg),
+		resultSel:       raised.Fill(dialogSel),
+		resultHover:     raised.Fill(dialogHover),
+		resultSelHover:  raised.Fill(dialogSel.Hover()),
 
 		codeStyle: codeStyle,
 		painted:   make(map[paintKey]string),

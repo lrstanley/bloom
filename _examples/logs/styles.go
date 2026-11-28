@@ -62,7 +62,7 @@ func newStyles(t *tint.Tint) styles {
 		barHover: bloom.ScrollbarStyle{ThumbStyle: f.Text(roles.Accent)},
 		match:    f.Fill(roles.Yellow),
 		current:  f.Fill(roles.Accent).Bold(true),
-		focused:  lipgloss.NewStyle().Background(f.Color(roles.Selection)),
+		focused:  lipgloss.NewStyle().Background(f.Color(roles.Bg.Selected())),
 		stamp:    sgr(muted),
 		levels: map[string]string{
 			info:  sgr(f.Text(roles.Info)),

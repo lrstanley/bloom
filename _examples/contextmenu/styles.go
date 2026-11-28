@@ -23,6 +23,7 @@ type styles struct {
 	item     lipgloss.Style // a file
 	hovered  lipgloss.Style // a file under the pointer
 	selected lipgloss.Style // the selected file
+	selHover lipgloss.Style // the selected file, under the pointer
 	status   lipgloss.Style // the status line
 
 	menuItem        lipgloss.Style // an item of a menu
@@ -47,8 +48,9 @@ func newStyles(t *tint.Tint) styles {
 		fit:      f,
 		panel:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border)),
 		item:     f.Text(roles.Fg).Padding(0, 1),
-		hovered:  f.Fill(roles.Hover).Padding(0, 1),
-		selected: f.Fill(roles.Selection).Bold(true).Padding(0, 1),
+		hovered:  f.Fill(roles.Bg.Hover()).Padding(0, 1),
+		selected: f.Fill(roles.Bg.Selected()).Bold(true).Padding(0, 1),
+		selHover: f.Fill(roles.Bg.Selected().Hover()).Bold(true).Padding(0, 1),
 		status:   f.Text(roles.Muted),
 
 		menuItem:        menuItem,

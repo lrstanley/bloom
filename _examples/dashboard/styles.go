@@ -12,19 +12,6 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-// control is a dialog's button: a role the example adds to bubbletint's,
-// well clear of the dialog it sits on, while its text still reads.
-var control = roles.Define(roles.Spec{
-	Name: "control",
-	Kind: roles.KindSurface,
-	Derive: func(p *roles.Palette) tint.Color {
-		fg := p.Color(roles.Fg)
-		return p.Color(roles.Raised).MixReadable(fg, fg, p.ByDark(0.22, 0.17), 4.5)
-	},
-	Distinct: []roles.Role{roles.Raised},
-	Fallback: roles.Fallback{Slots: []tint.Slot{tint.SlotBrightBlack}},
-})
-
 // styles are the example's colors and styles, all made from one bubbletint
 // tint by newStyles, so that nothing is a package global. The model keeps
 // them, and gives a copy to each component it keeps. A component built
@@ -49,7 +36,9 @@ type styles struct {
 	dialogTitle lipgloss.Style
 	dialogText  lipgloss.Style
 	button      lipgloss.Style
+	buttonHover lipgloss.Style
 	active      lipgloss.Style
+	activeHover lipgloss.Style
 	toast       lipgloss.Style
 
 	// The escape sequences that start the table's dim and green text. The
@@ -88,8 +77,10 @@ func newStyles(t *tint.Tint) styles {
 		dialog:      onPanel.Border(lipgloss.ThickBorder()).BorderForeground(raised.Color(roles.Warning)).Padding(1, 2),
 		dialogTitle: onPanel.Bold(true),
 		dialogText:  raised.Text(roles.Muted),
-		button:      raised.Fill(control).Padding(0, 2),
+		button:      raised.Fill(roles.Control).Padding(0, 2),
+		buttonHover: raised.Fill(roles.Control.Hover()).Padding(0, 2),
 		active:      raised.Fill(roles.Warning).Bold(true).Padding(0, 2),
+		activeHover: raised.Fill(roles.Warning.Hover()).Bold(true).Padding(0, 2),
 		toast:       onPanel.Border(lipgloss.RoundedBorder()).BorderForeground(raised.Color(roles.Success)).Padding(0, 1),
 
 		tableDim:  ansi.NewStyle().ForegroundColor(f.Color(roles.Muted)).String(),

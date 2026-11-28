@@ -16,9 +16,9 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/ultraviolet v0.0.0-20261125122737-8ed499892fb4
 	github.com/charmbracelet/x/ansi v0.12.0
-	github.com/lrstanley/bubbletint/chromatint/v2 v2.2.0-alpha.2
-	github.com/lrstanley/bubbletint/roles/v2 v2.2.0-alpha.2
-	github.com/lrstanley/bubbletint/v2 v2.2.0-alpha.2
+	github.com/lrstanley/bubbletint/chromatint/v2 v2.2.0-alpha.5
+	github.com/lrstanley/bubbletint/roles/v2 v2.2.0-alpha.5
+	github.com/lrstanley/bubbletint/v2 v2.2.0-alpha.5
 	golang.org/x/tools v0.53.0
 )
 

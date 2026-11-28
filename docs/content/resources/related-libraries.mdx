@@ -11,19 +11,27 @@ bloom covers layout, layering, input routing, and motion. These libraries cover 
 
 [bubbletint](https://github.com/lrstanley/bubbletint) gives you hundreds of ready-made terminal color themes, such as
 Dracula, Catppuccin, Nord, and Rosé Pine, as Go values, and can switch between them at runtime or follow the theme
-of the terminal your program runs in. Its colors are standard `color.Color` values, so they work directly in Lip
-Gloss styles and bloom effects:
+of the terminal your program runs in. Its roles package works out what each color is for, such as muted text, a
+dialog, or the row under the pointer, from any tint, dark or light. Its colors are standard `color.Color` values, so
+they work directly in Lip Gloss styles and bloom effects:
 
 ```go
-import tint "github.com/lrstanley/bubbletint/v2"
+import (
+	"github.com/charmbracelet/colorprofile"
+	"github.com/lrstanley/bubbletint/roles/v2"
+	tint "github.com/lrstanley/bubbletint/v2"
+)
 
-theme := tint.TintRosePine
+f := roles.Derive(tint.TintRosePine).Fit(roles.Target{Profile: colorprofile.TrueColor})
 
-panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(theme.BrightBlack)
-backdrop := fx.Recolor{Fg: theme.BrightBlack, Bg: theme.Bg}
+panel := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(f.Color(roles.Border))
+hovered := f.Fill(roles.Bg.Hover())
+dialog := f.Fill(roles.Raised)
+note := f.On(roles.Raised).Text(roles.Muted) // muted text, kept readable on the dialog
+backdrop := fx.Recolor{Fg: f.Color(roles.Border), Bg: f.Color(roles.Sunken)}
 
 // Effects that blend toward the terminal's colors start from the theme's.
-ui := bloom.New(bloom.WithColors(theme.Fg, theme.Bg))
+ui := bloom.New(bloom.WithColors(f.Color(roles.Fg), f.Color(roles.Bg)))
 ```
 
 Browse the themes at [lrstanley.github.io/bubbletint](https://lrstanley.github.io/bubbletint/).

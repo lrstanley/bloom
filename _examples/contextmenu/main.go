@@ -140,7 +140,7 @@ func (m *model) layout() bloom.Child {
 	for i, f := range m.files {
 		st, hover := m.st.item, m.st.hovered
 		if i == m.selected {
-			st, hover = m.st.selected, m.st.selected
+			st, hover = m.st.selected, m.st.selHover
 		}
 		label := fmt.Sprintf("%-20s %8s", f.name, f.size)
 		rows = append(rows, bloom.Text(label).Style(st).HoverStyle(hover).On(

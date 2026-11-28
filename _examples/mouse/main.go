@@ -110,7 +110,7 @@ func (m *model) fileList() bloom.Child {
 	for i, f := range files {
 		st, hover := m.st.item, m.st.hovered
 		if i == m.selected {
-			st, hover = m.st.selected, m.st.selected
+			st, hover = m.st.selected, m.st.selHover
 		}
 		rows = append(rows, bloom.Text(f).Style(st).HoverStyle(hover).On(
 			on.Click(func() tea.Cmd {
